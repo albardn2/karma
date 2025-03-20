@@ -1,0 +1,5 @@
+from app.repositories.google_sheets_repository import GoogleSheetRepository
+from app.repositories.google_sheets_repository import TableSheets
+
+#singleton
+google_sheet_repository = GoogleSheetRepository()

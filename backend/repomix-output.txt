@@ -1,0 +1,182 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+
+Additional Info:
+----------------
+
+================================================================
+Directory Structure
+================================================================
+app/
+  common/
+    errors.py
+  domains/
+    analytics/
+      __init__.py
+      routes.py
+  __init__.py
+  config.py
+  extensions.py
+pyproject.toml
+run.py
+
+================================================================
+Files
+================================================================
+
+================
+File: app/common/errors.py
+================
+# app/core/errors.py
+from flask import jsonify
+
+def register_error_handlers(app):
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({'error': 'Not found'}), 404
+
+    @app.errorhandler(500)
+    def server_error(error):
+        return jsonify({'error': 'Internal server error'}), 500
+
+================
+File: app/domains/analytics/__init__.py
+================
+# app/domains/hello/__init__.py
+from flask import Blueprint
+
+analytics_blueprint = Blueprint('analytics', __name__)
+
+# Import routes so they are registered with the blueprint
+from . import routes
+
+================
+File: app/domains/analytics/routes.py
+================
+# app/domains/hello/routes.py
+from flask import jsonify
+
+from app.domains.analytics import analytics_blueprint
+
+@analytics_blueprint.route('/', methods=['GET'])
+def hello_world():
+    return jsonify({'message': 'Hello World'})
+
+
+
+@analytics_blueprint.route('/', methods=['GET'])
+def get_account_balances():
+    return jsonify({'message': 'Hello World'})
+
+================
+File: app/__init__.py
+================
+# app/__init__.py
+from flask import Flask
+
+from app.common.errors import register_error_handlers
+from app.config import Config
+from app.domains.analytics import analytics_blueprint
+
+
+def create_app(config_object=Config):
+    app = Flask(__name__)
+    app.config.from_object(config_object)
+
+    # Register blueprints
+    app.register_blueprint(analytics_blueprint, url_prefix='/hello')
+
+    # Register error handlers
+    register_error_handlers(app)
+
+    return app
+
+================
+File: app/config.py
+================
+# app/config.py
+class Config:
+    DEBUG = True
+    SECRET_KEY = 'your-secret-key'
+
+================
+File: app/extensions.py
+================
+# app/extensions.py
+# (For now, this file is empty. You can initialize and configure extensions here later.)
+
+================
+File: pyproject.toml
+================
+[project]
+name = "backend"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "zaid",email = "zaid.al-bardan@tomtom.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "flask (>=3.1.0,<3.2.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+================
+File: run.py
+================
+# run.py
+from app import create_app
+
+app = create_app()
+
+if __name__ == '__main__':
+    app.run()
+
+
+
+================================================================
+End of Codebase
+================================================================

@@ -1,0 +1,1900 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+
+Additional Info:
+----------------
+
+================================================================
+Directory Structure
+================================================================
+assets/
+  css/
+    style.css
+backend/
+  app/
+    common/
+      errors.py
+    domains/
+      analytics/
+        __init__.py
+        chart_interfaces.py
+        routes.py
+      financials/
+        __init__.py
+        domain.py
+        routes.py
+    repositories/
+      google_sheets_repository.py
+    __init__.py
+    config.py
+    extensions.py
+  .env
+  pyproject.toml
+  run.py
+pages/
+  analytics/
+    charts.html
+    index.html
+    tables.html
+  home/
+    home.js
+    index.html
+.repomixignore
+main.js
+package.json
+README
+repomix.config.json
+
+================================================================
+Files
+================================================================
+
+================
+File: assets/css/style.css
+================
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+    color: #333;
+}
+
+/* Toggle Button */
+.toggle-btn {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: #333;
+    color: #fff;
+    border: none;
+    padding: 10px 15px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    z-index: 1000;
+    border-radius: 5px;
+    transition: background 0.3s ease;
+}
+
+.toggle-btn:hover {
+    background: #555;
+}
+
+/* Sidebar */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: -250px;
+    width: 250px;
+    height: 100%;
+    background: #333;
+    color: #fff;
+    transition: left 0.3s ease;
+    padding-top: 60px;
+    z-index: 900;
+}
+
+.sidebar.open {
+    left: 0;
+}
+
+.sidebar ul {
+    list-style: none;
+}
+
+.sidebar ul li {
+    padding: 15px 20px;
+    border-bottom: 1px solid #444;
+}
+
+.sidebar ul li a {
+    color: #fff;
+    text-decoration: none;
+}
+
+/* Header (Logo Section) */
+.header {
+    width: 100%;
+    height: 150px; /* Adjust as needed */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    position: relative;
+    z-index: 2;
+}
+
+.logo img {
+    max-width: 200px;  /* Limit logo width to 200px */
+    height: auto;
+    transition: transform 0.3s ease;
+}
+
+.logo img:hover {
+    transform: scale(1.1);
+}
+
+/* Video Section */
+.video-section {
+    position: relative;
+    width: 100%;
+    /* Calculate height as full viewport minus header and footer heights */
+    height: calc(100vh - 150px - 50px); /* Adjust footer height if needed */
+    overflow: hidden;
+    background: #000; /* Fallback color in case video doesn't load */
+}
+
+.section-bg-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+}
+
+/* Footer */
+.footer {
+    height: 50px; /* Adjust as needed */
+    width: 100%;
+    background: #333;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    bottom: 0;
+    z-index: 2;
+}
+
+/* Simple fadeIn animation */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Breadcrumb Toolbar */
+.breadcrumb {
+    margin: 10px 20px;
+    font-size: 14px;
+    color: #333;
+}
+
+.breadcrumb a {
+    color: #333;
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.breadcrumb span {
+    margin: 0 5px;
+}
+
+================
+File: backend/app/common/errors.py
+================
+# app/core/errors.py
+from flask import jsonify
+
+def register_error_handlers(app):
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({'error': 'Not found'}), 404
+
+    @app.errorhandler(500)
+    def server_error(error):
+        return jsonify({'error': 'Internal server error'}), 500
+
+================
+File: backend/app/domains/analytics/__init__.py
+================
+# app/domains/hello/__init__.py
+from flask import Blueprint
+
+analytics_blueprint = Blueprint('analytics', __name__)
+
+# Import routes so they are registered with the blueprint
+from . import routes
+
+================
+File: backend/app/domains/analytics/chart_interfaces.py
+================
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+from typing import List, Optional, Union
+
+# Common base model for all charts
+class ChartBase(BaseModel):
+    title: str
+    chart_type: str  # This field can be used as a discriminator in your front end
+
+# Data model for a bar chart
+class BarChartData(BaseModel):
+    labels: List[Union[str, int, float, datetime]]
+    values: List[float]
+    background_colors: Optional[List[str]] = None
+    border_colors: Optional[List[str]] = None
+
+class BarChart(ChartBase):
+    chart_type: str = "bar"
+    data: BarChartData
+
+# Data model for a line chart
+class LineChartData(BaseModel):
+    # labels list of strings, integers, or dates
+    labels: List[Union[str, int, float, datetime]]
+    values: List[float]
+    line_color: Optional[str] = None
+    fill: Optional[bool] = False
+
+class LineChart(ChartBase):
+    chart_type: str = "line"
+    data: LineChartData
+
+# Data model for a pie chart
+class PieChartData(BaseModel):
+    labels: List[Union[str, int, float, datetime]]
+    values: List[float]
+    colors: Optional[List[str]] = None
+
+class PieChart(ChartBase):
+    chart_type: str = "pie"
+    data: PieChartData
+
+# Data model for a simple number chart
+class NumberChartData(BaseModel):
+    value: float
+    unit: Optional[str] = None  # e.g., %, $, etc.
+    # You could add an optional description or formatting options if needed
+
+class NumberChart(ChartBase):
+    chart_type: str = "number"
+    data: NumberChartData
+
+# Union type that can be used if your endpoint returns multiple types of charts
+Chart = Union[BarChart, LineChart, PieChart, NumberChart]
+
+================
+File: backend/app/domains/analytics/routes.py
+================
+# app/domains/hello/routes.py
+from flask import Blueprint, request, jsonify
+from app.repositories.google_sheets_repository import GoogleSheetRepository
+from app.repositories.google_sheets_repository import TableSheets
+from app.domains.analytics import analytics_blueprint
+from app.domains.financials.domain import FinancialsDomain
+from app.domains.analytics.chart_interfaces import Chart, BarChart, BarChartData, LineChart, LineChartData, PieChart, PieChartData, NumberChart
+
+from app.domains.analytics.chart_interfaces import NumberChartData
+
+
+@analytics_blueprint.route('/account-balance', methods=['GET'])
+def get_account_balances_chart():
+
+    # request param account id
+    account_id = request.args.get('account_id')
+    if not account_id:
+        return jsonify({'message': 'Account ID is required'}), 400
+
+    financials_domain = FinancialsDomain()
+    account_balance = financials_domain.get_account_balance(account_id=account_id)
+
+    # number chart
+    chart = NumberChart(
+        title="Account Balance",
+        data=NumberChartData(value=account_balance)
+    )
+    return jsonify(chart.dict())
+
+
+@analytics_blueprint.route('/account-balance-timeseries', methods=['GET'])
+def get_account_balances_timeseries_chart():
+
+    # request param account id
+    account_id = request.args.get('account_id')
+    if not account_id:
+        return jsonify({'message': 'Account ID is required'}), 400
+
+    financials_domain = FinancialsDomain()
+    account_balances_timeseries = financials_domain.generate_balance_cumulitive_sum(account_id=account_id)
+    # returns tuple(balance, date)
+
+    # line chart
+    chart = LineChart(
+        title="Account Balance Over Time",
+        data=LineChartData(
+            labels=[date for _, date in account_balances_timeseries],
+            values=[balance for balance, _ in account_balances_timeseries]
+        )
+    )
+    return jsonify(chart.dict())
+
+
+
+# @analytics_blueprint.route('/account-balance-time-grouped-chart', methods=['GET'])
+# def get_account_balances_timeseries_chart():
+#     return jsonify({'message': 'Hello World'})
+
+================
+File: backend/app/domains/financials/__init__.py
+================
+# app/domains/hello/__init__.py
+from flask import Blueprint
+
+financials_blueprint = Blueprint('financials', __name__)
+
+# Import routes so they are registered with the blueprint
+from . import routes
+
+================
+File: backend/app/domains/financials/domain.py
+================
+from datetime import datetime
+from enum import Enum
+from typing import Optional, Tuple, List
+import pandas as pd
+from app.repositories.google_sheets_repository import GoogleSheetRepository
+from app.repositories.google_sheets_repository import TableSheets
+from pydantic import BaseModel
+
+
+
+
+class AccountBalanceEvent(BaseModel):
+    event_date: str
+    event_type: str # str tied to enum
+    amount: float
+    metadata: dict = {}
+
+class EventType(Enum):
+    PURCHASE = 'purchase'
+    TRANSFER = 'transfer'
+    SALARY = 'salary'
+    PRODUCTION_PURCHASE = 'production_purchase'
+    PAYMENT = 'payment'
+    INVOICE = 'invoice'
+    EXPENSE = 'expense'
+
+
+class FinancialsDomain:
+
+    #HACK
+    MAIN_ACCOUNT = 'acc_pcg9l_00000003'
+
+    def __init__(self):
+        self.google_sheet_repository = GoogleSheetRepository()
+
+
+    def get_account_balance(self, account_id: str, starting_balance: tuple[float, datetime] = None):
+        cumsum = self.generate_balance_cumulitive_sum(account_id, starting_balance)
+        return cumsum[-1][0]
+
+    def generate_balance_cumulitive_sum(
+            self,
+            account_id: str,
+            start: Optional[Tuple[float, datetime]] = None
+    ) -> List[Tuple[float, datetime]]:
+        """
+        Generate a time series of cumulative balances from a DataFrame of events.
+
+        Parameters:
+            events (pd.DataFrame): DataFrame with at least two columns:
+                - 'date': the timestamp of the event (datetime-compatible string or object)
+                - 'amount': the amount to add (or subtract) from the balance.
+            start (Optional[Tuple[float, datetime]]): A tuple containing the starting balance and date.
+                If provided, this tuple is the first entry in the resulting time series.
+                If not provided, the starting balance defaults to 0.
+
+        Returns:
+            List[Tuple[float, datetime]]: A list of tuples, each representing (balance, date) in chronological order.
+            :param start:
+            :param account_id:
+        """
+        # Ensure the 'date' column is converted to native Python datetime objects
+        events = self.get_account_events(account_id)
+        events = events.copy()
+        events['event_date'] = pd.to_datetime(events['event_date']).dt.to_pydatetime()
+
+        # Sort events by date
+        events_sorted = events.sort_values(by='event_date')
+
+        # Initialize the time series list and starting balance
+        time_series: List[Tuple[float, datetime]] = []
+
+        if start is not None:
+            balance, start_date = start
+            time_series.append((balance, start_date))
+        else:
+            balance = 0.0
+
+        # Process each event to update the balance and record the timestamp
+        for _, row in events_sorted.iterrows():
+            event_date = row['event_date']
+            amount = row['amount']
+            balance += amount
+            time_series.append((balance, event_date))
+
+        return time_series
+
+    def get_account_events(self, account_id: str):
+        # Load dataframes from the google sheet repository
+        accounts = self.google_sheet_repository.get_all(TableSheets.ACCOUNTS)
+        transfers = self.google_sheet_repository.get_all(TableSheets.TRANSFERS)
+        purchases = self.google_sheet_repository.get_all(TableSheets.PURCHASES)
+        salaries = self.google_sheet_repository.get_all(TableSheets.SALARIES)
+        production_purchases = self.google_sheet_repository.get_all(TableSheets.PRODUCTION_PURCHASES)
+        payments = self.google_sheet_repository.get_all(TableSheets.PAYMENTS)
+        expenses = self.google_sheet_repository.get_all(TableSheets.EXPENSES)
+
+        # return salaries
+
+        # Create an empty DataFrame with the needed columns
+        events_df = pd.DataFrame(columns=['event_date', 'event_type', 'amount', 'metadata'])
+
+        # Process non-transfer events only for the main account
+        if account_id == self.MAIN_ACCOUNT:
+            # Process purchases: Timestamp -> event_date, total_price -> amount
+            if not purchases.empty:
+                df = purchases[['Timestamp', 'total_price']].copy()
+                df['event_date'] = df['Timestamp']
+                df['amount'] = df['total_price'].apply(self.parse_amount) * -1
+                df['event_type'] = EventType.PURCHASE.value
+                df['metadata'] = [{}] * len(df)
+                df = df[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, df], ignore_index=True)
+
+            # Process production purchases similarly
+            if not production_purchases.empty:
+                df = production_purchases[['Timestamp', 'total_price']].copy()
+                df['event_date'] = df['Timestamp']
+                df['amount'] = df['total_price'].apply(self.parse_amount) * -1
+                df['event_type'] = EventType.PRODUCTION_PURCHASE.value
+                df['metadata'] = [{}] * len(df)
+                df = df[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, df], ignore_index=True)
+
+            # Process salaries: Timestamp -> event_date, amount remains amount
+            if not salaries.empty:
+                df = salaries[['Timestamp', 'amount']].copy()
+                df['amount'] = df['amount'].apply(self.parse_amount) * -1
+                df['event_date'] = df['Timestamp']
+                df['event_type'] = EventType.SALARY.value
+                df['metadata'] = [{}] * len(df)
+                df = df[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, df], ignore_index=True)
+
+            # Process payments: Timestamp -> event_date, amount remains amount
+            if not payments.empty:
+                df = payments[['Timestamp', 'amount']].copy()
+                df['amount'] = df['amount'].apply(self.parse_amount)
+                df['event_date'] = df['Timestamp']
+                df['event_type'] = EventType.PAYMENT.value
+                df['metadata'] = [{}] * len(df)
+                df = df[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, df], ignore_index=True)
+
+            # Process expenses: Timestamp -> event_date, Amount Paid -> amount
+            if not expenses.empty:
+                df = expenses[['Timestamp', 'Amount Paid']].copy()
+                df['event_date'] = df['Timestamp']
+                df['amount'] = df['Amount Paid'].apply(self.parse_amount) * -1
+                df['event_type'] = EventType.EXPENSE.value
+                df['metadata'] = [{}] * len(df)
+                df = df[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, df], ignore_index=True)
+
+        # -- Process Transfers (for any account) --
+
+        # Find the desired account's currency from the accounts table.
+        # Assumes that the "id" column in accounts uniquely identifies an account.
+        desired_account = accounts[accounts['id'] == account_id]
+        if desired_account.empty:
+            raise ValueError(f"Account {account_id} not found in accounts table.")
+        desired_currency = desired_account.iloc[0]['currency'].lower()
+
+        # Filter transfers where this account is either the sender or the receiver
+        if not transfers.empty:
+            outgoing = transfers[transfers['From Account'] == account_id].copy()
+            incoming = transfers[transfers['To Account'] == account_id].copy()
+
+            # Define a conversion function to ensure the amount is in the desired currency.
+            # conversion rate is given as syp per usd.
+            def convert_amount(row):
+                amt = self.parse_amount(row['Amount'])
+                trans_currency = row['currency'].lower()
+                if trans_currency != desired_currency:
+                    rate = row['conversion rate (usd to syp)']
+                    # If desired currency is syp and the transfer is in usd, multiply.
+                    if desired_currency == 'syp' and trans_currency == 'usd':
+                        return amt * rate
+                    # If desired currency is usd and the transfer is in syp, divide.
+                    elif desired_currency == 'usd' and trans_currency == 'syp':
+                        return amt / rate
+                    else:
+                        # For any other currency combination, leave as is.
+                        raise ValueError(f"Unsupported currency conversion {trans_currency} to desired currency {desired_currency}")
+
+                else:
+                    return amt
+
+            # Process outgoing transfers
+            if not outgoing.empty:
+                outgoing['amount'] = outgoing.apply(convert_amount, axis=1) * -1
+                outgoing['event_date'] = outgoing['Timestamp']
+                outgoing['event_type'] = EventType.TRANSFER.value
+                outgoing['metadata'] = [{}] * len(outgoing)
+                outgoing = outgoing[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, outgoing], ignore_index=True)
+
+            # Process incoming transfers
+            if not incoming.empty:
+                incoming['amount'] = incoming.apply(convert_amount, axis=1)
+                incoming['event_date'] = incoming['Timestamp']
+                incoming['event_type'] = EventType.TRANSFER.value
+                incoming['metadata'] = [{}] * len(incoming)
+                incoming = incoming[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, incoming], ignore_index=True)
+
+        # Optionally sort the events by date (if the date format allows for lexicographical sorting)
+        events_df.sort_values(by='event_date', inplace=True)
+        events_df.reset_index(drop=True, inplace=True)
+
+        return events_df
+
+
+    def parse_amount(self, value):
+        """Convert a string with possible commas to float."""
+        try:
+            if isinstance(value, str):
+                value = value.replace(',', '')
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
+
+    def parse_timestamp(self, value):
+        """Parse timestamp from format: M/D/YYYY H:M:S (e.g., 8/23/2024 14:41:25)."""
+        try:
+            return datetime.strptime(value, "%m/%d/%Y %H:%M:%S")
+        except Exception:
+            return None
+
+================
+File: backend/app/domains/financials/routes.py
+================
+# app/domains/hello/routes.py
+from flask import Blueprint, request, jsonify
+from app.domains.financials import financials_blueprint
+from pydantic import BaseModel, ValidationError
+
+from app.repositories.google_sheets_repository import GoogleSheetRepository
+from app.repositories.google_sheets_repository import TableSheets
+
+
+class GetTableQuery(BaseModel):
+    table: str
+
+@financials_blueprint.route('/get-table', methods=['GET'])
+def get_table_data():
+    # Validate query parameters using Pydantic
+    try:
+        query_params = GetTableQuery(**request.args)
+    except ValidationError as e:
+        # Return validation errors as JSON with status code 422 (Unprocessable Entity)
+        return jsonify(e.errors()), 422
+
+    table_name = query_params.table
+    df = GoogleSheetRepository().get_all(TableSheets(table_name))
+    return jsonify(df.to_dict(orient='records'))
+
+================
+File: backend/app/repositories/google_sheets_repository.py
+================
+import os
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from enum import Enum
+import pandas as pd
+
+class TableSheets(Enum):
+    ACCOUNTS = 'accounts'
+    PURCHASES = 'purchases'
+    VENDORS = 'vendors'
+    TRANSFERS = 'transfers'
+    SALARIES = 'salaries'
+    PRODUCTION_PURCHASES = 'production_purchases'
+    PAYMENTS = 'payments'
+    INVOICE = 'invoice'
+    EXPENSES = 'expenses'
+    EMPLOYEE_REGISTRATION = 'employee_registration'
+    CUSTOMER_REGISTRATION = 'customer_registration'
+
+class GoogleSheetRepository:
+    TABLE_TO_SHEET_MAPPER = {
+        TableSheets.ACCOUNTS: {'spreadsheet_id': '1ZUz53zq3q9eQMgshMmW8axzyiTplZyUPSLsyjg0jBc4', 'sheet_name': 'main'},
+        TableSheets.PURCHASES: {'spreadsheet_id': '1jHp7OFhjfKz7QIJEAeLRKJGmVFhuiJySGkNWxekJiNU', 'sheet_name': 'Form Responses 1'},
+        TableSheets.VENDORS: {'spreadsheet_id': '1oAmx9g4qxaZyCQOR2TO1Wva04lcdYDjYdd7b2_GMmMA', 'sheet_name': 'main'},
+        TableSheets.TRANSFERS: {'spreadsheet_id': '1S2wbYAG1trhf1ukwMMq2iVJzgFhnKpeLH2jqcx7YEuQ', 'sheet_name': 'main'},
+        TableSheets.SALARIES: {'spreadsheet_id': '1_4--THfe3mn1JogknKvfkiwXc7XFbGLGtDwZcyHXSDQ', 'sheet_name': 'Form Responses 1'},
+        TableSheets.PRODUCTION_PURCHASES: {'spreadsheet_id': '17aRoh5AWmykuyS6Ex4ZN1wx2D-2LFOGdVRRC0ac5KfY', 'sheet_name': 'Form Responses 1'},
+        TableSheets.PAYMENTS: {'spreadsheet_id': '1I1mBLdsk1CAcLQsVblolCIz1zqSTYZURe0vUfS5rlIo', 'sheet_name': 'main'},
+        TableSheets.INVOICE: {'spreadsheet_id': '1hA_A6ozG_m-48BE7nvPD-b6NCLwc5TzGgTnkwB213Fo', 'sheet_name': 'main'},
+        TableSheets.EXPENSES: {'spreadsheet_id': '1D5ihxWl2bM3_j8EQ0ABdEvH9HnuCXF1shmqd6CRqhcY', 'sheet_name': 'Form Responses 1'},
+        TableSheets.EMPLOYEE_REGISTRATION: {'spreadsheet_id': '1hUP8oDkHIsZC74rpU_uy5hLEWaPdl-Obu2d1THNwcsY', 'sheet_name': 'main'},
+        TableSheets.CUSTOMER_REGISTRATION: {'spreadsheet_id': '1ipZbj9waKoDSNohDnjaNmZh39h1sk2cQFuW4HHcWBUU', 'sheet_name': 'main'}
+
+    }
+
+    def __init__(self):
+        creds = service_account.Credentials.from_service_account_file(
+            os.getenv('GOOGLE_APPLICATION_CREDENTIALS'),
+            scopes=['https://www.googleapis.com/auth/spreadsheets']
+        )
+        self.service = build('sheets', 'v4', credentials=creds)
+
+    def get_all(self, table: TableSheets):
+        spreadsheet_id = self.TABLE_TO_SHEET_MAPPER[table]['spreadsheet_id']
+        sheet_name = self.TABLE_TO_SHEET_MAPPER[table]['sheet_name']
+        result = self.service.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=sheet_name
+        ).execute()
+        values = result.get('values', [])
+        if not values:
+            # Return an empty DataFrame if there is no data.
+            return pd.DataFrame()
+        # Use the first row as header and the rest as data.
+        header, *data = values
+        return pd.DataFrame(data, columns=header)
+
+================
+File: backend/app/__init__.py
+================
+# app/__init__.py
+from flask import Flask
+
+from app.common.errors import register_error_handlers
+from app.config import Config
+from app.domains.analytics import analytics_blueprint
+from app.domains.financials import financials_blueprint
+
+
+def create_app(config_object=Config):
+    app = Flask(__name__)
+    app.config.from_object(config_object)
+
+    # Register blueprints
+    app.register_blueprint(analytics_blueprint, url_prefix='/analytics')
+    app.register_blueprint(financials_blueprint, url_prefix='/financials')
+
+    # Register error handlers
+    register_error_handlers(app)
+
+    return app
+
+================
+File: backend/app/config.py
+================
+# app/config.py
+class Config:
+    DEBUG = True
+    SECRET_KEY = 'your-secret-key'
+
+================
+File: backend/app/extensions.py
+================
+# app/extensions.py
+# (For now, this file is empty. You can initialize and configure extensions here later.)
+
+================
+File: backend/.env
+================
+# .env
+DEBUG=True
+SECRET_KEY=your-secret-key
+GOOGLE_APPLICATION_CREDENTIALS='/Users/zaid/Downloads/lithe-elixir-178918-729df7a7ad44.json'
+# Add any other environment variables here
+
+================
+File: backend/pyproject.toml
+================
+[project]
+name = "backend"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "zaid",email = "zaid.al-bardan@tomtom.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "flask (>=3.1.0,<3.2.0)",
+    "python-dotenv (>=1.0.1,<2.0.0)",
+    "google-api-python-client (>=2.164.0,<3.0.0)",
+    "google-auth (>=2.38.0,<3.0.0)",
+    "pydantic (>=2.10.6,<3.0.0)",
+    "pandas (>=2.2.3,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+================
+File: backend/run.py
+================
+# run.py
+from dotenv import load_dotenv
+from app import create_app
+
+load_dotenv()
+
+app = create_app()
+
+if __name__ == '__main__':
+    app.run()
+
+================
+File: pages/analytics/charts.html
+================
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Charts - Analytics - Karma</title>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <style>
+        /* Overall layout for charts page */
+        .charts-container {
+            display: flex;
+            height: calc(100vh - 150px - 50px - 40px); /* after header, footer, breadcrumb */
+        }
+        /* Left sidebar for chart tabs */
+        .charts-sidebar {
+            width: 220px;
+            background: #eee;
+            border-right: 1px solid #ccc;
+            padding: 20px;
+        }
+        .charts-sidebar h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .charts-sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+        .charts-sidebar li {
+            margin-bottom: 10px;
+        }
+        .charts-sidebar a {
+            display: block;
+            padding: 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+            background: #fff;
+            transition: background 0.3s;
+        }
+        .charts-sidebar a:hover, .charts-sidebar a.active {
+            background: #ddd;
+        }
+        /* Main content area for charts */
+        .charts-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        #chart-title {
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        /* Container for each account chart with fixed height */
+        .account-chart-container {
+            margin-bottom: 40px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            height: 350px; /* Fixed overall height for each chart container */
+            overflow: hidden;
+        }
+        .account-chart-title {
+            font-size: 20px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        /* Chart canvas fixed height */
+        .chart-canvas {
+            width: 100% !important;
+            height: 300px; /* Fixed height for canvas */
+        }
+        /* Placeholder for other charts */
+        .chart-placeholder {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            color: #666;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+<!-- Header Section with Clickable Logo -->
+<header class="header">
+    <div class="logo">
+        <a href="../home/index.html">
+            <img src="../../assets/images/logo.png" alt="Karma Logo">
+        </a>
+    </div>
+</header>
+
+<!-- Breadcrumb Toolbar -->
+<nav class="breadcrumb">
+    <a href="../home/index.html">Home</a>
+    <span>&gt;</span>
+    <a href="index.html">Analytics</a>
+    <span>&gt;</span>
+    <a href="charts.html">Charts</a>
+</nav>
+
+<!-- Main Charts Container -->
+<div class="charts-container">
+    <!-- Left Sidebar for Chart Tabs -->
+    <aside class="charts-sidebar">
+        <h2>Charts</h2>
+        <ul>
+            <li><a href="#" data-chart="account_balances">Account Balances</a></li>
+            <li><a href="#" data-chart="purchases_expenses">Purchases and Expenses</a></li>
+            <li><a href="#" data-chart="delivered_revenue">Delivered Revenue</a></li>
+        </ul>
+    </aside>
+    <!-- Main Content Area -->
+    <div class="charts-content" id="chart-data">
+        <div id="chart-title">Please select a chart from the sidebar.</div>
+        <div id="chart-content" class="chart-placeholder">
+            Chart content will appear here.
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+    <p>Welcome to Karma</p>
+</footer>
+
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Renderer JavaScript for Chart Tabs and Account Balance Charts -->
+<script>
+    const { ipcRenderer } = require('electron');
+
+    // Tab functionality.
+    const tabLinks = document.querySelectorAll('.charts-sidebar a');
+    const chartTitle = document.getElementById('chart-title');
+    const chartContent = document.getElementById('chart-content');
+
+    function clearActiveTabs() {
+        tabLinks.forEach(link => link.classList.remove('active'));
+    }
+
+    async function loadChart(chartId) {
+        clearActiveTabs();
+        document.querySelector(`.charts-sidebar a[data-chart="${chartId}"]`).classList.add('active');
+        if (chartId === 'account_balances') {
+            chartTitle.textContent = 'Account Balances Over Time';
+            await loadAccountBalanceCharts();
+        } else if (chartId === 'purchases_expenses') {
+            chartTitle.textContent = 'Purchases and Expenses';
+            chartContent.textContent = 'Placeholder: Purchases and Expenses Chart';
+        } else if (chartId === 'delivered_revenue') {
+            chartTitle.textContent = 'Delivered Revenue';
+            chartContent.textContent = 'Placeholder: Delivered Revenue Chart';
+        } else {
+            chartTitle.textContent = 'Unknown Chart';
+            chartContent.textContent = '';
+        }
+    }
+
+    tabLinks.forEach(link => {
+        link.addEventListener('click', event => {
+            event.preventDefault();
+            const chartId = link.getAttribute('data-chart');
+            loadChart(chartId);
+        });
+    });
+
+    // Helper function to parse numeric strings (removing commas) to float.
+    function parseAmount(value) {
+        if (typeof value !== 'string') return value;
+        return parseFloat(value.replace(/,/g, ''));
+    }
+
+    // Function to load account balance charts for each unique account.
+    async function loadAccountBalanceCharts() {
+        // Mapping for data sources.
+        const sources = {
+            accounts: { spreadsheetId: '1ZUz53zq3q9eQMgshMmW8axzyiTplZyUPSLsyjg0jBc4', range: 'main' },
+            transfers: { spreadsheetId: '1S2wbYAG1trhf1ukwMMq2iVJzgFhnKpeLH2jqcx7YEuQ', range: 'main' },
+            salaries: { spreadsheetId: '1_4--THfe3mn1JogknKvfkiwXc7XFbGLGtDwZcyHXSDQ', range: 'Form Responses 1' },
+            purchases: { spreadsheetId: '1jHp7OFhjfKz7QIJEAeLRKJGmVFhuiJySGkNWxekJiNU', range: 'Form Responses 1' },
+            production_purchases: { spreadsheetId: '17aRoh5AWmykuyS6Ex4ZN1wx2D-2LFOGdVRRC0ac5KfY', range: 'Form Responses 1' },
+            payments: { spreadsheetId: '1I1mBLdsk1CAcLQsVblolCIz1zqSTYZURe0vUfS5rlIo', range: 'main' },
+            expenses: { spreadsheetId: '1D5ihxWl2bM3_j8EQ0ABdEvH9HnuCXF1shmqd6CRqhcY', range: 'Form Responses 1' }
+        };
+
+        // Helper: fetch data from a mapping; if missing, return empty array.
+        async function fetchData(mapping) {
+            try {
+                const data = await ipcRenderer.invoke('fetch-sheet-data', mapping.spreadsheetId, mapping.range);
+                return (data && data.length > 1) ? data : [];
+            } catch (err) {
+                console.error('Error fetching data for', mapping.spreadsheetId, err);
+                return [];
+            }
+        }
+
+        // Fetch all data concurrently.
+        const [accountsData, transfersData, salariesData, purchasesData, prodPurchasesData, paymentsData, expensesData] =
+            await Promise.all([
+                fetchData(sources.accounts),
+                fetchData(sources.transfers),
+                fetchData(sources.salaries),
+                fetchData(sources.purchases),
+                fetchData(sources.production_purchases),
+                fetchData(sources.payments),
+                fetchData(sources.expenses)
+            ]);
+
+        // Get unique account IDs from the accounts table.
+        let accounts = [];
+        if (accountsData.length > 0) {
+            // Assuming the first row is header and the first column is 'id'
+            accounts = accountsData.slice(1).map(row => row[0]).filter(id => id);
+        } else {
+            accounts = ['acc_pcg9l_00000003'];
+        }
+
+        // For each account, compute events.
+        let chartsData = [];
+        const targetAccount = 'acc_pcg9l_00000003';
+
+        // Preprocess events from each source.
+        const transfersEvents = transfersData.slice(1).map(row => ({
+            timestamp: new Date(row[1]),
+            fromAcc: row[3],
+            toAcc: row[4],
+            amount: parseAmount(row[5]) || 0,
+            currency: row[6] ? row[6].toLowerCase() : '',
+            convRate: parseAmount(row[7]) || 1
+        }));
+        const paymentsEvents = paymentsData.slice(1).map(row => ({
+            timestamp: new Date(row[1]),
+            amount: parseAmount(row[4]) || 0
+        }));
+        const salariesEvents = salariesData.slice(1).map(row => ({
+            timestamp: new Date(row[1]),
+            amount: -(parseAmount(row[5]) || 0)
+        }));
+        const purchasesEvents = purchasesData.slice(1).map(row => ({
+            timestamp: new Date(row[0]),
+            amount: -(parseAmount(row[6]) || 0)
+        }));
+        const prodPurchasesEvents = prodPurchasesData.slice(1).map(row => ({
+            timestamp: new Date(row[0]),
+            amount: -(parseAmount(row[6]) || 0)
+        }));
+        const expensesEvents = expensesData.slice(1).map(row => ({
+            timestamp: new Date(row[0]),
+            amount: -(parseAmount(row[4]) || 0)
+        }));
+
+        // Loop through each account from the accounts table.
+        for (const account of accounts) {
+            let events = [];
+            // Include transfers events where the account is involved.
+            transfersEvents.forEach(e => {
+                if (e.toAcc === account) {
+                    let amt = e.amount;
+                    if (e.currency === 'usd') { amt *= e.convRate; }
+                    events.push({ timestamp: e.timestamp, amount: +amt });
+                }
+                if (e.fromAcc === account) {
+                    let amt = e.amount;
+                    if (e.currency === 'usd') { amt *= e.convRate; }
+                    events.push({ timestamp: e.timestamp, amount: -amt });
+                }
+            });
+            // For target account only, include additional events.
+            if (account === targetAccount) {
+                paymentsEvents.forEach(e => { events.push({ timestamp: e.timestamp, amount: +e.amount }); });
+                salariesEvents.forEach(e => { events.push({ timestamp: e.timestamp, amount: e.amount }); });
+                purchasesEvents.forEach(e => { events.push({ timestamp: e.timestamp, amount: e.amount }); });
+                prodPurchasesEvents.forEach(e => { events.push({ timestamp: e.timestamp, amount: e.amount }); });
+                expensesEvents.forEach(e => { events.push({ timestamp: e.timestamp, amount: e.amount }); });
+            }
+            // Sort events by time.
+            events.sort((a, b) => a.timestamp - b.timestamp);
+            // Compute cumulative balance.
+            let cumulative = 0;
+            const timeSeries = events.map(event => {
+                cumulative += event.amount;
+                return { time: event.timestamp, balance: cumulative };
+            });
+            chartsData.push({ account, timeSeries });
+        }
+
+        // Clear previous chart content.
+        chartContent.innerHTML = '';
+        // For each account, render a separate chart.
+        chartsData.forEach(chartInfo => {
+            const container = document.createElement('div');
+            container.className = 'account-chart-container';
+            const accTitle = document.createElement('div');
+            accTitle.className = 'account-chart-title';
+            accTitle.textContent = `Account: ${chartInfo.account}`;
+            container.appendChild(accTitle);
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'chart-canvas';
+            container.appendChild(canvas);
+            chartContent.appendChild(container);
+
+            const labels = chartInfo.timeSeries.map(pt => pt.time.toLocaleString());
+            const dataPoints = chartInfo.timeSeries.map(pt => pt.balance);
+            const chartData = {
+                labels,
+                datasets: [{
+                    label: 'Balance',
+                    data: dataPoints,
+                    fill: false,
+                    borderColor: 'blue',
+                    tension: 0.1
+                }]
+            };
+            const config = {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Time' },
+                            ticks: { autoSkip: true, maxTicksLimit: 10 }
+                        },
+                        y: {
+                            title: { display: true, text: 'Balance' }
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            };
+            new Chart(canvas, config);
+        });
+    }
+</script>
+</body>
+</html>
+
+================
+File: pages/analytics/index.html
+================
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Analytics - Karma</title>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <style>
+        /* Container for stacked option cards, raised to the upper middle */
+        .analytics-options {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start; /* Align to top */
+            align-items: center;
+            height: calc(100vh - 150px - 50px - 40px); /* Subtract header, footer, and breadcrumb spacing */
+            padding-top: 40px; /* Adjust this value to raise/lower the cards */
+            gap: 20px;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+        /* Stacked rectangle option cards */
+        .option-card {
+            width: 300px;
+            padding: 20px;
+            background: #fff;
+            border: 2px solid #333;
+            border-radius: 10px;
+            text-align: center;
+            text-decoration: none;
+            color: #333;
+            font-size: 18px;
+            transition: transform 0.3s ease, background 0.3s ease;
+        }
+        .option-card:hover {
+            background: #f0f0f0;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+<!-- Header Section with Clickable Logo -->
+<header class="header">
+    <div class="logo">
+        <a href="../home/index.html">
+            <img src="../../assets/images/logo.png" alt="Karma Logo">
+        </a>
+    </div>
+</header>
+
+<!-- Breadcrumb Toolbar -->
+<nav class="breadcrumb">
+    <a href="../home/index.html">Home</a>
+    <span>&gt;</span>
+    <a href="index.html">Analytics</a>
+</nav>
+
+<!-- Analytics Options (Stacked Rectangles) -->
+<div class="analytics-options">
+    <a href="tables.html" class="option-card">Tables</a>
+    <a href="charts.html" class="option-card">Charts</a>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+    <p>Welcome to Karma</p>
+</footer>
+</body>
+</html>
+
+================
+File: pages/analytics/tables.html
+================
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tables - Analytics - Karma</title>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <style>
+        /* Container for the tables page */
+        .tables-container {
+            display: flex;
+            height: calc(100vh - 150px - 50px - 40px); /* available height after header, footer, breadcrumb */
+        }
+        /* Sidebar styling */
+        .tables-sidebar {
+            width: 200px;
+            background: #eee;
+            border-right: 1px solid #ccc;
+            padding: 20px;
+        }
+        .tables-sidebar h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .tables-sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+        .tables-sidebar li {
+            margin-bottom: 10px;
+        }
+        .tables-sidebar a {
+            display: block;
+            padding: 8px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+            background: #fff;
+            transition: background 0.3s;
+        }
+        .tables-sidebar a:hover {
+            background: #ddd;
+        }
+        /* Main content area */
+        .tables-content {
+            flex: 1;
+            padding: 0 20px 20px; /* Removed top padding so title sits flush */
+            overflow-y: auto;
+        }
+        /* Table title styled to be flush at the top */
+        #table-title {
+            position: sticky;
+            top: 0;
+            background: #f9f9f9;
+            font-size: 26px;
+            font-weight: bold;
+            padding: 10px;  /* Reduced padding */
+            margin: 0;
+            border-bottom: 2px solid #444;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: #333;
+            z-index: 10;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background: #f4f4f4;
+            cursor: pointer;
+            position: relative;
+        }
+        /* Arrow indicator styling */
+        .sort-arrow {
+            font-size: 10px;
+            margin-left: 4px;
+        }
+        /* Style the sort button so it looks like plain text */
+        .sort-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: inherit;
+            font-family: inherit;
+            cursor: pointer;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+<!-- Header Section with Clickable Logo -->
+<header class="header">
+    <div class="logo">
+        <a href="../home/index.html">
+            <img src="../../assets/images/logo.png" alt="Karma Logo">
+        </a>
+    </div>
+</header>
+
+<!-- Breadcrumb Toolbar -->
+<nav class="breadcrumb">
+    <a href="../home/index.html">Home</a>
+    <span>&gt;</span>
+    <a href="index.html">Analytics</a>
+    <span>&gt;</span>
+    <a href="tables.html">Tables</a>
+</nav>
+
+<!-- Main Content Area -->
+<div class="tables-container">
+    <!-- Sidebar with table names -->
+    <aside class="tables-sidebar">
+        <h2>Tables</h2>
+        <ul>
+            <li><a href="#" data-table="accounts">Accounts</a></li>
+            <li><a href="#" data-table="purchases">Purchases</a></li>
+            <li><a href="#" data-table="vendors">Vendors</a></li>
+            <li><a href="#" data-table="transfers">Transfers</a></li>
+            <li><a href="#" data-table="salaries">Salaries</a></li>
+            <li><a href="#" data-table="production_purchases">Production Purchases</a></li>
+            <li><a href="#" data-table="payments">Payments</a></li>
+            <li><a href="#" data-table="invoice">Invoice</a></li>
+            <li><a href="#" data-table="expenses">Expenses</a></li>
+            <li><a href="#" data-table="employee_registration">Employee Registration</a></li>
+            <li><a href="#" data-table="customer_registration">Customer Registration</a></li>
+        </ul>
+    </aside>
+    <!-- Content area where table data will be loaded -->
+    <div class="tables-content" id="table-data">
+        <div id="table-title">Please select a table from the sidebar.</div>
+        <div id="table-content"></div>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+    <p>Welcome to Karma</p>
+</footer>
+
+<!-- Renderer JavaScript: Using RESTful API to fetch table data -->
+<script>
+    // Attach click event listeners to sidebar links
+    document.querySelectorAll('.tables-sidebar a').forEach(link => {
+        link.addEventListener('click', async event => {
+            event.preventDefault();
+            const tableName = event.target.getAttribute('data-table');
+            const tableTitle = document.getElementById('table-title');
+            const tableContent = document.getElementById('table-content');
+
+            tableTitle.innerText = tableName.replace(/_/g, ' ').toUpperCase();
+            tableContent.innerHTML = '<p>Loading table...</p>';
+
+            try {
+                // Using port 5000 for the Flask backend.
+                const response = await fetch(`http://localhost:5000/financials/get-table?table=${tableName}`);
+
+                // Check if the response is OK (status in the 200-299 range)
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (!data || !data.length) {
+                    tableContent.innerHTML = '<p>No data found in this table.</p>';
+                    return;
+                }
+
+                // Build and display the table using our enhanced function for JSON objects
+                const table = buildHtmlTable(data);
+                tableContent.innerHTML = '';
+                tableContent.appendChild(table);
+
+                // Expose a global sort function (if needed)
+                window.sortTable = function(index) {
+                    sortTableByColumn(table, index, JSON.parse(table.getAttribute('data-coltypes'))[index]);
+                };
+            } catch (err) {
+                console.error('Fetch error:', err);
+                tableContent.innerHTML = `<p>Error loading table: ${err.message}</p>`;
+            }
+        });
+    });
+
+    // Enhanced function to build an HTML table from an array of objects.
+    // The keys of the first object are used as table headers.
+    function buildHtmlTable(dataObjects) {
+        // Extract headers from the first object.
+        const headers = Object.keys(dataObjects[0]);
+        let colCount = headers.length;
+        let colTypes = new Array(colCount).fill('string');
+
+        // Determine column types based on the first non-null value in each column.
+        headers.forEach((header, index) => {
+            for (let obj of dataObjects) {
+                let value = obj[header];
+                if (value !== null && value !== undefined && value !== "") {
+                    // Check if it's a valid date.
+                    if (!isNaN(Date.parse(value))) {
+                        colTypes[index] = 'date';
+                    } else if (!isNaN(parseFloat(value)) && isFinite(value)) {
+                        colTypes[index] = 'number';
+                    }
+                    break;
+                }
+            }
+        });
+
+        let table = document.createElement('table');
+        table.setAttribute('data-coltypes', JSON.stringify(colTypes));
+
+        // Build header with clickable sort button and filter controls.
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headers.forEach((header, index) => {
+            const th = document.createElement('th');
+            th.style.position = 'relative';
+
+            const headerContainer = document.createElement('div');
+            headerContainer.style.display = 'flex';
+            headerContainer.style.flexDirection = 'column';
+            headerContainer.style.alignItems = 'flex-start';
+
+            // Create a button for the clickable header title with arrow indicator.
+            const titleBtn = document.createElement('button');
+            titleBtn.className = 'sort-btn';
+            titleBtn.style.display = 'flex';
+            titleBtn.style.alignItems = 'center';
+            titleBtn.innerHTML = header + '<span class="sort-arrow"></span>';
+            titleBtn.onclick = function() {
+                const newSort = sortTableByColumn(table, index, colTypes[index]);
+                // Update the arrow indicator based on new sort direction.
+                const arrowSpan = titleBtn.querySelector('.sort-arrow');
+                if (newSort === 'asc') {
+                    arrowSpan.textContent = '↑';
+                } else if (newSort === 'desc') {
+                    arrowSpan.textContent = '↓';
+                } else {
+                    arrowSpan.textContent = '';
+                }
+            };
+            headerContainer.appendChild(titleBtn);
+
+            // Filter controls container.
+            const filterContainer = document.createElement('div');
+            filterContainer.style.marginTop = '4px';
+            filterContainer.style.display = 'flex';
+            filterContainer.style.gap = '4px';
+
+            const operatorSelect = document.createElement('select');
+            operatorSelect.innerHTML = `<option value="contains">Contains</option>
+                                      <option value="greater">Greater Than</option>
+                                      <option value="less">Less Than</option>`;
+            operatorSelect.style.fontSize = '10px';
+
+            const filterInput = document.createElement('input');
+            filterInput.type = 'text';
+            filterInput.placeholder = 'Filter...';
+            filterInput.style.fontSize = '10px';
+
+            th.dataset.filterOperator = 'contains';
+            th.dataset.filterValue = '';
+            operatorSelect.onchange = function(e) {
+                th.dataset.filterOperator = e.target.value;
+                applyFilters(table);
+            };
+            filterInput.oninput = function(e) {
+                th.dataset.filterValue = e.target.value;
+                applyFilters(table);
+            };
+
+            filterContainer.appendChild(operatorSelect);
+            filterContainer.appendChild(filterInput);
+            headerContainer.appendChild(filterContainer);
+
+            th.appendChild(headerContainer);
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Build table body.
+        const tbody = document.createElement('tbody');
+        dataObjects.forEach(obj => {
+            const row = document.createElement('tr');
+            headers.forEach(header => {
+                const td = document.createElement('td');
+                td.textContent = obj[header] !== null && obj[header] !== undefined ? obj[header] : '';
+                row.appendChild(td);
+            });
+            tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        return table;
+    }
+
+    // Function to sort table by column, handling empty cells and types.
+    // Returns the new sort direction: 'asc' or 'desc'
+    function sortTableByColumn(table, columnIndex, colType) {
+        const tbody = table.tBodies[0];
+        const rows = Array.from(tbody.rows);
+        let currentSort = table.getAttribute('data-sort-' + columnIndex) || 'none';
+        let newSort = (currentSort === 'asc' ? 'desc' : 'asc');
+        table.setAttribute('data-sort-' + columnIndex, newSort);
+
+        rows.sort((a, b) => {
+            let aText = a.cells[columnIndex].textContent.trim();
+            let bText = b.cells[columnIndex].textContent.trim();
+
+            // Treat empty cells as smallest value.
+            if (!aText) aText = '';
+            if (!bText) bText = '';
+
+            if (colType === 'number') {
+                aText = parseFloat(aText) || 0;
+                bText = parseFloat(bText) || 0;
+            } else if (colType === 'date') {
+                aText = Date.parse(aText) || 0;
+                bText = Date.parse(bText) || 0;
+            } else {
+                // For strings, compare lowercase versions.
+                aText = aText.toLowerCase();
+                bText = bText.toLowerCase();
+            }
+
+            if (aText < bText) return newSort === 'asc' ? -1 : 1;
+            if (aText > bText) return newSort === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        // Re-append sorted rows.
+        rows.forEach(row => tbody.appendChild(row));
+        return newSort;
+    }
+
+    // Function to apply filters to table rows based on header filter controls.
+    function applyFilters(table) {
+        const colTypes = JSON.parse(table.getAttribute('data-coltypes'));
+        const headers = table.tHead.rows[0].cells;
+        let filters = [];
+        for (let i = 0; i < headers.length; i++) {
+            filters.push({
+                operator: headers[i].dataset.filterOperator,
+                value: headers[i].dataset.filterValue,
+                colType: colTypes[i]
+            });
+        }
+        const tbody = table.tBodies[0];
+        Array.from(tbody.rows).forEach(row => {
+            let show = true;
+            filters.forEach((filter, index) => {
+                const cellText = row.cells[index].textContent.trim();
+                if (filter.value) {
+                    if (filter.operator === 'contains') {
+                        if (!cellText.toLowerCase().includes(filter.value.toLowerCase())) {
+                            show = false;
+                        }
+                    } else if (filter.operator === 'greater') {
+                        if (filter.colType === 'number') {
+                            if (!(parseFloat(cellText) > parseFloat(filter.value))) show = false;
+                        } else if (filter.colType === 'date') {
+                            if (!(Date.parse(cellText) > Date.parse(filter.value))) show = false;
+                        } else {
+                            if (!(cellText > filter.value)) show = false;
+                        }
+                    } else if (filter.operator === 'less') {
+                        if (filter.colType === 'number') {
+                            if (!(parseFloat(cellText) < parseFloat(filter.value))) show = false;
+                        } else if (filter.colType === 'date') {
+                            if (!(Date.parse(cellText) < Date.parse(filter.value))) show = false;
+                        } else {
+                            if (!(cellText < filter.value)) show = false;
+                        }
+                    }
+                }
+            });
+            row.style.display = show ? '' : 'none';
+        });
+    }
+</script>
+</body>
+</html>
+
+================
+File: pages/home/home.js
+================
+// Function to toggle the sidebar open/closed
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+        sidebar.classList.toggle('open');
+    }
+}
+
+================
+File: pages/home/index.html
+================
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Karma - Home</title>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+</head>
+<body>
+<!-- Toggle Sidebar Button -->
+<button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+
+<!-- Sidebar -->
+<div id="sidebar" class="sidebar">
+    <ul>
+        <li><a href="../analytics/index.html">Analytics</a></li>
+        <li><a href="#">Financials</a></li>
+        <li><a href="#">Operations</a></li>
+        <li><a href="#">Distribution and Sales</a></li>
+    </ul>
+</div>
+
+<!-- Header Section with Logo (Not clickable on home) -->
+<header class="header">
+    <div class="logo">
+        <img src="../../assets/images/logo.png" alt="Karma Logo">
+    </div>
+</header>
+
+<!-- Main Content with Full-Width Video Background -->
+<section class="video-section">
+    <video class="section-bg-video" autoplay muted loop>
+        <source src="../../assets/video/test.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+    <p>Welcome to Karma</p>
+</footer>
+
+<!-- Home page JavaScript -->
+<script src="home.js"></script>
+<script>
+    window.addEventListener('DOMContentLoaded', () => {
+        const sectionVideo = document.querySelector('.section-bg-video');
+        if (sectionVideo) {
+            sectionVideo.playbackRate = 0.5;
+        }
+    });
+</script>
+</body>
+</html>
+
+================
+File: .repomixignore
+================
+# Add patterns to ignore here, one per line
+# Example:
+# *.log
+# tmp/
+
+================
+File: main.js
+================
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+const { google } = require('googleapis');
+
+// Path to your service account credentials file (adjust the path if needed)
+const SERVICE_ACCOUNT_FILE = '/Users/zaid/Downloads/lithe-elixir-178918-729df7a7ad44.json';
+
+// Define the required scopes for read-only access to spreadsheets
+const SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
+
+// Load your service account credentials
+const credentials = require(SERVICE_ACCOUNT_FILE);
+
+// IMPORTANT: Replace any escaped newline characters in the private key with actual newlines.
+const privateKey = credentials.private_key.replace(/\\n/g, '\n');
+
+// Create a JWT client using your service account credentials
+const jwtClient = new google.auth.JWT(
+    credentials.client_email,
+    null,
+    privateKey,
+    SCOPES,
+    null
+);
+
+// Build the Sheets API service using the JWT client
+const sheets = google.sheets({ version: 'v4', auth: jwtClient });
+
+// IPC handler: dynamically accepts spreadsheetId and range
+ipcMain.handle('fetch-sheet-data', async (event, spreadsheetId, range) => {
+    try {
+        // Authorize the JWT client (this works similar to your Python code)
+        await jwtClient.authorize();
+
+        // Fetch data from the specified spreadsheet and range
+        const res = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range
+        });
+
+        const data = res.data.values;
+        console.log("Fetched data:", JSON.stringify(data, null, 2));
+        return data;
+    } catch (error) {
+        console.error("Error fetching data:", error);
+        return { error: error.message };
+    }
+});
+
+function createWindow() {
+    const win = new BrowserWindow({
+        width: 1024,
+        height: 768,
+        webPreferences: {
+            nodeIntegration: true,  // Enabled for simplicity; in production consider preload scripts
+            contextIsolation: false
+        }
+    });
+
+    win.loadFile(path.join(__dirname, 'pages', 'home', 'index.html'));
+}
+
+app.whenReady().then(createWindow);
+
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});
+
+================
+File: package.json
+================
+{
+  "name": "karma-electron-app",
+  "version": "1.0.0",
+  "description": "A cool and clean Electron desktop app for Karma",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^35.0.1"
+  },
+  "dependencies": {
+    "googleapis": "^146.0.0"
+  }
+}
+
+================
+File: README
+================
+my-project/
+├── backend/
+│   ├── app/
+│   │   ├── __init__.py         # Initializes the Flask app
+│   │   ├── config.py           # Configuration settings
+│   │   ├── routes/             # Flask API endpoints
+│   │   │   ├── __init__.py
+│   │   │   └── sheets.py       # Example endpoint for Google Sheets data
+│   │   ├── models/             # (Optional) Data models or ORM definitions
+│   │   │   └── __init__.py
+│   │   ├── static/             # Static assets (if needed)
+│   │   └── templates/          # HTML templates for server-side rendering
+│   ├── tests/                  # Unit tests for the backend
+│   ├── run.py                  # Entry point to run the Flask server
+│   └── requirements.txt        # Python dependencies
+│
+├── frontend/
+│   ├── common/                     # Shared code across all platforms
+│   │   ├── components/             # Reusable UI components (buttons, forms, etc.)
+│   │   └── services/               # Abstraction for platform-specific features
+│   │       ├── cameraService.js    # Generic camera service API
+│   │       ├── gpsService.js       # Generic GPS service API
+│   │       └── platform/           # Platform-specific implementations
+│   │           ├── web/
+│   │           │   ├── camera.js   # Web implementation using HTML5 APIs
+│   │           │   └── gps.js      # Web implementation via Geolocation API
+│   │           ├── mobile/
+│   │           │   ├── camera.js   # Mobile-specific implementation (via Ionic/Cordova plugins)
+│   │           │   └── gps.js      # Mobile-specific implementation (native access)
+│   │           └── electron/
+│   │               ├── camera.js   # Electron implementation or fallback
+│   │               └── gps.js      # Electron-specific implementation (if applicable)
+│   │
+│   ├── web/                        # Core reusable web app
+│   │   ├── index.html              # Main entry point for the web app
+│   │   ├── assets/
+│   │   │   ├── css/
+│   │   │   │   └── style.css
+│   │   │   ├── js/
+│   │   │   │   ├── home.js
+│   │   │   │   └── app.js          # App logic that loads common components & services
+│   │   │   └── images/
+│   │   └── pages/                  # Organized page views/components
+│   │       ├── analytics/
+│   │       │   ├── charts.html
+│   │       │   ├── index.html
+│   │       │   └── tables.html
+│   │       └── home/
+│   │           └── index.html
+│   │
+│   ├── electron/                   # Electron wrapper for desktop distribution
+│   │   ├── main.js                 # Electron main process (loads the web app)
+│   │   ├── package.json            # Electron configuration
+│   │   └── preload.js              # (Optional) Preload script for secure IPC communication
+│   │
+│   └── mobile/                     # Mobile app wrapper using Ionic/Cordova
+│       ├── config.xml              # Mobile app configuration file
+│       ├── www/                    # Web assets for mobile (built from your web folder)
+│       │   ├── index.html
+│       │   ├── assets/
+│       │   │   ├── css/
+│       │   │   │   └── style.css
+│       │   │   ├── js/
+│       │   │   │   └── app.js
+│       │   │   └── images/
+│       │   └── pages/
+│       │       ├── analytics/
+│       │       └── home/
+│       └── platforms/              # Generated native projects (managed by Ionic/Cordova)
+│           ├── android/            # Android-specific files (auto-generated)
+│           └── ios/                # iOS-specific files (auto-generated)
+│
+└── README.md                       # Project overview and instructions
+
+================
+File: repomix.config.json
+================
+{
+  "output": {
+    "filePath": "repomix-output.txt",
+    "style": "plain",
+    "parsableStyle": false,
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "compress": false,
+    "topFilesLength": 5,
+    "showLineNumbers": false,
+    "copyToClipboard": false
+  },
+  "include": [],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": []
+  },
+  "security": {
+    "enableSecurityCheck": true
+  },
+  "tokenCount": {
+    "encoding": "o200k_base"
+  }
+}
+
+
+
+================================================================
+End of Codebase
+================================================================

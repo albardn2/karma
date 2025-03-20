@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Analytics - Karma</title>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <style>
+        /* Container for stacked option cards, raised to the upper middle */
+        .analytics-options {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start; /* Align to top */
+            align-items: center;
+            height: calc(100vh - 150px - 50px - 40px); /* Subtract header, footer, and breadcrumb spacing */
+            padding-top: 40px; /* Adjust this value to raise/lower the cards */
+            gap: 20px;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+        /* Stacked rectangle option cards */
+        .option-card {
+            width: 300px;
+            padding: 20px;
+            background: #fff;
+            border: 2px solid #333;
+            border-radius: 10px;
+            text-align: center;
+            text-decoration: none;
+            color: #333;
+            font-size: 18px;
+            transition: transform 0.3s ease, background 0.3s ease;
+        }
+        .option-card:hover {
+            background: #f0f0f0;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+<!-- Header Section with Clickable Logo -->
+<header class="header">
+    <div class="logo">
+        <a href="../home/index.html">
+            <img src="../../assets/images/logo.png" alt="Karma Logo">
+        </a>
+    </div>
+</header>
+
+<!-- Breadcrumb Toolbar -->
+<nav class="breadcrumb">
+    <a href="../home/index.html">Home</a>
+    <span>&gt;</span>
+    <a href="index.html">Analytics</a>
+</nav>
+
+<!-- Analytics Options (Stacked Rectangles) -->
+<div class="analytics-options">
+    <a href="tables.html" class="option-card">Tables</a>
+    <a href="charts.html" class="option-card">Charts</a>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+    <p>Welcome to Karma</p>
+</footer>
+</body>
+</html>

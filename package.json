@@ -1,0 +1,15 @@
+{
+  "name": "karma-electron-app",
+  "version": "1.0.0",
+  "description": "A cool and clean Electron desktop app for Karma",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^35.0.1"
+  },
+  "dependencies": {
+    "googleapis": "^146.0.0"
+  }
+}

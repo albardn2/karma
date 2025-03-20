@@ -1,0 +1,73 @@
+my-project/
+├── backend/
+│   ├── app/
+│   │   ├── __init__.py         # Initializes the Flask app
+│   │   ├── config.py           # Configuration settings
+│   │   ├── routes/             # Flask API endpoints
+│   │   │   ├── __init__.py
+│   │   │   └── sheets.py       # Example endpoint for Google Sheets data
+│   │   ├── models/             # (Optional) Data models or ORM definitions
+│   │   │   └── __init__.py
+│   │   ├── static/             # Static assets (if needed)
+│   │   └── templates/          # HTML templates for server-side rendering
+│   ├── tests/                  # Unit tests for the backend
+│   ├── run.py                  # Entry point to run the Flask server
+│   └── requirements.txt        # Python dependencies
+│
+├── frontend/
+│   ├── common/                     # Shared code across all platforms
+│   │   ├── components/             # Reusable UI components (buttons, forms, etc.)
+│   │   └── services/               # Abstraction for platform-specific features
+│   │       ├── cameraService.js    # Generic camera service API
+│   │       ├── gpsService.js       # Generic GPS service API
+│   │       └── platform/           # Platform-specific implementations
+│   │           ├── web/
+│   │           │   ├── camera.js   # Web implementation using HTML5 APIs
+│   │           │   └── gps.js      # Web implementation via Geolocation API
+│   │           ├── mobile/
+│   │           │   ├── camera.js   # Mobile-specific implementation (via Ionic/Cordova plugins)
+│   │           │   └── gps.js      # Mobile-specific implementation (native access)
+│   │           └── electron/
+│   │               ├── camera.js   # Electron implementation or fallback
+│   │               └── gps.js      # Electron-specific implementation (if applicable)
+│   │
+│   ├── web/                        # Core reusable web app
+│   │   ├── index.html              # Main entry point for the web app
+│   │   ├── assets/
+│   │   │   ├── css/
+│   │   │   │   └── style.css
+│   │   │   ├── js/
+│   │   │   │   ├── home.js
+│   │   │   │   └── app.js          # App logic that loads common components & services
+│   │   │   └── images/
+│   │   └── pages/                  # Organized page views/components
+│   │       ├── analytics/
+│   │       │   ├── charts.html
+│   │       │   ├── index.html
+│   │       │   └── tables.html
+│   │       └── home/
+│   │           └── index.html
+│   │
+│   ├── electron/                   # Electron wrapper for desktop distribution
+│   │   ├── main.js                 # Electron main process (loads the web app)
+│   │   ├── package.json            # Electron configuration
+│   │   └── preload.js              # (Optional) Preload script for secure IPC communication
+│   │
+│   └── mobile/                     # Mobile app wrapper using Ionic/Cordova
+│       ├── config.xml              # Mobile app configuration file
+│       ├── www/                    # Web assets for mobile (built from your web folder)
+│       │   ├── index.html
+│       │   ├── assets/
+│       │   │   ├── css/
+│       │   │   │   └── style.css
+│       │   │   ├── js/
+│       │   │   │   └── app.js
+│       │   │   └── images/
+│       │   └── pages/
+│       │       ├── analytics/
+│       │       └── home/
+│       └── platforms/              # Generated native projects (managed by Ionic/Cordova)
+│           ├── android/            # Android-specific files (auto-generated)
+│           └── ios/                # iOS-specific files (auto-generated)
+│
+└── README.md                       # Project overview and instructions

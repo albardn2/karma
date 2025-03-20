@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tables - Analytics - Karma</title>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <style>
+        /* Container for the tables page */
+        .tables-container {
+            display: flex;
+            height: calc(100vh - 150px - 50px - 40px); /* available height after header, footer, breadcrumb */
+        }
+        /* Sidebar styling */
+        .tables-sidebar {
+            width: 200px;
+            background: #eee;
+            border-right: 1px solid #ccc;
+            padding: 20px;
+        }
+        .tables-sidebar h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .tables-sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+        .tables-sidebar li {
+            margin-bottom: 10px;
+        }
+        .tables-sidebar a {
+            display: block;
+            padding: 8px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+            background: #fff;
+            transition: background 0.3s;
+        }
+        .tables-sidebar a:hover {
+            background: #ddd;
+        }
+        /* Main content area */
+        .tables-content {
+            flex: 1;
+            padding: 0 20px 20px; /* Removed top padding so title sits flush */
+            overflow-y: auto;
+        }
+        /* Table title styled to be flush at the top */
+        #table-title {
+            position: sticky;
+            top: 0;
+            background: #f9f9f9;
+            font-size: 26px;
+            font-weight: bold;
+            padding: 10px;  /* Reduced padding */
+            margin: 0;
+            border-bottom: 2px solid #444;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: #333;
+            z-index: 10;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background: #f4f4f4;
+            cursor: pointer;
+            position: relative;
+        }
+        /* Arrow indicator styling */
+        .sort-arrow {
+            font-size: 10px;
+            margin-left: 4px;
+        }
+        /* Style the sort button so it looks like plain text */
+        .sort-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: inherit;
+            font-family: inherit;
+            cursor: pointer;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+<!-- Header Section with Clickable Logo -->
+<header class="header">
+    <div class="logo">
+        <a href="../home/index.html">
+            <img src="../../assets/images/logo.png" alt="Karma Logo">
+        </a>
+    </div>
+</header>
+
+<!-- Breadcrumb Toolbar -->
+<nav class="breadcrumb">
+    <a href="../home/index.html">Home</a>
+    <span>&gt;</span>
+    <a href="index.html">Analytics</a>
+    <span>&gt;</span>
+    <a href="tables.html">Tables</a>
+</nav>
+
+<!-- Main Content Area -->
+<div class="tables-container">
+    <!-- Sidebar with table names -->
+    <aside class="tables-sidebar">
+        <h2>Tables</h2>
+        <ul>
+            <li><a href="#" data-table="accounts">Accounts</a></li>
+            <li><a href="#" data-table="purchases">Purchases</a></li>
+            <li><a href="#" data-table="vendors">Vendors</a></li>
+            <li><a href="#" data-table="transfers">Transfers</a></li>
+            <li><a href="#" data-table="salaries">Salaries</a></li>
+            <li><a href="#" data-table="production_purchases">Production Purchases</a></li>
+            <li><a href="#" data-table="payments">Payments</a></li>
+            <li><a href="#" data-table="invoice">Invoice</a></li>
+            <li><a href="#" data-table="expenses">Expenses</a></li>
+            <li><a href="#" data-table="employee_registration">Employee Registration</a></li>
+            <li><a href="#" data-table="customer_registration">Customer Registration</a></li>
+        </ul>
+    </aside>
+    <!-- Content area where table data will be loaded -->
+    <div class="tables-content" id="table-data">
+        <div id="table-title">Please select a table from the sidebar.</div>
+        <div id="table-content"></div>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+    <p>Welcome to Karma</p>
+</footer>
+
+<!-- Renderer JavaScript: Using RESTful API to fetch table data -->
+<script>
+    // Attach click event listeners to sidebar links
+    document.querySelectorAll('.tables-sidebar a').forEach(link => {
+        link.addEventListener('click', async event => {
+            event.preventDefault();
+            const tableName = event.target.getAttribute('data-table');
+            const tableTitle = document.getElementById('table-title');
+            const tableContent = document.getElementById('table-content');
+
+            tableTitle.innerText = tableName.replace(/_/g, ' ').toUpperCase();
+            tableContent.innerHTML = '<p>Loading table...</p>';
+
+            try {
+                // Using port 5000 for the Flask backend.
+                const response = await fetch(`http://localhost:5000/financials/get-table?table=${tableName}`);
+
+                // Check if the response is OK (status in the 200-299 range)
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (!data || !data.length) {
+                    tableContent.innerHTML = '<p>No data found in this table.</p>';
+                    return;
+                }
+
+                // Build and display the table using our enhanced function for JSON objects
+                const table = buildHtmlTable(data);
+                tableContent.innerHTML = '';
+                tableContent.appendChild(table);
+
+                // Expose a global sort function (if needed)
+                window.sortTable = function(index) {
+                    sortTableByColumn(table, index, JSON.parse(table.getAttribute('data-coltypes'))[index]);
+                };
+            } catch (err) {
+                console.error('Fetch error:', err);
+                tableContent.innerHTML = `<p>Error loading table: ${err.message}</p>`;
+            }
+        });
+    });
+
+    // Enhanced function to build an HTML table from an array of objects.
+    // The keys of the first object are used as table headers.
+    function buildHtmlTable(dataObjects) {
+        // Extract headers from the first object.
+        const headers = Object.keys(dataObjects[0]);
+        let colCount = headers.length;
+        let colTypes = new Array(colCount).fill('string');
+
+        // Determine column types based on the first non-null value in each column.
+        headers.forEach((header, index) => {
+            for (let obj of dataObjects) {
+                let value = obj[header];
+                if (value !== null && value !== undefined && value !== "") {
+                    // Check if it's a valid date.
+                    if (!isNaN(Date.parse(value))) {
+                        colTypes[index] = 'date';
+                    } else if (!isNaN(parseFloat(value)) && isFinite(value)) {
+                        colTypes[index] = 'number';
+                    }
+                    break;
+                }
+            }
+        });
+
+        let table = document.createElement('table');
+        table.setAttribute('data-coltypes', JSON.stringify(colTypes));
+
+        // Build header with clickable sort button and filter controls.
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headers.forEach((header, index) => {
+            const th = document.createElement('th');
+            th.style.position = 'relative';
+
+            const headerContainer = document.createElement('div');
+            headerContainer.style.display = 'flex';
+            headerContainer.style.flexDirection = 'column';
+            headerContainer.style.alignItems = 'flex-start';
+
+            // Create a button for the clickable header title with arrow indicator.
+            const titleBtn = document.createElement('button');
+            titleBtn.className = 'sort-btn';
+            titleBtn.style.display = 'flex';
+            titleBtn.style.alignItems = 'center';
+            titleBtn.innerHTML = header + '<span class="sort-arrow"></span>';
+            titleBtn.onclick = function() {
+                const newSort = sortTableByColumn(table, index, colTypes[index]);
+                // Update the arrow indicator based on new sort direction.
+                const arrowSpan = titleBtn.querySelector('.sort-arrow');
+                if (newSort === 'asc') {
+                    arrowSpan.textContent = '↑';
+                } else if (newSort === 'desc') {
+                    arrowSpan.textContent = '↓';
+                } else {
+                    arrowSpan.textContent = '';
+                }
+            };
+            headerContainer.appendChild(titleBtn);
+
+            // Filter controls container.
+            const filterContainer = document.createElement('div');
+            filterContainer.style.marginTop = '4px';
+            filterContainer.style.display = 'flex';
+            filterContainer.style.gap = '4px';
+
+            const operatorSelect = document.createElement('select');
+            operatorSelect.innerHTML = `<option value="contains">Contains</option>
+                                      <option value="greater">Greater Than</option>
+                                      <option value="less">Less Than</option>`;
+            operatorSelect.style.fontSize = '10px';
+
+            const filterInput = document.createElement('input');
+            filterInput.type = 'text';
+            filterInput.placeholder = 'Filter...';
+            filterInput.style.fontSize = '10px';
+
+            th.dataset.filterOperator = 'contains';
+            th.dataset.filterValue = '';
+            operatorSelect.onchange = function(e) {
+                th.dataset.filterOperator = e.target.value;
+                applyFilters(table);
+            };
+            filterInput.oninput = function(e) {
+                th.dataset.filterValue = e.target.value;
+                applyFilters(table);
+            };
+
+            filterContainer.appendChild(operatorSelect);
+            filterContainer.appendChild(filterInput);
+            headerContainer.appendChild(filterContainer);
+
+            th.appendChild(headerContainer);
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Build table body.
+        const tbody = document.createElement('tbody');
+        dataObjects.forEach(obj => {
+            const row = document.createElement('tr');
+            headers.forEach(header => {
+                const td = document.createElement('td');
+                td.textContent = obj[header] !== null && obj[header] !== undefined ? obj[header] : '';
+                row.appendChild(td);
+            });
+            tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        return table;
+    }
+
+    // Function to sort table by column, handling empty cells and types.
+    // Returns the new sort direction: 'asc' or 'desc'
+    function sortTableByColumn(table, columnIndex, colType) {
+        const tbody = table.tBodies[0];
+        const rows = Array.from(tbody.rows);
+        let currentSort = table.getAttribute('data-sort-' + columnIndex) || 'none';
+        let newSort = (currentSort === 'asc' ? 'desc' : 'asc');
+        table.setAttribute('data-sort-' + columnIndex, newSort);
+
+        rows.sort((a, b) => {
+            let aText = a.cells[columnIndex].textContent.trim();
+            let bText = b.cells[columnIndex].textContent.trim();
+
+            // Treat empty cells as smallest value.
+            if (!aText) aText = '';
+            if (!bText) bText = '';
+
+            if (colType === 'number') {
+                aText = parseFloat(aText) || 0;
+                bText = parseFloat(bText) || 0;
+            } else if (colType === 'date') {
+                aText = Date.parse(aText) || 0;
+                bText = Date.parse(bText) || 0;
+            } else {
+                // For strings, compare lowercase versions.
+                aText = aText.toLowerCase();
+                bText = bText.toLowerCase();
+            }
+
+            if (aText < bText) return newSort === 'asc' ? -1 : 1;
+            if (aText > bText) return newSort === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        // Re-append sorted rows.
+        rows.forEach(row => tbody.appendChild(row));
+        return newSort;
+    }
+
+    // Function to apply filters to table rows based on header filter controls.
+    function applyFilters(table) {
+        const colTypes = JSON.parse(table.getAttribute('data-coltypes'));
+        const headers = table.tHead.rows[0].cells;
+        let filters = [];
+        for (let i = 0; i < headers.length; i++) {
+            filters.push({
+                operator: headers[i].dataset.filterOperator,
+                value: headers[i].dataset.filterValue,
+                colType: colTypes[i]
+            });
+        }
+        const tbody = table.tBodies[0];
+        Array.from(tbody.rows).forEach(row => {
+            let show = true;
+            filters.forEach((filter, index) => {
+                const cellText = row.cells[index].textContent.trim();
+                if (filter.value) {
+                    if (filter.operator === 'contains') {
+                        if (!cellText.toLowerCase().includes(filter.value.toLowerCase())) {
+                            show = false;
+                        }
+                    } else if (filter.operator === 'greater') {
+                        if (filter.colType === 'number') {
+                            if (!(parseFloat(cellText) > parseFloat(filter.value))) show = false;
+                        } else if (filter.colType === 'date') {
+                            if (!(Date.parse(cellText) > Date.parse(filter.value))) show = false;
+                        } else {
+                            if (!(cellText > filter.value)) show = false;
+                        }
+                    } else if (filter.operator === 'less') {
+                        if (filter.colType === 'number') {
+                            if (!(parseFloat(cellText) < parseFloat(filter.value))) show = false;
+                        } else if (filter.colType === 'date') {
+                            if (!(Date.parse(cellText) < Date.parse(filter.value))) show = false;
+                        } else {
+                            if (!(cellText < filter.value)) show = false;
+                        }
+                    }
+                }
+            });
+            row.style.display = show ? '' : 'none';
+        });
+    }
+</script>
+</body>
+</html>

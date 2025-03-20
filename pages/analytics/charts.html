@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Accounts Analytics - Karma</title>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <style>
+        /* Page-specific styling */
+        body {
+            background: #f4f4f4;
+            font-family: Arial, sans-serif;
+            color: #333;
+        }
+        .header, .breadcrumb, .footer {
+            margin-bottom: 10px;
+        }
+        .content {
+            padding: 20px;
+        }
+        .dropdown-container {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .dropdown-container select {
+            font-size: 16px;
+            padding: 8px;
+            width: 300px;
+        }
+        .charts-container {
+            display: flex;
+            flex-direction: column; /* Change to column for stacked charts */
+            gap: 40px;
+        }
+        .chart-section {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .chart-section h3 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .chart-placeholder {
+            height: 400px; /* Increased height for better visibility */
+        }
+        .chart-canvas {
+            width: 100% !important;
+            height: 100% !important; /* Ensure canvas takes full height */
+        }
+    </style>
+</head>
+<body>
+<!-- Header Section -->
+<header class="header">
+    <div class="logo">
+        <a href="../home/index.html">
+            <img src="../../assets/images/logo.png" alt="Karma Logo">
+        </a>
+    </div>
+</header>
+
+<!-- Breadcrumb -->
+<nav class="breadcrumb">
+    <a href="../home/index.html">Home</a>
+    <span>&gt;</span>
+    <a href="index.html">Analytics</a>
+    <span>&gt;</span>
+    <span>Accounts Analytics</span>
+</nav>
+
+<!-- Main Content -->
+<div class="content">
+    <!-- Account Selector Drop-down -->
+    <div class="dropdown-container">
+        <label for="account-select">Select an Account: </label>
+        <select id="account-select">
+            <option value="">Loading accounts...</option>
+        </select>
+    </div>
+
+    <!-- Container for Charts -->
+    <div class="charts-container" id="charts-container">
+        <!-- Number Chart: Account Balance -->
+        <div class="chart-section" id="number-chart-section">
+            <h3>Account Balance</h3>
+            <div id="account-number-chart" class="chart-placeholder">
+                <!-- Chart will render here -->
+            </div>
+        </div>
+
+        <!-- Line Chart: Account Balance Over Time -->
+        <div class="chart-section" id="line-chart-section">
+            <h3>Account Balance Over Time</h3>
+            <div id="account-line-chart" class="chart-placeholder">
+                <!-- Chart will render here -->
+            </div>
+        </div>
+
+        <!-- Bar Chart: Account Balance Delta Monthly -->
+        <div class="chart-section" id="bar-chart-section">
+            <h3>Account Balance Delta Monthly</h3>
+            <div id="account-bar-chart" class="chart-placeholder">
+                <!-- Chart will render here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+    <p>Welcome to Karma</p>
+</footer>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Date adapter for Chart.js using date-fns -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+<script>
+    // Helper function to fetch JSON data from an endpoint.
+    async function fetchData(endpoint) {
+        const response = await fetch(endpoint);
+        if (!response.ok) {
+            throw new Error(`Error fetching data: ${response.statusText}`);
+        }
+        return response.json();
+    }
+
+    // Populate the account drop-down from the /financials/account-list route.
+    async function loadAccountsList() {
+        try {
+            const accounts = await fetchData('http://localhost:5000/financials/account-list');
+            const accountSelect = document.getElementById('account-select');
+            // Clear existing options.
+            accountSelect.innerHTML = '';
+            if (accounts.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No accounts found';
+                accountSelect.appendChild(opt);
+                return;
+            }
+            // Populate the drop-down (using account id and account_name for display).
+            accounts.forEach(account => {
+                const opt = document.createElement('option');
+                opt.value = account.id;
+                // Using account name if available.
+                opt.textContent = account.account_name ? account.account_name : account.id;
+                accountSelect.appendChild(opt);
+            });
+        } catch (error) {
+            console.error('Error loading accounts list:', error);
+            const accountSelect = document.getElementById('account-select');
+            accountSelect.innerHTML = '<option value="">Error loading accounts</option>';
+        }
+    }
+
+    // Render the Number chart (Account Balance)
+    function renderNumberChart(chartData, targetElement) {
+        targetElement.innerHTML = `<div style="font-size: 48px; text-align: center; padding: 20px; border: 1px solid #ccc; border-radius: 8px;">
+                                    ${chartData.data.value}${chartData.data.unit ? chartData.data.unit : ''}
+                                  </div>`;
+    }
+
+    // Render the Line chart (Account Balance Over Time) using Chart.js
+    function renderLineChart(chartData, targetElement) {
+        targetElement.innerHTML = `<canvas class="chart-canvas"></canvas>`;
+        const ctx = targetElement.querySelector('canvas').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartData.data.labels,
+                datasets: [{
+                    label: chartData.title,
+                    data: chartData.data.values,
+                    fill: false,
+                    borderColor: 'blue',
+                    tension: 0.1 // Smooth lines
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false, // Allow height to be flexible
+                plugins: {
+                    tooltip: {
+                        enabled: true // Enable tooltips
+                    },
+                    legend: {
+                        display: true // Show legend
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'day'
+                        },
+                        title: { display: true, text: 'Time' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Balance' }
+                    }
+                }
+            }
+        });
+    }
+
+    // Render the Bar chart (Account Balance Delta Monthly) using Chart.js
+    function renderBarChart(chartData, targetElement) {
+        targetElement.innerHTML = `<canvas class="chart-canvas"></canvas>`;
+        const ctx = targetElement.querySelector('canvas').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartData.data.labels,
+                datasets: [{
+                    label: chartData.title,
+                    data: chartData.data.values,
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        enabled: true
+                    },
+                    legend: {
+                        display: true
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Month' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Balance Delta' }
+                    }
+                }
+            }
+        });
+    }
+
+    // Load and render the charts for the selected account.
+    async function loadAccountCharts(accountId) {
+        // Endpoints with the account_id query parameter.
+        const numberChartEndpoint = `http://localhost:5000/analytics/account-balance?account_id=${accountId}`;
+        const lineChartEndpoint = `http://localhost:5000/analytics/account-balance-timeseries?account_id=${accountId}`;
+        const barChartEndpoint = `http://localhost:5000/analytics/account-balance-delta-monthly?account_id=${accountId}`;
+
+        const numberChartContainer = document.getElementById('account-number-chart');
+        const lineChartContainer = document.getElementById('account-line-chart');
+        const barChartContainer = document.getElementById('account-bar-chart');
+
+        // Clear current chart content.
+        numberChartContainer.innerHTML = 'Loading account balance...';
+        lineChartContainer.innerHTML = 'Loading balance time series...';
+        barChartContainer.innerHTML = 'Loading balance delta monthly...';
+
+        try {
+            const numberChartData = await fetchData(numberChartEndpoint);
+            renderNumberChart(numberChartData, numberChartContainer);
+        } catch (error) {
+            numberChartContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+        }
+
+        try {
+            const lineChartData = await fetchData(lineChartEndpoint);
+            renderLineChart(lineChartData, lineChartContainer);
+        } catch (error) {
+            lineChartContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+        }
+
+        try {
+            const barChartData = await fetchData(barChartEndpoint);
+            renderBarChart(barChartData, barChartContainer);
+        } catch (error) {
+            barChartContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+        }
+    }
+
+    // Set up event listener for account drop-down changes.
+    document.getElementById('account-select').addEventListener('change', function() {
+        const selectedAccountId = this.value;
+        if (selectedAccountId) {
+            loadAccountCharts(selectedAccountId);
+        }
+    });
+
+    // On page load, fetch accounts and optionally load the charts for the first account.
+    window.addEventListener('DOMContentLoaded', async () => {
+        await loadAccountsList();
+        const accountSelect = document.getElementById('account-select');
+        if (accountSelect.value) {
+            loadAccountCharts(accountSelect.value);
+        }
+    });
+</script>
+</body>
+</html>

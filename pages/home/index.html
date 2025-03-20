@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Karma - Home</title>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+</head>
+<body>
+<!-- Toggle Sidebar Button -->
+<button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+
+<!-- Sidebar -->
+<div id="sidebar" class="sidebar">
+    <ul>
+        <li><a href="../analytics/index.html">Analytics</a></li>
+        <li><a href="#">Financials</a></li>
+        <li><a href="#">Operations</a></li>
+        <li><a href="#">Distribution and Sales</a></li>
+    </ul>
+</div>
+
+<!-- Header Section with Logo (Not clickable on home) -->
+<header class="header">
+    <div class="logo">
+        <img src="../../assets/images/logo.png" alt="Karma Logo">
+    </div>
+</header>
+
+<!-- Main Content with Full-Width Video Background -->
+<section class="video-section">
+    <video class="section-bg-video" autoplay muted loop>
+        <source src="../../assets/video/test.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+    <p>Welcome to Karma</p>
+</footer>
+
+<!-- Home page JavaScript -->
+<script src="home.js"></script>
+<script>
+    window.addEventListener('DOMContentLoaded', () => {
+        const sectionVideo = document.querySelector('.section-bg-video');
+        if (sectionVideo) {
+            sectionVideo.playbackRate = 0.5;
+        }
+    });
+</script>
+</body>
+</html>
