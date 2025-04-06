@@ -51,10 +51,28 @@ app/
   domains/
     analytics/
       __init__.py
+      chart_interfaces.py
       routes.py
+    financials/
+      __init__.py
+      domain.py
+      routes.py
+  repositories/
+    __init__.py
+    google_sheets_repository.py
   __init__.py
   config.py
-  extensions.py
+migrations/
+  versions/
+    778ac4161e64_initial_migration_with_user_model.py
+  env.py
+  README
+  script.py.mako
+models/
+  base.py
+  common.py
+alembic.ini
+docker-compose.yaml
 pyproject.toml
 run.py
 
@@ -89,22 +107,604 @@ analytics_blueprint = Blueprint('analytics', __name__)
 from . import routes
 
 ================
+File: app/domains/analytics/chart_interfaces.py
+================
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+from typing import List, Optional, Union
+
+# Common base model for all charts
+class ChartBase(BaseModel):
+    title: str
+    chart_type: str  # This field can be used as a discriminator in your front end
+
+# Data model for a bar chart
+class BarChartData(BaseModel):
+    labels: List[Union[str, int, float, datetime]]
+    values: List[float]
+    background_colors: Optional[List[str]] = None
+    border_colors: Optional[List[str]] = None
+
+class BarChart(ChartBase):
+    chart_type: str = "bar"
+    data: BarChartData
+
+# Data model for a line chart
+class LineChartData(BaseModel):
+    # labels list of strings, integers, or dates
+    labels: List[Union[str, int, float, datetime]]
+    values: List[float]
+    line_color: Optional[str] = None
+    fill: Optional[bool] = False
+
+class LineChart(ChartBase):
+    chart_type: str = "line"
+    data: LineChartData
+
+# Data model for a pie chart
+class PieChartData(BaseModel):
+    labels: List[Union[str, int, float, datetime]]
+    values: List[float]
+    colors: Optional[List[str]] = None
+
+class PieChart(ChartBase):
+    chart_type: str = "pie"
+    data: PieChartData
+
+# Data model for a simple number chart
+class NumberChartData(BaseModel):
+    value: float
+    unit: Optional[str] = None  # e.g., %, $, etc.
+    # You could add an optional description or formatting options if needed
+
+class NumberChart(ChartBase):
+    chart_type: str = "number"
+    data: NumberChartData
+
+# Union type that can be used if your endpoint returns multiple types of charts
+Chart = Union[BarChart, LineChart, PieChart, NumberChart]
+
+================
 File: app/domains/analytics/routes.py
 ================
 # app/domains/hello/routes.py
-from flask import jsonify
-
+from flask import Blueprint, request, jsonify
 from app.domains.analytics import analytics_blueprint
+from app.domains.financials.domain import FinancialsDomain
+from app.domains.analytics.chart_interfaces import Chart, BarChart, BarChartData, LineChart, LineChartData, PieChart, PieChartData, NumberChart
 
-@analytics_blueprint.route('/', methods=['GET'])
-def hello_world():
-    return jsonify({'message': 'Hello World'})
+from app.domains.analytics.chart_interfaces import NumberChartData
+from pydantic import BaseModel
 
 
 
-@analytics_blueprint.route('/', methods=['GET'])
-def get_account_balances():
-    return jsonify({'message': 'Hello World'})
+
+
+
+
+
+
+
+
+
+@analytics_blueprint.route('/account-balance', methods=['GET'])
+def get_account_balances_chart():
+
+    # request param account id
+    account_id = request.args.get('account_id')
+    if not account_id:
+        return jsonify({'message': 'Account ID is required'}), 400
+
+    financials_domain = FinancialsDomain()
+    account_balance = financials_domain.get_account_balance(account_id=account_id)
+
+    # number chart
+    chart = NumberChart(
+        title="Account Balance",
+        data=NumberChartData(value=account_balance)
+    )
+    return jsonify(chart.dict())
+
+
+@analytics_blueprint.route('/account-balance-timeseries', methods=['GET'])
+def get_account_balances_timeseries_chart():
+
+    # request param account id
+    account_id = request.args.get('account_id')
+    if not account_id:
+        return jsonify({'message': 'Account ID is required'}), 400
+
+    financials_domain = FinancialsDomain()
+    account_balances_timeseries = financials_domain.generate_balance_cumulitive_sum(account_id=account_id)
+    # returns tuple(balance, date)
+
+    # line chart
+    chart = LineChart(
+        title="Account Balance Over Time",
+        data=LineChartData(
+            labels=[date for _, date in account_balances_timeseries],
+            values=[balance for balance, _ in account_balances_timeseries]
+        )
+    )
+    return jsonify(chart.dict())
+
+# get barchart of account balance delta over time grouped by Month
+@analytics_blueprint.route('/account-balance-delta-monthly', methods=['GET'])
+def get_account_balances_delta_monthly_chart():
+        # request param account id
+        account_id = request.args.get('account_id')
+        if not account_id:
+            return jsonify({'message': 'Account ID is required'}), 400
+
+        financials_domain = FinancialsDomain()
+        account_balances_delta_monthly = financials_domain.generate_balance_delta_monthly(account_id=account_id)
+        # returns tuple(balance, date)
+
+        # line chart
+        chart = BarChart(
+            title="Account Balance Delta Monthly",
+            data=BarChartData(
+                labels=[date for _, date in account_balances_delta_monthly],
+                values=[balance for balance, _ in account_balances_delta_monthly]
+            )
+        )
+        return jsonify(chart.dict())
+
+
+
+# @analytics_blueprint.route('/account-balance-time-grouped-chart', methods=['GET'])
+# def get_account_balances_timeseries_chart():
+#     return jsonify({'message': 'Hello World'})
+
+================
+File: app/domains/financials/__init__.py
+================
+# app/domains/hello/__init__.py
+from flask import Blueprint
+
+financials_blueprint = Blueprint('financials', __name__)
+
+# Import routes so they are registered with the blueprint
+from . import routes
+
+================
+File: app/domains/financials/domain.py
+================
+from datetime import datetime
+from enum import Enum
+from typing import Optional, Tuple, List
+import pandas as pd
+from app.repositories.google_sheets_repository import GoogleSheetRepository
+from app.repositories.google_sheets_repository import TableSheets
+from pydantic import BaseModel
+
+from app.repositories import google_sheet_repository
+
+
+class AccountBalanceEvent(BaseModel):
+    event_date: str
+    event_type: str # str tied to enum
+    amount: float
+    metadata: dict = {}
+
+class EventType(Enum):
+    PURCHASE = 'purchase'
+    TRANSFER = 'transfer'
+    SALARY = 'salary'
+    PRODUCTION_PURCHASE = 'production_purchase'
+    PAYMENT = 'payment'
+    INVOICE = 'invoice'
+    EXPENSE = 'expense'
+
+
+class FinancialsDomain:
+
+    #HACK
+    MAIN_ACCOUNT = 'acc_pcg9l_00000003'
+
+    def __init__(self):
+        self.google_sheet_repository = google_sheet_repository
+
+    def generate_balance_delta_monthly(self,account_id: str) -> tuple[float, str]:
+        # get all events
+        events = self.get_account_events(account_id)
+        # filter by month
+        events['event_date'] = pd.to_datetime(events['event_date'])
+        # filter by month
+        events['month'] = events['event_date'].dt.to_period('M')
+        # group by month
+        events_grouped = events.groupby('month').agg({'amount': 'sum'}).reset_index()
+
+        # return tuple series balance and month(str)
+        return [(row['amount'], row['month'].strftime('%Y-%m')) for _, row in events_grouped.iterrows()]
+
+
+
+
+
+
+
+
+
+
+    def get_account_balance(self, account_id: str, starting_balance: tuple[float, datetime] = None):
+        cumsum = self.generate_balance_cumulitive_sum(account_id, starting_balance)
+        return cumsum[-1][0]
+
+    def generate_balance_cumulitive_sum(
+            self,
+            account_id: str,
+            start: Optional[Tuple[float, datetime]] = None
+    ) -> List[Tuple[float, str]]:
+        """
+        Generate a time series of cumulative balances from a DataFrame of events.
+
+        Parameters:
+            events (pd.DataFrame): DataFrame with at least two columns:
+                - 'date': the timestamp of the event (datetime-compatible string or object)
+                - 'amount': the amount to add (or subtract) from the balance.
+            start (Optional[Tuple[float, datetime]]): A tuple containing the starting balance and date.
+                If provided, this tuple is the first entry in the resulting time series.
+                If not provided, the starting balance defaults to 0.
+
+        Returns:
+            List[Tuple[float, datetime]]: A list of tuples, each representing (balance, date) in chronological order.
+            :param start:
+            :param account_id:
+        """
+        # Ensure the 'date' column is converted to native Python datetime objects
+        events = self.get_account_events(account_id)
+        events = events.copy()
+
+        # event date should be in format 7/27/2024 18:31:40
+
+        events['event_date'] = pd.to_datetime(events['event_date']).dt.to_pydatetime()
+        # fix make isoformat
+        events['event_date'] = events['event_date'].apply(lambda x: x.isoformat())
+
+        # Sort events by date
+        events_sorted = events.sort_values(by='event_date')
+
+        # Initialize the time series list and starting balance
+        time_series: List[Tuple[float, datetime]] = []
+
+        if start is not None:
+            balance, start_date = start
+            time_series.append((balance, start_date))
+        else:
+            balance = 0.0
+
+        # Process each event to update the balance and record the timestamp
+        for _, row in events_sorted.iterrows():
+            event_date = row['event_date']
+            amount = row['amount']
+            balance += amount
+            time_series.append((balance, event_date))
+
+
+
+        return time_series
+
+    def get_account_events(self, account_id: str):
+        # Load dataframes from the google sheet repository
+        accounts = self.google_sheet_repository.get_all(TableSheets.ACCOUNTS)
+        transfers = self.google_sheet_repository.get_all(TableSheets.TRANSFERS)
+        purchases = self.google_sheet_repository.get_all(TableSheets.PURCHASES)
+        salaries = self.google_sheet_repository.get_all(TableSheets.SALARIES)
+        production_purchases = self.google_sheet_repository.get_all(TableSheets.PRODUCTION_PURCHASES)
+        payments = self.google_sheet_repository.get_all(TableSheets.PAYMENTS)
+        expenses = self.google_sheet_repository.get_all(TableSheets.EXPENSES)
+
+        # return salaries
+
+        # Create an empty DataFrame with the needed columns
+        events_df = pd.DataFrame(columns=['event_date', 'event_type', 'amount', 'metadata'])
+
+        # Process non-transfer events only for the main account
+        if account_id == self.MAIN_ACCOUNT:
+            # Process purchases: Timestamp -> event_date, total_price -> amount
+            if not purchases.empty:
+                df = purchases[['Timestamp', 'total_price']].copy()
+                df['event_date'] = df['Timestamp']
+                df['amount'] = df['total_price'].apply(self.parse_amount) * -1
+                df['event_type'] = EventType.PURCHASE.value
+                df['metadata'] = [{}] * len(df)
+                df = df[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, df], ignore_index=True)
+
+            # Process production purchases similarly
+            if not production_purchases.empty:
+                df = production_purchases[['Timestamp', 'total_price']].copy()
+                df['event_date'] = df['Timestamp']
+                df['amount'] = df['total_price'].apply(self.parse_amount) * -1
+                df['event_type'] = EventType.PRODUCTION_PURCHASE.value
+                df['metadata'] = [{}] * len(df)
+                df = df[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, df], ignore_index=True)
+
+            # Process salaries: Timestamp -> event_date, amount remains amount
+            if not salaries.empty:
+                df = salaries[['Timestamp', 'amount']].copy()
+                df['amount'] = df['amount'].apply(self.parse_amount) * -1
+                df['event_date'] = df['Timestamp']
+                df['event_type'] = EventType.SALARY.value
+                df['metadata'] = [{}] * len(df)
+                df = df[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, df], ignore_index=True)
+
+            # Process payments: Timestamp -> event_date, amount remains amount
+            if not payments.empty:
+                df = payments[['Timestamp', 'amount']].copy()
+                df['amount'] = df['amount'].apply(self.parse_amount)
+                df['event_date'] = df['Timestamp']
+                df['event_type'] = EventType.PAYMENT.value
+                df['metadata'] = [{}] * len(df)
+                df = df[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, df], ignore_index=True)
+
+            # Process expenses: Timestamp -> event_date, Amount Paid -> amount
+            if not expenses.empty:
+                df = expenses[['Timestamp', 'Amount Paid']].copy()
+                df['event_date'] = df['Timestamp']
+                df['amount'] = df['Amount Paid'].apply(self.parse_amount) * -1
+                df['event_type'] = EventType.EXPENSE.value
+                df['metadata'] = [{}] * len(df)
+                df = df[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, df], ignore_index=True)
+
+        # -- Process Transfers (for any account) --
+
+        # Find the desired account's currency from the accounts table.
+        # Assumes that the "id" column in accounts uniquely identifies an account.
+        desired_account = accounts[accounts['id'] == account_id]
+        if desired_account.empty:
+            raise ValueError(f"Account {account_id} not found in accounts table.")
+        desired_currency = desired_account.iloc[0]['currency'].lower()
+
+        # Filter transfers where this account is either the sender or the receiver
+        if not transfers.empty:
+            outgoing = transfers[transfers['From Account'] == account_id].copy()
+            incoming = transfers[transfers['To Account'] == account_id].copy()
+
+            # Define a conversion function to ensure the amount is in the desired currency.
+            # conversion rate is given as syp per usd.
+            def convert_amount(row):
+                amt = self.parse_amount(row['Amount'])
+                trans_currency = row['currency'].lower()
+                if trans_currency != desired_currency:
+                    rate = row['conversion rate (usd to syp)']
+                    # If desired currency is syp and the transfer is in usd, multiply.
+                    if desired_currency == 'syp' and trans_currency == 'usd':
+                        return amt * rate
+                    # If desired currency is usd and the transfer is in syp, divide.
+                    elif desired_currency == 'usd' and trans_currency == 'syp':
+                        return amt / rate
+                    else:
+                        # For any other currency combination, leave as is.
+                        raise ValueError(f"Unsupported currency conversion {trans_currency} to desired currency {desired_currency}")
+
+                else:
+                    return amt
+
+            # Process outgoing transfers
+            if not outgoing.empty:
+                outgoing['amount'] = outgoing.apply(convert_amount, axis=1) * -1
+                outgoing['event_date'] = outgoing['Timestamp']
+                outgoing['event_type'] = EventType.TRANSFER.value
+                outgoing['metadata'] = [{}] * len(outgoing)
+                outgoing = outgoing[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, outgoing], ignore_index=True)
+
+            # Process incoming transfers
+            if not incoming.empty:
+                incoming['amount'] = incoming.apply(convert_amount, axis=1)
+                incoming['event_date'] = incoming['Timestamp']
+                incoming['event_type'] = EventType.TRANSFER.value
+                incoming['metadata'] = [{}] * len(incoming)
+                incoming = incoming[['event_date', 'event_type', 'amount', 'metadata']]
+                events_df = pd.concat([events_df, incoming], ignore_index=True)
+
+        # Optionally sort the events by date (if the date format allows for lexicographical sorting)
+        events_df.sort_values(by='event_date', inplace=True)
+        events_df.reset_index(drop=True, inplace=True)
+
+        return events_df
+
+
+    def parse_amount(self, value):
+        """Convert a string with possible commas to float."""
+        try:
+            if isinstance(value, str):
+                value = value.replace(',', '')
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
+
+    def parse_timestamp(self, value):
+        """Parse timestamp from format: M/D/YYYY H:M:S (e.g., 8/23/2024 14:41:25)."""
+        try:
+            return datetime.strptime(value, "%m/%d/%Y %H:%M:%S")
+        except Exception:
+            return None
+
+================
+File: app/domains/financials/routes.py
+================
+# app/domains/hello/routes.py
+from flask import Blueprint, request, jsonify
+from app.domains.financials import financials_blueprint
+from pydantic import BaseModel, ValidationError
+from app.repositories import google_sheet_repository
+from app.repositories.google_sheets_repository import TableSheets
+
+
+class GetTableQuery(BaseModel):
+    table: str
+
+@financials_blueprint.route('/get-table', methods=['GET'])
+def get_table_data():
+    # Validate query parameters using Pydantic
+    try:
+        query_params = GetTableQuery(**request.args)
+    except ValidationError as e:
+        # Return validation errors as JSON with status code 422 (Unprocessable Entity)
+        return jsonify(e.errors()), 422
+
+    table_name = query_params.table
+    df = google_sheet_repository.get_all(TableSheets(table_name))
+    return jsonify(df.to_dict(orient='records'))
+
+
+
+class Account(BaseModel):
+    id: str
+    timestamp: str
+    email_address: str
+    account_name: str
+    is_external: bool
+    currency: str
+
+@financials_blueprint.route('/account-list', methods=['GET'])
+def get_account_ids_list():
+    df = google_sheet_repository.get_all(TableSheets.ACCOUNTS)
+    # map to Account model: # id	Timestamp	Email Address	account name	is_external	currency
+    df.columns = ['id', 'timestamp', 'email_address', 'account_name', 'is_external', 'currency']
+
+    # Convert DataFrame to list of Account models
+    accounts = df.to_dict(orient='records')
+    try:
+        _ = [Account(**account) for account in accounts]
+    except ValidationError as e:
+        # Return validation errors as JSON with status code 422 (Unprocessable Entity)
+        return jsonify(e.errors()), 422
+
+    return jsonify(accounts)
+
+================
+File: app/repositories/__init__.py
+================
+from app.repositories.google_sheets_repository import GoogleSheetRepository
+from app.repositories.google_sheets_repository import TableSheets
+
+#singleton
+google_sheet_repository = GoogleSheetRepository()
+
+================
+File: app/repositories/google_sheets_repository.py
+================
+import os
+import time
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from enum import Enum
+import pandas as pd
+
+class TableSheets(Enum):
+    ACCOUNTS = 'accounts'
+    PURCHASES = 'purchases'
+    VENDORS = 'vendors'
+    TRANSFERS = 'transfers'
+    SALARIES = 'salaries'
+    PRODUCTION_PURCHASES = 'production_purchases'
+    PAYMENTS = 'payments'
+    INVOICE = 'invoice'
+    EXPENSES = 'expenses'
+    EMPLOYEE_REGISTRATION = 'employee_registration'
+    CUSTOMER_REGISTRATION = 'customer_registration'
+
+class GoogleSheetRepository:
+    # Each table now maps to a list of sheet definitions.
+    TABLE_TO_SHEET_MAPPER = {
+        TableSheets.ACCOUNTS: [
+            {'spreadsheet_id': '1ZUz53zq3q9eQMgshMmW8axzyiTplZyUPSLsyjg0jBc4', 'sheet_name': 'main'}
+        ],
+        TableSheets.PURCHASES: [
+            {'spreadsheet_id': '1jHp7OFhjfKz7QIJEAeLRKJGmVFhuiJySGkNWxekJiNU', 'sheet_name': 'Form Responses 1'},
+            {'spreadsheet_id': '1iceUUkUDbFCSEgqj8k97Ko9WnLsBjq6Ee6tWwKnyiMU', 'sheet_name': 'Form Responses 1'}
+        ],
+        TableSheets.VENDORS: [
+            {'spreadsheet_id': '1oAmx9g4qxaZyCQOR2TO1Wva04lcdYDjYdd7b2_GMmMA', 'sheet_name': 'main'}
+        ],
+        TableSheets.TRANSFERS: [
+            {'spreadsheet_id': '1S2wbYAG1trhf1ukwMMq2iVJzgFhnKpeLH2jqcx7YEuQ', 'sheet_name': 'main'}
+        ],
+        TableSheets.SALARIES: [
+            {'spreadsheet_id': '1zWskp5UNq7KTJsH_DO0xhIvPhTGXYpyB3xuxE0HTxPM', 'sheet_name': 'main'},
+            {'spreadsheet_id': '1_4--THfe3mn1JogknKvfkiwXc7XFbGLGtDwZcyHXSDQ', 'sheet_name': 'Form Responses 1'}
+        ],
+        TableSheets.PRODUCTION_PURCHASES: [
+            {'spreadsheet_id': '17aRoh5AWmykuyS6Ex4ZN1wx2D-2LFOGdVRRC0ac5KfY', 'sheet_name': 'Form Responses 1'},
+            {'spreadsheet_id': '1BINyyADOy51evE34jc-NmeXuPiC2SCDuJOwsSoObIGo', 'sheet_name': 'Form Responses 1'}
+        ],
+        TableSheets.PAYMENTS: [
+            {'spreadsheet_id': '1I1mBLdsk1CAcLQsVblolCIz1zqSTYZURe0vUfS5rlIo', 'sheet_name': 'main'}
+        ],
+        TableSheets.INVOICE: [
+            {'spreadsheet_id': '1hA_A6ozG_m-48BE7nvPD-b6NCLwc5TzGgTnkwB213Fo', 'sheet_name': 'main'}
+        ],
+        TableSheets.EXPENSES: [
+            {'spreadsheet_id': '1D5ihxWl2bM3_j8EQ0ABdEvH9HnuCXF1shmqd6CRqhcY', 'sheet_name': 'Form Responses 1'}
+        ],
+        TableSheets.EMPLOYEE_REGISTRATION: [
+            {'spreadsheet_id': '1hUP8oDkHIsZC74rpU_uy5hLEWaPdl-Obu2d1THNwcsY', 'sheet_name': 'main'}
+        ],
+        TableSheets.CUSTOMER_REGISTRATION: [
+            {'spreadsheet_id': '1ipZbj9waKoDSNohDnjaNmZh39h1sk2cQFuW4HHcWBUU', 'sheet_name': 'main'}
+        ]
+    }
+
+    CACHE_EXPIRY_SECONDS = 600  # 10 minutes
+
+    def __init__(self):
+        creds = service_account.Credentials.from_service_account_file(
+            os.getenv('GOOGLE_APPLICATION_CREDENTIALS'),
+            scopes=['https://www.googleapis.com/auth/spreadsheets']
+        )
+        self.service = build('sheets', 'v4', credentials=creds)
+        self.cache = {}  # Dictionary to store cached data per table
+
+    def get_all(self, table: TableSheets) -> pd.DataFrame:
+        # Check if there's a valid cached response
+        cache_entry = self.cache.get(table)
+        if cache_entry:
+            cached_df, timestamp = cache_entry
+            if time.time() - timestamp < self.CACHE_EXPIRY_SECONDS:
+                return cached_df
+
+        # Get the list of sheets for the table.
+        sheets_info = self.TABLE_TO_SHEET_MAPPER.get(table, [])
+        all_dataframes = []
+
+        for sheet_def in sheets_info:
+            spreadsheet_id = sheet_def['spreadsheet_id']
+            sheet_name = sheet_def['sheet_name']
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=spreadsheet_id,
+                range=sheet_name
+            ).execute()
+            values = result.get('values', [])
+            if not values:
+                # Skip if there is no data in this sheet.
+                continue
+            # Use the first row as header and the rest as data.
+            header, *data = values
+            df = pd.DataFrame(data, columns=header)
+            all_dataframes.append(df)
+
+        if all_dataframes:
+            # Concatenate data from all sheets and drop rows with any missing values.
+            for df in all_dataframes:
+                df.dropna(inplace=True)
+            combined_df = pd.concat(all_dataframes, ignore_index=True)
+        else:
+            # Return an empty DataFrame if no sheets had data.
+            combined_df = pd.DataFrame()
+
+        # Update the cache with the new DataFrame and the current timestamp.
+        self.cache[table] = (combined_df, time.time())
+
+        return combined_df
 
 ================
 File: app/__init__.py
@@ -115,14 +715,18 @@ from flask import Flask
 from app.common.errors import register_error_handlers
 from app.config import Config
 from app.domains.analytics import analytics_blueprint
+from app.domains.financials import financials_blueprint
 
 
 def create_app(config_object=Config):
+
+
     app = Flask(__name__)
     app.config.from_object(config_object)
 
     # Register blueprints
-    app.register_blueprint(analytics_blueprint, url_prefix='/hello')
+    app.register_blueprint(analytics_blueprint, url_prefix='/analytics')
+    app.register_blueprint(financials_blueprint, url_prefix='/financials')
 
     # Register error handlers
     register_error_handlers(app)
@@ -138,10 +742,229 @@ class Config:
     SECRET_KEY = 'your-secret-key'
 
 ================
-File: app/extensions.py
+File: migrations/versions/778ac4161e64_initial_migration_with_user_model.py
 ================
-# app/extensions.py
-# (For now, this file is empty. You can initialize and configure extensions here later.)
+"""Initial migration with User model
+
+Revision ID: 778ac4161e64
+Revises: 
+Create Date: 2025-03-28 18:37:43.952418
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '778ac4161e64'
+down_revision: Union[str, None] = None
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    pass
+    # ### end Alembic commands ###
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    pass
+    # ### end Alembic commands ###
+
+================
+File: migrations/env.py
+================
+# migrations/env.py
+import os
+import sys
+from logging.config import fileConfig
+from sqlalchemy import engine_from_config, pool
+from alembic import context
+
+# this is the Alembic Config object, which provides
+# access to the values within the .ini file in use.
+config = context.config
+
+# Interpret the config file for Python logging.
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+
+from models.base import Base
+
+# Set the target metadata for 'autogenerate' support.
+target_metadata = Base.metadata
+
+def run_migrations_offline():
+    """Run migrations in 'offline' mode."""
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+def run_migrations_online():
+    """Run migrations in 'online' mode."""
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+
+================
+File: migrations/README
+================
+Generic single-database configuration.
+
+================
+File: migrations/script.py.mako
+================
+"""${message}
+
+Revision ID: ${up_revision}
+Revises: ${down_revision | comma,n}
+Create Date: ${create_date}
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+${imports if imports else ""}
+
+# revision identifiers, used by Alembic.
+revision: str = ${repr(up_revision)}
+down_revision: Union[str, None] = ${repr(down_revision)}
+branch_labels: Union[str, Sequence[str], None] = ${repr(branch_labels)}
+depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    ${upgrades if upgrades else "pass"}
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    ${downgrades if downgrades else "pass"}
+
+================
+File: models/base.py
+================
+# models/base.py
+from sqlalchemy.orm import declarative_base
+
+Base = declarative_base()
+
+================
+File: models/common.py
+================
+import uuid
+from datetime import datetime
+from sqlalchemy import create_engine, Column, String, DateTime
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+from models.base import Base
+
+class User(Base):
+    __tablename__ = 'user'
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    username = Column(String(50), nullable=False, unique=True)
+    first_name = Column(String(50), nullable=False)
+    last_name = Column(String(50), nullable=False)
+    password = Column(String(128), nullable=False)
+    email = Column(String(120), nullable=True, unique=True)
+    permission_scope = Column(String(256), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+================
+File: alembic.ini
+================
+# alembic.ini
+[alembic]
+script_location = migrations
+# Update the URL with your Postgres credentials and database name.
+sqlalchemy.url = postgresql://local:local@localhost/backend
+
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARN
+handlers = console
+qualname =
+[logger_sqlalchemy]
+level = WARN
+handlers =
+qualname = sqlalchemy.engine
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+
+================
+File: docker-compose.yaml
+================
+version: '3.8'
+
+services:
+  db:
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_USER: local
+      POSTGRES_PASSWORD: local
+      POSTGRES_DB: backend
+    command: postgres -c listen_addresses='*'
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
 
 ================
 File: pyproject.toml
@@ -156,7 +979,12 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "flask (>=3.1.0,<3.2.0)"
+    "flask (>=3.1.0,<3.2.0)",
+    "python-dotenv (>=1.0.1,<2.0.0)",
+    "google-api-python-client (>=2.164.0,<3.0.0)",
+    "google-auth (>=2.38.0,<3.0.0)",
+    "pydantic (>=2.10.6,<3.0.0)",
+    "pandas (>=2.2.3,<3.0.0)"
 ]
 
 
@@ -168,7 +996,13 @@ build-backend = "poetry.core.masonry.api"
 File: run.py
 ================
 # run.py
+import os
+from dotenv import load_dotenv, find_dotenv
 from app import create_app
+
+print(find_dotenv())
+load_dotenv(dotenv_path="/Users/zaid/Desktop/karma/backend/.env")
+print(os.getenv('GOOGLE_APPLICATION_CREDENTIALS'))
 
 app = create_app()
 
