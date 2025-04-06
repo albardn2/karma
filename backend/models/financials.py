@@ -500,7 +500,7 @@ class Employee(Base):
 
 
 # ------------------------------
-# Fixed Assets, Batch, Inventory & Related Events
+# Fixed Assets, Batch, Inventory, Warehouse & Related Events
 # ------------------------------
 
 class FixedAsset(Base):
@@ -566,12 +566,30 @@ class Batch(Base):
     inventory_events = relationship("InventoryEvent", back_populates="batch")
 
 
+class Warehouse(Base):
+    __tablename__ = "warehouse"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(120), nullable=False, unique=True)
+    address = Column(Text, nullable=False)
+    coordinates = Column(String(120), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    notes = Column(Text, nullable=True)
+
+    # relations
+    inventories = relationship("Inventory", back_populates="warehouse")
+
+    def __repr__(self):
+        return f"<Warehouse(uuid={self.uuid}, name={self.name}, location={self.location})>"
+
+
 class Inventory(Base):
     __tablename__ = "inventory"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     material_uuid = Column(String(36), ForeignKey("material.uuid"))
+    warehouse_uuid = Column(String(36), ForeignKey("warehouse.uuid"), nullable=True)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
     lot_id = Column(String(120), nullable=False)  # lot number or ID
@@ -584,6 +602,7 @@ class Inventory(Base):
 
     # relations
     material = relationship("Material", back_populates="inventory")
+    warehouse = relationship("Warehouse", back_populates="inventories")
     inventory_events = relationship("InventoryEvent", back_populates="inventory")
 
     @property
