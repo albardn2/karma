@@ -18,7 +18,6 @@ from models.base import Base
 # Customer & Related Models
 # ------------------------------
 
-
 class Customer(Base):
     __tablename__ = "customer"
 
@@ -42,9 +41,7 @@ class Customer(Base):
 
     @property
     def balance(self):
-        return sum(
-            order.total_amount for order in self.orders if not order.is_fulfilled
-        )
+        return sum(order.total_amount for order in self.orders if not order.is_fulfilled)
 
     def __repr__(self):
         return (
@@ -74,9 +71,7 @@ class OrderItem(Base):
     __tablename__ = "order_item"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    customer_order_uuid = Column(
-        String(36), ForeignKey("customer_order.uuid"), nullable=False
-    )
+    customer_order_uuid = Column(String(36), ForeignKey("customer_order.uuid"), nullable=False)
     quantity = Column(Integer, nullable=False)
     unit = Column(String(120), nullable=False)  # should be same as material unit
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
@@ -88,18 +83,10 @@ class OrderItem(Base):
     # relations
     order = relationship("CustomerOrder", back_populates="order_items")
     material = relationship("Material", back_populates="order_items")
-    invoice_item = relationship(
-        "InvoiceItem", back_populates="order_item", uselist=False
-    )
-    inventory_events = relationship(
-        "InventoryEvent", back_populates="customer_order_item"
-    )
-    debit_note_items = relationship(
-        "DebitNoteItem", back_populates="customer_order_item"
-    )
-    credit_note_items = relationship(
-        "CreditNoteItem", back_populates="customer_order_item"
-    )
+    invoice_item = relationship("InvoiceItem", back_populates="order_item", uselist=False)
+    inventory_events = relationship("InventoryEvent", back_populates="customer_order_item")
+    debit_note_items = relationship("DebitNoteItem", back_populates="customer_order_item")
+    credit_note_items = relationship("CreditNoteItem", back_populates="customer_order_item")
 
     def __repr__(self):
         return (
@@ -112,15 +99,12 @@ class OrderItem(Base):
 # Invoice & Payment Models
 # ------------------------------
 
-
 class Invoice(Base):
     __tablename__ = "invoice"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=False)
-    customer_order_uuid = Column(
-        String(36), ForeignKey("customer_order.uuid"), nullable=False
-    )
+    customer_order_uuid = Column(String(36), ForeignKey("customer_order.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     currency = Column(String(120), nullable=False)
     status = Column(String(120), nullable=False)  # e.g., void, pending, paid, etc.
@@ -211,22 +195,18 @@ class Payment(Base):
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     invoice_uuid = Column(String(36), ForeignKey("invoice.uuid"), nullable=False)
-    financial_account_uuid = Column(
-        String(36), ForeignKey("financial_account.uuid"), nullable=False
-    )
+    financial_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=False)
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
     payment_method = Column(String(120), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
-    debit_note_item_uuid = Column(
-        String(36), ForeignKey("debit_note_item.uuid"), nullable=True
-    )
+    debit_note_item_uuid = Column(String(36), ForeignKey("debit_note_item.uuid"), nullable=True)
 
     # relations
     invoice = relationship("Invoice", back_populates="payments")
     financial_account = relationship("FinancialAccount", back_populates="payments")
-    debit_note_item = relationship("DebitNoteItem", back_populates="payment")
+    debit_note_item = relationship("DebitNoteItem", back_populates="payments")
 
     def __repr__(self):
         return (
@@ -238,7 +218,6 @@ class Payment(Base):
 # ------------------------------
 # Financial & Transaction Models
 # ------------------------------
-
 
 class FinancialAccount(Base):
     __tablename__ = "financial_account"
@@ -253,16 +232,8 @@ class FinancialAccount(Base):
     # relations
     payments = relationship("Payment", back_populates="financial_account")
     payouts = relationship("Payout", back_populates="financial_account")
-    transactions_from = relationship(
-        "Transaction",
-        foreign_keys="Transaction.from_account_uuid",
-        back_populates="from_account",
-    )
-    transactions_to = relationship(
-        "Transaction",
-        foreign_keys="Transaction.to_account_uuid",
-        back_populates="to_account",
-    )
+    transactions_from = relationship("Transaction", foreign_keys="Transaction.from_account_uuid", back_populates="from_account")
+    transactions_to = relationship("Transaction", foreign_keys="Transaction.to_account_uuid", back_populates="to_account")
 
     def __repr__(self):
         return f"<FinancialAccount(uuid={self.uuid}, account_name={self.account_name}, balance={self.balance})>"
@@ -274,27 +245,15 @@ class Transaction(Base):
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
-    from_account_uuid = Column(
-        String(36), ForeignKey("financial_account.uuid"), nullable=False
-    )
-    to_account_uuid = Column(
-        String(36), ForeignKey("financial_account.uuid"), nullable=False
-    )
+    from_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=False)
+    to_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=False)
     exchange_rate = Column(Float, default=1.0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
 
     # relations
-    from_account = relationship(
-        "FinancialAccount",
-        foreign_keys=[from_account_uuid],
-        back_populates="transactions_from",
-    )
-    to_account = relationship(
-        "FinancialAccount",
-        foreign_keys=[to_account_uuid],
-        back_populates="transactions_to",
-    )
+    from_account = relationship("FinancialAccount", foreign_keys=[from_account_uuid], back_populates="transactions_from")
+    to_account = relationship("FinancialAccount", foreign_keys=[to_account_uuid], back_populates="transactions_to")
 
     def __repr__(self):
         return f"<Transaction(uuid={self.uuid}, amount={self.amount}, created_at={self.created_at})>"
@@ -303,7 +262,6 @@ class Transaction(Base):
 # ------------------------------
 # Vendor, Material & Pricing Models
 # ------------------------------
-
 
 class Vendor(Base):
     __tablename__ = "vendor"
@@ -356,6 +314,7 @@ class Material(Base):
     batches = relationship("Batch", back_populates="material")
     purchase_order_items = relationship("PurchaseOrderItem", back_populates="material")
     fixed_assets = relationship("FixedAsset", back_populates="material")
+    inventory_events = relationship("InventoryEvent", back_populates="material")
 
     def __repr__(self):
         return f"<Material(uuid={self.uuid}, name={self.name})>"
@@ -388,7 +347,6 @@ class Pricing(Base):
 # Purchase & Expense Models
 # ------------------------------
 
-
 class PurchaseOrder(Base):
     __tablename__ = "purchase_order"
 
@@ -403,16 +361,12 @@ class PurchaseOrder(Base):
 
     # relations
     vendor = relationship("Vendor", back_populates="purchase_orders")
-    purchase_order_items = relationship(
-        "PurchaseOrderItem", back_populates="purchase_order"
-    )
+    purchase_order_items = relationship("PurchaseOrderItem", back_populates="purchase_order")
     payouts = relationship("Payout", back_populates="purchase_order")
 
     @property
     def total_amount(self):
-        return sum(
-            item.price_per_unit * item.quantity for item in self.purchase_order_items
-        )
+        return sum(item.price_per_unit * item.quantity for item in self.purchase_order_items)
 
     @property
     def amount_paid(self):
@@ -437,11 +391,7 @@ class PurchaseOrder(Base):
     @property
     def fulfilled_at(self):
         if self.is_fulfilled:
-            return max(
-                item.fulfilled_at
-                for item in self.purchase_order_items
-                if item.fulfilled_at
-            )
+            return max(item.fulfilled_at for item in self.purchase_order_items if item.fulfilled_at)
 
     def __repr__(self):
         return (
@@ -454,9 +404,7 @@ class PurchaseOrderItem(Base):
     __tablename__ = "purchase_order_item"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    purchase_order_uuid = Column(
-        String(36), ForeignKey("purchase_order.uuid"), nullable=False
-    )
+    purchase_order_uuid = Column(String(36), ForeignKey("purchase_order.uuid"), nullable=False)
     quantity = Column(Integer, nullable=False)
     price_per_unit = Column(Float, nullable=False)
     unit = Column(String(120), nullable=False)  # should be same as material unit
@@ -468,22 +416,12 @@ class PurchaseOrderItem(Base):
     is_deleted = Column(Boolean, default=False)
 
     # relations
-    purchase_order = relationship(
-        "PurchaseOrder", back_populates="purchase_order_items"
-    )
+    purchase_order = relationship("PurchaseOrder", back_populates="purchase_order_items")
     material = relationship("Material", back_populates="purchase_order_items")
-    fixed_asset = relationship(
-        "FixedAsset", back_populates="purchase_order_item", uselist=False
-    )
-    debit_note_items = relationship(
-        "DebitNoteItem", back_populates="purchase_order_item"
-    )
-    credit_note_items = relationship(
-        "CreditNoteItem", back_populates="purchase_order_item"
-    )
-    inventory_events = relationship(
-        "InventoryEvent", back_populates="purchase_order_item"
-    )
+    fixed_asset = relationship("FixedAsset", back_populates="purchase_order_item", uselist=False)
+    debit_note_items = relationship("DebitNoteItem", back_populates="purchase_order_item")
+    credit_note_items = relationship("CreditNoteItem", back_populates="purchase_order_item")
+    inventory_events = relationship("InventoryEvent", back_populates="purchase_order_item")
 
     @property
     def total_price(self):
@@ -500,21 +438,15 @@ class Payout(Base):
     __tablename__ = "payout"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    purchase_order_uuid = Column(
-        String(36), ForeignKey("purchase_order.uuid"), nullable=True
-    )
+    purchase_order_uuid = Column(String(36), ForeignKey("purchase_order.uuid"), nullable=True)
     expense_uuid = Column(String(36), ForeignKey("expense.uuid"), nullable=True)
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
-    financial_account_uuid = Column(
-        String(36), ForeignKey("financial_account.uuid"), nullable=False
-    )
+    financial_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
     employee_uuid = Column(String(36), ForeignKey("employee.uuid"), nullable=True)
-    credit_note_item_uuid = Column(
-        String(36), ForeignKey("credit_note_item.uuid"), nullable=True
-    )
+    credit_note_item_uuid = Column(String(36), ForeignKey("credit_note_item.uuid"), nullable=True)
 
     # relations
     financial_account = relationship("FinancialAccount", back_populates="payouts")
@@ -522,6 +454,9 @@ class Payout(Base):
     expense = relationship("Expense", back_populates="payouts")
     employee = relationship("Employee", back_populates="payouts")
     credit_note_item = relationship("CreditNoteItem", back_populates="payouts")
+
+    def __repr__(self):
+        return f"<Payout(uuid={self.uuid}, amount={self.amount}, currency={self.currency})>"
 
 
 class Expense(Base):
@@ -568,7 +503,6 @@ class Employee(Base):
 # Fixed Assets, Batch, Inventory & Related Events
 # ------------------------------
 
-
 class FixedAsset(Base):
     __tablename__ = "fixed_asset"
 
@@ -579,15 +513,11 @@ class FixedAsset(Base):
     purchase_date = Column(DateTime, nullable=False)
     current_value = Column(Float, nullable=False)
     annual_depreciation_rate = Column(Float, nullable=False)  # in percentage
-    purchase_order_item_uuid = Column(
-        String(36), ForeignKey("purchase_order_item.uuid"), nullable=True
-    )
+    purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=True)
     is_deleted = Column(Boolean, default=False)
 
     # relations
-    purchase_order_item = relationship(
-        "PurchaseOrderItem", back_populates="fixed_asset"
-    )
+    purchase_order_item = relationship("PurchaseOrderItem", back_populates="fixed_asset")
 
     def __repr__(self):
         return (
@@ -621,9 +551,7 @@ class Batch(Base):
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    type = Column(
-        String(120), nullable=False
-    )  # e.g., powder_preparation, coated_peanuts
+    type = Column(String(120), nullable=False)  # e.g., powder_preparation, coated_peanuts
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
     batch_id = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
@@ -674,32 +602,20 @@ class InventoryEvent(Base):
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     inventory_uuid = Column(String(36), ForeignKey("inventory.uuid"), nullable=False)
-    purchase_order_item_uuid = Column(
-        String(36), ForeignKey("purchase_order_item.uuid"), nullable=True
-    )
+    purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=True)
     batch_uuid = Column(String(36), ForeignKey("batch.uuid"), nullable=True)
-    customer_order_item_uuid = Column(
-        String(36), ForeignKey("order_item.uuid"), nullable=True
-    )
-    event_type = Column(
-        String(120), nullable=False
-    )  # e.g., addition, removal, adjustment, transfer, etc.
+    customer_order_item_uuid = Column(String(36), ForeignKey("order_item.uuid"), nullable=True)
+    event_type = Column(String(120), nullable=False)  # e.g., addition, removal, adjustment, transfer, etc.
     quantity = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
-    debit_note_item_uuid = Column(
-        String(36), ForeignKey("debit_note_item.uuid"), nullable=True
-    )
-    credit_note_item_uuid = Column(
-        String(36), ForeignKey("credit_note_item.uuid"), nullable=True
-    )
+    debit_note_item_uuid = Column(String(36), ForeignKey("debit_note_item.uuid"), nullable=True)
+    credit_note_item_uuid = Column(String(36), ForeignKey("credit_note_item.uuid"), nullable=True)
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
 
     # relations
     inventory = relationship("Inventory", back_populates="inventory_events")
-    purchase_order_item = relationship(
-        "PurchaseOrderItem", back_populates="inventory_events"
-    )
+    purchase_order_item = relationship("PurchaseOrderItem", back_populates="inventory_events")
     batch = relationship("Batch", back_populates="inventory_events")
     customer_order_item = relationship("OrderItem", back_populates="inventory_events")
     debit_note_item = relationship("DebitNoteItem", back_populates="inventory_events")
@@ -717,7 +633,6 @@ class InventoryEvent(Base):
 # Debit & Credit Note Models
 # ------------------------------
 
-
 class DebitNoteItem(Base):
     __tablename__ = "debit_note_item"
 
@@ -726,25 +641,17 @@ class DebitNoteItem(Base):
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
     status = Column(String(120), nullable=False)  # e.g., void, pending, paid
-    invoice_item_uuid = Column(
-        String(36), ForeignKey("invoice_item.uuid"), nullable=False
-    )
-    customer_order_item_uuid = Column(
-        String(36), ForeignKey("order_item.uuid"), nullable=False
-    )
+    invoice_item_uuid = Column(String(36), ForeignKey("invoice_item.uuid"), nullable=False)
+    customer_order_item_uuid = Column(String(36), ForeignKey("order_item.uuid"), nullable=False)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=False)
     vendor_uuid = Column(String(36), ForeignKey("vendor.uuid"), nullable=False)
-    purchase_order_item_uuid = Column(
-        String(36), ForeignKey("purchase_order_item.uuid"), nullable=False
-    )
+    purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # relations
     invoice_item = relationship("InvoiceItem", back_populates="debit_note_items")
     customer_order_item = relationship("OrderItem", back_populates="debit_note_items")
-    purchase_order_item = relationship(
-        "PurchaseOrderItem", back_populates="debit_note_items"
-    )
+    purchase_order_item = relationship("PurchaseOrderItem", back_populates="debit_note_items")
     customer = relationship("Customer", back_populates="debit_note_items")
     vendor = relationship("Vendor", back_populates="debit_note_items")
     inventory_events = relationship("InventoryEvent", back_populates="debit_note_item")
@@ -762,25 +669,17 @@ class CreditNoteItem(Base):
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
     status = Column(String(120), nullable=False)  # e.g., void, pending, paid
-    invoice_item_uuid = Column(
-        String(36), ForeignKey("invoice_item.uuid"), nullable=True
-    )
-    customer_order_item_uuid = Column(
-        String(36), ForeignKey("order_item.uuid"), nullable=True
-    )
+    invoice_item_uuid = Column(String(36), ForeignKey("invoice_item.uuid"), nullable=True)
+    customer_order_item_uuid = Column(String(36), ForeignKey("order_item.uuid"), nullable=True)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=True)
     vendor_uuid = Column(String(36), ForeignKey("vendor.uuid"), nullable=True)
-    purchase_order_item_uuid = Column(
-        String(36), ForeignKey("purchase_order_item.uuid"), nullable=False
-    )
+    purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # relations
     invoice_item = relationship("InvoiceItem", back_populates="credit_note_items")
     customer_order_item = relationship("OrderItem", back_populates="credit_note_items")
-    purchase_order_item = relationship(
-        "PurchaseOrderItem", back_populates="credit_note_items"
-    )
+    purchase_order_item = relationship("PurchaseOrderItem", back_populates="credit_note_items")
     inventory_events = relationship("InventoryEvent", back_populates="credit_note_item")
     customer = relationship("Customer", back_populates="credit_note_items")
     vendor = relationship("Vendor", back_populates="credit_note_items")
