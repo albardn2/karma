@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 
 from models.base import Base
-from models.common import User
+from models.common import *
 
 # Set the target metadata for 'autogenerate' support.
 target_metadata = Base.metadata
