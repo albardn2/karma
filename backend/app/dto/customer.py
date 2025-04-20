@@ -14,8 +14,6 @@ class CustomerCategory(str, Enum):
     SUPERMARKET = "supermarket"
 
 
-
-
 class CustomerBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -28,6 +26,7 @@ class CustomerBase(BaseModel):
     notes: Optional[str] = None
     category: CustomerCategory
     coordinates: Optional[str] = None
+    created_by_uuid : Optional[UUID] = None
 
 class CustomerCreate(CustomerBase):
     """What’s required when creating a new customer."""

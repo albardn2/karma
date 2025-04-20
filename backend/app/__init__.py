@@ -7,6 +7,10 @@ from app.config import Config
 
 from app.entrypoint.routes.common.errors import register_error_handlers
 from app.entrypoint.routes.customer import customer_blueprint
+from app.entrypoint.routes.material import material_blueprint
+from app.entrypoint.routes.vendor import vendor_blueprint
+from app.entrypoint.routes.employee import employee_blueprint
+from app.entrypoint.routes.expense import expense_blueprint
 
 load_dotenv()
 
@@ -21,7 +25,10 @@ def create_app(config_object=Config):
 
     # Register blueprints
     app.register_blueprint(customer_blueprint, url_prefix='/customer')
-    # app.register_blueprint(financials_blueprint, url_prefix='/financials')
+    app.register_blueprint(material_blueprint, url_prefix='/material')
+    app.register_blueprint(vendor_blueprint, url_prefix='/vendor')
+    app.register_blueprint(employee_blueprint, url_prefix='/employee')
+    app.register_blueprint(expense_blueprint, url_prefix='/expense')
 
     # Register error handlers
     register_error_handlers(app)

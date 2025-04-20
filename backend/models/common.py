@@ -60,6 +60,7 @@ class Customer(Base):
     __tablename__ = "customer"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     email_address = Column(String(120), nullable=True, unique=True)
     company_name = Column(String(120), nullable=False)
@@ -92,6 +93,7 @@ class CustomerOrder(Base):
     __tablename__ = "customer_order"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=False)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -109,6 +111,7 @@ class OrderItem(Base):
     __tablename__ = "order_item"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     customer_order_uuid = Column(String(36), ForeignKey("customer_order.uuid"), nullable=False)
     quantity = Column(Integer, nullable=False)
     unit = Column(String(120), nullable=False)  # should be same as material unit
@@ -141,6 +144,7 @@ class Invoice(Base):
     __tablename__ = "invoice"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=False)
     customer_order_uuid = Column(String(36), ForeignKey("customer_order.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -186,6 +190,7 @@ class InvoiceItem(Base):
     __tablename__ = "invoice_item"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     invoice_uuid = Column(String(36), ForeignKey("invoice.uuid"), nullable=False)
     order_item_uuid = Column(String(36), ForeignKey("order_item.uuid"), nullable=False)
     price_per_unit = Column(Float, nullable=False)
@@ -232,6 +237,7 @@ class Payment(Base):
     __tablename__ = "payment"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     invoice_uuid = Column(String(36), ForeignKey("invoice.uuid"), nullable=False)
     financial_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=False)
     amount = Column(Float, nullable=False)
@@ -261,6 +267,7 @@ class FinancialAccount(Base):
     __tablename__ = "financial_account"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     account_name = Column(String(120), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     balance = Column(Float, nullable=False)
@@ -281,6 +288,7 @@ class Transaction(Base):
     __tablename__ = "transaction"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
     from_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=False)
@@ -305,6 +313,7 @@ class Vendor(Base):
     __tablename__ = "vendor"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     email_address = Column(String(120), nullable=True, unique=True)
     company_name = Column(String(120), nullable=False)
@@ -338,12 +347,14 @@ class Material(Base):
     __tablename__ = "material"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     name = Column(String(120), nullable=False)
-    unit = Column(String(120), nullable=True)  # e.g., kg, liters, etc.
+    measure_unit = Column(String(120), nullable=True)  # e.g., kg, liters, etc.
     created_at = Column(DateTime, default=datetime.utcnow)
     sku = Column(String(120), nullable=False, unique=True)
     description = Column(Text, nullable=True)
     type = Column(String(120), nullable=False)  # e.g., raw_material, product, interim
+    is_deleted = Column(Boolean, default=False)
 
     # relations
     pricing = relationship("Pricing", back_populates="material", uselist=False)
@@ -362,6 +373,7 @@ class Pricing(Base):
     __tablename__ = "pricing"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     price_per_unit = Column(Float, nullable=False)
@@ -389,6 +401,7 @@ class PurchaseOrder(Base):
     __tablename__ = "purchase_order"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     vendor_uuid = Column(String(36), ForeignKey("vendor.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     currency = Column(String(120), nullable=False)
@@ -442,6 +455,7 @@ class PurchaseOrderItem(Base):
     __tablename__ = "purchase_order_item"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     purchase_order_uuid = Column(String(36), ForeignKey("purchase_order.uuid"), nullable=False)
     quantity = Column(Integer, nullable=False)
     price_per_unit = Column(Float, nullable=False)
@@ -476,6 +490,7 @@ class Payout(Base):
     __tablename__ = "payout"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     purchase_order_uuid = Column(String(36), ForeignKey("purchase_order.uuid"), nullable=True)
     expense_uuid = Column(String(36), ForeignKey("expense.uuid"), nullable=True)
     amount = Column(Float, nullable=False)
@@ -501,6 +516,7 @@ class Expense(Base):
     __tablename__ = "expense"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -522,6 +538,7 @@ class Employee(Base):
     __tablename__ = "employee"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     email_address = Column(String(120), nullable=True, unique=True)
     full_name = Column(String(120), nullable=False)
@@ -529,7 +546,7 @@ class Employee(Base):
     full_address = Column(Text, nullable=True)
     identification = Column(Text, nullable=True)  # URL(s) or file path(s)
     notes = Column(Text, nullable=True)
-    type = Column(String(120), nullable=True)
+    role = Column(String(120), nullable=True)
     is_deleted = Column(Boolean, default=False)
     image = Column(Text, nullable=True)  # URL(s) or file path(s)
 
@@ -545,6 +562,7 @@ class FixedAsset(Base):
     __tablename__ = "fixed_asset"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     name = Column(String(120), nullable=False)
     description = Column(Text, nullable=True)
@@ -590,6 +608,7 @@ class Batch(Base):
     __tablename__ = "batch"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     type = Column(String(120), nullable=False)  # e.g., powder_preparation, coated_peanuts
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
@@ -610,6 +629,7 @@ class Warehouse(Base):
     __tablename__ = "warehouse"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     name = Column(String(120), nullable=False, unique=True)
     address = Column(Text, nullable=False)
     coordinates = Column(String(120), nullable=True)
@@ -627,6 +647,7 @@ class Inventory(Base):
     __tablename__ = "inventory"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     material_uuid = Column(String(36), ForeignKey("material.uuid"))
     warehouse_uuid = Column(String(36), ForeignKey("warehouse.uuid"), nullable=True)
@@ -660,6 +681,7 @@ class InventoryEvent(Base):
     __tablename__ = "inventory_event"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     inventory_uuid = Column(String(36), ForeignKey("inventory.uuid"), nullable=False)
     purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=True)
     batch_uuid = Column(String(36), ForeignKey("batch.uuid"), nullable=True)
@@ -696,6 +718,8 @@ class DebitNoteItem(Base):
     __tablename__ = "debit_note_item"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
@@ -724,6 +748,7 @@ class CreditNoteItem(Base):
     __tablename__ = "credit_note_item"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)

@@ -5,9 +5,15 @@ from sqlalchemy.orm import sessionmaker
 from app.adapters.repositories.customer_repository import CustomerRepository
 from app.adapters.unit_of_work._abstract_unit_of_work import AbstractUnitOfWork
 from app.adapters.repositories.material_repository import MaterialRepository
+from app.adapters.repositories.vendor_repository import VendorRepository
+from app.adapters.repositories.employee_repository import EmployeeRepository
+from app.adapters.repositories.expense_repository import ExpenseRepository
 
 SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")  # type: ignore
 DEFAULT_SESSION_FACTORY = sessionmaker(autocommit=False, autoflush=True, bind=create_engine(SQLALCHEMY_DATABASE_URI))
+
+
+
 
 
 class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
@@ -18,7 +24,9 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.session = self.session_factory()
         self.customer_repository = CustomerRepository(session=self.session)
         self.material_repository = MaterialRepository(session=self.session)
-
+        self.vendor_repository = VendorRepository(session=self.session)
+        self.employee_repository = EmployeeRepository(session=self.session)
+        self.expense_repository = ExpenseRepository(session=self.session)
         return self
 
     def __exit__(self, *args):
