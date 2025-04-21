@@ -11,6 +11,8 @@ import uuid
 from datetime import datetime
 import importlib
 import pytest
+from app.adapters.repositories._abstract_repo import Pagination
+
 
 @pytest.fixture(autouse=True)
 def return_dicts():
@@ -47,6 +49,26 @@ class DummyRepo:
     def find_all(self, **kwargs):
         return self._all.get(self.name, [])
 
+    def find_all_paginated(self, page: int, per_page: int, **kwargs):
+        items = self._all.get(self.name, [])
+        total = len(items)
+        start = (page - 1) * per_page
+        end   = start + per_page
+        page_items = items[start:end]
+
+        # use the real Pagination class
+        return Pagination(
+            items=page_items,
+            total=total,
+            page=page,
+            per_page=per_page
+        )
+
+    def find_all_by_filters_paginated(self, filters=None, page: int = 1, per_page: int = 20, ordering=None):
+        # we ignore filters/ordering in the dummy,
+        # but still return a real Pagination
+        return self.find_all_paginated(page, per_page)
+
 class DummyUoW:
     """
     Context manager that hands out DummyRepo for each repo attribute.
@@ -61,6 +83,8 @@ class DummyUoW:
         self.vendor_repository   = DummyRepo("vendor",    return_single, return_all)
         self.employee_repository = DummyRepo("employee",  return_single, return_all)
         self.expense_repository  = DummyRepo("expense",   return_single, return_all)
+        self.pricing_repository  = DummyRepo("pricing",   return_single, return_all)
+        self.purchase_order_repository = DummyRepo("purchase_order", return_single, return_all)
         # add more repositories here as you need them…
 
     def __enter__(self):
@@ -92,6 +116,8 @@ def patch_all_uows(monkeypatch, return_dicts):
         "app.entrypoint.routes.vendor.routes",
         "app.entrypoint.routes.employee.routes",
         "app.entrypoint.routes.expense.routes",
+        "app.entrypoint.routes.pricing.routes",
+        "app.entrypoint.routes.purchase_order.routes",
         # add any other route modules here…
     ]:
         mod = importlib.import_module(module_path)
@@ -109,6 +135,9 @@ def app():
     from app.entrypoint.routes.vendor import vendor_blueprint
     from app.entrypoint.routes.employee import employee_blueprint
     from app.entrypoint.routes.expense import expense_blueprint
+    from app.entrypoint.routes.pricing import pricing_blueprint
+    from app.entrypoint.routes.purchase_order import purchase_order_blueprint
+
 
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -118,6 +147,9 @@ def app():
     app.register_blueprint(vendor_blueprint,    url_prefix="/vendor")
     app.register_blueprint(employee_blueprint,  url_prefix="/employee")
     app.register_blueprint(expense_blueprint,   url_prefix="/expense")
+    app.register_blueprint(pricing_blueprint, url_prefix="/pricing")
+    app.register_blueprint(purchase_order_blueprint, url_prefix="/purchase_order")
+
     # register other blueprints here…
 
     return app

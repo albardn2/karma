@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from datetime import datetime
 from models.common import Material as MaterialModel
@@ -142,7 +144,7 @@ def test_delete_material_marks_deleted(client, return_dicts, dummy_uow_class):
     assert saved.is_deleted is True
 
 
-def test_list_materials(client, return_dicts):
+def test_list_materials_paginated(client, return_dicts):
     _, return_all = return_dicts
 
     m1 = MaterialModel(
@@ -173,6 +175,50 @@ def test_list_materials(client, return_dicts):
     assert resp.status_code == 200
 
     data = resp.get_json()
+    # pagination envelope
+    assert isinstance(data["materials"], list)
     assert data["total_count"] == 2
+    assert data["page"] == 1
+    assert data["per_page"] == 20
+    assert data["pages"] == 1
+
     skus = {item["sku"] for item in data["materials"]}
     assert skus == {m1.sku, m2.sku}
+
+
+def test_list_materials_multi_page(client, return_dicts):
+    _, return_all = return_dicts
+
+    # 25 dummy materials
+    mats = []
+    for i in range(25):
+        m = MaterialModel(
+            name=f"Mat {i}",
+            measure_unit="kg",
+            sku=f"M-{i:03}",
+            description=f"Mat {i}",
+            type=MaterialType.INTERIM.value,
+        )
+        m.uuid       = str(uuid.uuid4())
+        m.created_at = datetime.utcnow()
+        m.is_deleted = False
+        mats.append(m)
+
+    return_all["material"] = mats
+
+    # request page 2 with per_page=20
+    resp = client.get("/materials/?page=2&per_page=20")
+    assert resp.status_code == 200
+
+    data = resp.get_json()
+    assert data["total_count"] == 25
+    assert data["page"] == 2
+    assert data["per_page"] == 20
+    assert data["pages"] == 2
+
+    # only 5 items on the second page
+    assert len(data["materials"]) == 5
+
+    expected_skus = {m.sku for m in mats[20:]}
+    returned_skus = {item["sku"] for item in data["materials"]}
+    assert returned_skus == expected_skus

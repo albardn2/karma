@@ -378,13 +378,14 @@ class Pricing(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     price_per_unit = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
+    is_deleted = Column(Boolean, default=False)
 
     # relations
     material = relationship("Material", back_populates="pricing")
 
     @property
     def unit(self):
-        return self.material.unit
+        return self.material.measure_unit
 
     def __repr__(self):
         return (
@@ -441,14 +442,9 @@ class PurchaseOrder(Base):
 
     @property
     def fulfilled_at(self):
-        if self.is_fulfilled:
+        if self.is_fulfilled and self.purchase_order_items:
             return max(item.fulfilled_at for item in self.purchase_order_items if item.fulfilled_at)
 
-    def __repr__(self):
-        return (
-            f"<PurchaseOrder(uuid={self.uuid}, vendor_name={self.vendor.company_name}, "
-            f"total_amount={self.total_amount}, is_paid={self.is_paid})>"
-        )
 
 
 class PurchaseOrderItem(Base):

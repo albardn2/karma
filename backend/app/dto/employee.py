@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
@@ -48,6 +48,20 @@ class EmployeeRead(EmployeeBase):
     created_at: datetime
     is_deleted: bool
 
-class EmployeeReadList(BaseModel):
-    employees: List[EmployeeRead]
-    total_count: int
+class EmployeeListParams(BaseModel):
+    """Pagination parameters for listing employees."""
+    model_config = ConfigDict()
+
+    page: int = Field(1, gt=0, description="Page number, starting from 1")
+    per_page: int = Field(20, gt=0, le=100, description="Items per page, max 100")
+
+
+class EmployeePage(BaseModel):
+    """Paginated employee list response."""
+    model_config = ConfigDict()
+
+    employees: List[EmployeeRead] = Field(..., description="List of employees on this page")
+    total_count: int = Field(..., description="Total number of employees")
+    page: int = Field(..., description="Current page number")
+    per_page: int = Field(..., description="Number of items per page")
+    pages: int = Field(..., description="Total number of pages")

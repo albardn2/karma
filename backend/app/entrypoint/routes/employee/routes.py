@@ -6,7 +6,8 @@ from app.dto.employee import (
     EmployeeCreate,
     EmployeeRead,
     EmployeeUpdate,
-    EmployeeReadList,
+    EmployeeListParams,
+    EmployeePage
 )
 from models.common import Employee as EmployeeModel
 
@@ -76,12 +77,30 @@ def delete_employee(uuid: str):
 
 @employee_blueprint.route('/', methods=['GET'])
 def list_employees():
+    # Parse & validate pagination params
+    try:
+        params = EmployeeListParams(**request.args)
+    except ValidationError as e:
+        return jsonify(e.errors()), 400
+
     with SqlAlchemyUnitOfWork() as uow:
-        all_emps = uow.employee_repository.find_all(is_deleted=False)
+        page_obj = uow.employee_repository.find_all_paginated(
+            page=params.page,
+            per_page=params.per_page,
+            is_deleted=False
+        )
+
         items = [
             EmployeeRead.from_orm(e).model_dump(mode='json')
-            for e in all_emps
+            for e in page_obj.items
         ]
-        result = EmployeeReadList(employees=items, total_count=len(items)) \
-            .model_dump(mode='json')
+
+        result = EmployeePage(
+            employees=items,
+            total_count=page_obj.total,
+            page=page_obj.page,
+            per_page=page_obj.per_page,
+            pages=page_obj.pages
+        ).model_dump(mode='json')
+
     return jsonify(result), 200

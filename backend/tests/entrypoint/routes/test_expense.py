@@ -158,7 +158,14 @@ def test_list_expenses(client, return_dicts):
     resp = client.get("/expense/")
     assert resp.status_code == 200
     data = resp.get_json()
+
+    # paginated shape
+    assert "expenses" in data and isinstance(data["expenses"], list)
     assert data["total_count"] == 2
+    assert data["page"] == 1
+    assert data["per_page"] == 20  # default
+    assert data["pages"] == 1      # ceil(2/20) == 1
+
     amounts = {item["amount"] for item in data["expenses"]}
     assert amounts == {e1.amount, e2.amount}
 
@@ -166,7 +173,6 @@ def test_list_expenses(client, return_dicts):
 def test_list_expenses_filter_by_vendor(client, return_dicts):
     _, return_all = return_dicts
 
-    # two sample expenses with different vendors
     vendor1 = str(uuid.uuid4())
     vendor2 = str(uuid.uuid4())
     e1 = ExpenseModel(
@@ -192,14 +198,16 @@ def test_list_expenses_filter_by_vendor(client, return_dicts):
         description="For vendor2"
     )
 
-    # stub the repo to return only e1 when filtering by vendor1
     return_all["expense"] = [e1]
 
     resp = client.get(f"/expense/?vendor_uuid={vendor1}")
     assert resp.status_code == 200
-
     data = resp.get_json()
+
     assert data["total_count"] == 1
+    assert data["page"] == 1
+    assert data["per_page"] == 20
+    assert data["pages"] == 1
     assert len(data["expenses"]) == 1
     assert data["expenses"][0]["vendor_uuid"] == vendor1
 
@@ -207,7 +215,6 @@ def test_list_expenses_filter_by_vendor(client, return_dicts):
 def test_list_expenses_filter_by_category(client, return_dicts):
     _, return_all = return_dicts
 
-    # two sample expenses with different categories
     e1 = ExpenseModel(
         uuid=str(uuid.uuid4()),
         created_by_uuid=None,
@@ -231,13 +238,55 @@ def test_list_expenses_filter_by_category(client, return_dicts):
         description="Misc expense"
     )
 
-    # stub the repo to return only the RENT ones
     return_all["expense"] = [e1]
 
     resp = client.get(f"/expense/?category={ExpenseCategory.RENT.value}")
     assert resp.status_code == 200
-
     data = resp.get_json()
+
     assert data["total_count"] == 1
+    assert data["page"] == 1
+    assert data["per_page"] == 20
+    assert data["pages"] == 1
     assert data["expenses"][0]["category"] == ExpenseCategory.RENT.value
 
+
+def test_list_expenses_multiple_pages(client, return_dicts):
+    _, return_all = return_dicts
+
+    # Create 25 dummy expenses
+    exps = []
+    for i in range(25):
+        exp = ExpenseModel(
+            uuid=str(uuid.uuid4()),
+            created_by_uuid=None,
+            amount=float(i),
+            currency="USD",
+            created_at=datetime.utcnow(),
+            vendor_uuid=None,
+            category=None,
+            is_deleted=False,
+            description=f"Expense {i}"
+        )
+        exps.append(exp)
+
+    # Stub repo to return all 25
+    return_all["expense"] = exps
+
+    # Request page 2 with per_page=20 → should return items 20–24
+    resp = client.get("/expense/?page=2&per_page=20")
+    assert resp.status_code == 200
+
+    data = resp.get_json()
+    assert data["total_count"] == 25
+    assert data["page"] == 2
+    assert data["per_page"] == 20
+    assert data["pages"] == 2
+
+    # Only 5 items on page 2
+    assert len(data["expenses"]) == 5
+
+    # Validate that we got the tail slice
+    expected_amounts = {exp.amount for exp in exps[20:25]}
+    received_amounts = {item["amount"] for item in data["expenses"]}
+    assert received_amounts == expected_amounts

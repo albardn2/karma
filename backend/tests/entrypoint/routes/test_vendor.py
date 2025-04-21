@@ -151,7 +151,7 @@ def test_delete_vendor_marks_deleted(client, return_dicts, dummy_uow_class):
     assert saved.is_deleted is True
 
 
-def test_list_vendors(client, return_dicts):
+def test_list_vendors_paginated(client, return_dicts):
     _, return_all = return_dicts
 
     v1 = VendorModel(
@@ -190,6 +190,56 @@ def test_list_vendors(client, return_dicts):
     assert resp.status_code == 200
 
     data = resp.get_json()
+    # pagination envelope
+    assert isinstance(data["vendors"], list)
     assert data["total_count"] == 2
+    assert data["page"] == 1
+    assert data["per_page"] == 20
+    assert data["pages"] == 1
+
     names = {item["company_name"] for item in data["vendors"]}
     assert names == {v1.company_name, v2.company_name}
+
+
+def test_list_vendors_multi_page(client, return_dicts):
+    _, return_all = return_dicts
+
+    # create 25 fake vendors
+    all_vendors = []
+    for i in range(25):
+        v = VendorModel(
+            uuid=str(uuid.uuid4()),
+            created_by_uuid=None,
+            created_at=datetime.utcnow(),
+            email_address=None,
+            company_name=f"Vendor {i}",
+            full_name=str(i),
+            phone_number=str(1000 + i),
+            full_address=None,
+            business_cards=None,
+            notes=None,
+            category=None,
+            coordinates=None,
+            is_deleted=False
+        )
+        all_vendors.append(v)
+
+    return_all["vendor"] = all_vendors
+
+    # request page 2 with 20 per page
+    resp = client.get("/vendor/?page=2&per_page=20")
+    assert resp.status_code == 200
+
+    data = resp.get_json()
+    assert data["total_count"] == 25
+    assert data["page"] == 2
+    assert data["per_page"] == 20
+    assert data["pages"] == 2
+
+    # only 5 items on second page
+    assert len(data["vendors"]) == 5
+
+    expected = {v.company_name for v in all_vendors[20:]}
+    returned = {item["company_name"] for item in data["vendors"]}
+    assert returned == expected
+

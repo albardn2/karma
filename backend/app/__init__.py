@@ -11,6 +11,10 @@ from app.entrypoint.routes.material import material_blueprint
 from app.entrypoint.routes.vendor import vendor_blueprint
 from app.entrypoint.routes.employee import employee_blueprint
 from app.entrypoint.routes.expense import expense_blueprint
+from app.entrypoint.routes.pricing import pricing_blueprint
+from app.entrypoint.routes.purchase_order import purchase_order_blueprint
+
+# from app.entrypoint.routes.fixed_asset import fixed_asset_blueprint
 
 load_dotenv()
 
@@ -29,6 +33,9 @@ def create_app(config_object=Config):
     app.register_blueprint(vendor_blueprint, url_prefix='/vendor')
     app.register_blueprint(employee_blueprint, url_prefix='/employee')
     app.register_blueprint(expense_blueprint, url_prefix='/expense')
+    app.register_blueprint(pricing_blueprint, url_prefix='/pricing')
+    app.register_blueprint(purchase_order_blueprint, url_prefix='/purchase-order')
+    # app.register_blueprint(fixed_asset_blueprint, url_prefix='/fixed-asset')
 
     # Register error handlers
     register_error_handlers(app)

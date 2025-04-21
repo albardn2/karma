@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from datetime import datetime
 from models.common import Customer as CustomerModel
@@ -138,7 +140,7 @@ def test_delete_customer_marks_deleted(client, return_dicts, dummy_uow_class):
     assert saved.is_deleted is True
 
 
-def test_list_customers(client, return_dicts):
+def test_list_customers_paginated(client, return_dicts):
     _, return_all = return_dicts
 
     c1 = CustomerModel(
@@ -163,12 +165,57 @@ def test_list_customers(client, return_dicts):
     c2.created_at = datetime.utcnow()
     c2.is_deleted = False
 
+    # stub repo to return exactly these two
     return_all["customer"] = [c1, c2]
 
+    # default page=1, per_page=20
     resp = client.get("/customers/")
     assert resp.status_code == 200
 
     data = resp.get_json()
+    # pagination envelope
+    assert isinstance(data["customers"], list)
     assert data["total_count"] == 2
+    assert data["page"] == 1
+    assert data["per_page"] == 20
+    assert data["pages"] == 1
+
     uuids = {c["uuid"] for c in data["customers"]}
     assert uuids == {c1.uuid, c2.uuid}
+
+
+def test_list_customers_multi_page(client, return_dicts):
+    _, return_all = return_dicts
+
+    # create 25 fake customers
+    all_customers = []
+    for i in range(25):
+        c = CustomerModel(
+            company_name=f"Co {i}",
+            full_name=str(i),
+            phone_number=str(i),
+            full_address="X",
+            category="roastery",
+        )
+        c.uuid       = str(uuid.uuid4())
+        c.created_at = datetime.utcnow()
+        c.is_deleted = False
+        all_customers.append(c)
+
+    return_all["customer"] = all_customers
+
+    # ask for page 2 of 20
+    resp = client.get("/customers/?page=2&per_page=20")
+    assert resp.status_code == 200
+
+    data = resp.get_json()
+    assert data["total_count"] == 25
+    assert data["page"] == 2
+    assert data["per_page"] == 20
+    assert data["pages"] == 2
+
+    # only 5 items on second page
+    assert len(data["customers"]) == 5
+    expected_uuids = {c.uuid for c in all_customers[20:]}
+    returned_uuids = {c["uuid"] for c in data["customers"]}
+    assert returned_uuids == expected_uuids

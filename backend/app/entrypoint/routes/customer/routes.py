@@ -7,7 +7,7 @@ from app.entrypoint.routes.customer import customer_blueprint
 from app.dto.customer import CustomerCreate, CustomerRead
 from models.common import Customer as CustomerModel
 
-from app.dto.customer import CustomerUpdate, CustomerReadList
+from app.dto.customer import CustomerUpdate, CustomerReadList,CustomerListParams, CustomerPage
 
 
 @customer_blueprint.route('/', methods=['POST'])
@@ -69,10 +69,28 @@ def delete_customer(uuid: str):
 
 
 @customer_blueprint.route('/', methods=['GET'])
-def get_customers():
+def list_customers():
+    # Parse & validate pagination params
+    try:
+        params = CustomerListParams(**request.args)
+    except ValidationError as e:
+        return jsonify(e.errors()), 400
+
     with SqlAlchemyUnitOfWork() as uow:
-        customers = uow.customer_repository.find_all(is_deleted=False)
-        customers_data = [CustomerRead.from_orm(c).model_dump(mode='json') for c in customers]
-        result = CustomerReadList(customers=customers_data, total_count=len(customers_data)).model_dump(mode='json')
+        page_obj = uow.customer_repository.find_all_paginated(
+            is_deleted=False,
+            **params.model_dump(exclude_none=True),
+        )
+        items = [
+            CustomerRead.from_orm(c).model_dump(mode='json')
+            for c in page_obj.items
+        ]
+        result = CustomerPage(
+            customers=items,
+            total_count=page_obj.total,
+            page=page_obj.page,
+            per_page=page_obj.per_page,
+            pages=page_obj.pages
+        ).model_dump(mode='json')
 
     return jsonify(result), 200

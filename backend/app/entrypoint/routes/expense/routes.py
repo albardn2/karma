@@ -7,7 +7,8 @@ from app.dto.expense import (
     ExpenseRead,
     ExpenseUpdate,
     ExpenseReadList,
-    ExpenseListParams
+    ExpenseListParams,
+    ExpensePage
 )
 from models.common import Expense as ExpenseModel
 from app.entrypoint.routes.expense import expense_blueprint
@@ -78,20 +79,50 @@ def delete_expense(uuid: str):
 
 @expense_blueprint.route('/', methods=['GET'])
 def list_expenses():
-    # Parse & validate query params into DTO
+    # Parse & validate query & pagination params
     try:
         params = ExpenseListParams(**request.args)
     except ValidationError as e:
         return jsonify(e.errors()), 400
 
-    # Convert DTO to simple dict for repository kwargs
-    filter_params = params.model_dump(exclude_none=True)
-    # Query using repository that accepts field‑value kwargs
+    # Build filters list based on DTO
+    filters = [ExpenseModel.is_deleted == False]
+    if params.vendor_uuid:
+        filters.append(ExpenseModel.vendor_uuid == str(params.vendor_uuid))
+    if params.category:
+        filters.append(ExpenseModel.category == params.category.value)
+    if params.min_amount is not None:
+        filters.append(ExpenseModel.amount >= params.min_amount)
+    if params.max_amount is not None:
+        filters.append(ExpenseModel.amount <= params.max_amount)
+    if params.start:
+        filters.append(ExpenseModel.created_at >= params.start)
+    if params.end:
+        filters.append(ExpenseModel.created_at <= params.end)
+
+    # remove deleted
+    filters.append(ExpenseModel.is_deleted == False)
+
+    # Fetch paginated results
     with SqlAlchemyUnitOfWork() as uow:
-        exps = uow.expense_repository.find_all(is_deleted=False,**filter_params)
+        page_obj = uow.expense_repository.find_all_by_filters_paginated(
+            filters=filters,
+            page=params.page,
+            per_page=params.per_page
+        )
+
         items = [
-            ExpenseRead.from_orm(e).model_dump(mode='json') for e in exps
+            ExpenseRead.from_orm(e).model_dump(mode='json')
+            for e in page_obj.items
         ]
-        result = ExpenseReadList(expenses=items, total_count=len(items)).model_dump(mode='json')
+
+        # Build paginated response via DTO
+        result = ExpensePage(
+            expenses=items,
+            total_count=page_obj.total,
+            page=page_obj.page,
+            per_page=page_obj.per_page,
+            pages=page_obj.pages
+        ).model_dump(mode='json')
 
     return jsonify(result), 200

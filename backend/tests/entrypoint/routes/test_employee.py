@@ -146,16 +146,16 @@ def test_delete_employee_marks_deleted(client, return_dicts, dummy_uow_class):
     assert saved.is_deleted is True
 
 
-def test_list_employees(client, return_dicts):
+def test_list_employees_paginated(client, return_dicts):
     _, return_all = return_dicts
 
     e1 = EmployeeModel(
         uuid=str(uuid.uuid4()),
         created_by_uuid=None,
         created_at=datetime.utcnow(),
-        email_address=None,
+        email_address="one@example.com",
         full_name="Employee One",
-        phone_number="+1-555-777-8888",
+        phone_number="111-1111",
         full_address=None,
         identification=None,
         notes=None,
@@ -167,9 +167,9 @@ def test_list_employees(client, return_dicts):
         uuid=str(uuid.uuid4()),
         created_by_uuid=None,
         created_at=datetime.utcnow(),
-        email_address=None,
+        email_address="two@example.com",
         full_name="Employee Two",
-        phone_number="+1-555-999-0000",
+        phone_number="222-2222",
         full_address=None,
         identification=None,
         notes=None,
@@ -179,10 +179,58 @@ def test_list_employees(client, return_dicts):
     )
     return_all["employee"] = [e1, e2]
 
+    # default page=1, per_page=20
     resp = client.get("/employee/")
     assert resp.status_code == 200
 
     data = resp.get_json()
+    # ensure paginated envelope
+    assert isinstance(data["employees"], list)
     assert data["total_count"] == 2
-    names = {item["full_name"] for item in data["employees"]}
-    assert names == {e1.full_name, e2.full_name}
+    assert data["page"] == 1
+    assert data["per_page"] == 20
+    assert data["pages"] == 1
+
+    returned_uuids = {emp["uuid"] for emp in data["employees"]}
+    assert returned_uuids == {e1.uuid, e2.uuid}
+
+
+def test_list_employees_multi_page(client, return_dicts):
+    _, return_all = return_dicts
+
+    # build 25 fake employees
+    emps = []
+    for i in range(25):
+        emp = EmployeeModel(
+            uuid=str(uuid.uuid4()),
+            created_by_uuid=None,
+            created_at=datetime.utcnow(),
+            email_address=f"{i}@example.com",
+            full_name=f"Emp {i}",
+            phone_number=str(1000 + i),
+            full_address=None,
+            identification=None,
+            notes=None,
+            role=None,
+            image=None,
+            is_deleted=False
+        )
+        emps.append(emp)
+    return_all["employee"] = emps
+
+    # request second page with 20 per page
+    resp = client.get("/employee/?page=2&per_page=20")
+    assert resp.status_code == 200
+
+    data = resp.get_json()
+    assert data["total_count"] == 25
+    assert data["page"] == 2
+    assert data["per_page"] == 20
+    assert data["pages"] == 2
+
+    # only 5 items on page 2
+    assert len(data["employees"]) == 5
+
+    expected = {emp.uuid for emp in emps[20:]}
+    actual   = {emp["uuid"] for emp in data["employees"]}
+    assert actual == expected

@@ -1,7 +1,7 @@
 from enum import Enum
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
 
@@ -26,7 +26,7 @@ class CustomerBase(BaseModel):
     notes: Optional[str] = None
     category: CustomerCategory
     coordinates: Optional[str] = None
-    created_by_uuid : Optional[UUID] = None
+    created_by_uuid : Optional[str] = None
 
 class CustomerCreate(CustomerBase):
     """What’s required when creating a new customer."""
@@ -51,7 +51,7 @@ class CustomerUpdate(BaseModel):
 
 class CustomerRead(CustomerBase):
     """What we return to clients."""
-    uuid: UUID
+    uuid: str
     created_at: datetime
     is_deleted: bool
 
@@ -66,3 +66,21 @@ class CustomerReadList(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class CustomerListParams(BaseModel):
+    """Pagination parameters for listing customers."""
+
+    page: int = Field(1, gt=0, description="Page number, starting from 1")
+    per_page: int = Field(20, gt=0, le=100, description="Items per page, max 100")
+
+
+class CustomerPage(BaseModel):
+    """Paginated customer list response."""
+    model_config = ConfigDict()
+
+    customers: List[CustomerRead] = Field(..., description="List of customers on this page")
+    total_count: int = Field(..., description="Total number of customers")
+    page: int = Field(..., description="Current page number")
+    per_page: int = Field(..., description="Number of items per page")
+    pages: int = Field(..., description="Total number of pages")

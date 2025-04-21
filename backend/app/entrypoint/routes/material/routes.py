@@ -3,8 +3,11 @@ from pydantic import ValidationError
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.dto.material import (
-    MaterialCreate, MaterialRead,
-    MaterialUpdate, MaterialReadList,
+    MaterialCreate,
+    MaterialRead,
+    MaterialUpdate,
+    MaterialListParams,
+    MaterialPage
 )
 from models.common import Material as MaterialModel
 
@@ -73,12 +76,30 @@ def delete_material(uuid: str):
 
 @material_blueprint.route('/', methods=['GET'])
 def list_materials():
+    # Parse & validate pagination params
+    try:
+        params = MaterialListParams(**request.args)
+    except ValidationError as e:
+        return jsonify(e.errors()), 400
+
     with SqlAlchemyUnitOfWork() as uow:
-        all_mat = uow.material_repository.find_all(is_deleted=False)
-        data    = [
+        page_obj = uow.material_repository.find_all_paginated(
+            page=params.page,
+            per_page=params.per_page,
+            is_deleted=False
+        )
+
+        items = [
             MaterialRead.from_orm(m).model_dump(mode='json')
-            for m in all_mat
+            for m in page_obj.items
         ]
-        result = MaterialReadList(materials=data, total_count=len(data)) \
-            .model_dump(mode='json')
+
+        result = MaterialPage(
+            materials=items,
+            total_count=page_obj.total,
+            page=page_obj.page,
+            per_page=page_obj.per_page,
+            pages=page_obj.pages
+        ).model_dump(mode='json')
+
     return jsonify(result), 200

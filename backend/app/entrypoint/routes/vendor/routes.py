@@ -9,6 +9,8 @@ from app.dto.vendor import (
     VendorRead,
     VendorUpdate,
     VendorReadList,
+    VendorListParams,
+    VendorPage
 )
 from models.common import Vendor as VendorModel
 
@@ -82,15 +84,33 @@ def delete_vendor(uuid: str):
 
 @vendor_blueprint.route('/', methods=['GET'])
 def list_vendors():
+    # 1) Parse & validate pagination params
+    try:
+        params = VendorListParams(**request.args)
+    except ValidationError as e:
+        return jsonify(e.errors()), 400
+
+    # 2) Fetch paginated results
     with SqlAlchemyUnitOfWork() as uow:
-        all_vendors = uow.vendor_repository.find_all(is_deleted=False)
+        page_obj = uow.vendor_repository.find_all_paginated(
+            page=params.page,
+            per_page=params.per_page,
+            is_deleted=False
+        )
+
+        # 3) Serialize items
         items = [
             VendorRead.from_orm(v).model_dump(mode='json')
-            for v in all_vendors
+            for v in page_obj.items
         ]
-        result = VendorReadList(
+
+        # 4) Build paginated response
+        result = VendorPage(
             vendors=items,
-            total_count=len(items)
+            total_count=page_obj.total,
+            page=page_obj.page,
+            per_page=page_obj.per_page,
+            pages=page_obj.pages
         ).model_dump(mode='json')
 
     return jsonify(result), 200

@@ -51,5 +51,21 @@ class ExpenseReadList(BaseModel):
 
 class ExpenseListParams(BaseModel):
     vendor_uuid: Optional[str] = None
-    category: Optional[ExpenseCategory] = None
+    category:    Optional[ExpenseCategory] = None
+    min_amount:  Optional[float] = None
+    max_amount:  Optional[float] = None
+    start:       Optional[datetime] = None  # ISO timestamps in query
+    end:         Optional[datetime] = None
+    page:        int = 1
+    per_page:    int = 20
+
+
+class ExpensePage(BaseModel):
+    """Paginated list response."""
+    expenses: List[ExpenseRead]
+    total_count: int
+    page: int
+    per_page: int
+    pages: int
+
 
