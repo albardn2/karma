@@ -85,6 +85,7 @@ class DummyUoW:
         self.expense_repository  = DummyRepo("expense",   return_single, return_all)
         self.pricing_repository  = DummyRepo("pricing",   return_single, return_all)
         self.purchase_order_repository = DummyRepo("purchase_order", return_single, return_all)
+        self.purchase_order_item_repository = DummyRepo("purchase_order_item", return_single, return_all)
         # add more repositories here as you need them…
 
     def __enter__(self):
@@ -118,6 +119,7 @@ def patch_all_uows(monkeypatch, return_dicts):
         "app.entrypoint.routes.expense.routes",
         "app.entrypoint.routes.pricing.routes",
         "app.entrypoint.routes.purchase_order.routes",
+        "app.entrypoint.routes.purchase_order_item.routes",
         # add any other route modules here…
     ]:
         mod = importlib.import_module(module_path)
@@ -137,6 +139,7 @@ def app():
     from app.entrypoint.routes.expense import expense_blueprint
     from app.entrypoint.routes.pricing import pricing_blueprint
     from app.entrypoint.routes.purchase_order import purchase_order_blueprint
+    from app.entrypoint.routes.purchase_order_item import poi_blueprint
 
 
     app = Flask(__name__)
@@ -149,6 +152,7 @@ def app():
     app.register_blueprint(expense_blueprint,   url_prefix="/expense")
     app.register_blueprint(pricing_blueprint, url_prefix="/pricing")
     app.register_blueprint(purchase_order_blueprint, url_prefix="/purchase_order")
+    app.register_blueprint(poi_blueprint, url_prefix="/purchase_order_item")
 
     # register other blueprints here…
 

@@ -13,6 +13,7 @@ from app.entrypoint.routes.employee import employee_blueprint
 from app.entrypoint.routes.expense import expense_blueprint
 from app.entrypoint.routes.pricing import pricing_blueprint
 from app.entrypoint.routes.purchase_order import purchase_order_blueprint
+from app.entrypoint.routes.purchase_order_item import poi_blueprint
 
 # from app.entrypoint.routes.fixed_asset import fixed_asset_blueprint
 
@@ -35,6 +36,7 @@ def create_app(config_object=Config):
     app.register_blueprint(expense_blueprint, url_prefix='/expense')
     app.register_blueprint(pricing_blueprint, url_prefix='/pricing')
     app.register_blueprint(purchase_order_blueprint, url_prefix='/purchase-order')
+    app.register_blueprint(poi_blueprint, url_prefix='/purchase-order-item')
     # app.register_blueprint(fixed_asset_blueprint, url_prefix='/fixed-asset')
 
     # Register error handlers

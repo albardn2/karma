@@ -455,6 +455,7 @@ class PurchaseOrderItem(Base):
     purchase_order_uuid = Column(String(36), ForeignKey("purchase_order.uuid"), nullable=False)
     quantity = Column(Integer, nullable=False)
     price_per_unit = Column(Float, nullable=False)
+    currency = Column(String(120), nullable=False)
     unit = Column(String(120), nullable=False)  # should be same as material unit
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
