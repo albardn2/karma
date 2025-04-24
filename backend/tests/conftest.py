@@ -87,6 +87,7 @@ class DummyUoW:
         self.purchase_order_repository = DummyRepo("purchase_order", return_single, return_all)
         self.purchase_order_item_repository = DummyRepo("purchase_order_item", return_single, return_all)
         self.financial_account_repository = DummyRepo("financial_account", return_single, return_all)
+        self.warehouse_repository = DummyRepo("warehouse", return_single, return_all)
         # add more repositories here as you need them…
 
     def __enter__(self):
@@ -122,6 +123,7 @@ def patch_all_uows(monkeypatch, return_dicts):
         "app.entrypoint.routes.purchase_order.routes",
         "app.entrypoint.routes.purchase_order_item.routes",
         "app.entrypoint.routes.financial_account.routes",
+        "app.entrypoint.routes.warehouse.routes",
         # add any other route modules here…
     ]:
         mod = importlib.import_module(module_path)
@@ -143,6 +145,7 @@ def app():
     from app.entrypoint.routes.purchase_order import purchase_order_blueprint
     from app.entrypoint.routes.purchase_order_item import poi_blueprint
     from app.entrypoint.routes.financial_account import financial_account_blueprint
+    from app.entrypoint.routes.warehouse import warehouse_blueprint
 
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -156,6 +159,7 @@ def app():
     app.register_blueprint(purchase_order_blueprint, url_prefix="/purchase_order")
     app.register_blueprint(poi_blueprint, url_prefix="/purchase_order_item")
     app.register_blueprint(financial_account_blueprint, url_prefix="/financial_account")
+    app.register_blueprint(warehouse_blueprint, url_prefix="/warehouse")
 
     # register other blueprints here…
 

@@ -13,6 +13,7 @@ from app.adapters.repositories.pricing_repository import PricingRepository
 from app.adapters.repositories.purchase_order_repository import PurchaseOrderRepository
 from app.adapters.repositories.purchase_order_item_repository import PurchaseOrderItemRepository
 from app.adapters.repositories.financial_account_repository import FinancialAccountRepository
+from app.adapters.repositories.warehouse_repository import WarehouseRepository
 
 SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")  # type: ignore
 DEFAULT_SESSION_FACTORY = sessionmaker(autocommit=False, autoflush=True, bind=create_engine(SQLALCHEMY_DATABASE_URI))
@@ -37,6 +38,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.purchase_order_repository = PurchaseOrderRepository(session=self.session)
         self.purchase_order_item_repository = PurchaseOrderItemRepository(session=self.session)
         self.financial_account_repository = FinancialAccountRepository(session=self.session)
+        self.warehouse_repository = WarehouseRepository(session=self.session)  # Placeholder for warehouse repository
         return self
 
     def __exit__(self, *args):

@@ -633,6 +633,7 @@ class Warehouse(Base):
     coordinates = Column(String(120), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
+    is_deleted = Column(Boolean, default=False)
 
     # relations
     inventories = relationship("Inventory", back_populates="warehouse")

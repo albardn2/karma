@@ -15,6 +15,7 @@ from app.entrypoint.routes.pricing import pricing_blueprint
 from app.entrypoint.routes.purchase_order import purchase_order_blueprint
 from app.entrypoint.routes.purchase_order_item import poi_blueprint
 from app.entrypoint.routes.financial_account import financial_account_blueprint
+from app.entrypoint.routes.warehouse import warehouse_blueprint
 
 # from app.entrypoint.routes.fixed_asset import fixed_asset_blueprint
 
@@ -39,6 +40,7 @@ def create_app(config_object=Config):
     app.register_blueprint(purchase_order_blueprint, url_prefix='/purchase-order')
     app.register_blueprint(poi_blueprint, url_prefix='/purchase-order-item')
     app.register_blueprint(financial_account_blueprint, url_prefix='/financial-account')
+    app.register_blueprint(warehouse_blueprint, url_prefix='/warehouse')
     # app.register_blueprint(fixed_asset_blueprint, url_prefix='/fixed-asset')
 
     # Register error handlers
