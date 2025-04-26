@@ -28,7 +28,7 @@ class DummyRepo:
         self._all        = return_all
         self.saved_model = None
 
-    def save(self, model, commit: bool):
+    def save(self, model, commit: bool = False):
         # mimic SQLAlchemy default assignment
         if not getattr(model, "uuid", None):
             model.uuid = str(uuid.uuid4())
@@ -38,6 +38,10 @@ class DummyRepo:
             model.is_deleted = False
 
         self.saved_model = model
+
+    def commit(self):
+        # mimic SQLAlchemy’s commit
+        pass
 
     def delete(self, model, commit: bool):
         # capture delete too
