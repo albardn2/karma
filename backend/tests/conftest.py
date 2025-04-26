@@ -89,12 +89,17 @@ class DummyUoW:
         self.financial_account_repository = DummyRepo("financial_account", return_single, return_all)
         self.warehouse_repository = DummyRepo("warehouse", return_single, return_all)
         self.fixed_asset_repository = DummyRepo("fixed_asset", return_single, return_all)
+        self.transaction_repository = DummyRepo("transaction", return_single, return_all)
         # add more repositories here as you need them…
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    def commit(self):
+        # mimic SQLAlchemy’s commit
         pass
 
 @pytest.fixture
@@ -126,6 +131,7 @@ def patch_all_uows(monkeypatch, return_dicts):
         "app.entrypoint.routes.financial_account.routes",
         "app.entrypoint.routes.warehouse.routes",
         "app.entrypoint.routes.fixed_asset.routes",
+        "app.entrypoint.routes.transaction.routes",
         # add any other route modules here…
     ]:
         mod = importlib.import_module(module_path)
@@ -149,6 +155,7 @@ def app():
     from app.entrypoint.routes.financial_account import financial_account_blueprint
     from app.entrypoint.routes.warehouse import warehouse_blueprint
     from app.entrypoint.routes.fixed_asset import fixed_asset_blueprint
+    from app.entrypoint.routes.transaction import transaction_blueprint
 
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -164,6 +171,7 @@ def app():
     app.register_blueprint(financial_account_blueprint, url_prefix="/financial_account")
     app.register_blueprint(warehouse_blueprint, url_prefix="/warehouse")
     app.register_blueprint(fixed_asset_blueprint, url_prefix="/fixed_asset")
+    app.register_blueprint(transaction_blueprint, url_prefix="/transaction")
 
     # register other blueprints here…
 

@@ -292,11 +292,12 @@ class Transaction(Base):
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
-    from_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=False)
-    to_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=False)
+    from_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=True)
+    to_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=True)
     exchange_rate = Column(Float, default=1.0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
+    is_deleted = Column(Boolean, default=False)
 
     # relations
     from_account = relationship("FinancialAccount", foreign_keys=[from_account_uuid], back_populates="transactions_from")
