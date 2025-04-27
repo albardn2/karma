@@ -96,6 +96,7 @@ class DummyUoW:
         self.transaction_repository = DummyRepo("transaction", return_single, return_all)
         self.customer_order_repository = DummyRepo("customer_order", return_single, return_all)
         self.customer_order_item_repository = DummyRepo("customer_order_item", return_single, return_all)
+        self.invoice_repository = DummyRepo("invoice", return_single, return_all)
         # add more repositories here as you need them…
 
     def __enter__(self):
@@ -140,6 +141,7 @@ def patch_all_uows(monkeypatch, return_dicts):
         "app.entrypoint.routes.transaction.routes",
         "app.entrypoint.routes.customer_order.routes",
         "app.entrypoint.routes.customer_order_item.routes",
+        "app.entrypoint.routes.invoice.routes",
         # add any other route modules here…
     ]:
         mod = importlib.import_module(module_path)
@@ -166,6 +168,7 @@ def app():
     from app.entrypoint.routes.transaction import transaction_blueprint
     from app.entrypoint.routes.customer_order import customer_order_blueprint
     from app.entrypoint.routes.customer_order_item import customer_order_item_blueprint
+    from app.entrypoint.routes.invoice import invoice_blueprint
 
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -184,6 +187,7 @@ def app():
     app.register_blueprint(transaction_blueprint, url_prefix="/transaction")
     app.register_blueprint(customer_order_blueprint, url_prefix="/customer_order")
     app.register_blueprint(customer_order_item_blueprint, url_prefix="/customer_order_item")
+    app.register_blueprint(invoice_blueprint, url_prefix="/invoice")
 
 
     # register other blueprints here…

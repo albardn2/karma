@@ -20,6 +20,7 @@ from app.entrypoint.routes.fixed_asset import fixed_asset_blueprint
 from app.entrypoint.routes.transaction import transaction_blueprint
 from app.entrypoint.routes.customer_order import customer_order_blueprint
 from app.entrypoint.routes.customer_order_item import customer_order_item_blueprint
+from app.entrypoint.routes.invoice import invoice_blueprint
 
 # from app.entrypoint.routes.fixed_asset import fixed_asset_blueprint
 
@@ -49,6 +50,7 @@ def create_app(config_object=Config):
     app.register_blueprint(transaction_blueprint, url_prefix='/transaction')
     app.register_blueprint(customer_order_blueprint, url_prefix='/customer-order')
     app.register_blueprint(customer_order_item_blueprint, url_prefix='/customer-order-item')
+    app.register_blueprint(invoice_blueprint, url_prefix='/invoice')
 
     register_error_handlers(app)
 

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import bcrypt
 from sqlalchemy import create_engine, Column, String, DateTime, Text, Float
@@ -160,6 +160,7 @@ class Invoice(Base):
     paid_at = Column(DateTime, nullable=True)
     due_date = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)
+    is_deleted = Column(Boolean, default=False)
 
     # relations
     customer_order = relationship("CustomerOrder", back_populates="invoices")
@@ -183,8 +184,19 @@ class Invoice(Base):
         return self.amount_due == 0
 
     @property
-    def is_overdue(self):
-        return self.due_date and self.due_date < datetime.utcnow()
+    def is_overdue(self) -> bool:
+        if not self.due_date:
+            return False
+
+        # ensure due_date is aware; if it’s naïve, attach UTC
+        due = (
+            self.due_date
+            if self.due_date.tzinfo is not None
+            else self.due_date.replace(tzinfo=timezone.utc)
+        )
+
+        now = datetime.now(timezone.utc)
+        return due < now
 
     def __repr__(self):
         return (
