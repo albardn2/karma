@@ -263,6 +263,7 @@ class Payment(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
     debit_note_item_uuid = Column(String(36), ForeignKey("debit_note_item.uuid"), nullable=True)
+    is_deleted  = Column(Boolean, default=False)
 
     # relations
     invoice = relationship("Invoice", back_populates="payments")
