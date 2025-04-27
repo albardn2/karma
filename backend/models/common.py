@@ -100,22 +100,22 @@ class CustomerOrder(Base):
     is_deleted = Column(Boolean, default=False)
 
     # relations
-    order_items = relationship("OrderItem", back_populates="order")
+    customer_order_items = relationship("CustomerOrderItem", back_populates="customer_order")
     invoices = relationship("Invoice", back_populates="customer_order")
     customer = relationship("Customer", back_populates="orders")
 
     @property
     def is_fulfilled(self):
-        return all(item.is_fulfilled for item in self.order_items)
+        return all(item.is_fulfilled for item in self.customer_order_items)
 
     @property
     def fulfilled_at(self):
-        if self.is_fulfilled and self.order_items:
-            return max(item.fulfilled_at for item in self.order_items if item.fulfilled_at)
+        if self.is_fulfilled and self.customer_order_items:
+            return max(item.fulfilled_at for item in self.customer_order_items if item.fulfilled_at)
 
 
-class OrderItem(Base):
-    __tablename__ = "order_item"
+class CustomerOrderItem(Base):
+    __tablename__ = "customer_order_item"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
@@ -125,20 +125,20 @@ class OrderItem(Base):
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
     is_fulfilled = Column(Boolean, default=False)
     fulfilled_at = Column(DateTime, nullable=True)
-    quantity_shipped = Column(Float, nullable=False, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
+    is_deleted = Column(Boolean, default=False)
 
     # relations
-    order = relationship("CustomerOrder", back_populates="order_items")
-    material = relationship("Material", back_populates="order_items")
-    invoice_item = relationship("InvoiceItem", back_populates="order_item", uselist=False)
+    customer_order = relationship("CustomerOrder", back_populates="customer_order_items")
+    material = relationship("Material", back_populates="customer_order_items")
+    invoice_item = relationship("InvoiceItem", back_populates="customer_order_item", uselist=False)
     inventory_events = relationship("InventoryEvent", back_populates="customer_order_item")
     debit_note_items = relationship("DebitNoteItem", back_populates="customer_order_item")
     credit_note_items = relationship("CreditNoteItem", back_populates="customer_order_item")
 
     def __repr__(self):
         return (
-            f"<OrderItem(uuid={self.uuid}, material_name={self.material.name}, "
+            f"<CustomerOrderItem(uuid={self.uuid}, material_name={self.material.name}, "
             f"quantity={self.quantity})>"
         )
 
@@ -199,13 +199,13 @@ class InvoiceItem(Base):
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     invoice_uuid = Column(String(36), ForeignKey("invoice.uuid"), nullable=False)
-    order_item_uuid = Column(String(36), ForeignKey("order_item.uuid"), nullable=False)
+    customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=False)
     price_per_unit = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # relations
     invoice = relationship("Invoice", back_populates="invoice_items")
-    order_item = relationship("OrderItem", back_populates="invoice_item")
+    customer_order_item = relationship("CustomerOrderItem", back_populates="invoice_item")
     debit_note_items = relationship("DebitNoteItem", back_populates="invoice_item")
     credit_note_items = relationship("CreditNoteItem", back_populates="invoice_item")
 
@@ -215,19 +215,19 @@ class InvoiceItem(Base):
 
     @property
     def material(self):
-        return self.order_item.material
+        return self.customer_order_item.material
 
     @property
     def quantity(self):
-        return self.order_item.quantity
+        return self.customer_order_item.quantity
 
     @property
     def unit(self):
-        return self.order_item.unit
+        return self.customer_order_item.unit
 
     @property
     def material_name(self):
-        return self.order_item.material.name
+        return self.customer_order_item.material.name
 
     @property
     def currency(self):
@@ -367,7 +367,7 @@ class Material(Base):
 
     # relations
     pricing = relationship("Pricing", back_populates="material", uselist=False)
-    order_items = relationship("OrderItem", back_populates="material")
+    customer_order_items = relationship("CustomerOrderItem", back_populates="material")
     inventory = relationship("Inventory", back_populates="material")
     batches = relationship("Batch", back_populates="material")
     purchase_order_items = relationship("PurchaseOrderItem", back_populates="material")
@@ -692,7 +692,7 @@ class InventoryEvent(Base):
     inventory_uuid = Column(String(36), ForeignKey("inventory.uuid"), nullable=False)
     purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=True)
     batch_uuid = Column(String(36), ForeignKey("batch.uuid"), nullable=True)
-    customer_order_item_uuid = Column(String(36), ForeignKey("order_item.uuid"), nullable=True)
+    customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=True)
     event_type = Column(String(120), nullable=False)  # e.g., addition, removal, adjustment, transfer, etc.
     quantity = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -705,7 +705,7 @@ class InventoryEvent(Base):
     inventory = relationship("Inventory", back_populates="inventory_events")
     purchase_order_item = relationship("PurchaseOrderItem", back_populates="inventory_events")
     batch = relationship("Batch", back_populates="inventory_events")
-    customer_order_item = relationship("OrderItem", back_populates="inventory_events")
+    customer_order_item = relationship("CustomerOrderItem", back_populates="inventory_events")
     debit_note_item = relationship("DebitNoteItem", back_populates="inventory_events")
     credit_note_item = relationship("CreditNoteItem", back_populates="inventory_events")
     material = relationship("Material", back_populates="inventory_events")
@@ -732,7 +732,7 @@ class DebitNoteItem(Base):
     notes = Column(Text, nullable=True)
     status = Column(String(120), nullable=False)  # e.g., void, pending, paid
     invoice_item_uuid = Column(String(36), ForeignKey("invoice_item.uuid"), nullable=False)
-    customer_order_item_uuid = Column(String(36), ForeignKey("order_item.uuid"), nullable=False)
+    customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=False)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=False)
     vendor_uuid = Column(String(36), ForeignKey("vendor.uuid"), nullable=False)
     purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=False)
@@ -740,7 +740,7 @@ class DebitNoteItem(Base):
 
     # relations
     invoice_item = relationship("InvoiceItem", back_populates="debit_note_items")
-    customer_order_item = relationship("OrderItem", back_populates="debit_note_items")
+    customer_order_item = relationship("CustomerOrderItem", back_populates="debit_note_items")
     purchase_order_item = relationship("PurchaseOrderItem", back_populates="debit_note_items")
     customer = relationship("Customer", back_populates="debit_note_items")
     vendor = relationship("Vendor", back_populates="debit_note_items")
@@ -761,7 +761,7 @@ class CreditNoteItem(Base):
     notes = Column(Text, nullable=True)
     status = Column(String(120), nullable=False)  # e.g., void, pending, paid
     invoice_item_uuid = Column(String(36), ForeignKey("invoice_item.uuid"), nullable=True)
-    customer_order_item_uuid = Column(String(36), ForeignKey("order_item.uuid"), nullable=True)
+    customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=True)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=True)
     vendor_uuid = Column(String(36), ForeignKey("vendor.uuid"), nullable=True)
     purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=False)
@@ -769,7 +769,7 @@ class CreditNoteItem(Base):
 
     # relations
     invoice_item = relationship("InvoiceItem", back_populates="credit_note_items")
-    customer_order_item = relationship("OrderItem", back_populates="credit_note_items")
+    customer_order_item = relationship("CustomerOrderItem", back_populates="credit_note_items")
     purchase_order_item = relationship("PurchaseOrderItem", back_populates="credit_note_items")
     inventory_events = relationship("InventoryEvent", back_populates="credit_note_item")
     customer = relationship("Customer", back_populates="credit_note_items")
