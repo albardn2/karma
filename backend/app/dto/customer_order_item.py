@@ -2,7 +2,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
-
+from app.dto.common_enums import UnitOfMeasure
 
 
 class CustomerOrderItemCreate(BaseModel):
@@ -23,7 +23,7 @@ class CustomerOrderItemRead(BaseModel):
     created_by_uuid: Optional[str] = None
     customer_order_uuid: str
     quantity: int
-    unit: str
+    unit: UnitOfMeasure
     material_uuid: str
     uuid: str
     is_fulfilled: bool

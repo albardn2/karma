@@ -13,6 +13,9 @@ from app.dto.customer_order_item import (
 from app.domains.customer_order_item.domain import CustomerOrderItemDomain
 from app.entrypoint.routes.common.errors import NotFoundError
 
+from app.dto.common_enums import UnitOfMeasure
+
+
 # --- BULK CREATE ---
 
 def test_bulk_create_order_items_success(client, monkeypatch):
@@ -24,7 +27,7 @@ def test_bulk_create_order_items_success(client, monkeypatch):
             created_by_uuid=None,
             customer_order_uuid=str(uuid.uuid4()),
             quantity=3,
-            unit="kg",
+            unit=UnitOfMeasure.KG,
             material_uuid=str(uuid.uuid4()),
             is_fulfilled=False,
             is_deleted=False,
@@ -36,7 +39,7 @@ def test_bulk_create_order_items_success(client, monkeypatch):
             created_by_uuid=None,
             customer_order_uuid=str(uuid.uuid4()),
             quantity=5,
-            unit="ltr",
+            unit=UnitOfMeasure.LITERS,
             material_uuid=str(uuid.uuid4()),
             is_fulfilled=False,
             is_deleted=False,
@@ -82,7 +85,7 @@ def test_get_order_item_success(client, return_dicts, monkeypatch):
         uuid=str(uuid.uuid4()),
         customer_order_uuid=str(uuid.uuid4()),
         quantity=7,
-        unit="pcs",
+        unit=UnitOfMeasure.PCS,
         material_uuid=str(uuid.uuid4()),
         created_by_uuid=None,
         is_fulfilled=False,
@@ -122,7 +125,7 @@ def test_list_order_items_default_pagination(client, return_dicts, monkeypatch):
         uuid=str(uuid.uuid4()),
         customer_order_uuid="CO1",
         quantity=1,
-        unit="kg",
+        unit=UnitOfMeasure.KG,
         material_uuid=str(uuid.uuid4()),
         created_by_uuid=None,
         is_fulfilled=False,
@@ -134,7 +137,7 @@ def test_list_order_items_default_pagination(client, return_dicts, monkeypatch):
         uuid=str(uuid.uuid4()),
         customer_order_uuid="CO2",
         quantity=2,
-        unit="ltr",
+        unit=UnitOfMeasure.LITERS,
         material_uuid=str(uuid.uuid4()),
         created_by_uuid=None,
         is_fulfilled=False,
@@ -194,7 +197,7 @@ def test_fulfill_order_items_success(client, monkeypatch):
                 created_by_uuid=None,
                 customer_order_uuid=str(uuid.uuid4()),
                 quantity=4,
-                unit="kg",
+                unit=UnitOfMeasure.KG,
                 material_uuid=str(uuid.uuid4()),
                 is_fulfilled=True,
                 is_deleted=False,
@@ -226,7 +229,7 @@ def test_delete_order_items_success(client, monkeypatch):
             created_by_uuid=None,
             customer_order_uuid=str(uuid.uuid4()),
             quantity=6,
-            unit="ltr",
+            unit=UnitOfMeasure.KG,
             material_uuid=str(uuid.uuid4()),
             is_fulfilled=False,
             is_deleted=True,
