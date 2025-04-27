@@ -94,6 +94,7 @@ class DummyUoW:
         self.warehouse_repository = DummyRepo("warehouse", return_single, return_all)
         self.fixed_asset_repository = DummyRepo("fixed_asset", return_single, return_all)
         self.transaction_repository = DummyRepo("transaction", return_single, return_all)
+        self.customer_order_repository = DummyRepo("customer_order", return_single, return_all)
         # add more repositories here as you need them…
 
     def __enter__(self):
@@ -136,6 +137,7 @@ def patch_all_uows(monkeypatch, return_dicts):
         "app.entrypoint.routes.warehouse.routes",
         "app.entrypoint.routes.fixed_asset.routes",
         "app.entrypoint.routes.transaction.routes",
+        "app.entrypoint.routes.customer_order.routes",
         # add any other route modules here…
     ]:
         mod = importlib.import_module(module_path)
@@ -160,6 +162,7 @@ def app():
     from app.entrypoint.routes.warehouse import warehouse_blueprint
     from app.entrypoint.routes.fixed_asset import fixed_asset_blueprint
     from app.entrypoint.routes.transaction import transaction_blueprint
+    from app.entrypoint.routes.customer_order import customer_order_blueprint
 
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -176,6 +179,7 @@ def app():
     app.register_blueprint(warehouse_blueprint, url_prefix="/warehouse")
     app.register_blueprint(fixed_asset_blueprint, url_prefix="/fixed_asset")
     app.register_blueprint(transaction_blueprint, url_prefix="/transaction")
+    app.register_blueprint(customer_order_blueprint, url_prefix="/customer_order")
 
     # register other blueprints here…
 

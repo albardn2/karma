@@ -97,14 +97,21 @@ class CustomerOrder(Base):
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=False)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    is_fulfilled = Column(Boolean, default=False)
-    fulfilled_at = Column(DateTime, nullable=True)
     is_deleted = Column(Boolean, default=False)
 
     # relations
     order_items = relationship("OrderItem", back_populates="order")
     invoices = relationship("Invoice", back_populates="customer_order")
     customer = relationship("Customer", back_populates="orders")
+
+    @property
+    def is_fulfilled(self):
+        return all(item.is_fulfilled for item in self.order_items)
+
+    @property
+    def fulfilled_at(self):
+        if self.is_fulfilled and self.order_items:
+            return max(item.fulfilled_at for item in self.order_items if item.fulfilled_at)
 
 
 class OrderItem(Base):

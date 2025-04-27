@@ -1,0 +1,73 @@
+from flask import Blueprint, request, jsonify
+from datetime import datetime
+from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+from app.entrypoint.routes.common.errors import NotFoundError
+from app.dto.customer_order import (
+    CustomerOrderCreate,
+    CustomerOrderRead,
+    CustomerOrderUpdate,
+    CustomerOrderListParams,
+    CustomerOrderPage,
+)
+from models.common import CustomerOrder as CustomerOrderModel
+from app.entrypoint.routes.customer_order import customer_order_blueprint
+from app.domains.customer_order.domain import CustomerOrderDomain
+
+
+@customer_order_blueprint.route("/", methods=["POST"])
+def create_customer_order():
+    payload = CustomerOrderCreate(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        customer_order_read = CustomerOrderDomain.create_customer_order(uow=uow, payload=payload)
+        uow.commit()
+        result = customer_order_read.model_dump(mode="json")
+    return jsonify(result), 201
+
+@customer_order_blueprint.route("/<string:uuid>", methods=["GET"])
+def get_customer_order(uuid: str):
+    with SqlAlchemyUnitOfWork() as uow:
+        order = uow.customer_order_repository.find_one(uuid=uuid, is_deleted=False)
+        if not order:
+            raise NotFoundError("CustomerOrder not found")
+        result = CustomerOrderRead.from_orm(order).model_dump(mode="json")
+        uow.commit()
+    return jsonify(result), 200
+#
+@customer_order_blueprint.route("/<string:uuid>", methods=["PUT"])
+def update_customer_order(uuid: str):
+    payload = CustomerOrderUpdate(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        customer_order_read = CustomerOrderDomain.update_customer_order(uuid=uuid,uow=uow, payload=payload)
+        result = customer_order_read.model_dump(mode="json")
+        uow.commit()
+    return jsonify(result), 200
+#
+@customer_order_blueprint.route("/<string:uuid>", methods=["DELETE"])
+def delete_customer_order(uuid: str):
+    with SqlAlchemyUnitOfWork() as uow:
+        customer_order_read = CustomerOrderDomain.delete_customer_order(uuid=uuid, uow=uow)
+        result = customer_order_read.model_dump(mode="json")
+        uow.commit()
+    return jsonify(result), 200
+
+@customer_order_blueprint.route("/", methods=["GET"])
+def list_customer_orders():
+    params = CustomerOrderListParams(**request.args)
+    filters = [CustomerOrderModel.is_deleted == False]
+    if params.customer_uuid:
+        filters.append(CustomerOrderModel.customer_uuid == params.customer_uuid)
+    with SqlAlchemyUnitOfWork() as uow:
+        page_obj = uow.customer_order_repository.find_all_by_filters_paginated(
+            filters=filters,
+            page=params.page,
+            per_page=params.per_page
+        )
+        items = [CustomerOrderRead.from_orm(o).model_dump(mode="json") for o in page_obj.items]
+        result = CustomerOrderPage(
+            orders=items,
+            total_count=page_obj.total,
+            page=page_obj.page,
+            per_page=page_obj.per_page,
+            pages=page_obj.pages
+        ).model_dump(mode="json")
+    return jsonify(result), 200
