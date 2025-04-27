@@ -214,6 +214,8 @@ class InvoiceItem(Base):
     customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=False)
     price_per_unit = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    unit = Column(String(120), nullable=False)  # should be same as material unit
+    is_deleted = Column(Boolean, default=False)
 
     # relations
     invoice = relationship("Invoice", back_populates="invoice_items")
@@ -232,10 +234,6 @@ class InvoiceItem(Base):
     @property
     def quantity(self):
         return self.customer_order_item.quantity
-
-    @property
-    def unit(self):
-        return self.customer_order_item.unit
 
     @property
     def material_name(self):
