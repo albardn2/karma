@@ -1,0 +1,8 @@
+from app.adapters.repositories._abstract_repo import AbstractRepository
+from models.common import Payout
+
+
+class PayoutRepository(AbstractRepository[Payout]):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._type = Payout

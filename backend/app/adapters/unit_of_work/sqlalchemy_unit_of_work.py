@@ -20,6 +20,7 @@ from app.adapters.repositories.customer_order_item_repository import CustomerOrd
 from app.adapters.repositories.invoice_repository import InvoiceRepository
 from app.adapters.repositories.invoice_item_repository import InvoiceItemRepository
 from app.adapters.repositories.payment_repository import PaymentRepository
+from app.adapters.repositories.payout_repository import PayoutRepository
 
 
 SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")  # type: ignore
@@ -52,6 +53,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.invoice_repository = InvoiceRepository(session=self.session)
         self.invoice_item_repository = InvoiceItemRepository(session=self.session)
         self.payment_repository = PaymentRepository(session=self.session)
+        self.payout_repository = PayoutRepository(session=self.session)
 
         return self
 

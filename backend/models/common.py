@@ -516,7 +516,9 @@ class Payout(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
     employee_uuid = Column(String(36), ForeignKey("employee.uuid"), nullable=True)
+    employee_uuid = Column(String(36), ForeignKey("employee.uuid"), nullable=True)
     credit_note_item_uuid = Column(String(36), ForeignKey("credit_note_item.uuid"), nullable=True)
+    is_deleted = Column(Boolean, default=False)
 
     # relations
     financial_account = relationship("FinancialAccount", back_populates="payouts")
