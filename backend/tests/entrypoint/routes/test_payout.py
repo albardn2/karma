@@ -181,117 +181,116 @@ def test_delete_payout_success(client, monkeypatch):
 
 # # --- LIST ---
 #
-# def test_list_payouts_default_pagination(client, return_dicts, monkeypatch):
-#     _, return_all = return_dicts
-#     m1 = PayoutModel(
-#         uuid=str(uuid.uuid4()),
-#         created_by_uuid=None,
-#         purchase_order_uuid="po1",
-#         expense_uuid=None,
-#         amount=10.0,
-#         currency="USD",
-#         financial_account_uuid="fa1",
-#         created_at=datetime(2025,1,1),
-#         notes=None,
-#         employee_uuid=None,
-#         credit_note_item_uuid=None,
-#         is_deleted=False
-#     )
-#     m2 = PayoutModel(
-#         uuid=str(uuid.uuid4()),
-#         created_by_uuid=None,
-#         purchase_order_uuid="po2",
-#         expense_uuid=None,
-#         amount=20.0,
-#         currency="USD",
-#         financial_account_uuid="fa2",
-#         created_at=datetime(2025,2,1),
-#         notes=None,
-#         employee_uuid=None,
-#         credit_note_item_uuid=None,
-#         is_deleted=False
-#     )
-#     return_all['payout'] = [m1, m2]
-#     dto1 = PayoutRead(
-#         uuid=m1.uuid,
-#         created_by_uuid=None,
-#         purchase_order_uuid=m1.purchase_order_uuid,
-#         expense_uuid=None,
-#         amount=10.0,
-#         currency=Currency.USD,
-#         notes=None,
-#         employee_uuid=None,
-#         credit_note_item_uuid=None,
-#         financial_account_uuid=m1.financial_account_uuid,
-#         created_at=datetime.utcnow(),
-#         is_deleted=False
-#     )
-#     dto2 = PayoutRead(
-#         uuid=m2.uuid,
-#         created_by_uuid=None,
-#         purchase_order_uuid=m2.purchase_order_uuid,
-#         expense_uuid=None,
-#         amount=20.0,
-#         currency=Currency.USD,
-#         notes=None,
-#         employee_uuid=None,
-#         credit_note_item_uuid=None,
-#         financial_account_uuid=m2.financial_account_uuid,
-#         created_at=datetime.utcnow(),
-#         is_deleted=False
-#     )
-#     monkeypatch.setattr(
-#         PayoutRead,
-#         'from_orm',
-#         classmethod(lambda cls,obj: dto1 if obj is m1 else dto2)
-#     )
-#     resp = client.get('/payout/')
-#     assert resp.status_code == 200
-#     data = resp.get_json()
-#     assert data['total_count'] == 2
-#     ids = {p['uuid'] for p in data['payouts']}
-#     assert ids == {m1.uuid, m2.uuid}
-#
-#
-# def test_list_payouts_filter_purchase_order(client, return_dicts):
-#     _, return_all = return_dicts
-#     m = PayoutModel(
-#         uuid=str(uuid.uuid4()),
-#         created_by_uuid=None,
-#         purchase_order_uuid="FILTER_PO",
-#         expense_uuid=None,
-#         amount=30.0,
-#         currency="USD",
-#         financial_account_uuid="faF",
-#         created_at=datetime.utcnow(),
-#         notes=None,
-#         employee_uuid=None,
-#         credit_note_item_uuid=None,
-#         is_deleted=False
-#     )
-#     return_all['payout'] = [m]
-#     read_dto = PayoutRead(
-#         uuid=m.uuid,
-#         created_by_uuid=None,
-#         purchase_order_uuid=m.purchase_order_uuid,
-#         expense_uuid=None,
-#         amount=30.0,
-#         currency=Currency.USD,
-#         notes=None,
-#         employee_uuid=None,
-#         credit_note_item_uuid=None,
-#         financial_account_uuid=m.financial_account_uuid,
-#         created_at=datetime.utcnow(),
-#         is_deleted=False
-#     )
-#     monkeypatch.setenv
-#     monkeypatch.setattr(
-#         PayoutRead,
-#         'from_orm',
-#         classmethod(lambda cls,obj: read_dto)
-#     )
-#     resp = client.get(f'/payout/?purchase_order_uuid={m.purchase_order_uuid}')
-#     assert resp.status_code == 200
-#     data = resp.get_json()
-#     assert data['total_count'] == 1
-#     assert data['payouts'][0]['purchase_order_uuid'] == m.purchase_order_uuid
+def test_list_payouts_default_pagination(client, return_dicts, monkeypatch):
+    _, return_all = return_dicts
+    m1 = PayoutModel(
+        uuid=str(uuid.uuid4()),
+        created_by_uuid=None,
+        purchase_order_uuid="po1",
+        expense_uuid=None,
+        amount=10.0,
+        currency="USD",
+        financial_account_uuid="fa1",
+        created_at=datetime(2025,1,1),
+        notes=None,
+        employee_uuid=None,
+        credit_note_item_uuid=None,
+        is_deleted=False
+    )
+    m2 = PayoutModel(
+        uuid=str(uuid.uuid4()),
+        created_by_uuid=None,
+        purchase_order_uuid="po2",
+        expense_uuid=None,
+        amount=20.0,
+        currency="USD",
+        financial_account_uuid="fa2",
+        created_at=datetime(2025,2,1),
+        notes=None,
+        employee_uuid=None,
+        credit_note_item_uuid=None,
+        is_deleted=False
+    )
+    return_all['payout'] = [m1, m2]
+    dto1 = PayoutRead(
+        uuid=m1.uuid,
+        created_by_uuid=None,
+        purchase_order_uuid=m1.purchase_order_uuid,
+        expense_uuid=None,
+        amount=10.0,
+        currency=Currency.USD,
+        notes=None,
+        employee_uuid=None,
+        credit_note_item_uuid=None,
+        financial_account_uuid=m1.financial_account_uuid,
+        created_at=datetime.utcnow(),
+        is_deleted=False
+    )
+    dto2 = PayoutRead(
+        uuid=m2.uuid,
+        created_by_uuid=None,
+        purchase_order_uuid=m2.purchase_order_uuid,
+        expense_uuid=None,
+        amount=20.0,
+        currency=Currency.USD,
+        notes=None,
+        employee_uuid=None,
+        credit_note_item_uuid=None,
+        financial_account_uuid=m2.financial_account_uuid,
+        created_at=datetime.utcnow(),
+        is_deleted=False
+    )
+    monkeypatch.setattr(
+        PayoutRead,
+        'from_orm',
+        classmethod(lambda cls,obj: dto1 if obj is m1 else dto2)
+    )
+    resp = client.get('/payout/')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['total_count'] == 2
+    ids = {p['uuid'] for p in data['payouts']}
+    assert ids == {m1.uuid, m2.uuid}
+
+
+def test_list_payouts_filter_purchase_order(client, return_dicts,monkeypatch):
+    _, return_all = return_dicts
+    m = PayoutModel(
+        uuid=str(uuid.uuid4()),
+        created_by_uuid=None,
+        purchase_order_uuid="FILTER_PO",
+        expense_uuid=None,
+        amount=30.0,
+        currency="USD",
+        financial_account_uuid="faF",
+        created_at=datetime.utcnow(),
+        notes=None,
+        employee_uuid=None,
+        credit_note_item_uuid=None,
+        is_deleted=False
+    )
+    return_all['payout'] = [m]
+    read_dto = PayoutRead(
+        uuid=m.uuid,
+        created_by_uuid=None,
+        purchase_order_uuid=m.purchase_order_uuid,
+        expense_uuid=None,
+        amount=30.0,
+        currency=Currency.USD,
+        notes=None,
+        employee_uuid=None,
+        credit_note_item_uuid=None,
+        financial_account_uuid=m.financial_account_uuid,
+        created_at=datetime.utcnow(),
+        is_deleted=False
+    )
+    monkeypatch.setattr(
+        PayoutRead,
+        'from_orm',
+        classmethod(lambda cls,obj: read_dto)
+    )
+    resp = client.get(f'/payout/?purchase_order_uuid={m.purchase_order_uuid}')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['total_count'] == 1
+    assert data['payouts'][0]['purchase_order_uuid'] == m.purchase_order_uuid

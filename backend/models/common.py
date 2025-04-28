@@ -673,13 +673,14 @@ class Inventory(Base):
     warehouse_uuid = Column(String(36), ForeignKey("warehouse.uuid"), nullable=True)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
-    lot_id = Column(String(120), nullable=False)  # lot number or ID
+    lot_id = Column(String(120), nullable=False, unique=True)
     expiration_date = Column(DateTime, nullable=True)  # for perishable items
     cost_per_unit = Column(Float, nullable=False)
     unit = Column(String(120), nullable=False)  # should be same as material unit
     current_quantity = Column(Float, nullable=False)
     original_quantity = Column(Float, nullable=False)
     is_active = Column(Boolean, default=True)
+    currency = Column(String(120), nullable=False)
 
     # relations
     material = relationship("Material", back_populates="inventory")
