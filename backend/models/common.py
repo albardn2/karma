@@ -2,7 +2,8 @@ import uuid
 from datetime import datetime, timezone
 
 import bcrypt
-from sqlalchemy import create_engine, Column, String, DateTime, Text, Float
+from sqlalchemy import create_engine, Column, String, DateTime, Text, Float, JSON
+from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import declarative_base, sessionmaker
 import uuid
 from datetime import datetime
@@ -380,7 +381,7 @@ class Material(Base):
     pricing = relationship("Pricing", back_populates="material", uselist=False)
     customer_order_items = relationship("CustomerOrderItem", back_populates="material")
     inventory = relationship("Inventory", back_populates="material")
-    batches = relationship("Batch", back_populates="material")
+    processes = relationship("Process", back_populates="material")
     purchase_order_items = relationship("PurchaseOrderItem", back_populates="material")
     fixed_assets = relationship("FixedAsset", back_populates="material")
     inventory_events = relationship("InventoryEvent", back_populates="material")
@@ -623,25 +624,24 @@ class FixedAsset(Base):
         return self.price_per_unit * self.quantity
 
 
-class Batch(Base):
-    __tablename__ = "batch"
+class Process(Base):
+    __tablename__ = "process"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     type = Column(String(120), nullable=False)  # e.g., powder_preparation, coated_peanuts
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
-    batch_id = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
-    data = Column(Text, nullable=True)
+    data = Column(MutableDict.as_mutable(JSON), default=dict)
     cost_per_unit = Column(Float, nullable=False)
     unit = Column(String(120), nullable=False)  # should be same as material unit
     quantity = Column(Float, nullable=False)
 
     # relations
-    material = relationship("Material", back_populates="batches")
-    inventory_events = relationship("InventoryEvent", back_populates="batch")
+    material = relationship("Material", back_populates="processes")
+    inventory_events = relationship("InventoryEvent", back_populates="process")
 
 
 class Warehouse(Base):
@@ -705,7 +705,7 @@ class InventoryEvent(Base):
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     inventory_uuid = Column(String(36), ForeignKey("inventory.uuid"), nullable=False)
     purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=True)
-    batch_uuid = Column(String(36), ForeignKey("batch.uuid"), nullable=True)
+    process_uuid = Column(String(36), ForeignKey("process.uuid"), nullable=True)
     customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=True)
     event_type = Column(String(120), nullable=False)  # e.g., addition, removal, adjustment, transfer, etc.
     quantity = Column(Float, nullable=False)
@@ -714,11 +714,12 @@ class InventoryEvent(Base):
     debit_note_item_uuid = Column(String(36), ForeignKey("debit_note_item.uuid"), nullable=True)
     credit_note_item_uuid = Column(String(36), ForeignKey("credit_note_item.uuid"), nullable=True)
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
+    is_deleted = Column(Boolean, default=False)
 
     # relations
     inventory = relationship("Inventory", back_populates="inventory_events")
     purchase_order_item = relationship("PurchaseOrderItem", back_populates="inventory_events")
-    batch = relationship("Batch", back_populates="inventory_events")
+    process = relationship("Process", back_populates="inventory_events")
     customer_order_item = relationship("CustomerOrderItem", back_populates="inventory_events")
     debit_note_item = relationship("DebitNoteItem", back_populates="inventory_events")
     credit_note_item = relationship("CreditNoteItem", back_populates="inventory_events")
