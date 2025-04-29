@@ -34,18 +34,21 @@ class InventoryEventCreate(InventoryEventBase):
     """Fields required to create a new inventory event."""
     pass
 
-    # @model_validator(mode="before")
-    # @classmethod
-    # def check_exclusive_fields(cls, values: dict) -> dict:
-    #     po = bool(values.get("purchase_order_item_uuid"))
-    #     co = bool(values.get("customer_order_item_uuid"))
-    #     dn = bool(values.get("debit_note_item_uuid"))
-    #     cn = bool(values.get("credit_note_item_uuid"))
-    #     process = bool(values.get("process_uuid"))
-    #     if not (po or co or dn or cn or process):
-    #         raise BadRequestError("At least one of purchase_order_item_uuid, customer_order_item_uuid, debit_note_item_uuid, credit_note_item_uuid or process_uuid must be set.")
-    #     if (po + co + dn + cn + process) > 1:
-    #         raise BadRequestError("Only one of purchase_order_item_uuid, customer_order_item_uuid, debit_note_item_uuid, credit_note_item_uuid or process_uuid can be set.")
+    @model_validator(mode="before")
+    @classmethod
+    def check_exclusive_fields(cls, values: dict) -> dict:
+        po = bool(values.get("purchase_order_item_uuid"))
+        co = bool(values.get("customer_order_item_uuid"))
+        dn = bool(values.get("debit_note_item_uuid"))
+        cn = bool(values.get("credit_note_item_uuid"))
+        process = bool(values.get("process_uuid"))
+        if not (po or co or dn or cn or process):
+            raise BadRequestError("At least one of purchase_order_item_uuid, customer_order_item_uuid, debit_note_item_uuid, credit_note_item_uuid or process_uuid must be set.")
+        if (po + co + dn + cn + process) > 1:
+            raise BadRequestError("Only one of purchase_order_item_uuid, customer_order_item_uuid, debit_note_item_uuid, credit_note_item_uuid or process_uuid can be set.")
+
+        return values
+
 
 
 

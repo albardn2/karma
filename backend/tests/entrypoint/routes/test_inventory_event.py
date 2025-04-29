@@ -20,7 +20,7 @@ def test_create_inventory_event_success(client, monkeypatch):
         uuid=str(uuid.uuid4()),
         created_by_uuid="user-1",
         inventory_uuid="inv-123",
-        purchase_order_item_uuid=None,
+        purchase_order_item_uuid="UUID",
         process_uuid=None,
         customer_order_item_uuid=None,
         event_type=InventoryEventType.PROCUREMENT,
@@ -40,6 +40,7 @@ def test_create_inventory_event_success(client, monkeypatch):
     )
     payload = {
         "inventory_uuid": read_dto.inventory_uuid,
+        "purchase_order_item_uuid": read_dto.purchase_order_item_uuid,
         "event_type": read_dto.event_type.value,
         "quantity": read_dto.quantity,
         "notes": read_dto.notes
@@ -52,7 +53,7 @@ def test_create_inventory_event_success(client, monkeypatch):
 def test_create_inventory_event_validation_error(client):
     # missing required: inventory_uuid, event_type, quantity
     with pytest.raises(ValidationError) as excinfo:
-        resp = client.post('/inventory_event/', json={})
+        resp = client.post('/inventory_event/', json={"purchase_order_item_uuid": "UUID"})
         assert resp.status_code == 422
         err = resp.get_json()
         assert err['error'] == 'Validation error'

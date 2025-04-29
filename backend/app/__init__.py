@@ -26,6 +26,7 @@ from app.entrypoint.routes.payment import payment_blueprint
 from app.entrypoint.routes.payout import payout_blueprint
 from app.entrypoint.routes.inventory import inventory_blueprint
 from app.entrypoint.routes.inventory_event import inventory_event_blueprint
+from app.entrypoint.routes.debit_note import debit_note_item_blueprint
 
 # from app.entrypoint.routes.fixed_asset import fixed_asset_blueprint
 
@@ -61,6 +62,8 @@ def create_app(config_object=Config):
     app.register_blueprint(payout_blueprint, url_prefix='/payout')
     app.register_blueprint(inventory_blueprint, url_prefix='/inventory')
     app.register_blueprint(inventory_event_blueprint, url_prefix='/inventory-event')
+    app.register_blueprint(debit_note_item_blueprint, url_prefix='/debit-note-item')
+
 
     register_error_handlers(app)
 

@@ -23,7 +23,7 @@ from app.adapters.repositories.payment_repository import PaymentRepository
 from app.adapters.repositories.payout_repository import PayoutRepository
 from app.adapters.repositories.inventory_repository import InventoryRepository
 from app.adapters.repositories.inventory_event_repository import InventoryEventRepository
-
+from app.adapters.repositories.debit_note_item_repository import DebitNoteItemRepository
 
 
 SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")  # type: ignore
@@ -59,6 +59,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.payout_repository = PayoutRepository(session=self.session)
         self.inventory_repository = InventoryRepository(session=self.session)
         self.inventory_event_repository = InventoryEventRepository(session=self.session)
+        self.debit_note_item_repository = DebitNoteItemRepository(session=self.session)
 
         return self
 

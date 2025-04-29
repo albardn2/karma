@@ -10,7 +10,6 @@ from app.dto.common_enums import Currency
 class InvoiceStatus(str, Enum):
     PENDING = "pending"
     PAID = "paid"
-    OVERDUE = "overdue"
     VOID = "void"
     REFUNDED = "refunded"
     PARTIALLY_REFUNDED = "partially_refunded"
