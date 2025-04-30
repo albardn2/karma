@@ -780,8 +780,9 @@ class CreditNoteItem(Base):
     customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=True)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=True)
     vendor_uuid = Column(String(36), ForeignKey("vendor.uuid"), nullable=True)
-    purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=False)
+    purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    is_deleted = Column(Boolean, default=False)
 
     # relations
     invoice_item = relationship("InvoiceItem", back_populates="credit_note_items")

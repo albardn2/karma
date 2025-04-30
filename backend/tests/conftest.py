@@ -104,6 +104,7 @@ class DummyUoW:
         self.inventory_repository = DummyRepo("inventory", return_single, return_all)
         self.inventory_event_repository = DummyRepo("inventory_event", return_single, return_all)
         self.debit_note_item_repository = DummyRepo("debit_note_item", return_single, return_all)
+        self.credit_note_item_repository = DummyRepo("credit_note_item", return_single, return_all)
         # add more repositories here as you need them…
 
     def __enter__(self):
@@ -155,6 +156,7 @@ def patch_all_uows(monkeypatch, return_dicts):
         "app.entrypoint.routes.inventory.routes",
         "app.entrypoint.routes.inventory_event.routes",
         "app.entrypoint.routes.debit_note.routes",
+        "app.entrypoint.routes.credit_note.routes",
         # add any other route modules here…
     ]:
         mod = importlib.import_module(module_path)
@@ -188,6 +190,7 @@ def app():
     from app.entrypoint.routes.inventory import inventory_blueprint
     from app.entrypoint.routes.inventory_event import inventory_event_blueprint
     from app.entrypoint.routes.debit_note import debit_note_item_blueprint
+    from app.entrypoint.routes.credit_note import credit_note_item_blueprint
 
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -213,6 +216,9 @@ def app():
     app.register_blueprint(inventory_blueprint, url_prefix="/inventory")
     app.register_blueprint(inventory_event_blueprint, url_prefix="/inventory_event")
     app.register_blueprint(debit_note_item_blueprint, url_prefix="/debit_note_item")
+    app.register_blueprint(credit_note_item_blueprint, url_prefix="/credit_note_item")
+
+
 
     return app
 

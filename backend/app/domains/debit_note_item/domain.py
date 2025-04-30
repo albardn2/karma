@@ -10,7 +10,7 @@ class DebitNoteItemDomain:
     @staticmethod
     def create_item(uow: SqlAlchemyUnitOfWork, payload: DebitNoteItemCreate) -> DebitNoteItemRead:
         item = DebitNoteItemModel(**payload.model_dump(mode="json"))
-        uow.debit_note_item_repository.save(model=item, commit=True)
+        uow.debit_note_item_repository.save(model=item, commit=False)
         return DebitNoteItemRead.from_orm(item)
 
 
@@ -21,6 +21,6 @@ class DebitNoteItemDomain:
         m = uow.debit_note_item_repository.find_one(uuid=uuid, is_deleted=False)
         if not m:
             raise NotFoundError("DebitNoteItem not found")
-        uow.debit_note_item_repository.delete(model=m, commit=True)
+        uow.debit_note_item_repository.delete(model=m, commit=False)
 
         return DebitNoteItemRead.from_orm(m)
