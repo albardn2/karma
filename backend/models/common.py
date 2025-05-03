@@ -33,6 +33,8 @@ class User(Base):
     permission_scope = Column(String(256), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     phone_number = Column(String(256), nullable=True)
+    language = Column(String(10), nullable=True)
+    is_deleted = Column(Boolean, default=False)
 
     # Method to set password securely
     def set_password(self, plaintext_password):
@@ -48,6 +50,12 @@ class User(Base):
             plaintext_password.encode('utf-8'),
             self.password.encode('utf-8')
         )
+
+    @property
+    def is_admin(self):
+        scopes= self.permission_scope.split(",")
+        return any(scope in ["admin", "superuser"] for scope in scopes)
+
 
 
 

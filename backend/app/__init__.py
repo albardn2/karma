@@ -4,6 +4,8 @@ import os
 from dotenv import load_dotenv, dotenv_values
 from flask import Flask
 from app.config import Config
+from flask_jwt_extended import JWTManager
+
 
 from app.entrypoint.routes.common.errors import register_error_handlers
 from app.entrypoint.routes.customer import customer_blueprint
@@ -29,9 +31,12 @@ from app.entrypoint.routes.inventory_event import inventory_event_blueprint
 from app.entrypoint.routes.debit_note import debit_note_item_blueprint
 from app.entrypoint.routes.credit_note import credit_note_item_blueprint
 from app.entrypoint.routes.process import process_blueprint
+from app.entrypoint.routes.auth import auth_blueprint
 
+
+
+jwt = JWTManager()
 load_dotenv()
-
 def create_app(config_object=Config):
     app = Flask(__name__)
 
@@ -40,6 +45,15 @@ def create_app(config_object=Config):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     env_config = dotenv_values(os.path.join(BASE_DIR,"..", ".env"))
     app.config.from_mapping(env_config)
+
+    app.config['JWT_SECRET_KEY'] = "super-secret-change-me"
+    # accept tokens from both headers and cookies
+    app.config['JWT_TOKEN_LOCATION'] = ["headers", "cookies"]
+    app.config['JWT_COOKIE_SECURE']   = True     # only over HTTPS in prod
+    app.config['JWT_COOKIE_SAMESITE'] = 'Lax'
+    app.config['JWT_ACCESS_COOKIE_PATH'] = '/'
+    app.config["JWT_COOKIE_CSRF_PROTECT"] = False # TESTING
+    jwt.init_app(app)
 
     # Register blueprints
     app.register_blueprint(customer_blueprint, url_prefix='/customer')
@@ -65,6 +79,7 @@ def create_app(config_object=Config):
     app.register_blueprint(debit_note_item_blueprint, url_prefix='/debit-note-item')
     app.register_blueprint(credit_note_item_blueprint, url_prefix='/credit-note-item')
     app.register_blueprint(process_blueprint, url_prefix='/process')
+    app.register_blueprint(auth_blueprint, url_prefix='/auth')
 
     register_error_handlers(app)
 

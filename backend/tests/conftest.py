@@ -1,6 +1,6 @@
 import os, sys
 from dotenv import load_dotenv, dotenv_values
-
+from flask_jwt_extended import JWTManager
 
 load_dotenv()
 # assume tests/ sits alongside app/
@@ -106,6 +106,7 @@ class DummyUoW:
         self.debit_note_item_repository = DummyRepo("debit_note_item", return_single, return_all)
         self.credit_note_item_repository = DummyRepo("credit_note_item", return_single, return_all)
         self.process_repository = DummyRepo("process", return_single, return_all)
+        self.user_repository = DummyRepo("user", return_single, return_all)
         # add more repositories here as you need them…
 
     def __enter__(self):
@@ -159,6 +160,7 @@ def patch_all_uows(monkeypatch, return_dicts):
         "app.entrypoint.routes.debit_note.routes",
         "app.entrypoint.routes.credit_note.routes",
         "app.entrypoint.routes.process.routes",
+        "app.entrypoint.routes.auth.routes",
         # add any other route modules here…
     ]:
         mod = importlib.import_module(module_path)
@@ -194,6 +196,7 @@ def app():
     from app.entrypoint.routes.debit_note import debit_note_item_blueprint
     from app.entrypoint.routes.credit_note import credit_note_item_blueprint
     from app.entrypoint.routes.process import process_blueprint
+    from app.entrypoint.routes.auth import auth_blueprint
 
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -221,6 +224,17 @@ def app():
     app.register_blueprint(debit_note_item_blueprint, url_prefix="/debit_note_item")
     app.register_blueprint(credit_note_item_blueprint, url_prefix="/credit_note_item")
     app.register_blueprint(process_blueprint, url_prefix="/process")
+    app.register_blueprint(auth_blueprint, url_prefix="/auth")
+
+    app.config['JWT_SECRET_KEY'] = "super-secret-change-me"
+    # accept tokens from both headers and cookies
+    app.config['JWT_TOKEN_LOCATION'] = ["headers", "cookies"]
+    app.config['JWT_COOKIE_SECURE']   = True     # only over HTTPS in prod
+    app.config['JWT_COOKIE_SAMESITE'] = 'Lax'
+    app.config['JWT_ACCESS_COOKIE_PATH'] = '/'
+    app.config["JWT_COOKIE_CSRF_PROTECT"] = False # TESTING
+    jwt = JWTManager()
+    jwt.init_app(app)
 
     return app
 

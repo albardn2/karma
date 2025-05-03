@@ -6,16 +6,17 @@ authors = [
     {name = "zaid",email = "zaid.al-bardan@tomtom.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<4"
 dependencies = [
     "flask (>=3.1.0,<3.2.0)",
     "python-dotenv (>=1.0.1,<2.0.0)",
     "google-api-python-client (>=2.164.0,<3.0.0)",
     "google-auth (>=2.38.0,<3.0.0)",
-    "pydantic (>=2.10.6,<3.0.0)",
     "pandas (>=2.2.3,<3.0.0)",
     "email-validator (>=2.0.0,<3.0.0)",
     "pytest (>=8.3.5,<9.0.0)",
+    "pydantic (==2.11.3)",
+    "flask-jwt-extended (>=4.7.1,<5.0.0)"
 ]
 
 

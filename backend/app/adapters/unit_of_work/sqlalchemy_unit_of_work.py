@@ -26,6 +26,7 @@ from app.adapters.repositories.inventory_event_repository import InventoryEventR
 from app.adapters.repositories.debit_note_item_repository import DebitNoteItemRepository
 from app.adapters.repositories.credit_note_item_repository import CreditNoteItemRepository
 from app.adapters.repositories.process_repository import ProcessRepository
+from app.adapters.repositories.user_repository import UserRepository
 
 
 SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")  # type: ignore
@@ -64,6 +65,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.debit_note_item_repository = DebitNoteItemRepository(session=self.session)
         self.credit_note_item_repository = CreditNoteItemRepository(session=self.session)
         self.process_repository = ProcessRepository(session=self.session)
+        self.user_repository = UserRepository(session=self.session)
 
         return self
 
