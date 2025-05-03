@@ -28,6 +28,7 @@ from app.entrypoint.routes.inventory import inventory_blueprint
 from app.entrypoint.routes.inventory_event import inventory_event_blueprint
 from app.entrypoint.routes.debit_note import debit_note_item_blueprint
 from app.entrypoint.routes.credit_note import credit_note_item_blueprint
+from app.entrypoint.routes.process import process_blueprint
 
 load_dotenv()
 
@@ -63,6 +64,7 @@ def create_app(config_object=Config):
     app.register_blueprint(inventory_event_blueprint, url_prefix='/inventory-event')
     app.register_blueprint(debit_note_item_blueprint, url_prefix='/debit-note-item')
     app.register_blueprint(credit_note_item_blueprint, url_prefix='/credit-note-item')
+    app.register_blueprint(process_blueprint, url_prefix='/process')
 
     register_error_handlers(app)
 

@@ -381,7 +381,6 @@ class Material(Base):
     pricing = relationship("Pricing", back_populates="material", uselist=False)
     customer_order_items = relationship("CustomerOrderItem", back_populates="material")
     inventory = relationship("Inventory", back_populates="material")
-    processes = relationship("Process", back_populates="material")
     purchase_order_items = relationship("PurchaseOrderItem", back_populates="material")
     fixed_assets = relationship("FixedAsset", back_populates="material")
     inventory_events = relationship("InventoryEvent", back_populates="material")
@@ -631,16 +630,11 @@ class Process(Base):
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     type = Column(String(120), nullable=False)  # e.g., powder_preparation, coated_peanuts
-    material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
     data = Column(MutableDict.as_mutable(JSON), default=dict)
-    cost_per_unit = Column(Float, nullable=False)
-    unit = Column(String(120), nullable=False)  # should be same as material unit
-    quantity = Column(Float, nullable=False)
 
     # relations
-    material = relationship("Material", back_populates="processes")
     inventory_events = relationship("InventoryEvent", back_populates="process")
 
 
