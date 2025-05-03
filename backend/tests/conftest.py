@@ -1,6 +1,7 @@
 import os, sys
 from dotenv import load_dotenv, dotenv_values
-from flask_jwt_extended import JWTManager
+from flask_jwt_extended import JWTManager, create_access_token
+
 
 load_dotenv()
 # assume tests/ sits alongside app/
@@ -13,6 +14,17 @@ from datetime import datetime
 import importlib
 import pytest
 from app.adapters.repositories._abstract_repo import Pagination
+from app.dto.auth import PermissionScope
+
+@pytest.fixture
+def admin_token(client):
+    # issue an admin‐scoped JWT for protected endpoints
+    admin_uuid = str(uuid.uuid4())
+    with client.application.app_context():
+        return create_access_token(
+            identity=admin_uuid,
+            additional_claims={"scopes": [PermissionScope.ADMIN.value]}
+        )
 
 
 @pytest.fixture(autouse=True)
