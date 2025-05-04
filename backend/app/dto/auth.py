@@ -32,6 +32,7 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     phone_number: Optional[str] = None
     language: Optional[str] = None
+    password: Optional[str] = None
     # only admins may change this:
     permission_scope: Optional[PermissionScope] = None
 

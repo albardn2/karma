@@ -50,6 +50,8 @@ class UserDomain:
         updates = payload.model_dump(exclude_unset=True)
         for field, val in updates.items():
             setattr(user, field, val)
+        if payload.password:
+            user.set_password(payload.password)
 
         uow.user_repository.save(model=user, commit=False)
 

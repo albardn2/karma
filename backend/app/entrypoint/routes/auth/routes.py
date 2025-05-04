@@ -25,6 +25,8 @@ from app.dto.auth import UserListParams
 from app.dto.auth import UserPage
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 
+from app.dto.auth import PermissionScope
+
 
 @auth_blueprint.route("/register", methods=["POST"])
 @scopes_required("admin","superuser")
@@ -150,3 +152,9 @@ def delete_user(user_uuid: str):
         dto = user_read.model_dump(mode="json")
         uow.commit()
     return jsonify(dto), 200
+
+# route to list permission scope enums
+@auth_blueprint.route("/permissions", methods=["GET"])
+def list_permissions():
+    permissions = [p.value for p in PermissionScope]
+    return jsonify(permissions), 200
