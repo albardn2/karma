@@ -18,9 +18,8 @@ class FinancialAccountUpdate(BaseModel):
     """All fields optional for partial updates."""
     account_name: Optional[str]   = None
     balance:      Optional[float] = None
-    currency:     Optional[Currency] = None
     notes:        Optional[str]   = None
-    is_deleted:   Optional[bool]   = None
+    currency:     Optional[Currency] = None
 
 class FinancialAccountRead(FinancialAccountBase):
     model_config = ConfigDict(from_attributes=True)

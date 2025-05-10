@@ -1,5 +1,5 @@
-from flask import Blueprint, request, jsonify
-from pydantic import ValidationError
+from flask import request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.dto.financial_account import (
@@ -12,67 +12,63 @@ from app.dto.financial_account import (
 from models.common import FinancialAccount as FinancialAccountModel
 
 from app.entrypoint.routes.financial_account import financial_account_blueprint
+from app.entrypoint.routes.common.errors import NotFoundError
+from app.entrypoint.routes.common.auth import scopes_required
+
+from app.domains.financial_account.domain import FinancialAccountDomain
 
 
 @financial_account_blueprint.route('/', methods=['POST'])
+@jwt_required()
+@scopes_required("admin", "superuser")
 def create_account():
-    try:
-        payload = FinancialAccountCreate(**request.json)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = FinancialAccountCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        current_user_uuid = get_jwt_identity()
         data = payload.model_dump(mode='json')
         acct = FinancialAccountModel(**data)
+        acct.created_by_uuid = current_user_uuid
         uow.financial_account_repository.save(model=acct, commit=True)
         result = FinancialAccountRead.from_orm(acct).model_dump(mode='json')
     return jsonify(result), 201
 
 @financial_account_blueprint.route('/<string:uuid>', methods=['GET'])
+@jwt_required()
+@scopes_required("admin", "superuser")
 def get_account(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         acct = uow.financial_account_repository.find_one(uuid=uuid, is_deleted=False)
         if not acct:
-            return jsonify({'message': 'FinancialAccount not found'}), 404
+            raise NotFoundError("FinancialAccount not found")
         result = FinancialAccountRead.from_orm(acct).model_dump(mode='json')
     return jsonify(result), 200
 
 @financial_account_blueprint.route('/<string:uuid>', methods=['PUT'])
+@jwt_required()
+@scopes_required("admin", "superuser")
 def update_account(uuid: str):
-    try:
-        payload = FinancialAccountUpdate(**request.json)
-        updates = payload.model_dump(exclude_unset=True, mode='json')
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = FinancialAccountUpdate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
-        acct = uow.financial_account_repository.find_one(uuid=uuid, is_deleted=False)
-        if not acct:
-            return jsonify({'message': 'FinancialAccount not found'}), 404
-        for field, val in updates.items():
-            setattr(acct, field, val)
-        uow.financial_account_repository.save(model=acct, commit=True)
-        result = FinancialAccountRead.from_orm(acct).model_dump(mode='json')
+        acct_read = FinancialAccountDomain.update_financial_account(uow=uow, uuid=uuid, payload=payload)
+        result = acct_read.model_dump(mode='json')
+        uow.commit()
     return jsonify(result), 200
 
 @financial_account_blueprint.route('/<string:uuid>', methods=['DELETE'])
+@jwt_required()
+@scopes_required("admin", "superuser")
 def delete_account(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
-        acct = uow.financial_account_repository.find_one(uuid=uuid, is_deleted=False)
-        if not acct:
-            return jsonify({'message': 'FinancialAccount not found'}), 404
-        acct.is_deleted = True
-        uow.financial_account_repository.save(model=acct, commit=True)
-        result = FinancialAccountRead.from_orm(acct).model_dump(mode='json')
+        acct_read = FinancialAccountDomain.delete_financial_account(uow=uow, uuid=uuid)
+        result = acct_read.model_dump(mode='json')
+        uow.commit()
     return jsonify(result), 200
 
 @financial_account_blueprint.route('/', methods=['GET'])
+@jwt_required()
+@scopes_required("admin", "superuser")
 def list_accounts():
-    try:
-        params = FinancialAccountListParams(**request.args)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    params = FinancialAccountListParams(**request.args)
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.financial_account_repository.find_all_paginated(
             is_deleted=False,

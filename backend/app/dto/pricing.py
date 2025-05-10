@@ -5,6 +5,7 @@ from datetime import datetime
 
 from app.dto.common_enums import UnitOfMeasure
 
+from app.dto.common_enums import Currency
 
 
 class PricingBase(BaseModel):
@@ -18,11 +19,8 @@ class PricingCreate(PricingBase):
 
 class PricingUpdate(BaseModel):
     """All fields optional for partial updates."""
-    material_uuid: Optional[str] = None
     price_per_unit: Optional[float] = None
-    currency: Optional[str] = None
-    created_by_uuid: Optional[str] = None
-    is_deleted: Optional[bool] = None
+    currency: Optional[Currency] = None
 
 class PricingRead(BaseModel):
     """Response model for a single pricing."""
@@ -32,7 +30,7 @@ class PricingRead(BaseModel):
     created_by_uuid: Optional[str] = None
     material_uuid: str
     price_per_unit: float
-    currency: str
+    currency: Currency
     created_at: datetime
     is_deleted: bool
     unit: UnitOfMeasure = None
@@ -40,7 +38,8 @@ class PricingRead(BaseModel):
 class PricingListParams(BaseModel):
     """Pagination parameters for listing pricings."""
     model_config = ConfigDict()
-
+    material_uuid: Optional[str] = None
+    currency: Optional[Currency] = None
     page: int = Field(1, gt=0, description="Page number (>=1)")
     per_page: int = Field(20, gt=0, le=100, description="Items per page (<=100)")
 

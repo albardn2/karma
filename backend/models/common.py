@@ -87,9 +87,31 @@ class Customer(Base):
     debit_note_items = relationship("DebitNoteItem", back_populates="customer")
     credit_note_items = relationship("CreditNoteItem", back_populates="customer")
 
+    def _calculate_balance_per_currency(self, currency):
+        order_total = 0
+        for order in self.orders:
+            invoices = order.invoices
+            for invoice in invoices:
+                if not invoice.is_deleted and invoice.currency == currency:
+                    order_total += invoice.amount_due
+
+        debit_note_total = 0
+        for dni in self.debit_note_items:
+            if not dni.is_deleted and dni.currency == currency:
+                debit_note_total += dni.amount_due
+
+        credit_note_total = 0
+        for cni in self.credit_note_items:
+            if not cni.is_deleted and cni.currency == currency:
+                credit_note_total += cni.amount_due
+
+        return order_total + debit_note_total - credit_note_total
     @property
-    def balance(self):
-        return sum(order.total_amount for order in self.orders if not order.is_fulfilled)
+    def balance_per_currency(self) -> dict[str, float]:
+        currencies = ["USD", "SYP"]
+        return {currency: self._calculate_balance_per_currency(currency) for currency in currencies}
+
+
 
     def __repr__(self):
         return (
@@ -123,6 +145,7 @@ class CustomerOrder(Base):
             return max(item.fulfilled_at for item in self.customer_order_items if item.fulfilled_at)
 
 
+
 class CustomerOrderItem(Base):
     __tablename__ = "customer_order_item"
 
@@ -130,7 +153,7 @@ class CustomerOrderItem(Base):
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     customer_order_uuid = Column(String(36), ForeignKey("customer_order.uuid"), nullable=False)
     quantity = Column(Integer, nullable=False)
-    unit = Column(String(120), nullable=False)  # should be same as material unit
+    unit = Column(String(120), nullable=False)
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
     is_fulfilled = Column(Boolean, default=False)
     fulfilled_at = Column(DateTime, nullable=True)
@@ -178,11 +201,11 @@ class Invoice(Base):
 
     @property
     def total_amount(self):
-        return sum(item.total_price for item in self.invoice_items)
+        return sum(item.total_price for item in self.invoice_items if not item.is_deleted)
 
     @property
     def amount_paid(self):
-        return sum(payment.amount for payment in self.payments)
+        return sum(payment.amount for payment in self.payments if not payment.is_deleted)
 
     @property
     def amount_due(self):
@@ -317,11 +340,13 @@ class Transaction(Base):
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
-    amount = Column(Float, nullable=False)
-    currency = Column(String(120), nullable=False)
+    from_amount = Column(Float, nullable=True)
+    from_currency = Column(String(120), nullable=True)
     from_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=True)
     to_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=True)
-    exchange_rate = Column(Float, default=1.0, nullable=False)
+    to_amount = Column(Float, nullable=True)
+    to_currency = Column(String(120), nullable=True)
+    usd_to_syp_exchange_rate = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
@@ -332,7 +357,6 @@ class Transaction(Base):
 
     def __repr__(self):
         return f"<Transaction(uuid={self.uuid}, amount={self.amount}, created_at={self.created_at})>"
-
 
 # ------------------------------
 # Vendor, Material & Pricing Models
@@ -599,10 +623,13 @@ class FixedAsset(Base):
     purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=True)
     is_deleted = Column(Boolean, default=False)
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
+    quantity = Column(Float, nullable=False)
+    price_per_unit = Column(Float, nullable=False)
 
     # relations
     purchase_order_item = relationship("PurchaseOrderItem", back_populates="fixed_asset")
     material = relationship("Material", back_populates="fixed_assets")
+
 
     def __repr__(self):
         return (
@@ -610,22 +637,9 @@ class FixedAsset(Base):
             f"annual_depreciation_rate={self.annual_depreciation_rate})>"
         )
 
-    # @property
-    # def material(self):
-    #     return self.purchase_order_item.material
-
     @property
     def unit(self):
-        return self.purchase_order_item.unit
-
-    @property
-    def quantity(self):
-        return self.purchase_order_item.quantity
-
-    @property
-    def price_per_unit(self):
-        return self.purchase_order_item.price_per_unit
-
+        return self.material.measure_unit
     @property
     def total_price(self):
         return self.price_per_unit * self.quantity
@@ -765,6 +779,13 @@ class DebitNoteItem(Base):
     inventory_events = relationship("InventoryEvent", back_populates="debit_note_item")
     payments = relationship("Payment", back_populates="debit_note_item")
 
+    @property
+    def amount_paid(self):
+        return sum(payment.amount for payment in self.payments if not payment.is_deleted)
+    @property
+    def amount_due(self):
+        return self.amount - self.amount_paid
+
     def __repr__(self):
         return f"<DebitNoteItem(uuid={self.uuid}, amount={self.amount}, status={self.status})>"
 
@@ -794,6 +815,13 @@ class CreditNoteItem(Base):
     customer = relationship("Customer", back_populates="credit_note_items")
     vendor = relationship("Vendor", back_populates="credit_note_items")
     payouts = relationship("Payout", back_populates="credit_note_item")
+
+    @property
+    def amount_paid(self):
+        return sum(payout.amount for payout in self.payouts if not payout.is_deleted)
+    @property
+    def amount_due(self):
+        return self.amount - self.amount_paid
 
     def __repr__(self):
         return f"<CreditNoteItem(uuid={self.uuid}, amount={self.amount}, status={self.status})>"

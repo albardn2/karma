@@ -13,19 +13,17 @@ from models.common import FixedAsset as FixedAssetModel
 
 from app.entrypoint.routes.fixed_asset import fixed_asset_blueprint
 
+from app.entrypoint.routes.common.errors import NotFoundError
+from app.domains.fixed_asset.domain import FixedAssetDomain
+
 
 @fixed_asset_blueprint.route('/', methods=['POST'])
 def create_fixed_asset():
-    try:
-        payload = FixedAssetCreate(**request.json)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = FixedAssetCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
-        data = payload.model_dump(mode='json')
-        fa = FixedAssetModel(**data)
-        uow.fixed_asset_repository.save(model=fa, commit=True)
-        result = FixedAssetRead.from_orm(fa).model_dump(mode='json')
+        fa_read = FixedAssetDomain.create_fixed_asset(uow=uow, payload=payload)
+        result = fa_read.model_dump(mode='json')
+        uow.commit()
     return jsonify(result), 201
 
 @fixed_asset_blueprint.route('/<string:uuid>', methods=['GET'])
@@ -33,22 +31,18 @@ def get_fixed_asset(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         fa = uow.fixed_asset_repository.find_one(uuid=uuid, is_deleted=False)
         if not fa:
-            return jsonify({'message': 'FixedAsset not found'}), 404
+            raise NotFoundError('FixedAsset not found')
         result = FixedAssetRead.from_orm(fa).model_dump(mode='json')
     return jsonify(result), 200
 
 @fixed_asset_blueprint.route('/<string:uuid>', methods=['PUT'])
 def update_fixed_asset(uuid: str):
-    try:
-        payload = FixedAssetUpdate(**request.json)
-        updates = payload.model_dump(exclude_unset=True, mode='json')
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = FixedAssetUpdate(**request.json)
+    updates = payload.model_dump(exclude_unset=True, mode='json')
     with SqlAlchemyUnitOfWork() as uow:
         fa = uow.fixed_asset_repository.find_one(uuid=uuid, is_deleted=False)
         if not fa:
-            return jsonify({'message': 'FixedAsset not found'}), 404
+            raise NotFoundError('FixedAsset not found')
         for field, val in updates.items():
             setattr(fa, field, val)
         uow.fixed_asset_repository.save(model=fa, commit=True)

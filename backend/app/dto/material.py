@@ -9,9 +9,11 @@ from app.dto.common_enums import UnitOfMeasure
 
 class MaterialType(str, Enum):
     RAW_MATERIAL = "raw_material"
-    PRODUCT     = "product"
-    INTERIM     = "interim"
-    FIXED_ASSET  = "fixed_asset"
+    PREPARED     = "prepared"
+    PRODUCT      = "product"
+    MACHINERY_AND_EQUIPMENT = "machinery_and_equipment"
+    VEHICLE = "vehicle"
+
 
 class MaterialBase(BaseModel):
     # when converting from ORM objects
@@ -40,8 +42,6 @@ class MaterialUpdate(BaseModel):
     sku: Optional[str] = None
     description: Optional[str] = None
     type: Optional[MaterialType] = None
-    created_by_uuid: Optional[str] = None
-    is_deleted: Optional[bool] = None
 
 class MaterialRead(MaterialBase):
     """
@@ -57,7 +57,7 @@ class MaterialRead(MaterialBase):
 class MaterialListParams(BaseModel):
     """Pagination parameters for listing materials."""
     model_config = ConfigDict()
-
+    type: Optional[MaterialType] = None
     page: int = Field(1, gt=0, description="Page number, starting at 1")
     per_page: int = Field(20, gt=0, le=100, description="Items per page, max 100")
 

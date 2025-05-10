@@ -8,16 +8,17 @@ from app.dto.customer import CustomerCreate, CustomerRead
 from models.common import Customer as CustomerModel
 
 from app.dto.customer import CustomerUpdate, CustomerReadList,CustomerListParams, CustomerPage
+from app.entrypoint.routes.common.errors import BadRequestError
+from app.entrypoint.routes.common.errors import NotFoundError
 
 
 @customer_blueprint.route('/', methods=['POST'])
 def create_customer():
-    try:
-        payload = CustomerCreate(**request.json)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = CustomerCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        if uow.customer_repository.find_one(email_address=payload.email_address):
+            raise BadRequestError(f"Customer with email {payload.email_address} already exists")
+
         cust = CustomerModel(**payload.model_dump())
         uow.customer_repository.save(model=cust, commit=True)
         customer_data = CustomerRead.from_orm(cust).model_dump(mode='json')
@@ -30,23 +31,23 @@ def get_customer(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         customer = uow.customer_repository.find_one(uuid=uuid,is_deleted=False)
         if not customer:
-            return jsonify({'message': 'Customer not found'}), 404
+            raise NotFoundError('Customer not found')
         customer_data = CustomerRead.from_orm(customer).model_dump(mode='json')
     return jsonify(customer_data), 200
 
 
 @customer_blueprint.route('/<string:uuid>', methods=['PUT'])
 def update_customer(uuid: str):
-    try:
-        payload = CustomerUpdate(**request.json)
-        data = payload.model_dump(exclude_unset=True)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = CustomerUpdate(**request.json)
+    data = payload.model_dump(exclude_unset=True)
     with SqlAlchemyUnitOfWork() as uow:
-        customer = uow.customer_repository.find_one(uuid=uuid)
+        customer = uow.customer_repository.find_one(uuid=uuid, is_deleted=False)
         if not customer:
-            return jsonify({'message': 'Customer not found'}), 404
+            return NotFoundError("Customer not found")
+
+        if payload.email_address != customer.email_address:
+            if uow.customer_repository.find_one(email_address=payload.email_address):
+                raise BadRequestError(f"Customer with email {payload.email_address} already exists")
 
         customer.update(**data)
         uow.customer_repository.save(model=customer, commit=True)
@@ -58,9 +59,23 @@ def update_customer(uuid: str):
 @customer_blueprint.route('/<string:uuid>', methods=['DELETE'])
 def delete_customer(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
-        customer = uow.customer_repository.find_one(uuid=uuid)
+        customer = uow.customer_repository.find_one(uuid=uuid, is_deleted=False)
         if not customer:
-            return jsonify({'message': 'Customer not found'}), 404
+            raise NotFoundError("Customer not found")
+
+        customer_orders = uow.customer_order_repository.find_all(uuid=uuid, is_deleted=False)
+        if customer_orders:
+            raise BadRequestError("Customer has orders and cannot be deleted")
+        debit_note_items = uow.debit_note_item_repository.find_all(uuid=uuid, is_deleted=False)
+        if debit_note_items:
+            raise BadRequestError("Customer has debit notes and cannot be deleted")
+        credit_note_items = uow.credit_note_item_repository.find_all(uuid=uuid, is_deleted=False)
+        if credit_note_items:
+            raise BadRequestError("Customer has credit notes and cannot be deleted")
+        for k,v in customer.balance_per_currency.items():
+            if v > 0:
+                raise BadRequestError("Customer has balance and cannot be deleted")
+
         customer.is_deleted = True
         uow.customer_repository.save(model=customer, commit=True)
         customer_data = CustomerRead.from_orm(customer).model_dump(mode='json')
@@ -71,15 +86,26 @@ def delete_customer(uuid: str):
 @customer_blueprint.route('/', methods=['GET'])
 def list_customers():
     # Parse & validate pagination params
-    try:
-        params = CustomerListParams(**request.args)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
+    params = CustomerListParams(**request.args)
+    filters = [CustomerModel.is_deleted == False]
+    if params.category:
+        filters.append(CustomerModel.category == params.category.value)
+    if params.customer_uuid:
+        filters.append(CustomerModel.uuid == params.customer_uuid)
+    if params.email_address:
+        filters.append(CustomerModel.email_address == params.email_address)
+    if params.company_name:
+        filters.append(CustomerModel.company_name == params.company_name)
+    if params.full_name:
+        filters.append(CustomerModel.full_name == params.full_name)
+    if params.phone_number:
+        filters.append(CustomerModel.phone_number == params.phone_number)
 
     with SqlAlchemyUnitOfWork() as uow:
-        page_obj = uow.customer_repository.find_all_paginated(
-            is_deleted=False,
-            **params.model_dump(exclude_none=True),
+        page_obj = uow.customer_repository.find_all_by_filters_paginated(
+            filters=filters,
+            page=params.page,
+            per_page=params.per_page
         )
         items = [
             CustomerRead.from_orm(c).model_dump(mode='json')

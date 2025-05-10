@@ -42,7 +42,7 @@ class UserDomain:
             raise NotFoundError("Current user not found")
         if current_user_uuid != user_uuid and not current_user.is_admin:
             raise BadRequestError("You are not authorized to update this user")
-        UserDomain.validate_existing(uow=uow, payload=payload)
+        UserDomain.validate_existing(uow=uow, payload=payload,updated_user=user)
 
         if payload.permission_scope and not current_user.is_admin:
             raise BadRequestError("You are not authorized to change permission scope")
@@ -68,18 +68,19 @@ class UserDomain:
         dto = UserRead.from_orm(user)
         return dto
 
-
-
-
-
-
-
     @staticmethod
-    def validate_existing(uow: SqlAlchemyUnitOfWork, payload):
+    def validate_existing(uow: SqlAlchemyUnitOfWork,payload,updated_user:UserModel = None):
         """
         Check if username and email are unique
         """
-        if uow.user_repository.find_one(username=payload.username, is_deleted=False):
+        username_changed = True
+        email_changed = True
+        if updated_user:
+            username_changed = payload.username != updated_user.username
+            email_changed = payload.email != updated_user.email
+
+
+        if username_changed and uow.user_repository.find_one(username=payload.username):
             raise BadRequestError(f"Username {payload.username!r} already taken")
-        if payload.email and uow.user_repository.find_one(email=payload.email, is_deleted=False):
+        if email_changed and payload.email and uow.user_repository.find_one(email=payload.email, is_deleted=False):
             raise BadRequestError(f"Email {payload.email!r} already registered")

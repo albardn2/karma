@@ -4,13 +4,14 @@ from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
+from app.dto.common_enums import Currency
 
 
 class CustomerCategory(str, Enum):
     """Enum for customer categories."""
     ROASTERY = "roastery"
     RESTAURANT = "restaurant"
-    SMALL_RETAIL = "small_retail"
+    MINIMARKET = "minimarket"
     SUPERMARKET = "supermarket"
 
 
@@ -30,11 +31,7 @@ class CustomerBase(BaseModel):
 
 class CustomerCreate(CustomerBase):
     """What’s required when creating a new customer."""
-    company_name: str
-    full_name: str
-    phone_number: str
-    full_address: str
-    category: CustomerCategory
+
 
 class CustomerUpdate(BaseModel):
     """All fields optional for partial updates."""
@@ -47,13 +44,13 @@ class CustomerUpdate(BaseModel):
     notes: Optional[str] = None
     category: Optional[CustomerCategory] = None
     coordinates: Optional[str] = None
-    is_deleted: Optional[bool] = None
 
 class CustomerRead(CustomerBase):
     """What we return to clients."""
     uuid: str
     created_at: datetime
     is_deleted: bool
+    balance_per_currency: dict[Currency, float]
 
     class Config:
         orm_mode = True
@@ -70,6 +67,13 @@ class CustomerReadList(BaseModel):
 
 class CustomerListParams(BaseModel):
     """Pagination parameters for listing customers."""
+    model_config = ConfigDict()
+    category: Optional[CustomerCategory] = None
+    customer_uuid: Optional[str] = None
+    email_address: Optional[str] = None
+    company_name: Optional[str] = None
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
 
     page: int = Field(1, gt=0, description="Page number, starting from 1")
     per_page: int = Field(20, gt=0, le=100, description="Items per page, max 100")

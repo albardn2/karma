@@ -12,17 +12,19 @@ from app.dto.warehouse import (
 from models.common import Warehouse as WarehouseModel
 from app.entrypoint.routes.warehouse import warehouse_blueprint
 
+from app.entrypoint.routes.common.errors import NotFoundError
+
+from app.entrypoint.routes.common.errors import BadRequestError
+
 
 @warehouse_blueprint.route('/', methods=['POST'])
 def create_warehouse():
-    try:
-        payload = WarehouseCreate(**request.json)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = WarehouseCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
         data = payload.model_dump(mode='json',exclude_unset=True)
         wh = WarehouseModel(**data)
+        if uow.warehouse_repository.find_one(name=wh.name):
+            raise BadRequestError("Warehouse with this name already exists")
         uow.warehouse_repository.save(model=wh, commit=True)
         result = WarehouseRead.from_orm(wh).model_dump(mode='json')
     return jsonify(result), 201
@@ -32,22 +34,18 @@ def get_warehouse(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         wh = uow.warehouse_repository.find_one(uuid=uuid, is_deleted=False)
         if not wh:
-            return jsonify({'message': 'Warehouse not found'}), 404
+            raise NotFoundError("Warehouse not found")
         result = WarehouseRead.from_orm(wh).model_dump(mode='json')
     return jsonify(result), 200
 
 @warehouse_blueprint.route('/<string:uuid>', methods=['PUT'])
 def update_warehouse(uuid: str):
-    try:
-        payload = WarehouseUpdate(**request.json)
-        updates = payload.model_dump(exclude_unset=True, mode='json')
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = WarehouseUpdate(**request.json)
+    updates = payload.model_dump(exclude_unset=True, mode='json')
     with SqlAlchemyUnitOfWork() as uow:
         wh = uow.warehouse_repository.find_one(uuid=uuid, is_deleted=False)
         if not wh:
-            return jsonify({'message': 'Warehouse not found'}), 404
+            raise NotFoundError("Warehouse not found")
         for field, val in updates.items():
             setattr(wh, field, val)
         uow.warehouse_repository.save(model=wh, commit=True)
@@ -59,7 +57,9 @@ def delete_warehouse(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         wh = uow.warehouse_repository.find_one(uuid=uuid, is_deleted=False)
         if not wh:
-            return jsonify({'message': 'Warehouse not found'}), 404
+            raise NotFoundError("Warehouse not found")
+        if uow.inventory_repository.find_one(warehouse_uuid=wh.uuid, is_deleted=False):
+            raise BadRequestError("Cannot delete warehouse, inventories exist")
         wh.is_deleted = True
         uow.warehouse_repository.save(model=wh, commit=True)
         result = WarehouseRead.from_orm(wh).model_dump(mode='json')

@@ -8,11 +8,13 @@ from app.dto.common_enums import Currency
 class TransactionBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    amount: float
-    currency: Currency
+    from_amount: Optional[float] = None
+    from_currency: Optional[Currency] = None
     from_account_uuid: str | None = None
     to_account_uuid:   str | None = None
-    exchange_rate: float = Field(1.0, gt=0)
+    to_currency: Optional[Currency] = None
+    to_amount:   Optional[float] = None
+    usd_to_syp_exchange_rate: Optional[float] = None
     notes: Optional[str] = None
 
 class TransactionCreate(TransactionBase):
@@ -22,7 +24,6 @@ class TransactionCreate(TransactionBase):
 class TransactionUpdate(BaseModel):
     """All fields optional for partial updates."""
     model_config = ConfigDict(extra="forbid")
-
     notes:              Optional[str]    = None
 
 class TransactionRead(TransactionBase):
@@ -32,6 +33,7 @@ class TransactionRead(TransactionBase):
     created_by_uuid: Optional[str] = None
     created_at:      datetime
     is_deleted:      bool
+
 
 class TransactionListParams(BaseModel):
     """Optional filters plus pagination for listing transactions."""
