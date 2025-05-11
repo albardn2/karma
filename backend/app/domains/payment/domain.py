@@ -15,17 +15,31 @@ class PaymentDomain:
         """
         Create a payment in the database.
         """
+        if not payload.financial_account_uuid:
+            financial_account = uow.financial_account_repository.find_one(
+                currency=payload.currency.value,
+                is_deleted=False
+            )
+            if not financial_account:
+                raise NotFoundError('Financial account not found')
+            payload.financial_account_uuid = financial_account.uuid
+        else:
+            financial_account = uow.financial_account_repository.find_one(
+                uuid=payload.financial_account_uuid,
+                is_deleted=False
+            )
+            if not financial_account:
+                raise NotFoundError('Financial account not found')
         data = payload.model_dump(mode='json')
         pay = PaymentModel(**data)
         uow.payment_repository.save(model=pay, commit=False)
-
         if pay.financial_account.currency != payload.currency.value or pay.invoice.currency != payload.currency:
             raise BadRequestError(
                 f"Currency mismatch: {pay.financial_account.currency} != {payload.currency.value}"
             )
 
         # TODO: add financial account domain
-
+        financial_account.balance += pay.amount
         return PaymentRead.from_orm(pay)
 
     @staticmethod
@@ -39,7 +53,5 @@ class PaymentDomain:
 
         pay.is_deleted = True
         uow.payment_repository.save(model=pay, commit=False)
-
-        #TODO: add financial account domain to subtract from account balance
-
+        pay.financial_account.balance -= pay.amount
         return PaymentRead.from_orm(pay)

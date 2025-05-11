@@ -13,7 +13,7 @@ class PaymentBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
     created_by_uuid: Optional[str] = None
     invoice_uuid: str
-    financial_account_uuid: str
+    financial_account_uuid: Optional[str] = None
     amount: float = Field(..., gt=0)
     currency: Currency
     payment_method: PaymentMethod

@@ -151,7 +151,14 @@ class CustomerOrder(Base):
         # if all invoices are paid status
         return all(invoice.is_paid for invoice in self.invoices if not invoice.is_deleted)
 
+    @property
+    def is_overdue(self):
+        # if all invoices are overdue status
+        return any([invoice.is_overdue for invoice in self.invoices if not invoice.is_deleted])
 
+    @property
+    def total_amount(self):
+        return sum([invoice.total_amount for invoice in self.invoices if not invoice.is_deleted])
 class CustomerOrderItem(Base):
     __tablename__ = "customer_order_item"
 

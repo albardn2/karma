@@ -38,6 +38,8 @@ class CustomerOrderRead(CustomerOrderBase):
     is_fulfilled: bool
     fulfilled_at: Optional[datetime]
     is_deleted: bool
+    total_amount: float
+    is_overdue: bool
     customer_order_items: Optional[List[CustomerOrderItemRead]] = None
 
 class CustomerOrderListParams(BaseModel):
