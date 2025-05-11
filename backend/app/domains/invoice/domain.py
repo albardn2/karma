@@ -52,5 +52,6 @@ class InvoiceDomain:
             raise NotFoundError('Invoice not found')
 
         inv.is_deleted = True
+        inv.status = InvoiceStatus.VOID.value
         uow.invoice_repository.save(model=inv, commit=False)
         return InvoiceRead.from_orm(inv)

@@ -28,6 +28,7 @@ class InvoiceItemRead(InvoiceItemBase):
     created_at: datetime
     quantity: float
     material_name: str
+    material_uuid: str
     total_price: float
     currency: Currency
     unit: UnitOfMeasure

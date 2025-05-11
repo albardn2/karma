@@ -105,7 +105,8 @@ def list_customers():
         page_obj = uow.customer_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
-            per_page=params.per_page
+            per_page=params.per_page,
+            ordering=[CustomerModel.created_at.desc()]
         )
         items = [
             CustomerRead.from_orm(c).model_dump(mode='json')

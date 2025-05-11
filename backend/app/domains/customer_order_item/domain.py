@@ -10,6 +10,9 @@ from app.entrypoint.routes.common.errors import NotFoundError
 from app.dto.customer_order_item import CustomerOrderItemBulkFulfill
 
 from app.dto.customer_order_item import CustomerOrderItemBulkDelete
+from app.domains.inventory_event.domain import InventoryEventDomain
+from app.dto.inventory_event import InventoryEventCreate
+from app.dto.inventory_event import InventoryEventType
 
 
 class CustomerOrderItemDomain:
@@ -38,13 +41,23 @@ class CustomerOrderItemDomain:
         payload: CustomerOrderItemBulkFulfill
     ) -> CustomerOrderItemBulkRead:
         items = []
-        for item_uuid in payload.uuids:
-            m = uow.customer_order_item_repository.find_one(uuid=item_uuid, is_deleted=False)
-            if not m:
+        for item in payload.items:
+            customer_order_item = uow.customer_order_item_repository.find_one(uuid=item.customer_order_item_uuid, is_deleted=False)
+            if not customer_order_item:
                 raise NotFoundError("CustomerOrderItem not found")
-            m.is_fulfilled = True
-            m.fulfilled_at = datetime.now()
-            items.append(m)
+            customer_order_item.is_fulfilled = True
+            customer_order_item.fulfilled_at = datetime.now()
+            # create inventory event
+            InventoryEventDomain.create_inventory_event(
+                uow=uow,
+                payload=InventoryEventCreate(
+                    quantity=-(abs(customer_order_item.quantity)),
+                    event_type=InventoryEventType.SALE,
+                    inventory_uuid=item.inventory_uuid,
+                    customer_order_item_uuid=customer_order_item.uuid
+                )
+            )
+            items.append(customer_order_item)
         uow.customer_order_item_repository.batch_save(models=items, commit=False)
         bulk_read = CustomerOrderItemBulkRead(items=[CustomerOrderItemRead.from_orm(m) for m in items])
         return bulk_read

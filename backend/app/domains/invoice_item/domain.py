@@ -13,9 +13,6 @@ class InvoiceItemDomain:
         """
         Create invoice items in bulk.
         """
-
-
-
         invoice_items = []
         for item in payload.items:
             customer_order_item = uow.customer_order_item_repository.find_one(

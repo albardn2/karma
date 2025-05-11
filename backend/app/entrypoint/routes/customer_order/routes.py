@@ -12,8 +12,47 @@ from app.dto.customer_order import (
 from models.common import CustomerOrder as CustomerOrderModel
 from app.entrypoint.routes.customer_order import customer_order_blueprint
 from app.domains.customer_order.domain import CustomerOrderDomain
+from app.dto.customer_order import CustomerOrderWithItemsAndInvoiceCreate
+from app.dto.customer_order import CustomerOrderWithItemsAndInvoiceRead
+
+from app.dto.customer_order_item import CustomerOrderItemBulkRead, CustomerOrderItemRead
 
 
+# ----------------------- CUSTOMER ORDER WITH ITEMS AND INVOICES -----------------
+
+@customer_order_blueprint.route("/with-items-and-invoice", methods=["POST"])
+def create_customer_order_with_items_and_invoice():
+    payload = CustomerOrderWithItemsAndInvoiceCreate(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        full_read = CustomerOrderDomain.create_customer_order_with_items_and_invoice(uow=uow, payload=payload)
+        result = full_read.model_dump(mode="json")
+        uow.commit()
+    return jsonify(result), 201
+
+
+@customer_order_blueprint.route("/with-items-and-invoice/<string:uuid>", methods=["GET"])
+def get_customer_order_with_items_and_invoice(uuid: str):
+    with SqlAlchemyUnitOfWork() as uow:
+        cus_order = uow.customer_order_repository.find_one(uuid=uuid, is_deleted=False)
+        if not cus_order:
+            raise NotFoundError("CustomerOrder not found")
+
+        dto=CustomerOrderWithItemsAndInvoiceRead.from_customer_order_model(cus_order)
+        result = dto.model_dump(mode="json")
+    return jsonify(result), 201
+
+
+@customer_order_blueprint.route("/with-items-and-invoice/<string:uuid>", methods=["DELETE"])
+def delete_customer_order_with_items_and_invoice(uuid: str):
+    with SqlAlchemyUnitOfWork() as uow:
+        dto = CustomerOrderDomain.delete_customer_order_with_items_and_invoice(uuid=uuid, uow=uow)
+        result = dto.model_dump(mode="json")
+        uow.commit()
+    return jsonify(result), 201
+
+
+
+# ----------------------- CUSTOMER ORDER -----------------------
 @customer_order_blueprint.route("/", methods=["POST"])
 def create_customer_order():
     payload = CustomerOrderCreate(**request.json)

@@ -6,6 +6,8 @@ from typing import Optional, List
 from datetime import datetime
 from app.dto.common_enums import Currency
 
+from app.dto.invoice_item import InvoiceItemRead
+
 
 class InvoiceStatus(str, Enum):
     PENDING = "pending"
@@ -22,7 +24,6 @@ class InvoiceBase(BaseModel):
     customer_uuid: str
     customer_order_uuid: str
     currency: Currency
-    paid_at: Optional[datetime] = None
     due_date: Optional[datetime] = None
     notes: Optional[str] = None
 
@@ -48,6 +49,7 @@ class InvoiceRead(InvoiceBase):
     is_paid: bool
     is_overdue: bool
     is_deleted: bool
+    invoice_items: Optional[List[InvoiceItemRead]] = None
 
 class InvoiceListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")

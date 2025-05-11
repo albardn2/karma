@@ -3,6 +3,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 from app.dto.common_enums import UnitOfMeasure
+from app.dto.invoice_item import InvoiceItemCreate
+from app.dto.invoice_item import InvoiceItemBulkCreate
 
 
 class CustomerOrderItemCreate(BaseModel):
@@ -31,10 +33,16 @@ class CustomerOrderItemRead(BaseModel):
     fulfilled_at: Optional[datetime]
     created_at: datetime
 
+
+class FulfillItem(BaseModel):
+    """Schema for fulfilling a customer order item."""
+    model_config = ConfigDict(extra="forbid")
+    customer_order_item_uuid: str
+    inventory_uuid: str
 class CustomerOrderItemBulkFulfill(BaseModel):
     """Schema for bulk fulfilling customer order items by UUID."""
     model_config = ConfigDict(extra="forbid")
-    uuids: List[str]
+    items: List[FulfillItem]
 
 class CustomerOrderItemBulkDelete(BaseModel):
     """Schema for bulk deleting (soft) customer order items by UUID."""

@@ -11,20 +11,17 @@ class InventoryEventType(str, Enum):
     SALE = "sale"
     TRANSFER = "transfer"
     RETURN = "return"
-    ORIGINAL_ADJUSTMENT = "original_adjustment"
-    ADJUSTMENT = "adjustment"
-    SCRAP = "scrap"
 
 
 class InventoryEventBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
     created_by_uuid: Optional[str] = None
-    inventory_uuid: str
+    inventory_uuid: Optional[str] = str
     purchase_order_item_uuid: Optional[str] = None
     process_uuid: Optional[str] = None
     customer_order_item_uuid: Optional[str] = None
     event_type: InventoryEventType
-    quantity: float = Field(..., gt=0)
+    quantity: float
     notes: Optional[str] = None
     debit_note_item_uuid: Optional[str] = None
     credit_note_item_uuid: Optional[str] = None

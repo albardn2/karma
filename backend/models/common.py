@@ -137,13 +137,19 @@ class CustomerOrder(Base):
 
     @property
     def is_fulfilled(self):
-        return all(item.is_fulfilled for item in self.customer_order_items)
+        return all([item.is_fulfilled for item in self.customer_order_items if not item.is_deleted])
 
     @property
     def fulfilled_at(self):
+        return None
         if self.is_fulfilled and self.customer_order_items:
-            return max(item.fulfilled_at for item in self.customer_order_items if item.fulfilled_at)
-
+            return max(item.fulfilled_at for item in self.customer_order_items if item.fulfilled_at and not item.is_deleted)
+        else:
+            return None
+    @property
+    def is_paid(self):
+        # if all invoices are paid status
+        return all(invoice.is_paid for invoice in self.invoices if not invoice.is_deleted)
 
 
 class CustomerOrderItem(Base):
@@ -270,6 +276,10 @@ class InvoiceItem(Base):
     @property
     def material_name(self):
         return self.customer_order_item.material.name
+
+    @property
+    def material_uuid(self):
+        return self.customer_order_item.material.uuid
 
     @property
     def currency(self):

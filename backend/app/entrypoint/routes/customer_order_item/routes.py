@@ -68,11 +68,9 @@ def fulfill_order_items():
     with SqlAlchemyUnitOfWork() as uow:
         bulk_read = CustomerOrderItemDomain.fulfill_items(
             uow=uow,
-            payload=payload
-        )
+            payload=payload)
         uow.commit()
     return jsonify(bulk_read.model_dump(mode='json')), 200
-
 
 @customer_order_item_blueprint.route('/bulk-delete', methods=['DELETE'])
 def delete_order_items():
