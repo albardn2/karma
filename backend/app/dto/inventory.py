@@ -16,11 +16,23 @@ class InventoryBase(BaseModel):
     current_quantity: float = Field(..., ge=0)
     original_quantity: float = Field(..., ge=0)
     is_active: bool = True
-    currency: Currency
+    currency: Optional[Currency]  = None
 
-class InventoryCreate(InventoryBase):
-    """Fields required to create a new inventory record."""
-    pass
+class InventoryCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    material_uuid: str
+    unit: UnitOfMeasure
+    warehouse_uuid: str
+
+    currency: Optional[Currency] = None
+    created_by_uuid: Optional[str] = None
+    notes: Optional[str] = None
+    lot_id: Optional[str] = None
+    expiration_date: Optional[datetime] = None
+    cost_per_unit: Optional[float] = Field(0.0, ge=0)
+    current_quantity: Optional[float] = Field(0.0, ge=0)
+    original_quantity: Optional[float] = Field(0.0, ge=0)
+    is_active: bool = True
 
 class InventoryUpdate(BaseModel):
     """Fields optional for partial updates."""

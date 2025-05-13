@@ -13,6 +13,7 @@ from app.dto.customer_order_item import CustomerOrderItemBulkDelete
 from app.domains.inventory_event.domain import InventoryEventDomain
 from app.dto.inventory_event import InventoryEventCreate
 from app.dto.inventory_event import InventoryEventType
+from app.entrypoint.routes.common.errors import BadRequestError
 
 
 class CustomerOrderItemDomain:
@@ -45,6 +46,8 @@ class CustomerOrderItemDomain:
             customer_order_item = uow.customer_order_item_repository.find_one(uuid=item.customer_order_item_uuid, is_deleted=False)
             if not customer_order_item:
                 raise NotFoundError("CustomerOrderItem not found")
+            if customer_order_item.is_fulfilled:
+                raise BadRequestError("CustomerOrderItem already fulfilled")
             customer_order_item.is_fulfilled = True
             customer_order_item.fulfilled_at = datetime.now()
             # create inventory event

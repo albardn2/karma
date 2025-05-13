@@ -5,21 +5,21 @@ from datetime import datetime
 
 from app.dto.common_enums import Currency, UnitOfMeasure
 from models.common import PurchaseOrderItem as PurchaseOrderItemModel
+from app.entrypoint.routes.common.errors import BadRequestError
+
 
 class PurchaseOrderItemBase(BaseModel):
-    purchase_order_uuid: str
+    purchase_order_uuid: Optional[str] = None # for po with item create
     material_uuid:       str
     quantity:            int
     price_per_unit:      float
-    currency:            Currency
+    currency:            Optional[Currency] = None
     unit:                UnitOfMeasure
 
 class PurchaseOrderItemCreate(PurchaseOrderItemBase):
     """Fields required to create a new purchase order item."""
     created_by_uuid: Optional[str]      = None
     quantity_received:   float           = 0.0
-    is_fulfilled:        bool            = False
-    fulfilled_at:        Optional[datetime] = None
 
 class PurchaseOrderItemUpdate(BaseModel):
     """All fields optional for partial updates."""
@@ -53,13 +53,6 @@ class PurchaseOrderItemRead(BaseModel):
     is_deleted:         bool
     total_price:        float  # computed
 
-    @model_validator(mode="before")
-    def _inject_computed(cls, data: Union[dict, PurchaseOrderItemModel]):
-        if isinstance(data, PurchaseOrderItemModel):
-            base = {f: getattr(data, f) for f in cls.model_fields if f != 'total_price'}
-            base['total_price'] = data.total_price
-            return base
-        return data
 
 class PurchaseOrderItemListParams(BaseModel):
     """Filters and pagination for listing purchase order items."""
@@ -84,3 +77,15 @@ class PurchaseOrderItemPage(BaseModel):
     per_page:    int                        = Field(..., description="Items per page")
     pages:       int                        = Field(..., description="Total pages available")
 
+
+
+class POFulfillItem(BaseModel):
+    """Schema for fulfilling a purchase order item."""
+    model_config = ConfigDict(extra="forbid")
+    purchase_order_item_uuid: str
+    warehouse_uuid: Optional[str] = None
+    inventory_uuid: Optional[str] = None
+
+class PurchaseOrderItemBulkFulfill(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: List[POFulfillItem]

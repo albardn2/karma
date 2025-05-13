@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 
 from app.dto.payment import PaymentCreate, PaymentRead
@@ -5,6 +7,7 @@ from models.common import Payment as PaymentModel
 
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.entrypoint.routes.common.errors import NotFoundError
+from app.dto.invoice import InvoiceStatus
 
 
 class PaymentDomain:
@@ -38,7 +41,20 @@ class PaymentDomain:
                 f"Currency mismatch: {pay.financial_account.currency} != {payload.currency.value}"
             )
 
-        # TODO: add financial account domain
+        if pay.invoice.status == InvoiceStatus.PAID.value:
+            raise BadRequestError(
+                f"Invoice {pay.invoice.uuid} is already paid"
+            )
+
+        if pay.invoice.amount_paid   > pay.invoice.total_amount:
+            raise BadRequestError(
+                f"Payment amount {pay.invoice.amount_paid} is greater than invoice amount {pay.invoice.total_amount}"
+            )
+        if pay.invoice.amount_due == 0:
+            pay.invoice.status = InvoiceStatus.PAID.value
+            pay.invoice.paid_at = datetime.now()
+
+
         financial_account.balance += pay.amount
         return PaymentRead.from_orm(pay)
 
@@ -54,4 +70,7 @@ class PaymentDomain:
         pay.is_deleted = True
         uow.payment_repository.save(model=pay, commit=False)
         pay.financial_account.balance -= pay.amount
+        if pay.invoice.status == InvoiceStatus.PAID.value:
+            pay.invoice.status = InvoiceStatus.PENDING.value
+            pay.invoice.paid_at = None
         return PaymentRead.from_orm(pay)

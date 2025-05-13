@@ -154,6 +154,6 @@ class CustomerOrderDomain:
             raise BadRequestError("Cannot delete a fulfilled customer order.")
 
         for invoice in customer_order.invoices:
-            if invoice.is_paid or invoice.amount_paid > 0:
+            if (not invoice.is_deleted) and invoice.is_paid or invoice.amount_paid > 0:
                 raise BadRequestError("Cannot delete a customer order with paid invoices.")
 

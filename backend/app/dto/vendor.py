@@ -15,8 +15,6 @@ class VendorCategory(str, Enum):
     OTHER = "other"
 
 
-
-
 class VendorCreate(BaseModel):
     created_by_uuid: Optional[UUID] = None
     email_address: Optional[EmailStr] = None
@@ -32,7 +30,7 @@ class VendorCreate(BaseModel):
 
 
 class VendorUpdate(BaseModel):
-    created_by_uuid: Optional[UUID] = None
+    created_by_uuid: Optional[str] = None
     email_address: Optional[EmailStr] = None
     company_name: Optional[str] = None
     full_name: Optional[str] = None
@@ -42,7 +40,6 @@ class VendorUpdate(BaseModel):
     notes: Optional[str] = None
     category: Optional[VendorCategory] = None
     coordinates: Optional[str] = None
-    is_deleted: Optional[bool] = None
 
 
 class VendorRead(BaseModel):
@@ -58,6 +55,7 @@ class VendorRead(BaseModel):
     full_address: Optional[str] = None
     business_cards: Optional[str] = None
     notes: Optional[str] = None
+    balance_per_currency: dict
     # and here too
     category: Optional[VendorCategory] = None
     coordinates: Optional[str] = None
@@ -72,8 +70,13 @@ class VendorReadList(BaseModel):
 # Pagination DTOs
 class VendorListParams(BaseModel):
     """Pagination parameters for listing vendors."""
+    uuid: Optional[str] = None
     model_config = ConfigDict()
-
+    category: Optional[VendorCategory] = None
+    company_name: Optional[str] = None
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    email_address: Optional[EmailStr] = None
     page: int = Field(1, gt=0, description="Page number, starting at 1")
     per_page: int = Field(20, gt=0, le=100, description="Items per page, max 100")
 

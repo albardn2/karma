@@ -5,7 +5,7 @@ from models.common import InventoryEvent as InventoryEventModel
 from app.dto.inventory_event import InventoryEventRead
 
 
-class SalesEventHandler:
+class PurchaseOrderEventHandler:
 
     def run(self,
             uow: SqlAlchemyUnitOfWork,
@@ -16,12 +16,13 @@ class SalesEventHandler:
         if not inventory:
             raise NotFoundError("Inventory not found")
 
-        customer_order_item = uow.customer_order_item_repository.find_one(uuid=event.customer_order_item_uuid, is_deleted=False)
-        if not customer_order_item:
-            raise NotFoundError("Customer Order Item not found")
+        purchase_order_item = uow.purchase_order_item_repository.find_one(uuid=event.purchase_order_item_uuid, is_deleted=False)
+        if not purchase_order_item:
+            raise NotFoundError("Purchase Order Item not found")
 
         event_model = InventoryEventModel(**event.model_dump(mode='json'))
-        inventory.current_quantity += event_model.quantity # event quantity could be negative
+        inventory.current_quantity += event_model.quantity
+        inventory.original_quantity += event_model.quantity
         event_model.material_uuid = inventory.material_uuid
         uow.inventory_event_repository.save(model=event_model, commit=False)
 

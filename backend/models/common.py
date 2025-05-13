@@ -2,7 +2,8 @@ import uuid
 from datetime import datetime, timezone
 
 import bcrypt
-from sqlalchemy import create_engine, Column, String, DateTime, Text, Float, JSON
+from sqlalchemy import create_engine, Column, String, DateTime, Text, Float, JSON, select, exists, and_
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import declarative_base, sessionmaker
 import uuid
@@ -20,6 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from models.base import Base
+from sqlalchemy.orm import column_property
 
 class User(Base):
     __tablename__ = 'user'
@@ -135,28 +137,26 @@ class CustomerOrder(Base):
     invoices = relationship("Invoice", back_populates="customer_order")
     customer = relationship("Customer", back_populates="orders")
 
-    @property
+    @hybrid_property
     def is_fulfilled(self):
         return all([item.is_fulfilled for item in self.customer_order_items if not item.is_deleted])
 
-    @property
+    @hybrid_property
     def fulfilled_at(self):
-        return None
         if self.is_fulfilled and self.customer_order_items:
             return max(item.fulfilled_at for item in self.customer_order_items if item.fulfilled_at and not item.is_deleted)
-        else:
-            return None
-    @property
+        return None
+    @hybrid_property
     def is_paid(self):
         # if all invoices are paid status
         return all(invoice.is_paid for invoice in self.invoices if not invoice.is_deleted)
 
-    @property
+    @hybrid_property
     def is_overdue(self):
         # if all invoices are overdue status
         return any([invoice.is_overdue for invoice in self.invoices if not invoice.is_deleted])
 
-    @property
+    @hybrid_property
     def total_amount(self):
         return sum([invoice.total_amount for invoice in self.invoices if not invoice.is_deleted])
 class CustomerOrderItem(Base):
@@ -226,7 +226,7 @@ class Invoice(Base):
 
     @property
     def is_paid(self):
-        return self.amount_due == 0
+        return self.status == "paid"
 
     @property
     def is_overdue(self) -> bool:
@@ -402,9 +402,28 @@ class Vendor(Base):
     debit_note_items = relationship("DebitNoteItem", back_populates="vendor")
     credit_note_items = relationship("CreditNoteItem", back_populates="vendor")
 
+    def _calculate_balance_per_currency(self, currency):
+        po_total = 0
+        for po in self.purchase_orders:
+            if not po.is_deleted and po.currency == currency:
+                po_total += po.amount_due
+
+        debit_note_total = 0
+        for dni in self.debit_note_items:
+            if not dni.is_deleted and dni.currency == currency:
+                debit_note_total += dni.amount_due
+
+        credit_note_total = 0
+        for cni in self.credit_note_items:
+            if not cni.is_deleted and cni.currency == currency:
+                credit_note_total += cni.amount_due
+        res = credit_note_total - po_total - debit_note_total
+        return res
     @property
-    def balance(self):
-        return 0
+    def balance_per_currency(self) -> dict[str, float]:
+        currencies = ["USD", "SYP"]
+        res = {currency: self._calculate_balance_per_currency(currency) for currency in currencies}
+        return res
 
     def __repr__(self):
         return (
@@ -476,45 +495,70 @@ class PurchaseOrder(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     currency = Column(String(120), nullable=False)
     status = Column(String(120), nullable=False)  # e.g., void, pending, paid, etc.
+    paid_at = Column(DateTime, nullable=True)
     is_deleted = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)
     payout_due_date = Column(DateTime, nullable=True)
-
-    # relations
     vendor = relationship("Vendor", back_populates="purchase_orders")
     purchase_order_items = relationship("PurchaseOrderItem", back_populates="purchase_order")
     payouts = relationship("Payout", back_populates="purchase_order")
 
-    @property
+    @hybrid_property
     def total_amount(self):
-        return sum(item.price_per_unit * item.quantity for item in self.purchase_order_items)
+        return sum([item.total_price for item in self.purchase_order_items if not item.is_deleted])
 
-    @property
+    @hybrid_property
     def amount_paid(self):
-        return sum(payout.amount for payout in self.payouts)
+        return sum([payout.amount for payout in self.payouts if not payout.is_deleted])
 
-    @property
+    @hybrid_property
     def amount_due(self):
         return self.total_amount - self.amount_paid
 
-    @property
+    @hybrid_property
     def is_paid(self):
-        return self.amount_due == 0
+        return self.status == "paid"
 
-    @property
+    @hybrid_property
     def is_overdue(self):
-        return self.payout_due_date and self.payout_due_date < datetime.utcnow()
+        # self.
+        return (not self.is_paid) and self.payout_due_date and self.payout_due_date < datetime.utcnow()
+    @is_overdue.expression
+    def is_overdue(cls):
+    # sql side: if the due date is in the past and the order is not paid
+        return and_(
+            cls.payout_due_date.isnot(None),
+            cls.payout_due_date < datetime.utcnow(),
+            cls.status != "paid",
+        )
 
-    @property
+    @hybrid_property
     def is_fulfilled(self):
-        return all(item.is_fulfilled for item in self.purchase_order_items)
-
-    @property
+        return all([item.is_fulfilled for item in self.purchase_order_items if not item.is_deleted])
+    @is_fulfilled.expression
+    def is_fulfilled(cls):
+        # SQL-side: NOT EXISTS a non-deleted item that is NOT fulfilled
+        return ~exists(
+            select(1)
+            .where(
+                PurchaseOrderItem.purchase_order_uuid == cls.uuid,
+                PurchaseOrderItem.is_deleted.is_(False),
+                PurchaseOrderItem.is_fulfilled.is_(False),
+                )
+        )
+    @hybrid_property
     def fulfilled_at(self):
-        if self.is_fulfilled and self.purchase_order_items:
-            return max(item.fulfilled_at for item in self.purchase_order_items if item.fulfilled_at)
+        # Python‐side: only compute if fully fulfilled
+        if not self.is_fulfilled:
+            return None
 
-
+        # collect all non-deleted, non-null timestamps
+        times = (
+            item.fulfilled_at
+            for item in self.purchase_order_items
+            if not item.is_deleted and item.fulfilled_at is not None
+        )
+        return max(times, default=None)
 
 class PurchaseOrderItem(Base):
     __tablename__ = "purchase_order_item"
@@ -564,7 +608,6 @@ class Payout(Base):
     financial_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
-    employee_uuid = Column(String(36), ForeignKey("employee.uuid"), nullable=True)
     employee_uuid = Column(String(36), ForeignKey("employee.uuid"), nullable=True)
     credit_note_item_uuid = Column(String(36), ForeignKey("credit_note_item.uuid"), nullable=True)
     is_deleted = Column(Boolean, default=False)
@@ -703,17 +746,17 @@ class Inventory(Base):
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     material_uuid = Column(String(36), ForeignKey("material.uuid"))
-    warehouse_uuid = Column(String(36), ForeignKey("warehouse.uuid"), nullable=True)
+    warehouse_uuid = Column(String(36), ForeignKey("warehouse.uuid"), nullable=False)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
     lot_id = Column(String(120), nullable=False, unique=True)
     expiration_date = Column(DateTime, nullable=True)  # for perishable items
-    cost_per_unit = Column(Float, nullable=False)
+    cost_per_unit = Column(Float, nullable=True)
     unit = Column(String(120), nullable=False)  # should be same as material unit
     current_quantity = Column(Float, nullable=False)
     original_quantity = Column(Float, nullable=False)
     is_active = Column(Boolean, default=True)
-    currency = Column(String(120), nullable=False)
+    currency = Column(String(120), nullable=True)
 
     # relations
     material = relationship("Material", back_populates="inventory")

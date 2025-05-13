@@ -9,6 +9,28 @@ from app.dto.purchase_order import (
 )
 from models.common import PurchaseOrder as PurchaseOrderModel
 from app.entrypoint.routes.purchase_order import purchase_order_blueprint
+from app.dto.purchase_order import PurchaseOrderCreateWithItems
+from app.domains.purchase_order.domain import PurchaseOrderDomain
+
+
+@purchase_order_blueprint.route('/with-items', methods=['POST'])
+def create_order_with_items():
+    payload = PurchaseOrderCreateWithItems(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        dto = PurchaseOrderDomain.create_purchase_order_with_items(uow=uow, payload=payload)
+        result = dto.model_dump(mode='json')
+        uow.commit()
+    return jsonify(result), 201
+
+@purchase_order_blueprint.route('/with-items/<string:uuid>', methods=['DELETE'])
+def delete_order_with_items(uuid: str):
+    with SqlAlchemyUnitOfWork() as uow:
+        dto = PurchaseOrderDomain.delete_purchase_order_with_items(uow=uow, uuid=uuid)
+        result = dto.model_dump(mode='json')
+        uow.commit()
+    return jsonify(result), 200
+
+# ----------------------------------------------------------
 
 
 @purchase_order_blueprint.route('/', methods=['POST'])
@@ -39,20 +61,15 @@ def get_order(uuid: str):
 
 @purchase_order_blueprint.route('/<string:uuid>', methods=['PUT'])
 def update_order(uuid: str):
-    try:
-        payload = PurchaseOrderUpdate(**request.json)
-        updates = payload.model_dump(exclude_unset=True, mode='json')
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = PurchaseOrderUpdate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
-        po = uow.purchase_order_repository.find_one(uuid=uuid, is_deleted=False)
-        if not po:
-            return jsonify({'message': 'PurchaseOrder not found'}), 404
-        for field, val in updates.items():
-            setattr(po, field, val)
-        uow.purchase_order_repository.save(model=po, commit=True)
-        result = PurchaseOrderRead.from_orm(po).model_dump(mode='json')
+        dto = PurchaseOrderDomain.update_purchase_order(
+            uow=uow,
+            uuid=uuid,
+            payload=payload
+        )
+        result = dto.model_dump(mode='json')
+        uow.commit()
     return jsonify(result), 200
 
 @purchase_order_blueprint.route('/<string:uuid>', methods=['DELETE'])
@@ -68,13 +85,15 @@ def delete_order(uuid: str):
 
 @purchase_order_blueprint.route('/', methods=['GET'])
 def list_orders():
-    try:
-        params = PurchaseOrderListParams(**request.args)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    params = PurchaseOrderListParams(**request.args)
     # build SQLAlchemy filters
     filters = [PurchaseOrderModel.is_deleted == False]
+    if params.uuid:
+        filters.append(PurchaseOrderModel.uuid == params.uuid)
+    if params.is_overdue is not None:
+        filters.append(PurchaseOrderModel.is_overdue == params.is_overdue)
+    if params.is_fulfilled is not None:
+        filters.append(PurchaseOrderModel.is_fulfilled == params.is_fulfilled)
     if params.vendor_uuid:
         filters.append(PurchaseOrderModel.vendor_uuid == params.vendor_uuid)
     if params.status:
@@ -83,10 +102,6 @@ def list_orders():
         filters.append(PurchaseOrderModel.created_at >= params.start_date)
     if params.end_date:
         filters.append(PurchaseOrderModel.created_at <= params.end_date)
-
-    # remove deleted
-    filters.append(PurchaseOrderModel.is_deleted == False)
-
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.purchase_order_repository.find_all_by_filters_paginated(
             filters=filters,
