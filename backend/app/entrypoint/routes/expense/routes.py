@@ -13,22 +13,18 @@ from app.dto.expense import (
 from models.common import Expense as ExpenseModel
 from app.entrypoint.routes.expense import expense_blueprint
 
+from app.domains.expense.domain import ExpenseDomain
+from app.entrypoint.routes.common.errors import NotFoundError
 
 
 @expense_blueprint.route('/', methods=['POST'])
 def create_expense():
-    try:
-        payload = ExpenseCreate(**request.json)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = ExpenseCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
-        data = payload.model_dump(mode='json')
-        exp = ExpenseModel(**data)
-        uow.expense_repository.save(model=exp, commit=True)
-        expense_data = ExpenseRead.from_orm(exp).model_dump(mode='json')
-
-    return jsonify(expense_data), 201
+        expense_read = ExpenseDomain.create_expense(uow=uow, payload=payload)
+        result = expense_read.model_dump(mode='json')
+        uow.commit()
+    return jsonify(result), 201
 
 
 @expense_blueprint.route('/<string:uuid>', methods=['GET'])
@@ -36,24 +32,18 @@ def get_expense(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         exp = uow.expense_repository.find_one(uuid=uuid, is_deleted=False)
         if not exp:
-            return jsonify({'message': 'Expense not found'}), 404
+            raise NotFoundError(f"Expense with uuid {uuid} not found")
         expense_data = ExpenseRead.from_orm(exp).model_dump(mode='json')
-
     return jsonify(expense_data), 200
-
 
 @expense_blueprint.route('/<string:uuid>', methods=['PUT'])
 def update_expense(uuid: str):
-    try:
-        payload = ExpenseUpdate(**request.json)
-        data = payload.model_dump(exclude_unset=True, mode='json')
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = ExpenseUpdate(**request.json)
+    data = payload.model_dump(exclude_unset=True, mode='json')
     with SqlAlchemyUnitOfWork() as uow:
-        exp = uow.expense_repository.find_one(uuid=uuid)
-        if not exp or exp.is_deleted:
-            return jsonify({'message': 'Expense not found'}), 404
+        exp = uow.expense_repository.find_one(uuid=uuid,is_deleted=False)
+        if not exp:
+            raise NotFoundError(f"Expense with uuid {uuid} not found")
 
         for field, val in data.items():
             setattr(exp, field, val)
@@ -66,15 +56,10 @@ def update_expense(uuid: str):
 @expense_blueprint.route('/<string:uuid>', methods=['DELETE'])
 def delete_expense(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
-        exp = uow.expense_repository.find_one(uuid=uuid)
-        if not exp or exp.is_deleted:
-            return jsonify({'message': 'Expense not found'}), 404
-
-        exp.is_deleted = True
-        uow.expense_repository.save(model=exp, commit=True)
-        expense_data = ExpenseRead.from_orm(exp).model_dump(mode='json')
-
-    return jsonify(expense_data), 200
+        dto = ExpenseDomain.delete_expense(uuid=uuid, uow=uow)
+        result = dto.model_dump(mode='json')
+        uow.commit()
+    return jsonify(result), 200
 
 
 @expense_blueprint.route('/', methods=['GET'])
@@ -91,14 +76,12 @@ def list_expenses():
         filters.append(ExpenseModel.vendor_uuid == str(params.vendor_uuid))
     if params.category:
         filters.append(ExpenseModel.category == params.category.value)
-    if params.min_amount is not None:
-        filters.append(ExpenseModel.amount >= params.min_amount)
-    if params.max_amount is not None:
-        filters.append(ExpenseModel.amount <= params.max_amount)
     if params.start:
         filters.append(ExpenseModel.created_at >= params.start)
     if params.end:
         filters.append(ExpenseModel.created_at <= params.end)
+    if params.status:
+        filters.append(ExpenseModel.status == params.status.value)
 
     # remove deleted
     filters.append(ExpenseModel.is_deleted == False)

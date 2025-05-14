@@ -632,9 +632,10 @@ class Expense(Base):
     currency = Column(String(120), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     vendor_uuid = Column(String(36), ForeignKey("vendor.uuid"), nullable=True)
-    category = Column(String(120), nullable=True)  # e.g., salary, etc.
+    category = Column(String(120), nullable=False)  # e.g., salary, etc.
     is_deleted = Column(Boolean, default=False)
     description = Column(Text, nullable=True)
+    status = Column(String(120), nullable=False)  # e.g., void, pending, paid, etc.
 
     # relations
     vendor = relationship("Vendor", back_populates="expenses")
@@ -642,7 +643,17 @@ class Expense(Base):
 
     @property
     def amount_paid(self):
-        return sum(payout.amount for payout in self.payouts)
+        return sum([payout.amount for payout in self.payouts if not payout.is_deleted])
+
+    @property
+    def amount_due(self):
+        return self.amount - self.amount_paid
+
+    @property
+    def is_paid(self):
+        return self.status == "paid"
+
+
 
 
 class Employee(Base):

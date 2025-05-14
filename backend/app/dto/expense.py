@@ -5,6 +5,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from app.dto.common_enums import Currency
+from app.dto.invoice import InvoiceStatus
 
 
 # import your actual enum from wherever you define it
@@ -13,35 +14,39 @@ class ExpenseCategory(str, Enum):
     WATER = "water"
     RENT = "rent"
     MAINTENANCE = "maintenance"
+    EQUIPMENT = "equipment"
+    SUPPLIES = "supplies"
+    TRAVEL = "travel"
+    MEALS = "meals"
     OTHER = "other"
-
 
 class ExpenseBase(BaseModel):
     amount: float
     currency: Currency
+    category: ExpenseCategory
     vendor_uuid: Optional[str] = None
-    category: Optional[ExpenseCategory] = None
     description: Optional[str] = None
+
+
 
 class ExpenseCreate(ExpenseBase):
     """Fields required to create a new expense."""
     created_by_uuid: Optional[str] = None
+    should_pay: Optional[bool] = False
 
 class ExpenseUpdate(BaseModel):
     """All fields optional for partial updates."""
-    created_by_uuid: Optional[str] = None
-    amount: Optional[float] = None
-    currency: Optional[Currency] = None
     vendor_uuid: Optional[str] = None
     category: Optional[ExpenseCategory] = None
     description: Optional[str] = None
-    is_deleted: Optional[bool] = None
+
 
 class ExpenseRead(ExpenseBase):
     model_config = ConfigDict(from_attributes=True)
 
     uuid: str
     created_by_uuid: Optional[str] = None
+    status : InvoiceStatus
     created_at: datetime
     is_deleted: bool
 
@@ -52,8 +57,7 @@ class ExpenseReadList(BaseModel):
 class ExpenseListParams(BaseModel):
     vendor_uuid: Optional[str] = None
     category:    Optional[ExpenseCategory] = None
-    min_amount:  Optional[float] = None
-    max_amount:  Optional[float] = None
+    status :    Optional[InvoiceStatus] = None
     start:       Optional[datetime] = None  # ISO timestamps in query
     end:         Optional[datetime] = None
     page:        int = 1
