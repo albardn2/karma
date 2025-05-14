@@ -29,11 +29,12 @@ class PayoutCreate(PayoutBase):
         po = bool(values.get("purchase_order_uuid"))
         ex = bool(values.get("expense_uuid"))
         emp = bool(values.get("employee_uuid"))
+        cni = bool(values.get("credit_note_item_uuid"))
 
-        if not (po or ex or emp):
-            raise BadRequestError("At least one of purchase_order_uuid, expense_uuid, or employee_uuid must be set.")
-        if (po + ex + emp) > 1:
-            raise BadRequestError("Only one of purchase_order_uuid, expense_uuid, or employee_uuid can be set.")
+        if not (po or ex or emp or cni):
+            raise BadRequestError("At least one of purchase_order_uuid, expense_uuid, employee_uuid or credit_note_item_uuid must be set.")
+        if (po + ex + emp + cni) > 1:
+            raise BadRequestError("Only one of purchase_order_uuid, expense_uuid, employee_uuid or credit_note_item_uuid can be set.")
         return values
 
 

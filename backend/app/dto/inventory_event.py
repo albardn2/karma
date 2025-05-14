@@ -11,6 +11,8 @@ class InventoryEventType(str, Enum):
     SALE = "sale"
     TRANSFER = "transfer"
     RETURN = "return"
+    ADJUSTMENT = "adjustment"
+
 
 
 class InventoryEventBase(BaseModel):
@@ -39,9 +41,9 @@ class InventoryEventCreate(InventoryEventBase):
         dn = bool(values.get("debit_note_item_uuid"))
         cn = bool(values.get("credit_note_item_uuid"))
         process = bool(values.get("process_uuid"))
-        if not (po or co or dn or cn or process):
+        if not (po or co or process):
             raise BadRequestError("At least one of purchase_order_item_uuid, customer_order_item_uuid, debit_note_item_uuid, credit_note_item_uuid or process_uuid must be set.")
-        if (po + co + dn + cn + process) > 1:
+        if (po + co + process) > 1:
             raise BadRequestError("Only one of purchase_order_item_uuid, customer_order_item_uuid, debit_note_item_uuid, credit_note_item_uuid or process_uuid can be set.")
 
         return values

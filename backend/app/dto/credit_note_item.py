@@ -13,12 +13,12 @@ class CreditNoteItemBase(BaseModel):
     amount: float = Field(..., gt=0)
     currency: Currency
     notes: Optional[str] = None
-    status: InvoiceStatus
     invoice_item_uuid: Optional[str] = None
-    customer_order_item_uuid: Optional[str] = None
     customer_uuid: Optional[str] = None
     vendor_uuid: Optional[str] = None
     purchase_order_item_uuid: Optional[str] = None
+    inventory_change : Optional[float] = None
+
 
 
 class CreditNoteItemCreate(CreditNoteItemBase):
@@ -30,27 +30,33 @@ class CreditNoteItemCreate(CreditNoteItemBase):
         po = bool(values.get("purchase_order_item_uuid"))
         v  = bool(values.get("vendor_uuid"))
         cu = bool(values.get("customer_uuid"))
-        co = bool(values.get("customer_order_item_uuid"))
-        if not (po or co or v or cu):
+        ii = bool(values.get("invoice_item_uuid"))
+        if not (po or ii or v or cu):
             raise BadRequestError(
                 "At least one of purchase_order_item_uuid, customer_order_item_uuid, vendor_uuid or customer_uuid must be set."
             )
-        if (po + co + v + cu) > 1:
+        if (po + ii + v + cu) > 1:
             raise BadRequestError(
                 "Only one of purchase_order_item_uuid, customer_order_item_uuid, vendor_uuid or customer_uuid can be set."
             )
+
+        if values.get("inventory_change") is not None and not (values.get("purchase_order_item_uuid") or values.get("invoice_item_uuid")):
+            raise BadRequestError(
+                "inventory_change can only be set if purchase_order_item_uuid or customer_order_item_uuid is set."
+            )
+
         return values
 
 
 class CreditNoteItemUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     notes: Optional[str] = None
-    status: Optional[InvoiceStatus] = None
 
 
 class CreditNoteItemRead(CreditNoteItemBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
+    status: InvoiceStatus
     created_at: datetime
     is_deleted: bool
 

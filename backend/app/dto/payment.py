@@ -1,9 +1,12 @@
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 from app.dto.common_enums import Currency
+
+from app.entrypoint.routes.common.errors import BadRequestError
+
 
 class PaymentMethod(str, Enum):
     """Enum for payment methods."""
@@ -12,13 +15,28 @@ class PaymentMethod(str, Enum):
 class PaymentBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
     created_by_uuid: Optional[str] = None
-    invoice_uuid: str
+    invoice_uuid: Optional[str] = None
     financial_account_uuid: Optional[str] = None
     amount: float = Field(..., gt=0)
     currency: Currency
     payment_method: PaymentMethod
     notes: Optional[str] = None
     debit_note_item_uuid: Optional[str] = None
+
+    # validate invoice uuid or debit note item uuid must exist but not both
+    @model_validator(mode="after")
+    def check_exclusive_fields(self):
+        # now `self` *is* the Payment instance
+        has_invoice = bool(self.invoice_uuid)
+        has_debit   = bool(self.debit_note_item_uuid)
+
+        if not (has_invoice or has_debit):
+            raise BadRequestError("At least one of invoice_uuid or debit_note_item_uuid must be set.")
+        if has_invoice and has_debit:
+            raise BadRequestError("Only one of invoice_uuid or debit_note_item_uuid can be set.")
+
+        return self
+
 
 class PaymentCreate(PaymentBase):
     """Fields required to create a new payment."""

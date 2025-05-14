@@ -35,27 +35,55 @@ class PaymentDomain:
                 raise NotFoundError('Financial account not found')
         data = payload.model_dump(mode='json')
         pay = PaymentModel(**data)
+        pay.financial_account = financial_account
         uow.payment_repository.save(model=pay, commit=False)
-        if pay.financial_account.currency != payload.currency.value or pay.invoice.currency != payload.currency:
+        if pay.financial_account.currency != payload.currency.value:
             raise BadRequestError(
                 f"Currency mismatch: {pay.financial_account.currency} != {payload.currency.value}"
             )
+        if pay.invoice:
+            if pay.invoice.currency != payload.currency:
+                raise BadRequestError(
+                    f"Currency mismatch: {pay.invoice.currency} != {payload.currency.value}"
+                )
+        if pay.debit_note_item:
+            if pay.debit_note_item.currency != payload.currency:
+                raise BadRequestError(
+                    f"Currency mismatch: {pay.debit_note_item.currency} != {payload.currency.value}"
+                )
 
-        if pay.invoice.status == InvoiceStatus.PAID.value:
-            raise BadRequestError(
-                f"Invoice {pay.invoice.uuid} is already paid"
-            )
+        if pay.invoice:
+            if pay.invoice.status == InvoiceStatus.PAID.value:
+                raise BadRequestError(
+                    f"Invoice {pay.invoice.uuid} is already paid"
+                )
+        if pay.debit_note_item:
+            if pay.debit_note_item.status == InvoiceStatus.PAID.value:
+                raise BadRequestError(
+                    f"DebitNoteItem {pay.debit_note_item.uuid} is already paid"
+                )
 
-        if pay.invoice.amount_paid   > pay.invoice.total_amount:
+        if pay.invoice and pay.invoice.amount_paid > pay.invoice.total_amount:
             raise BadRequestError(
                 f"Payment amount {pay.invoice.amount_paid} is greater than invoice amount {pay.invoice.total_amount}"
             )
-        if pay.invoice.amount_due == 0:
+
+        if pay.debit_note_item and pay.debit_note_item.amount_paid> pay.debit_note_item.amount:
+            raise BadRequestError(
+                f"Payment amount {pay.amount} is greater than debit note item amount {pay.debit_note_item.amount}"
+            )
+
+        if pay.invoice and pay.invoice.amount_due == 0:
             pay.invoice.status = InvoiceStatus.PAID.value
             pay.invoice.paid_at = datetime.now()
 
+        if pay.debit_note_item and pay.debit_note_item.amount_due == 0:
+            pay.debit_note_item.status = InvoiceStatus.PAID.value
+            pay.debit_note_item.paid_at = datetime.now()
+
 
         financial_account.balance += pay.amount
+        print(pay.__dict__)
         return PaymentRead.from_orm(pay)
 
     @staticmethod

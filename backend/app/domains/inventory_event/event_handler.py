@@ -5,6 +5,8 @@ from app.domains.inventory_event.event_handlers.sales_event_handler import Sales
 from app.dto.inventory_event import InventoryEventRead
 from app.domains.inventory_event.event_handlers.purchase_order_event_handler import PurchaseOrderEventHandler
 
+from app.domains.inventory_event.event_handlers.adjustement_event_handler import AdjustmentEventHandler
+
 
 class InventoryEventHandlerEntryPoint:
 
@@ -12,7 +14,8 @@ class InventoryEventHandlerEntryPoint:
 
         self.handler_mapper = {
             InventoryEventType.SALE: SalesEventHandler,
-            InventoryEventType.PURCHASE_ORDER: PurchaseOrderEventHandler
+            InventoryEventType.PURCHASE_ORDER: PurchaseOrderEventHandler,
+            InventoryEventType.ADJUSTMENT: AdjustmentEventHandler
         }
 
     def handle_event(self,uow: SqlAlchemyUnitOfWork, event: InventoryEventCreate) -> InventoryEventRead:

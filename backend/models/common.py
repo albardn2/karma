@@ -304,7 +304,7 @@ class Payment(Base):
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
-    invoice_uuid = Column(String(36), ForeignKey("invoice.uuid"), nullable=False)
+    invoice_uuid = Column(String(36), ForeignKey("invoice.uuid"), nullable=True)
     financial_account_uuid = Column(String(36), ForeignKey("financial_account.uuid"), nullable=False)
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
@@ -833,6 +833,7 @@ class DebitNoteItem(Base):
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
     status = Column(String(120), nullable=False)  # e.g., void, pending, paid
+    paid_at = Column(DateTime, nullable=True)
     invoice_item_uuid = Column(String(36), ForeignKey("invoice_item.uuid"), nullable=True)
     customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=True)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=True)
@@ -840,6 +841,7 @@ class DebitNoteItem(Base):
     purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     is_deleted = Column(Boolean, default=False)
+    inventory_change = Column(Float, nullable=True)  # positive or negative change in inventory
 
     # relations
     invoice_item = relationship("InvoiceItem", back_populates="debit_note_items")
@@ -870,6 +872,7 @@ class CreditNoteItem(Base):
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
     status = Column(String(120), nullable=False)  # e.g., void, pending, paid
+    paid_at = Column(DateTime, nullable=True)
     invoice_item_uuid = Column(String(36), ForeignKey("invoice_item.uuid"), nullable=True)
     customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=True)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=True)
@@ -877,6 +880,7 @@ class CreditNoteItem(Base):
     purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     is_deleted = Column(Boolean, default=False)
+    inventory_change = Column(Float, nullable=True)  # positive or negative change in inventory
 
     # relations
     invoice_item = relationship("InvoiceItem", back_populates="credit_note_items")
