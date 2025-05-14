@@ -58,6 +58,8 @@ def delete_payout(uuid: str):
 def list_payouts():
     params = PayoutListParams(**request.args)
     filters = [PayoutModel.is_deleted == False]
+    if params.credit_note_item_uuid:
+        filters.append(PayoutModel.credit_note_item_uuid == params.credit_note_item_uuid)
     if params.purchase_order_uuid:
         filters.append(PayoutModel.purchase_order_uuid == params.purchase_order_uuid)
     if params.expense_uuid:

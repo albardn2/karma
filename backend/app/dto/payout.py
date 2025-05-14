@@ -1,11 +1,10 @@
-# app/dto/payout.py
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 from app.dto.common_enums import Currency
 from pydantic_core import ValidationError
-
 from app.entrypoint.routes.common.errors import BadRequestError
+from app.dto.invoice import InvoiceStatus
 
 
 class PayoutBase(BaseModel):
@@ -52,6 +51,7 @@ class PayoutRead(PayoutBase):
 
 class PayoutListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    credit_note_item_uuid: Optional[str] = None
     purchase_order_uuid: Optional[str] = None
     expense_uuid:     Optional[str] = None
     employee_uuid:    Optional[str] = None
