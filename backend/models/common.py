@@ -802,6 +802,9 @@ class InventoryEvent(Base):
     credit_note_item_uuid = Column(String(36), ForeignKey("credit_note_item.uuid"), nullable=True)
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
     is_deleted = Column(Boolean, default=False)
+    cost_per_unit = Column(Float, nullable=True)
+    currency = Column(String(120), nullable=True)
+    affect_original = Column(Boolean, default=False)  # whether to affect the original quantity or not
 
     # relations
     inventory = relationship("Inventory", back_populates="inventory_events")

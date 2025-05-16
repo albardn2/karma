@@ -2,8 +2,8 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
-
 from app.entrypoint.routes.common.errors import BadRequestError
+from app.dto.common_enums import Currency
 
 
 class InventoryEventType(str, Enum):
@@ -13,6 +13,8 @@ class InventoryEventType(str, Enum):
     TRANSFER = "transfer"
     RETURN = "return"
     ADJUSTMENT = "adjustment"
+    MANUAL = "manual"
+
 
 
 
@@ -28,7 +30,9 @@ class InventoryEventBase(BaseModel):
     notes: Optional[str] = None
     debit_note_item_uuid: Optional[str] = None
     credit_note_item_uuid: Optional[str] = None
-
+    cost_per_unit: Optional[float] = None
+    currency: Optional[Currency] = None
+    affect_original:bool
 
 class InventoryEventCreate(InventoryEventBase):
     """Fields required to create a new inventory event."""
@@ -39,22 +43,26 @@ class InventoryEventCreate(InventoryEventBase):
     def check_exclusive_fields(cls, values: dict) -> dict:
         po = bool(values.get("purchase_order_item_uuid"))
         co = bool(values.get("customer_order_item_uuid"))
-        dn = bool(values.get("debit_note_item_uuid"))
-        cn = bool(values.get("credit_note_item_uuid"))
         process = bool(values.get("process_uuid"))
-        if not (po or co or process):
-            raise BadRequestError("At least one of purchase_order_item_uuid, customer_order_item_uuid, debit_note_item_uuid, credit_note_item_uuid or process_uuid must be set.")
-        if (po + co + process) > 1:
+        cpu = bool(values.get("cost_per_unit"))
+        currency = bool(values.get("currency"))
+        is_manual = bool(values.get("event_type") == InventoryEventType.MANUAL.value)
+
+        if not (po or co or process or (cpu and currency)):
+            raise BadRequestError("At least one of purchase_order_item_uuid, customer_order_item_uuid, process_uuid, cost_per_unit and currency must be set.")
+        if (po + co + process + cpu) > 1:
             raise BadRequestError("Only one of purchase_order_item_uuid, customer_order_item_uuid, debit_note_item_uuid, credit_note_item_uuid or process_uuid can be set.")
 
+        if cpu and (not is_manual or not currency):
+            raise BadRequestError("cost_per_unit and currency must be set if event_type is MANUAL.")
         return values
-
-
 
 
 class InventoryEventUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    event_type: Optional[InventoryEventType] = None
+    cost_per_unit: Optional[float] = None
+    currency: Optional[Currency] = None
+    affect_original:Optional[bool] = None
     quantity: Optional[float] = Field(None, gt=0)
     notes: Optional[str] = None
 

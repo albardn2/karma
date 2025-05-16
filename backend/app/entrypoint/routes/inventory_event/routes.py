@@ -11,20 +11,20 @@ from app.dto.inventory_event import (
 from models.common import InventoryEvent as InventoryEventModel
 from app.domains.inventory_event.domain import InventoryEventDomain
 from app.entrypoint.routes.inventory_event import inventory_event_blueprint
+from app.dto.inventory_event import InventoryEventType
+from app.entrypoint.routes.common.errors import BadRequestError
+
+
 
 
 @inventory_event_blueprint.route('/', methods=['POST'])
 def create_inventory_event():
-    print("Creating inventory event")
-    print(request.json)
     payload = InventoryEventCreate(**request.json)
-    print(payload)
     with SqlAlchemyUnitOfWork() as uow:
         ev_read = InventoryEventDomain.create_inventory_event(uow=uow, payload=payload)
         result = ev_read.model_dump(mode='json')
         uow.commit()
     return jsonify(result), 201
-
 
 @inventory_event_blueprint.route('/<string:uuid>', methods=['GET'])
 def get_inventory_event(uuid: str):
@@ -35,7 +35,6 @@ def get_inventory_event(uuid: str):
         result = InventoryEventRead.from_orm(ev).model_dump(mode='json')
     return jsonify(result), 200
 
-#
 @inventory_event_blueprint.route('/<string:uuid>', methods=['PUT'])
 def update_inventory_event(uuid: str):
     payload = InventoryEventUpdate(**request.json)
@@ -44,9 +43,13 @@ def update_inventory_event(uuid: str):
         ev = uow.inventory_event_repository.find_one(uuid=uuid)
         if not ev:
             raise NotFoundError('InventoryEvent not found')
+        if ev.event_type != InventoryEventType.MANUAL.value:
+            raise BadRequestError('InventoryEvent not found')
         for field, val in updates.items():
             setattr(ev, field, val)
         uow.inventory_event_repository.save(model=ev, commit=True)
+        # TODO: recalculate the inventory quantities from event
+        # TODO: recalculate inventory cost
         result = InventoryEventRead.from_orm(ev).model_dump(mode='json')
     return jsonify(result), 200
 
@@ -56,6 +59,7 @@ def delete_inventory_event(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         ev_read = InventoryEventDomain.delete_inventory_event(uow=uow, uuid=uuid)
         result = ev_read.model_dump(mode='json')
+        # TODO: recalculate inventory quantities from domain, model etc...
         uow.commit()
     return jsonify(result), 200
 

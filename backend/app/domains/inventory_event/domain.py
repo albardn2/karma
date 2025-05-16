@@ -25,28 +25,10 @@ class InventoryEventDomain:
         event = uow.inventory_event_repository.find_one(uuid=uuid, is_deleted=False)
         if not event:
             raise NotFoundError("InventoryEvent not found")
-        event.is_deleted = True
 
-        inventory = event.inventory
-        inventory.current_quantity -= event.quantity
-        uow.inventory_event_repository.save(model=event)
-        return InventoryEventRead.from_orm(event)
+        event_read = InventoryEventHandlerEntryPoint().delete_event(uow=uow, event=event)
+        return event_read
 
-
-    @staticmethod
-    def calculate_quantity(quantity: float,
-                           event_type:InventoryEventType) -> float:
-
-        if event_type == InventoryEventType.SALE:
-            return -(abs(quantity))
-        elif event_type == InventoryEventType.RETURN:
-            return +(abs(quantity))
-        elif event_type == InventoryEventType.TRANSFER:
-            return quantity
-        elif event_type == InventoryEventType.PROCUREMENT:
-            return quantity
-        else:
-            raise BadRequestError("Invalid event type")
 
     @staticmethod
     def validate_relations(uow: SqlAlchemyUnitOfWork, event: InventoryEventModel):

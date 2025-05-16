@@ -37,6 +37,7 @@ class ProcessDomain:
                     quantity=-abs(input.quantity),
                     process_uuid=process.uuid,
                     event_type=InventoryEventType.PROCESS.value,
+                    affect_original=False,
                 ),
             )
 
@@ -52,6 +53,7 @@ class ProcessDomain:
                     quantity=abs(output.quantity),
                     process_uuid=process.uuid,
                     event_type=InventoryEventType.PROCESS.value,
+                    affect_original=True,
                 ),
             )
 

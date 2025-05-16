@@ -22,10 +22,29 @@ class ProcessEventHandler:
 
         event_model = InventoryEventModel(**event.model_dump(mode='json'))
         inventory.current_quantity += event_model.quantity # event quantity could be negative
-        if inventory.current_quantity > 0:
+        if event_model.affect_original:
             inventory.original_quantity += event_model.quantity
         # TODO: method to recalculate those quantities based on the aggregated events
         event_model.material_uuid = inventory.material_uuid
+        uow.inventory_event_repository.save(model=event_model, commit=False)
+
+        return InventoryEventRead.from_orm(event_model)
+
+
+    def run_delete(self,uow: SqlAlchemyUnitOfWork, event: InventoryEventRead):
+        # check inventory_uuid exists
+        inventory = uow.inventory_repository.find_one(uuid=event.inventory_uuid, is_deleted=False)
+        if not inventory:
+            raise NotFoundError("Inventory not found")
+
+        event_model = uow.inventory_event_repository.find_one(uuid=event.uuid, is_deleted=False)
+        if not event_model:
+            raise NotFoundError("Inventory Event not found")
+
+        event_model.is_deleted = True
+        inventory.current_quantity -= event_model.quantity
+        if event_model.affect_original:
+            inventory.original_quantity -= event_model.quantity
         uow.inventory_event_repository.save(model=event_model, commit=False)
 
         return InventoryEventRead.from_orm(event_model)

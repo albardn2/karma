@@ -44,7 +44,9 @@ class CreditNoteItemDomain:
                     event_type=InventoryEventType.ADJUSTMENT,
                     customer_order_item_uuid=item.customer_order_item_uuid,
                     credit_note_item_uuid=item.uuid,
-                    inventory_uuid=inventory_uuid)
+                    inventory_uuid=inventory_uuid,
+                    affect_original=False
+                )
                 event_read = InventoryEventDomain.create_inventory_event(
                     uow=uow,
                     payload=payload
@@ -74,7 +76,9 @@ class CreditNoteItemDomain:
                     event_type=InventoryEventType.ADJUSTMENT,
                     purchase_order_item_uuid=item.purchase_order_item_uuid,
                     credit_note_item_uuid=item.uuid,
-                    inventory_uuid=inventory_uuid)
+                    inventory_uuid=inventory_uuid,
+                    affect_original=True
+                )
                 event_read = InventoryEventDomain.create_inventory_event(
                     uow=uow,
                     payload=payload

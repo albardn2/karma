@@ -57,7 +57,8 @@ class CustomerOrderItemDomain:
                     quantity=-(abs(customer_order_item.quantity)),
                     event_type=InventoryEventType.SALE,
                     inventory_uuid=item.inventory_uuid,
-                    customer_order_item_uuid=customer_order_item.uuid
+                    customer_order_item_uuid=customer_order_item.uuid,
+                    affect_original=False
                 )
             )
             items.append(customer_order_item)

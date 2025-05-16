@@ -37,6 +37,8 @@ class InventoryFulfillmentHandler:
                 quantity=abs(po_item.quantity),
                 event_type=InventoryEventType.PURCHASE_ORDER,
                 purchase_order_item_uuid=po_item.uuid,
-                inventory_uuid=inventory_uuid)
+                inventory_uuid=inventory_uuid,
+                affect_original=True,
+            )
             )
         return event_read
