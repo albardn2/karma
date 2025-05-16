@@ -8,6 +8,7 @@ from app.entrypoint.routes.common.errors import BadRequestError
 
 class InventoryEventType(str, Enum):
     PURCHASE_ORDER = "purchase_order"
+    PROCESS = "process"
     SALE = "sale"
     TRANSFER = "transfer"
     RETURN = "return"

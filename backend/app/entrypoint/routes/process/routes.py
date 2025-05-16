@@ -59,6 +59,10 @@ def list_processes():
         filters.append(ProcessModel.type == params.type)
     if params.created_by_uuid:
         filters.append(ProcessModel.created_by_uuid == params.created_by_uuid)
+    if params.start_date:
+        filters.append(ProcessModel.created_at >= params.start_date)
+    if params.end_date:
+        filters.append(ProcessModel.created_at <= params.end_date)
 
     with SqlAlchemyUnitOfWork() as uow:
         page = uow.process_repository.find_all_by_filters_paginated(
