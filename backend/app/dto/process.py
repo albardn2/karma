@@ -38,6 +38,7 @@ class ProcessOutputItem(BaseModel):
     quantity: float
     inventory_uuid: Optional[str] = None
     total_cost: Optional[float] = None
+    cost_per_unit: Optional[float] = None
 
 
 class ProcessData(BaseModel):

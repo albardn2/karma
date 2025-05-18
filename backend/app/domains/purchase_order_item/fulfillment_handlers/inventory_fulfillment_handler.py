@@ -24,7 +24,6 @@ class InventoryFulfillmentHandler:
             # create a new inventory entry with the po item and warehouse
             inv_create_payload = InventoryCreate(
                 material_uuid=po_item.material_uuid,
-                unit =po_item.unit,
                 warehouse_uuid=po_item_fulfillment_payload.warehouse_uuid,
 
             )

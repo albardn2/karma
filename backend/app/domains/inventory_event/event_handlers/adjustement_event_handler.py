@@ -29,9 +29,9 @@ class AdjustmentEventHandler:
                 raise NotFoundError("Purchase Order Item not found")
 
         event_model = InventoryEventModel(**event.model_dump(mode='json'))
-        inventory.current_quantity += event_model.quantity # event quantity could be negative
-        if event_model.affect_original:
-            inventory.original_quantity += event_model.quantity
+        # inventory.current_quantity += event_model.quantity # event quantity could be negative
+        # if event_model.affect_original:
+        #     inventory.original_quantity += event_model.quantity
         event_model.material_uuid = inventory.material_uuid
         uow.inventory_event_repository.save(model=event_model, commit=False)
 
@@ -48,9 +48,9 @@ class AdjustmentEventHandler:
             raise NotFoundError("Inventory Event not found")
 
         event_model.is_deleted = True
-        inventory.current_quantity -= event_model.quantity
-        if event_model.affect_original:
-            inventory.original_quantity -= event_model.quantity
+        # inventory.current_quantity -= event_model.quantity
+        # if event_model.affect_original:
+        #     inventory.original_quantity -= event_model.quantity
         uow.inventory_event_repository.save(model=event_model, commit=False)
 
         return InventoryEventRead.from_orm(event_model)

@@ -589,6 +589,38 @@ class PurchaseOrderItem(Base):
     def total_price(self):
         return self.quantity * self.price_per_unit
 
+    @property
+    def adjusted_quantity(self):
+        debit_note_change = 0
+        credit_note_change = 0
+        for item in self.debit_note_items:
+            if not item.is_deleted:
+                debit_note_change += item.inventory_change
+
+        for item in self.credit_note_items:
+            if not item.is_deleted:
+                credit_note_change += item.inventory_change
+
+        return self.quantity + debit_note_change + credit_note_change
+    @property
+    def adjusted_total_price(self): # total price
+        total_debit_note_price = 0
+        total_credit_note_price = 0
+        for item in self.debit_note_items:
+            if not item.is_deleted:
+                total_debit_note_price += item.amount
+        for item in self.credit_note_items:
+            if not item.is_deleted:
+                total_credit_note_price += item.amount
+
+        return self.total_price + abs(total_debit_note_price) - abs(total_credit_note_price)
+
+    @property
+    def adjusted_price_per_unit(self):
+        if self.adjusted_quantity == 0:
+            return 0
+        return self.adjusted_total_price / self.adjusted_quantity
+
     def __repr__(self):
         return (
             f"<PurchaseOrderItem(uuid={self.uuid}, material_name={self.material.name}, "
@@ -762,10 +794,10 @@ class Inventory(Base):
     is_deleted = Column(Boolean, default=False)
     lot_id = Column(String(120), nullable=False, unique=True)
     expiration_date = Column(DateTime, nullable=True)  # for perishable items
-    cost_per_unit = Column(Float, nullable=True)
+    _cached_cost_per_unit = Column(Float, nullable=True)
     unit = Column(String(120), nullable=False)  # should be same as material unit
-    current_quantity = Column(Float, nullable=False)
-    original_quantity = Column(Float, nullable=False)
+    _cached_current_quantity = Column(Float, nullable=True) # only for caching
+    _cached_original_quantity = Column(Float, nullable=True) # only for caching
     is_active = Column(Boolean, default=True)
     currency = Column(String(120), nullable=True)
 
@@ -777,6 +809,20 @@ class Inventory(Base):
     @property
     def total_original_cost(self):
         return self.original_quantity * self.cost_per_unit
+
+    @property
+    def original_quantity(self):
+        events = [event for event in self.inventory_events if not event.is_deleted]
+        if events:
+            return sum([event.quantity for event in events if event.affect_original])
+        return 0
+
+    @property
+    def current_quantity(self):
+        events = [event for event in self.inventory_events if not event.is_deleted]
+        if events:
+            return self.original_quantity + sum([event.quantity for event in events if not event.affect_original])
+        return 0
 
     def __repr__(self):
         return (

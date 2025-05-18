@@ -28,7 +28,9 @@ def get_inventory(uuid: str):
         inv = uow.inventory_repository.find_one(uuid=uuid, is_deleted=False)
         if not inv:
             raise NotFoundError('Inventory not found')
-        result = InventoryRead.from_orm(inv).model_dump(mode='json')
+        result = InventoryRead.from_orm(inv)
+        InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=result)
+        result = result.model_dump(mode='json')
     return jsonify(result), 200
 #
 @inventory_blueprint.route('/<string:uuid>', methods=['PUT'])
@@ -63,15 +65,19 @@ def list_inventories():
         filters.append(InventoryModel.warehouse_uuid == params.warehouse_uuid)
     if params.is_active is not None:
         filters.append(InventoryModel.is_active == params.is_active)
-    if params.currency:
-        filters.append(InventoryModel.currency == params.currency.value)
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.inventory_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
             per_page=params.per_page
         )
-        items = [InventoryRead.from_orm(i).model_dump(mode='json') for i in page_obj.items]
+        # enrich items with cost per unit
+        items = []
+        for i in page_obj.items:
+            dto = InventoryRead.from_orm(i)
+            InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=i)
+            items.append(dto.model_dump(mode='json'))
+        # items = [InventoryRead.from_orm(i).model_dump(mode='json') for i in page_obj.items]
         result = InventoryPage(
             inventories=items,
             total_count=page_obj.total,
