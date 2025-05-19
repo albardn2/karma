@@ -38,14 +38,20 @@ class CustomerOrderRead(CustomerOrderBase):
     is_fulfilled: bool
     fulfilled_at: Optional[datetime]
     is_deleted: bool
-    total_amount: float
+    total_adjusted_amount: float
     is_overdue: bool
     customer_order_items: Optional[List[CustomerOrderItemRead]] = None
+    net_amount_due: Optional[float] = None
+    net_amount_paid: Optional[float] = None
+    is_paid: Optional[bool] = None
 
 class CustomerOrderListParams(BaseModel):
     """Optional filters plus pagination for listing orders."""
     model_config = ConfigDict(extra="forbid")
     customer_uuid: Optional[str] = None
+    is_paid: Optional[bool] = None
+    is_fulfilled: Optional[bool] = None
+    is_overdue: Optional[bool] = None
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
 

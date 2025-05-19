@@ -17,7 +17,7 @@ class CreditNoteItemDomain:
 
 
         item = CreditNoteItemModel(**payload.model_dump(mode="json"))
-        item.status = InvoiceStatus.PENDING.value
+        # item.status = InvoiceStatus.PENDING.value
         uow.credit_note_item_repository.save(model=item, commit=False)
 
         if item.invoice_item_uuid:

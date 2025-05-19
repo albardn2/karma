@@ -19,20 +19,20 @@ class PayoutDomain:
         uow.payout_repository.save(model=po, commit=False)
         PayoutDomain.validate_currencies(payout=po)
 
-        if po.purchase_order_uuid:
-            if po.purchase_order.amount_due ==0:
-                po.purchase_order.status = InvoiceStatus.PAID.value
-                po.purchase_order.paid_at = po.created_at
-
-        elif po.expense_uuid:
-            if po.expense.amount_due ==0:
-                po.expense.status = InvoiceStatus.PAID.value
-                po.expense.paid_at = po.created_at
-
-        elif po.credit_note_item_uuid:
-            if po.credit_note_item.amount_due ==0:
-                po.credit_note_item.status = InvoiceStatus.PAID.value
-                po.credit_note_item.paid_at = po.created_at
+        # if po.purchase_order_uuid:
+        #     if po.purchase_order.amount_due ==0:
+        #         po.purchase_order.status = InvoiceStatus.PAID.value
+        #         po.purchase_order.paid_at = po.created_at
+        #
+        # elif po.expense_uuid:
+        #     if po.expense.amount_due ==0:
+        #         po.expense.status = InvoiceStatus.PAID.value
+        #         po.expense.paid_at = po.created_at
+        #
+        # elif po.credit_note_item_uuid:
+        #     if po.credit_note_item.amount_due ==0:
+        #         po.credit_note_item.status = InvoiceStatus.PAID.value
+        #         po.credit_note_item.paid_at = po.created_at
 
         return PayoutRead.from_orm(po)
 
@@ -45,15 +45,15 @@ class PayoutDomain:
         po.is_deleted = True
         uow.payout_repository.save(model=po, commit=False)
 
-        if po.purchase_order_uuid:
-            po.purchase_order.status = InvoiceStatus.PENDING.value
-            po.purchase_order.paid_at = None
-        elif po.expense_uuid:
-            po.expense.status = InvoiceStatus.PENDING.value
-            po.expense.paid_at = None
-        elif po.credit_note_item_uuid:
-            po.credit_note_item.status = InvoiceStatus.PENDING.value
-            po.credit_note_item.paid_at = None
+        # if po.purchase_order_uuid:
+        #     po.purchase_order.status = InvoiceStatus.PENDING.value
+        #     po.purchase_order.paid_at = None
+        # elif po.expense_uuid:
+        #     po.expense.status = InvoiceStatus.PENDING.value
+        #     po.expense.paid_at = None
+        # elif po.credit_note_item_uuid:
+        #     po.credit_note_item.status = InvoiceStatus.PENDING.value
+        #     po.credit_note_item.paid_at = None
 
 
 

@@ -36,7 +36,7 @@ class PurchaseOrderDomain:
         """
         data = payload.model_dump(exclude_unset=True)
         po = PurchaseOrderModel(**data)
-        po.status = PurchaseOrderStatus.PENDING.value
+        # po.status = PurchaseOrderStatus.PENDING.value
         uow.purchase_order_repository.save(model=po, commit=False)
         return po
 

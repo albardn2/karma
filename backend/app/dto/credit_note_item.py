@@ -10,7 +10,7 @@ from app.entrypoint.routes.common.errors import BadRequestError
 class CreditNoteItemBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
     created_by_uuid: Optional[str] = None
-    amount: float = Field(..., gt=0)
+    amount: float
     currency: Currency
     notes: Optional[str] = None
     invoice_item_uuid: Optional[str] = None
@@ -59,6 +59,11 @@ class CreditNoteItemRead(CreditNoteItemBase):
     status: InvoiceStatus
     created_at: datetime
     is_deleted: bool
+    amount_paid: float
+    amount_due: float
+    paid_at: Optional[datetime]
+    is_paid: bool
+
 
 
 class CreditNoteItemListParams(BaseModel):
@@ -69,6 +74,7 @@ class CreditNoteItemListParams(BaseModel):
     customer_uuid: Optional[str] = None
     vendor_uuid: Optional[str] = None
     status: Optional[InvoiceStatus] = None
+    is_paid: Optional[bool] = None
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
 

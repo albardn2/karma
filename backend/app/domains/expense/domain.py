@@ -17,7 +17,7 @@ class ExpenseDomain:
         data = payload.model_dump(mode='json')
         should_pay = data.pop("should_pay", None)
         exp = ExpenseModel(**data)
-        exp.status = InvoiceStatus.PENDING.value
+        # exp.status = InvoiceStatus.PENDING.value
         uow.expense_repository.save(model=exp, commit=False)
 
         if should_pay:
@@ -29,7 +29,7 @@ class ExpenseDomain:
                 expense_uuid=exp.uuid,
             )
             PayoutDomain.create_payout(uow, payout_payload)
-            exp.status = InvoiceStatus.PAID.value
+            # exp.status = InvoiceStatus.PAID.value
 
         return ExpenseRead.from_orm(exp)
 

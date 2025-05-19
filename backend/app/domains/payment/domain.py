@@ -36,7 +36,6 @@ class PaymentDomain:
         data = payload.model_dump(mode='json')
         pay = PaymentModel(**data)
         pay.financial_account = financial_account
-        uow.payment_repository.save(model=pay, commit=False)
         if pay.financial_account.currency != payload.currency.value:
             raise BadRequestError(
                 f"Currency mismatch: {pay.financial_account.currency} != {payload.currency.value}"
@@ -73,17 +72,17 @@ class PaymentDomain:
                 f"Payment amount {pay.amount} is greater than debit note item amount {pay.debit_note_item.amount}"
             )
 
-        if pay.invoice and pay.invoice.amount_due == 0:
-            pay.invoice.status = InvoiceStatus.PAID.value
-            pay.invoice.paid_at = datetime.now()
+        # if pay.invoice and pay.invoice.amount_due == 0:
+        #     pay.invoice.status = InvoiceStatus.PAID.value
+        #     pay.invoice.paid_at = datetime.now()
 
-        if pay.debit_note_item and pay.debit_note_item.amount_due == 0:
-            pay.debit_note_item.status = InvoiceStatus.PAID.value
-            pay.debit_note_item.paid_at = datetime.now()
+        # if pay.debit_note_item and pay.debit_note_item.amount_due == 0:
+        #     pay.debit_note_item.status = InvoiceStatus.PAID.value
+        #     pay.debit_note_item.paid_at = datetime.now()
 
 
-        financial_account.balance += pay.amount
-        print(pay.__dict__)
+        uow.payment_repository.save(model=pay, commit=False)
+        # financial_account.balance += pay.amount
         return PaymentRead.from_orm(pay)
 
     @staticmethod

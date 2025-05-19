@@ -3,9 +3,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 from app.dto.common_enums import Currency
-
 from app.dto.invoice import InvoiceStatus
-
 from app.entrypoint.routes.common.errors import BadRequestError
 
 
@@ -54,6 +52,10 @@ class DebitNoteItemRead(DebitNoteItemBase):
     status: InvoiceStatus
     created_at: datetime
     is_deleted: bool
+    is_paid: bool
+    amount_due: float
+    amount_paid: float
+    paid_at: Optional[datetime]
 
 class DebitNoteItemListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -63,6 +65,7 @@ class DebitNoteItemListParams(BaseModel):
     customer_uuid: Optional[str] = None
     vendor_uuid: Optional[str] = None
     status: Optional[InvoiceStatus] = None
+    is_paid: Optional[bool] = None
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
 

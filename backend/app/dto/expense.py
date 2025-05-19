@@ -47,8 +47,12 @@ class ExpenseRead(ExpenseBase):
     uuid: str
     created_by_uuid: Optional[str] = None
     status : InvoiceStatus
+    is_paid: bool
+    amount_due: float
+    amount_paid: float
     created_at: datetime
     is_deleted: bool
+    paid_at: Optional[datetime] = None
 
 class ExpenseReadList(BaseModel):
     expenses: List[ExpenseRead]
@@ -58,6 +62,7 @@ class ExpenseListParams(BaseModel):
     vendor_uuid: Optional[str] = None
     category:    Optional[ExpenseCategory] = None
     status :    Optional[InvoiceStatus] = None
+    is_paid:    Optional[bool] = None
     start:       Optional[datetime] = None  # ISO timestamps in query
     end:         Optional[datetime] = None
     page:        int = 1

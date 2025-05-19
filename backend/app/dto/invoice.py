@@ -44,8 +44,9 @@ class InvoiceRead(InvoiceBase):
     status: InvoiceStatus
     created_at: datetime
     total_amount: float
-    amount_paid: float
-    amount_due: float
+    total_adjusted_amount: float
+    net_amount_paid: float
+    net_amount_due: float
     is_paid: bool
     is_overdue: bool
     is_deleted: bool

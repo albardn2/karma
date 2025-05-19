@@ -64,8 +64,9 @@ class PurchaseOrderRead(BaseModel):
     payout_due_date:  Optional[datetime] = None
 
     total_amount:     float
-    amount_paid:      float
-    amount_due:       float
+    total_adjusted_amount: float
+    net_amount_paid:      float
+    net_amount_due:       float
     is_paid:          bool
     is_overdue:       Optional[bool] = None
     is_fulfilled:     bool
@@ -79,6 +80,7 @@ class PurchaseOrderListParams(BaseModel):
     uuid: Optional[str] = None
     vendor_uuid: Optional[str] = None
     status:      Optional[PurchaseOrderStatus] = None
+    is_paid: Optional[bool] = None
     start_date:  Optional[datetime] = Field(None, description="Filter orders created *after* this datetime")
     end_date:    Optional[datetime] = Field(None, description="Filter orders created *before* this datetime")
     is_fulfilled: Optional[bool] = None

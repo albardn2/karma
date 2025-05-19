@@ -30,13 +30,13 @@ class TransactionDomain:
         if tx.from_account:
             if tx.from_account.is_deleted:
                 raise BadRequestError('Cannot use a deleted account')
-            tx.from_account.balance -= tx.from_amount
+            # tx.from_account.balance -= tx.from_amount
             uow.financial_account_repository.save(model=tx.from_account, commit=False)
 
         if tx.to_account:
             if tx.to_account.is_deleted:
                 raise BadRequestError('Cannot use a deleted account')
-            tx.to_account.balance += tx.to_amount
+            # tx.to_account.balance += tx.to_amount
             uow.financial_account_repository.save(model=tx.to_account, commit=False)
 
         return TransactionRead.from_orm(tx)

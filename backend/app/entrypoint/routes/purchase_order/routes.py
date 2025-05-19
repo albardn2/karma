@@ -98,6 +98,8 @@ def list_orders():
         filters.append(PurchaseOrderModel.vendor_uuid == params.vendor_uuid)
     if params.status:
         filters.append(PurchaseOrderModel.status == params.status)
+    if params.is_paid is not None:
+        filters.append(PurchaseOrderModel.is_paid == params.is_paid)
     if params.start_date:
         filters.append(PurchaseOrderModel.created_at >= params.start_date)
     if params.end_date:

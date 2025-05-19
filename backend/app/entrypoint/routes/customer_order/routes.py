@@ -93,8 +93,20 @@ def delete_customer_order(uuid: str):
 def list_customer_orders():
     params = CustomerOrderListParams(**request.args)
     filters = [CustomerOrderModel.is_deleted == False]
+
     if params.customer_uuid:
         filters.append(CustomerOrderModel.customer_uuid == params.customer_uuid)
+
+    if params.is_paid is not None:
+        # either "paid = TRUE" or "paid = FALSE"
+        filters.append(CustomerOrderModel.is_paid.is_(params.is_paid))
+
+    if params.is_fulfilled is not None:
+        # you can also write `filters.append(CustomerOrderModel.is_fulfilled)` when True
+        filters.append(CustomerOrderModel.is_fulfilled.is_(params.is_fulfilled))
+
+    if params.is_overdue is not None:
+        filters.append(CustomerOrderModel.is_overdue.is_(params.is_overdue))
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.customer_order_repository.find_all_by_filters_paginated(
             filters=filters,

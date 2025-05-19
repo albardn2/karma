@@ -82,9 +82,8 @@ def list_expenses():
         filters.append(ExpenseModel.created_at <= params.end)
     if params.status:
         filters.append(ExpenseModel.status == params.status.value)
-
-    # remove deleted
-    filters.append(ExpenseModel.is_deleted == False)
+    if params.is_paid is not None:
+        filters.append(ExpenseModel.is_paid == params.is_paid)
 
     # Fetch paginated results
     with SqlAlchemyUnitOfWork() as uow:

@@ -2,10 +2,11 @@ import uuid
 from datetime import datetime, timezone
 
 import bcrypt
-from sqlalchemy import create_engine, Column, String, DateTime, Text, Float, JSON, select, exists, and_
+from sqlalchemy import create_engine, Column, String, DateTime, Text, Float, JSON, select, exists, and_, case, \
+    CheckConstraint, false, true, func, literal
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.mutable import MutableDict
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, validates
 import uuid
 from datetime import datetime
 from sqlalchemy import (
@@ -21,7 +22,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from models.base import Base
-from sqlalchemy.orm import column_property
 
 class User(Base):
     __tablename__ = 'user'
@@ -59,14 +59,6 @@ class User(Base):
         return any(scope in ["admin", "superuser"] for scope in scopes)
 
 
-
-
-
-
-# ------------------------------
-# Customer & Related Models
-# ------------------------------
-
 class Customer(Base):
     __tablename__ = "customer"
 
@@ -92,10 +84,12 @@ class Customer(Base):
     def _calculate_balance_per_currency(self, currency):
         order_total = 0
         for order in self.orders:
+            if order.is_deleted:
+                continue
             invoices = order.invoices
             for invoice in invoices:
                 if not invoice.is_deleted and invoice.currency == currency:
-                    order_total += invoice.amount_due
+                    order_total += invoice.net_amount_due
 
         debit_note_total = 0
         for dni in self.debit_note_items:
@@ -139,26 +133,146 @@ class CustomerOrder(Base):
 
     @hybrid_property
     def is_fulfilled(self):
-        return all([item.is_fulfilled for item in self.customer_order_items if not item.is_deleted])
+        # all non-deleted items have a fulfilled_at timestamp
+        return all(
+            item.fulfilled_at is not None
+            for item in self.customer_order_items
+            if not item.is_deleted
+        )
+
+    @is_fulfilled.expression
+    def is_fulfilled(cls):
+        # true if no non-deleted item is lacking fulfilled_at
+        return ~exists(
+            select(1).where(
+                CustomerOrderItem.customer_order_uuid == cls.uuid,
+                CustomerOrderItem.is_deleted.is_(False),
+                CustomerOrderItem.fulfilled_at.is_(None)
+            )
+        )
 
     @hybrid_property
     def fulfilled_at(self):
-        if self.is_fulfilled and self.customer_order_items:
-            return max(item.fulfilled_at for item in self.customer_order_items if item.fulfilled_at and not item.is_deleted)
-        return None
+        if not self.is_fulfilled:
+            return None
+        dates = [
+            item.fulfilled_at
+            for item in self.customer_order_items
+            if item.fulfilled_at is not None and not item.is_deleted
+        ]
+        return max(dates) if dates else None
+
+    @fulfilled_at.expression
+    def fulfilled_at(cls):
+        # latest fulfilled_at among non-deleted items
+        return (
+            select(func.max(CustomerOrderItem.fulfilled_at))
+            .where(
+                CustomerOrderItem.customer_order_uuid == cls.uuid,
+                CustomerOrderItem.is_deleted.is_(False),
+                CustomerOrderItem.fulfilled_at.isnot(None)
+            )
+            .scalar_subquery()
+        )
+
     @hybrid_property
     def is_paid(self):
-        # if all invoices are paid status
-        return all(invoice.is_paid for invoice in self.invoices if not invoice.is_deleted)
+        return all(
+            inv.is_paid
+            for inv in self.invoices
+            if not inv.is_deleted
+        )
+
+    @is_paid.expression
+    def is_paid(cls):
+        # true if no non-deleted invoice is unpaid
+        return ~exists(
+            select(1).where(
+                Invoice.customer_order_uuid == cls.uuid,
+                Invoice.is_deleted.is_(False),
+                Invoice.is_paid.is_(False)
+            )
+        )
 
     @hybrid_property
     def is_overdue(self):
-        # if all invoices are overdue status
-        return any([invoice.is_overdue for invoice in self.invoices if not invoice.is_deleted])
+        return any(
+            inv.is_overdue
+            for inv in self.invoices
+            if not inv.is_deleted
+        )
+
+    @is_overdue.expression
+    def is_overdue(cls):
+        # true if exists a non-deleted, overdue invoice
+        return exists(
+            select(1).where(
+                Invoice.customer_order_uuid == cls.uuid,
+                Invoice.is_deleted.is_(False),
+                Invoice.is_overdue.is_(True)
+            )
+        )
 
     @hybrid_property
-    def total_amount(self):
-        return sum([invoice.total_amount for invoice in self.invoices if not invoice.is_deleted])
+    def total_adjusted_amount(self):
+        return sum(
+            inv.total_adjusted_amount
+            for inv in self.invoices
+            if not inv.is_deleted
+        )
+
+    @total_adjusted_amount.expression
+    def total_adjusted_amount(cls):
+        # sum of all invoices' adjusted amounts
+        return (
+            select(func.coalesce(func.sum(Invoice.total_adjusted_amount), 0))
+            .where(
+                Invoice.customer_order_uuid == cls.uuid,
+                Invoice.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+
+    @hybrid_property
+    def net_amount_due(self):
+        return sum(
+            inv.net_amount_due
+            for inv in self.invoices
+            if not inv.is_deleted
+        )
+
+    @net_amount_due.expression
+    def net_amount_due(cls):
+        # sum of net due across invoices
+        return (
+            select(func.coalesce(func.sum(Invoice.net_amount_due), 0))
+            .where(
+                Invoice.customer_order_uuid == cls.uuid,
+                Invoice.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+
+    @hybrid_property
+    def net_amount_paid(self):
+        return sum(
+            inv.net_amount_paid
+            for inv in self.invoices
+            if not inv.is_deleted
+        )
+
+    @net_amount_paid.expression
+    def net_amount_paid(cls):
+        # sum of net paid across invoices
+        return (
+            select(func.coalesce(func.sum(Invoice.net_amount_paid), 0))
+            .where(
+                Invoice.customer_order_uuid == cls.uuid,
+                Invoice.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+
 class CustomerOrderItem(Base):
     __tablename__ = "customer_order_item"
 
@@ -187,7 +301,6 @@ class CustomerOrderItem(Base):
             f"quantity={self.quantity})>"
         )
 
-
 # ------------------------------
 # Invoice & Payment Models
 # ------------------------------
@@ -201,8 +314,8 @@ class Invoice(Base):
     customer_order_uuid = Column(String(36), ForeignKey("customer_order.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     currency = Column(String(120), nullable=False)
-    status = Column(String(120), nullable=False)  # e.g., void, pending, paid, etc.
-    paid_at = Column(DateTime, nullable=True)
+    # status = Column(String(120), nullable=False)  # e.g., void, pending, paid, etc.
+    # paid_at = Column(DateTime, nullable=True)
     due_date = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
@@ -212,37 +325,201 @@ class Invoice(Base):
     invoice_items = relationship("InvoiceItem", back_populates="invoice")
     payments = relationship("Payment", back_populates="invoice")
 
-    @property
+    @hybrid_property
+    def paid_at(self):
+        if self.status != "paid":
+            return None
+        return max(
+            payment.created_at
+            for payment in self.payments
+            if not payment.is_deleted
+        )
+
+    @paid_at.expression
+    def paid_at(cls):
+        return (
+            select(func.max(Payment.created_at))
+            .where(
+                Payment.invoice_uuid == cls.uuid,
+                Payment.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+
+    @hybrid_property
     def total_amount(self):
-        return sum(item.total_price for item in self.invoice_items if not item.is_deleted)
+        return sum(
+            item.total_price
+            for item in self.invoice_items
+            if not item.is_deleted
+        )
 
-    @property
-    def amount_paid(self):
-        return sum(payment.amount for payment in self.payments if not payment.is_deleted)
+    @total_amount.expression
+    def total_amount(cls):
+        return (
+            select(func.coalesce(func.sum(InvoiceItem.total_price), 0))
+            .where(
+                InvoiceItem.invoice_uuid == cls.uuid,
+                InvoiceItem.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
 
-    @property
-    def amount_due(self):
-        return self.total_amount - self.amount_paid
+    @hybrid_property
+    def total_adjusted_amount(self):
+        debit = sum(
+            dni.amount
+            for item in self.invoice_items
+            for dni in item.debit_note_items
+            if not dni.is_deleted
+        )
+        credit = sum(
+            cni.amount
+            for item in self.invoice_items
+            for cni in item.credit_note_items
+            if not cni.is_deleted
+        )
+        return self.total_amount + debit - credit
 
-    @property
+    @total_adjusted_amount.expression
+    def total_adjusted_amount(cls):
+        debit_sum = (
+            select(func.coalesce(func.sum(DebitNoteItem.amount), 0))
+            .select_from(InvoiceItem)
+            .join(DebitNoteItem, DebitNoteItem.invoice_item_uuid == InvoiceItem.uuid)
+            .where(
+                InvoiceItem.invoice_uuid == cls.uuid,
+                InvoiceItem.is_deleted.is_(False),
+                DebitNoteItem.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+        credit_sum = (
+            select(func.coalesce(func.sum(CreditNoteItem.amount), 0))
+            .select_from(InvoiceItem)
+            .join(CreditNoteItem, CreditNoteItem.invoice_item_uuid == InvoiceItem.uuid)
+            .where(
+                InvoiceItem.invoice_uuid == cls.uuid,
+                InvoiceItem.is_deleted.is_(False),
+                CreditNoteItem.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+        return cls.total_amount + debit_sum - credit_sum
+
+    @hybrid_property
+    def net_amount_paid(self):
+        direct = sum(
+            payment.amount
+            for payment in self.payments
+            if not payment.is_deleted
+        )
+        payouts = sum(
+            payout.amount
+            for item in self.invoice_items
+            for cni in item.credit_note_items
+            for payout in cni.payouts
+            if not (item.is_deleted or cni.is_deleted or payout.is_deleted)
+        )
+        debit_pay = sum(
+            payment.amount
+            for item in self.invoice_items
+            for dni in item.debit_note_items
+            for payment in dni.payments
+            if not (item.is_deleted or dni.is_deleted or payment.is_deleted)
+        )
+        return direct - payouts + debit_pay
+
+    @net_amount_paid.expression
+    def net_amount_paid(cls):
+        payment_sum = (
+            select(func.coalesce(func.sum(Payment.amount), 0))
+            .where(
+                Payment.invoice_uuid == cls.uuid,
+                Payment.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+        payouts_sum = (
+            select(func.coalesce(func.sum(Payout.amount), 0))
+            .select_from(InvoiceItem)
+            .join(CreditNoteItem, CreditNoteItem.invoice_item_uuid == InvoiceItem.uuid)
+            .join(Payout, Payout.credit_note_item_uuid == CreditNoteItem.uuid)
+            .where(
+                InvoiceItem.invoice_uuid == cls.uuid,
+                InvoiceItem.is_deleted.is_(False),
+                CreditNoteItem.is_deleted.is_(False),
+                Payout.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+        debit_pay_sum = (
+            select(func.coalesce(func.sum(Payment.amount), 0))
+            .select_from(InvoiceItem)
+            .join(DebitNoteItem, DebitNoteItem.invoice_item_uuid == InvoiceItem.uuid)
+            .join(Payment, Payment.debit_note_item_uuid == DebitNoteItem.uuid)
+            .where(
+                InvoiceItem.invoice_uuid == cls.uuid,
+                InvoiceItem.is_deleted.is_(False),
+                DebitNoteItem.is_deleted.is_(False),
+                Payment.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+        return payment_sum - payouts_sum + debit_pay_sum
+
+    @hybrid_property
+    def net_amount_due(self):
+        return self.total_adjusted_amount - self.net_amount_paid
+
+    @net_amount_due.expression
+    def net_amount_due(cls):
+        return cls.total_adjusted_amount - cls.net_amount_paid
+
+    @hybrid_property
     def is_paid(self):
-        return self.status == "paid"
+        return self.net_amount_due == 0
 
-    @property
+    @is_paid.expression
+    def is_paid(cls):
+        return cls.net_amount_due == literal(0)
+
+    @hybrid_property
+    def status(self):
+        if self.is_deleted:
+            return "void"
+        if self.is_paid:
+            return "paid"
+        return "pending"
+
+    @status.expression
+    def status(cls):
+        return case(
+            [
+                (cls.is_deleted, literal("void")),
+                (cls.is_paid,    literal("paid")),
+            ],
+            else_=literal("pending")
+        )
+
+    @hybrid_property
     def is_overdue(self) -> bool:
-        if not self.due_date:
+        if self.is_paid or not self.due_date:
             return False
-
-        # ensure due_date is aware; if it’s naïve, attach UTC
         due = (
             self.due_date
             if self.due_date.tzinfo is not None
             else self.due_date.replace(tzinfo=timezone.utc)
         )
+        return due < datetime.now(timezone.utc)
 
-        now = datetime.now(timezone.utc)
-        return due < now
-
+    @is_overdue.expression
+    def is_overdue(cls):
+        return and_(
+            cls.due_date.isnot(None),
+            cls.is_paid == false(),
+            cls.due_date < func.now()
+        )
     def __repr__(self):
         return (
             f"<Invoice(uuid={self.uuid}, total_amount={self.total_amount}, "
@@ -268,29 +545,64 @@ class InvoiceItem(Base):
     debit_note_items = relationship("DebitNoteItem", back_populates="invoice_item")
     credit_note_items = relationship("CreditNoteItem", back_populates="invoice_item")
 
-    @property
-    def total_price(self):
-        return self.price_per_unit * self.quantity
 
-    @property
-    def material(self):
-        return self.customer_order_item.material
-
-    @property
+    @hybrid_property
     def quantity(self):
         return self.customer_order_item.quantity
 
-    @property
+    @quantity.expression
+    def quantity(cls):
+        return (
+            select(CustomerOrderItem.quantity)
+            .where(CustomerOrderItem.uuid == cls.customer_order_item_uuid)
+            .scalar_subquery()
+        )
+
+    @hybrid_property
+    def total_price(self):
+        return self.price_per_unit * self.quantity
+
+    @total_price.expression
+    def total_price(cls):
+        return cls.price_per_unit * cls.quantity
+
+    @hybrid_property
+    def currency(self):
+        return self.invoice.currency
+
+    @currency.expression
+    def currency(cls):
+        return (
+            select(Invoice.currency)
+            .where(Invoice.uuid == cls.invoice_uuid)
+            .scalar_subquery()
+        )
+
+    @hybrid_property
+    def material_uuid(self):
+        return self.customer_order_item.material_uuid
+
+    @material_uuid.expression
+    def material_uuid(cls):
+        return (
+            select(CustomerOrderItem.material_uuid)
+            .where(CustomerOrderItem.uuid == cls.customer_order_item_uuid)
+            .scalar_subquery()
+        )
+
+    @hybrid_property
     def material_name(self):
         return self.customer_order_item.material.name
 
-    @property
-    def material_uuid(self):
-        return self.customer_order_item.material.uuid
+    @material_name.expression
+    def material_name(cls):
+        return (
+            select(Material.name)
+            .join(CustomerOrderItem, CustomerOrderItem.material_uuid == Material.uuid)
+            .where(CustomerOrderItem.uuid == cls.customer_order_item_uuid)
+            .scalar_subquery()
+        )
 
-    @property
-    def currency(self):
-        return self.invoice.currency
 
     def __repr__(self):
         return (
@@ -337,7 +649,7 @@ class FinancialAccount(Base):
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     account_name = Column(String(120), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    balance = Column(Float, nullable=False)
+    # balance = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
@@ -347,6 +659,34 @@ class FinancialAccount(Base):
     payouts = relationship("Payout", back_populates="financial_account")
     transactions_from = relationship("Transaction", foreign_keys="Transaction.from_account_uuid", back_populates="from_account")
     transactions_to = relationship("Transaction", foreign_keys="Transaction.to_account_uuid", back_populates="to_account")
+
+    @property
+    def balance(self):
+        transactions_in = sum(
+            transaction.to_amount
+            for transaction in self.transactions_to
+            if not transaction.is_deleted
+        )
+
+        transactions_out = sum(
+            transaction.from_amount
+            for transaction in self.transactions_from
+            if not transaction.is_deleted
+        )
+
+        payments = sum(
+            payment.amount
+            for payment in self.payments
+            if not payment.is_deleted
+        )
+
+        payouts = sum(
+            payout.amount
+            for payout in self.payouts
+            if not payout.is_deleted
+        )
+
+        return transactions_in - transactions_out + payments - payouts
 
     def __repr__(self):
         return f"<FinancialAccount(uuid={self.uuid}, account_name={self.account_name}, balance={self.balance})>"
@@ -406,7 +746,7 @@ class Vendor(Base):
         po_total = 0
         for po in self.purchase_orders:
             if not po.is_deleted and po.currency == currency:
-                po_total += po.amount_due
+                po_total += po.net_amount_due
 
         debit_note_total = 0
         for dni in self.debit_note_items:
@@ -494,8 +834,8 @@ class PurchaseOrder(Base):
     vendor_uuid = Column(String(36), ForeignKey("vendor.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     currency = Column(String(120), nullable=False)
-    status = Column(String(120), nullable=False)  # e.g., void, pending, paid, etc.
-    paid_at = Column(DateTime, nullable=True)
+    # status = Column(String(120), nullable=False)  # e.g., void, pending, paid, etc.
+    # paid_at = Column(DateTime, nullable=True)
     is_deleted = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)
     payout_due_date = Column(DateTime, nullable=True)
@@ -505,60 +845,153 @@ class PurchaseOrder(Base):
 
     @hybrid_property
     def total_amount(self):
-        return sum([item.total_price for item in self.purchase_order_items if not item.is_deleted])
+        return sum(
+            item.total_price
+            for item in self.purchase_order_items
+            if not item.is_deleted
+        )
+
+    @total_amount.expression
+    def total_amount(cls):
+        return (
+            select(func.coalesce(func.sum(PurchaseOrderItem.total_price), 0))
+            .where(
+                PurchaseOrderItem.purchase_order_uuid == cls.uuid,
+                PurchaseOrderItem.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
 
     @hybrid_property
-    def amount_paid(self):
-        return sum([payout.amount for payout in self.payouts if not payout.is_deleted])
+    def total_adjusted_amount(self):
+        return sum(
+            item.adjusted_total_price
+            for item in self.purchase_order_items
+            if not item.is_deleted
+        )
+
+    @total_adjusted_amount.expression
+    def total_adjusted_amount(cls):
+        return (
+            select(func.coalesce(func.sum(PurchaseOrderItem.adjusted_total_price), 0))
+            .where(
+                PurchaseOrderItem.purchase_order_uuid == cls.uuid,
+                PurchaseOrderItem.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
 
     @hybrid_property
-    def amount_due(self):
-        return self.total_amount - self.amount_paid
+    def net_amount_paid(self):
+        return sum(
+            payout.amount
+            for payout in self.payouts
+            if not payout.is_deleted
+        )
+
+    @net_amount_paid.expression
+    def net_amount_paid(cls):
+        return (
+            select(func.coalesce(func.sum(Payout.amount), 0))
+            .where(
+                Payout.purchase_order_uuid == cls.uuid,
+                Payout.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+
+    @hybrid_property
+    def net_amount_due(self):
+        return self.total_adjusted_amount - self.net_amount_paid
+
+    @net_amount_due.expression
+    def net_amount_due(cls):
+        return cls.total_adjusted_amount - cls.net_amount_paid
 
     @hybrid_property
     def is_paid(self):
-        return self.status == "paid"
+        return self.net_amount_due == 0
+
+    @is_paid.expression
+    def is_paid(cls):
+        return cls.net_amount_due == literal(0)
+
+    @hybrid_property
+    def status(self):
+        if self.is_deleted:
+            return "void"
+        if self.is_paid:
+            return "paid"
+        return "pending"
+
+    @status.expression
+    def status(cls):
+        return case(
+            [
+                (cls.is_deleted, literal("void")),
+                (cls.is_paid,    literal("paid")),
+            ],
+            else_=literal("pending")
+        )
 
     @hybrid_property
     def is_overdue(self):
-        # self.
-        return (not self.is_paid) and self.payout_due_date and self.payout_due_date < datetime.utcnow()
+        return (
+                not self.is_paid
+                and self.payout_due_date is not None
+                and self.payout_due_date < datetime.utcnow()
+        )
+
     @is_overdue.expression
     def is_overdue(cls):
-    # sql side: if the due date is in the past and the order is not paid
         return and_(
             cls.payout_due_date.isnot(None),
-            cls.payout_due_date < datetime.utcnow(),
-            cls.status != "paid",
+            cls.payout_due_date < func.now(),
+            cls.is_paid == literal(False)
         )
 
     @hybrid_property
     def is_fulfilled(self):
-        return all([item.is_fulfilled for item in self.purchase_order_items if not item.is_deleted])
+        return all(
+            item.is_fulfilled
+            for item in self.purchase_order_items
+            if not item.is_deleted
+        )
+
     @is_fulfilled.expression
     def is_fulfilled(cls):
-        # SQL-side: NOT EXISTS a non-deleted item that is NOT fulfilled
         return ~exists(
             select(1)
             .where(
                 PurchaseOrderItem.purchase_order_uuid == cls.uuid,
                 PurchaseOrderItem.is_deleted.is_(False),
-                PurchaseOrderItem.is_fulfilled.is_(False),
-                )
+                PurchaseOrderItem.is_fulfilled.is_(False)
+            )
         )
+
     @hybrid_property
     def fulfilled_at(self):
-        # Python‐side: only compute if fully fulfilled
         if not self.is_fulfilled:
             return None
-
-        # collect all non-deleted, non-null timestamps
         times = (
             item.fulfilled_at
             for item in self.purchase_order_items
             if not item.is_deleted and item.fulfilled_at is not None
         )
         return max(times, default=None)
+
+    @fulfilled_at.expression
+    def fulfilled_at(cls):
+        return (
+            select(func.max(PurchaseOrderItem.fulfilled_at))
+            .where(
+                PurchaseOrderItem.purchase_order_uuid == cls.uuid,
+                PurchaseOrderItem.is_deleted.is_(False),
+                PurchaseOrderItem.fulfilled_at.isnot(None)
+            )
+            .scalar_subquery()
+        )
+
 
 class PurchaseOrderItem(Base):
     __tablename__ = "purchase_order_item"
@@ -585,25 +1018,48 @@ class PurchaseOrderItem(Base):
     credit_note_items = relationship("CreditNoteItem", back_populates="purchase_order_item")
     inventory_events = relationship("InventoryEvent", back_populates="purchase_order_item")
 
-    @property
+    @hybrid_property
     def total_price(self):
         return self.quantity * self.price_per_unit
 
-    @property
+    @total_price.expression
+    def total_price(cls):
+        return cls.quantity * cls.price_per_unit
+
+    @hybrid_property
     def adjusted_quantity(self):
         debit_note_change = 0
         credit_note_change = 0
         for item in self.debit_note_items:
             if not item.is_deleted:
                 debit_note_change += item.inventory_change
-
         for item in self.credit_note_items:
             if not item.is_deleted:
                 credit_note_change += item.inventory_change
-
         return self.quantity + debit_note_change + credit_note_change
-    @property
-    def adjusted_total_price(self): # total price
+
+    @adjusted_quantity.expression
+    def adjusted_quantity(cls):
+        debit_sum = (
+            select(func.coalesce(func.sum(DebitNoteItem.inventory_change), 0))
+            .where(
+                DebitNoteItem.purchase_order_item_uuid == cls.uuid,
+                DebitNoteItem.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+        credit_sum = (
+            select(func.coalesce(func.sum(CreditNoteItem.inventory_change), 0))
+            .where(
+                CreditNoteItem.purchase_order_item_uuid == cls.uuid,
+                CreditNoteItem.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+        return cls.quantity + debit_sum + credit_sum
+
+    @hybrid_property
+    def adjusted_total_price(self):
         total_debit_note_price = 0
         total_credit_note_price = 0
         for item in self.debit_note_items:
@@ -612,15 +1068,40 @@ class PurchaseOrderItem(Base):
         for item in self.credit_note_items:
             if not item.is_deleted:
                 total_credit_note_price += item.amount
+        return self.total_price + total_debit_note_price - total_credit_note_price
 
-        return self.total_price + abs(total_debit_note_price) - abs(total_credit_note_price)
+    @adjusted_total_price.expression
+    def adjusted_total_price(cls):
+        debit_price_sum = (
+            select(func.coalesce(func.sum(DebitNoteItem.amount), 0))
+            .where(
+                DebitNoteItem.purchase_order_item_uuid == cls.uuid,
+                DebitNoteItem.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+        credit_price_sum = (
+            select(func.coalesce(func.sum(CreditNoteItem.amount), 0))
+            .where(
+                CreditNoteItem.purchase_order_item_uuid == cls.uuid,
+                CreditNoteItem.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+        return cls.total_price + debit_price_sum - credit_price_sum
 
-    @property
+    @hybrid_property
     def adjusted_price_per_unit(self):
         if self.adjusted_quantity == 0:
             return 0
         return self.adjusted_total_price / self.adjusted_quantity
 
+    @adjusted_price_per_unit.expression
+    def adjusted_price_per_unit(cls):
+        return case(
+            [(cls.adjusted_quantity == 0, literal(0))],
+            else_=cls.adjusted_total_price / cls.adjusted_quantity
+        )
     def __repr__(self):
         return (
             f"<PurchaseOrderItem(uuid={self.uuid}, material_name={self.material.name}, "
@@ -667,26 +1148,85 @@ class Expense(Base):
     category = Column(String(120), nullable=False)  # e.g., salary, etc.
     is_deleted = Column(Boolean, default=False)
     description = Column(Text, nullable=True)
-    status = Column(String(120), nullable=False)  # e.g., void, pending, paid, etc.
+    # status = Column(String(120), nullable=False)  # e.g., void, pending, paid, etc.
+
 
     # relations
     vendor = relationship("Vendor", back_populates="expenses")
     payouts = relationship("Payout", back_populates="expense")
 
-    @property
+    @hybrid_property
     def amount_paid(self):
-        return sum([payout.amount for payout in self.payouts if not payout.is_deleted])
+        return sum(
+            payout.amount
+            for payout in self.payouts
+            if not payout.is_deleted
+        )
 
-    @property
+    @amount_paid.expression
+    def amount_paid(cls):
+        return (
+            select(func.coalesce(func.sum(Payout.amount), 0))
+            .where(
+                Payout.expense_uuid == cls.uuid,
+                Payout.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+
+    @hybrid_property
     def amount_due(self):
         return self.amount - self.amount_paid
 
-    @property
+    @amount_due.expression
+    def amount_due(cls):
+        return cls.amount - cls.amount_paid
+
+    @hybrid_property
     def is_paid(self):
-        return self.status == "paid"
+        return self.amount_due == 0
 
+    @is_paid.expression
+    def is_paid(cls):
+        return cls.amount_due == literal(0)
 
+    @hybrid_property
+    def status(self):
+        if self.is_deleted:
+            return "void"
+        if self.is_paid:
+            return "paid"
+        return "pending"
 
+    @status.expression
+    def status(cls):
+        # void if deleted, paid if zero due, else pending
+        return case(
+            (cls.is_deleted, literal("void")),
+            (cls.is_paid,    literal("paid")),
+            else_=literal("pending")
+        )
+
+    @hybrid_property
+    def paid_at(self):
+        if not self.is_paid:
+            return None
+        times = (
+            payout.created_at
+            for payout in self.payouts
+            if not payout.is_deleted
+        )
+        return max(times, default=None)
+    @paid_at.expression
+    def paid_at(cls):
+        return (
+            select(func.max(Payout.created_at))
+            .where(
+                Payout.expense_uuid == cls.uuid,
+                Payout.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
 
 class Employee(Base):
     __tablename__ = "employee"
@@ -874,15 +1414,14 @@ class InventoryEvent(Base):
 
 class DebitNoteItem(Base):
     __tablename__ = "debit_note_item"
-
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
 
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
-    status = Column(String(120), nullable=False)  # e.g., void, pending, paid
-    paid_at = Column(DateTime, nullable=True)
+    # status = Column(String(120), nullable=False)  # e.g., void, pending, paid
+    # paid_at = Column(DateTime, nullable=True)
     invoice_item_uuid = Column(String(36), ForeignKey("invoice_item.uuid"), nullable=True)
     customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=True)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=True)
@@ -901,12 +1440,82 @@ class DebitNoteItem(Base):
     inventory_events = relationship("InventoryEvent", back_populates="debit_note_item")
     payments = relationship("Payment", back_populates="debit_note_item")
 
-    @property
+    @validates('amount')
+    def _validate_amount(self, key, value):
+        if value is None or value <= 0:
+            raise ValueError(f"'{key}' must be positive, got {value!r}")
+        return value
+
+
+    @hybrid_property
     def amount_paid(self):
-        return sum(payment.amount for payment in self.payments if not payment.is_deleted)
-    @property
+        return sum(
+            p.amount for p in self.payments if not p.is_deleted
+        )
+
+    @amount_paid.expression
+    def amount_paid(cls):
+        return (
+            select(func.coalesce(func.sum(Payment.amount), 0))
+            .where(
+                Payment.debit_note_item_uuid == cls.uuid,
+                Payment.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+
+    @hybrid_property
     def amount_due(self):
         return self.amount - self.amount_paid
+
+    @amount_due.expression
+    def amount_due(cls):
+        return cls.amount - cls.amount_paid
+
+    @hybrid_property
+    def status(self):
+        if self.is_deleted:
+            return "void"
+        if self.amount_due == 0:
+            return "paid"
+        return "pending"
+
+    @status.expression
+    def status(cls):
+        return case(
+            (cls.is_deleted, literal("void")),
+            (cls.amount_due == 0, literal("paid")),
+            else_=literal("pending")
+        )
+
+    @hybrid_property
+    def paid_at(self):
+        if self.amount_due != 0:
+            return None
+        payments = [p.created_at for p in self.payments if not p.is_deleted]
+        return max(payments, default=None)
+
+    @paid_at.expression
+    def paid_at(cls):
+        paid_subq = (
+            select(func.max(Payment.created_at))
+            .where(
+                Payment.debit_note_item_uuid == cls.uuid,
+                Payment.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+        return case(
+            (cls.amount_due == 0, paid_subq),
+            else_=literal(None)
+        )
+
+    @hybrid_property
+    def is_paid(self):
+        return self.amount_due == 0
+    @is_paid.expression
+    def is_paid(cls):
+        return cls.amount_due == literal(0)
 
     def __repr__(self):
         return f"<DebitNoteItem(uuid={self.uuid}, amount={self.amount}, status={self.status})>"
@@ -914,14 +1523,13 @@ class DebitNoteItem(Base):
 
 class CreditNoteItem(Base):
     __tablename__ = "credit_note_item"
-
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
-    status = Column(String(120), nullable=False)  # e.g., void, pending, paid
-    paid_at = Column(DateTime, nullable=True)
+    # status = Column(String(120), nullable=False)  # e.g., void, pending, paid
+    # paid_at = Column(DateTime, nullable=True)
     invoice_item_uuid = Column(String(36), ForeignKey("invoice_item.uuid"), nullable=True)
     customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=True)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=True)
@@ -940,15 +1548,80 @@ class CreditNoteItem(Base):
     vendor = relationship("Vendor", back_populates="credit_note_items")
     payouts = relationship("Payout", back_populates="credit_note_item")
 
-    @property
+    @validates('amount')
+    def _validate_amount(self, key, value):
+        if value is None or value <= 0:
+            raise ValueError(f"'{key}' must be positive, got {value!r}")
+        return value
+
+
+    @hybrid_property
     def amount_paid(self):
-        return sum(payout.amount for payout in self.payouts if not payout.is_deleted)
-    @property
+        return sum(
+            p.amount for p in self.payouts if not p.is_deleted
+        )
+
+    @amount_paid.expression
+    def amount_paid(cls):
+        return (
+            select(func.coalesce(func.sum(Payout.amount), 0))
+            .where(
+                Payout.credit_note_item_uuid == cls.uuid,
+                Payment.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+
+    @hybrid_property
     def amount_due(self):
         return self.amount - self.amount_paid
 
-    def __repr__(self):
-        return f"<CreditNoteItem(uuid={self.uuid}, amount={self.amount}, status={self.status})>"
+    @amount_due.expression
+    def amount_due(cls):
+        return cls.amount - cls.amount_paid
 
+    @hybrid_property
+    def status(self):
+        if self.is_deleted:
+            return "void"
+        if self.amount_due == 0:
+            return "paid"
+        return "pending"
 
+    @status.expression
+    def status(cls):
+        return case(
+            (cls.is_deleted, literal("void")),
+            (cls.amount_due == 0, literal("paid")),
+            else_=literal("pending")
+        )
+
+    @hybrid_property
+    def paid_at(self):
+        if self.amount_due != 0:
+            return None
+        payouts = [p.created_at for p in self.payouts if not p.is_deleted]
+        return max(payouts, default=None)
+
+    @paid_at.expression
+    def paid_at(cls):
+        paid_subq = (
+            select(func.max(Payout.created_at))
+            .where(
+                Payout.credit_note_item_uuid == cls.uuid,
+                Payout.is_deleted.is_(False)
+            )
+            .scalar_subquery()
+        )
+        return case(
+            (cls.amount_due == 0, paid_subq),
+            else_=literal(None)
+        )
+
+    @hybrid_property
+    def is_paid(self):
+        return self.amount_due == 0
+    @is_paid.expression
+    def is_paid(cls):
+        return cls.amount_due == literal(0)
 

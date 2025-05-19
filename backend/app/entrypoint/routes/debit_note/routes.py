@@ -70,7 +70,8 @@ def list_debit_note_items():
         filters.append(DebitNoteItemModel.vendor_uuid == params.vendor_uuid)
     if params.status:
         filters.append(DebitNoteItemModel.status == params.status.value)
-
+    if params.is_paid is not None:
+        filters.append(DebitNoteItemModel.is_paid == params.is_paid)
     with SqlAlchemyUnitOfWork() as uow:
         page = uow.debit_note_item_repository.find_all_by_filters_paginated(
             filters=filters,

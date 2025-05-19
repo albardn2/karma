@@ -16,7 +16,7 @@ class DebitNoteItemDomain:
 
 
         item = DebitNoteItemModel(**payload.model_dump(mode="json"))
-        item.status = InvoiceStatus.PENDING.value
+        # item.status = InvoiceStatus.PENDING.value
         uow.debit_note_item_repository.save(model=item, commit=False)
 
         if item.invoice_item_uuid:

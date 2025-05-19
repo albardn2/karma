@@ -20,7 +20,7 @@ class InvoiceDomain:
         """
         data = payload.model_dump()
         inv = InvoiceModel(**data)
-        inv.status = InvoiceStatus.PENDING.value
+        # inv.status = InvoiceStatus.PENDING.value
         inv.currency = payload.currency.value
         uow.invoice_repository.save(model=inv, commit=False)
         return InvoiceRead.from_orm(inv)
