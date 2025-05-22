@@ -88,6 +88,8 @@ def list_customers():
     # Parse & validate pagination params
     params = CustomerListParams(**request.args)
     filters = [CustomerModel.is_deleted == False]
+    if params.uuid:
+        filters.append(CustomerModel.uuid == params.uuid)
     if params.category:
         filters.append(CustomerModel.category == params.category.value)
     if params.customer_uuid:

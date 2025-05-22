@@ -35,6 +35,7 @@ class PaymentDomain:
                 raise NotFoundError('Financial account not found')
         data = payload.model_dump(mode='json')
         pay = PaymentModel(**data)
+        uow.payment_repository.save(model=pay, commit=False)
         pay.financial_account = financial_account
         if pay.financial_account.currency != payload.currency.value:
             raise BadRequestError(
@@ -51,37 +52,17 @@ class PaymentDomain:
                     f"Currency mismatch: {pay.debit_note_item.currency} != {payload.currency.value}"
                 )
 
-        if pay.invoice:
-            if pay.invoice.status == InvoiceStatus.PAID.value:
-                raise BadRequestError(
-                    f"Invoice {pay.invoice.uuid} is already paid"
-                )
-        if pay.debit_note_item:
-            if pay.debit_note_item.status == InvoiceStatus.PAID.value:
-                raise BadRequestError(
-                    f"DebitNoteItem {pay.debit_note_item.uuid} is already paid"
-                )
 
-        if pay.invoice and pay.invoice.amount_paid > pay.invoice.total_amount:
+        if pay.invoice and pay.invoice.net_amount_due < 0:
             raise BadRequestError(
-                f"Payment amount {pay.invoice.amount_paid} is greater than invoice amount {pay.invoice.total_amount}"
+                f"payment amount {pay.amount} is larger than payment due"
             )
 
-        if pay.debit_note_item and pay.debit_note_item.amount_paid> pay.debit_note_item.amount:
+        if pay.debit_note_item and pay.debit_note_item.amount_due < 0:
             raise BadRequestError(
                 f"Payment amount {pay.amount} is greater than debit note item amount {pay.debit_note_item.amount}"
             )
 
-        # if pay.invoice and pay.invoice.amount_due == 0:
-        #     pay.invoice.status = InvoiceStatus.PAID.value
-        #     pay.invoice.paid_at = datetime.now()
-
-        # if pay.debit_note_item and pay.debit_note_item.amount_due == 0:
-        #     pay.debit_note_item.status = InvoiceStatus.PAID.value
-        #     pay.debit_note_item.paid_at = datetime.now()
-
-
-        uow.payment_repository.save(model=pay, commit=False)
         # financial_account.balance += pay.amount
         return PaymentRead.from_orm(pay)
 

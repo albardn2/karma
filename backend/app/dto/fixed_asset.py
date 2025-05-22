@@ -5,8 +5,7 @@ from datetime import datetime
 class FixedAssetBase(BaseModel):
     name:                         str
     description:                  Optional[str] = None
-    purchase_date:                datetime
-    current_value:                float
+    purchase_date:                Optional[datetime] = None
     annual_depreciation_rate:     float  # percentage
     purchase_order_item_uuid:     Optional[str] = None
     material_uuid:                Optional[str] = None
@@ -27,7 +26,6 @@ class FixedAssetUpdate(BaseModel):
     name:                         Optional[str]     = None
     description:                  Optional[str]     = None
     purchase_date:                Optional[datetime] = None
-    current_value:                Optional[float]   = None
     annual_depreciation_rate:     Optional[float]   = None
     quantity:                     Optional[float]   = None
     price_per_unit:              Optional[float]   = None
@@ -42,6 +40,7 @@ class FixedAssetRead(FixedAssetBase):
     quantity:        float
     price_per_unit: float
     total_price:   float
+    current_value: float
 
 
 class FixedAssetListParams(BaseModel):

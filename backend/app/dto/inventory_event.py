@@ -21,7 +21,7 @@ class InventoryEventType(str, Enum):
 class InventoryEventBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
     created_by_uuid: Optional[str] = None
-    inventory_uuid: Optional[str] = str
+    inventory_uuid: str
     purchase_order_item_uuid: Optional[str] = None
     process_uuid: Optional[str] = None
     customer_order_item_uuid: Optional[str] = None

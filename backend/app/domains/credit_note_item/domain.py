@@ -9,21 +9,29 @@ from models.common import CreditNoteItem as CreditNoteItemModel
 from app.domains.inventory_event.domain import InventoryEventDomain
 from app.dto.inventory_event import InventoryEventCreate, InventoryEventType
 from app.dto.invoice import InvoiceStatus
+from app.domains.payout.domain import PayoutDomain
+from app.dto.payout import PayoutCreate
 
 
 class CreditNoteItemDomain:
     @staticmethod
     def create_item(uow: SqlAlchemyUnitOfWork, payload: CreditNoteItemCreate) -> CreditNoteItemRead:
 
-
-        item = CreditNoteItemModel(**payload.model_dump(mode="json"))
-        # item.status = InvoiceStatus.PENDING.value
+        data = payload.model_dump(mode="json")
+        create_payout = data.pop("create_payout", False)
+        item = CreditNoteItemModel(**data)
         uow.credit_note_item_repository.save(model=item, commit=False)
+
 
         if item.invoice_item_uuid:
             invoice_item = uow.invoice_item_repository.find_one(uuid=item.invoice_item_uuid, is_deleted=False)
             if not invoice_item:
                 raise NotFoundError("InvoiceItem not found")
+
+            invoice = invoice_item.invoice
+            if invoice.net_amount_due < 0:
+                raise BadRequestError("Invoice amount due is negative")
+
             item.customer_uuid = invoice_item.invoice.customer_uuid
             item.customer_order_item_uuid = invoice_item.customer_order_item_uuid
             if item.amount > invoice_item.total_price or item.currency != invoice_item.currency:
@@ -57,6 +65,10 @@ class CreditNoteItemDomain:
             if not purchase_order_item:
                 raise NotFoundError("PurchaseOrderItem not found")
 
+            purchase_order = purchase_order_item.purchase_order
+            if purchase_order.net_amount_due < 0:
+                raise BadRequestError("PurchaseOrder amount due is negative")
+
             item.vendor_uuid = purchase_order_item.purchase_order.vendor_uuid
             if item.amount > purchase_order_item.total_price or item.currency != purchase_order_item.currency:
                 raise BadRequestError("CreditNoteItem amount and currency must match PurchaseOrderItem")
@@ -84,6 +96,17 @@ class CreditNoteItemDomain:
                     payload=payload
                 )
 
+        if create_payout:
+            payout_create = PayoutCreate(
+                credit_note_item_uuid=item.uuid,
+                amount=item.amount,
+                currency=item.currency,
+                notes="auto")
+            PayoutDomain.create_payout(
+                uow=uow,
+                payload=payout_create
+            )
+        uow.session.refresh(item)
         return CreditNoteItemRead.from_orm(item)
 
 
@@ -97,8 +120,8 @@ class CreditNoteItemDomain:
         if payouts:
             raise BadRequestError("CreditNoteItem cannot be deleted, it has payouts")
         inv_events = uow.inventory_event_repository.find_all(credit_note_item_uuid=m.uuid, is_deleted=False)
-        if inv_events:
-            raise BadRequestError("CreditNoteItem cannot be deleted, it has inventory events")
+        for event in inv_events:
+            InventoryEventDomain.delete_inventory_event(uow=uow, uuid=event.uuid)
 
         m.is_deleted = True
         uow.credit_note_item_repository.save(model=m, commit=False)

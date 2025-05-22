@@ -23,7 +23,7 @@ def create_warehouse():
     with SqlAlchemyUnitOfWork() as uow:
         data = payload.model_dump(mode='json',exclude_unset=True)
         wh = WarehouseModel(**data)
-        if uow.warehouse_repository.find_one(name=wh.name):
+        if uow.warehouse_repository.find_first(name=wh.name):
             raise BadRequestError("Warehouse with this name already exists")
         uow.warehouse_repository.save(model=wh, commit=True)
         result = WarehouseRead.from_orm(wh).model_dump(mode='json')
@@ -58,7 +58,7 @@ def delete_warehouse(uuid: str):
         wh = uow.warehouse_repository.find_one(uuid=uuid, is_deleted=False)
         if not wh:
             raise NotFoundError("Warehouse not found")
-        if uow.inventory_repository.find_one(warehouse_uuid=wh.uuid, is_deleted=False):
+        if uow.inventory_repository.find_first(warehouse_uuid=wh.uuid, is_deleted=False):
             raise BadRequestError("Cannot delete warehouse, inventories exist")
         wh.is_deleted = True
         uow.warehouse_repository.save(model=wh, commit=True)

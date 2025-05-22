@@ -8,6 +8,10 @@ from models.common import PurchaseOrderItem as PurchaseOrderItemModel
 from app.entrypoint.routes.common.errors import NotFoundError, BadRequestError
 from app.dto.purchase_order_item import PurchaseOrderItemBulkFulfill
 from app.domains.purchase_order_item.fulfillment_handlers.fulfillment_handler_entrypoint import PurchaseOrderItemFulfillmentHandler
+from app.dto.purchase_order_item import PurchaseOrderItemBulkUnFulfill
+from app.domains.inventory.domain import InventoryDomain
+from app.domains.inventory_event.domain import InventoryEventDomain
+from app.dto.inventory_event import InventoryEventType
 
 
 class PurchaseOrderItemDomain:
@@ -36,6 +40,41 @@ class PurchaseOrderItemDomain:
         return [PurchaseOrderItemRead.from_orm(po_item) for po_item in items]
 
 
+    @staticmethod
+    def unfulfill_items(uow: SqlAlchemyUnitOfWork, payload: PurchaseOrderItemBulkUnFulfill) -> list[PurchaseOrderItemRead]:
+        items = []
+        for item in payload.items:
+            po_item = uow.purchase_order_item_repository.find_one(uuid=item.purchase_order_item_uuid, is_deleted=False)
+            if not po_item:
+                raise NotFoundError("PurchaseOrderItem not found")
+            if not po_item.is_fulfilled:
+                raise BadRequestError("PurchaseOrderItem already unfulfilled")
+            po_item.is_fulfilled = False
+            po_item.fulfilled_at = None
+
+            # delete event
+            inventory_events = [event for event in po_item.inventory_events if not event.is_deleted and event.event_type == InventoryEventType.PURCHASE_ORDER.value]
+            if len(inventory_events) !=1:
+                raise BadRequestError("PO inventory event count is not 1")
+            InventoryEventDomain.delete_inventory_event(
+                uow=uow,
+                uuid=inventory_events[0].uuid
+
+            )
+
+            uow.inventory_event_repository.save(model=inventory_events[0], commit=False)
+
+            # delete inventory entry if no event are attached, else raise exception
+            InventoryDomain.delete_inventory(
+                uow=uow,
+                uuid=inventory_events[0].inventory_uuid
+            )
+            items.append(po_item)
+
+
+
+        uow.purchase_order_item_repository.batch_save(models=items, commit=False)
+        return [PurchaseOrderItemRead.from_orm(po_item) for po_item in items]
 
 
 

@@ -9,6 +9,8 @@ from app.entrypoint.routes.common.errors import NotFoundError
 
 from app.dto.invoice import InvoiceUpdate
 
+from app.entrypoint.routes.common.errors import BadRequestError
+
 
 class InvoiceDomain:
 
@@ -51,7 +53,22 @@ class InvoiceDomain:
         if not inv:
             raise NotFoundError('Invoice not found')
 
+        InvoiceDomain.validate_delete_invoice(invoice=inv)
+
         inv.is_deleted = True
-        inv.status = InvoiceStatus.VOID.value
         uow.invoice_repository.save(model=inv, commit=False)
         return InvoiceRead.from_orm(inv)
+
+    @staticmethod
+    def validate_delete_invoice(
+        invoice: InvoiceModel
+    ):
+        """
+        Validate if an invoice can be deleted.
+        """
+        payments= [
+            payment for payment in invoice.payments if not payment.is_deleted
+        ]
+        if payments:
+            raise BadRequestError("Cannot delete an invoice with payments.")
+

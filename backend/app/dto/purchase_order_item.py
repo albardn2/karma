@@ -14,7 +14,7 @@ class PurchaseOrderItemBase(BaseModel):
     quantity:            int
     price_per_unit:      float
     currency:            Optional[Currency] = None
-    unit:                UnitOfMeasure
+    unit:                Optional[UnitOfMeasure] = None
 
 class PurchaseOrderItemCreate(PurchaseOrderItemBase):
     """Fields required to create a new purchase order item."""
@@ -86,6 +86,23 @@ class POFulfillItem(BaseModel):
     warehouse_uuid: Optional[str] = None
     inventory_uuid: Optional[str] = None
 
+    # validate that either warehouse_uuid or inventory_uuid is provided
+    # after
+    @model_validator(mode="after")
+    def check_warehouse_or_inventory(self):
+        if not self.warehouse_uuid and not self.inventory_uuid:
+            raise BadRequestError("Either warehouse_uuid or inventory_uuid must be provided.")
+        return self
+
 class PurchaseOrderItemBulkFulfill(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: List[POFulfillItem]
+
+class POUnFulfillItem(BaseModel):
+    """Schema for unfulfilling a purchase order item."""
+    model_config = ConfigDict(extra="forbid")
+    purchase_order_item_uuid: str
+
+class PurchaseOrderItemBulkUnFulfill(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: List[POUnFulfillItem]

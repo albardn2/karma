@@ -61,7 +61,7 @@ def delete_pricing(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         pr = uow.pricing_repository.find_one(uuid=uuid, is_deleted=False)
         if not pr:
-            return jsonify({'message': 'Pricing not found'}), 404
+            raise NotFoundError("Pricing not found")
 
         pr.is_deleted = True
         uow.pricing_repository.save(model=pr, commit=True)

@@ -16,6 +16,8 @@ from app.domains.customer_order_item.domain import CustomerOrderItemDomain
 from app.dto.customer_order_item import CustomerOrderItemBulkFulfill
 from app.dto.customer_order_item import CustomerOrderItemBulkDelete
 
+from app.dto.customer_order_item import CustomerOrderItemBulkUnFulfill
+
 
 @customer_order_item_blueprint.route('/bulk-create', methods=['POST'])
 def create_order_items():
@@ -71,6 +73,18 @@ def fulfill_order_items():
             payload=payload)
         uow.commit()
     return jsonify(bulk_read.model_dump(mode='json')), 200
+
+@customer_order_item_blueprint.route('/unfulfill-items', methods=['POST'])
+def unfulfill_order_items():
+    payload = CustomerOrderItemBulkUnFulfill(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        bulk_read = CustomerOrderItemDomain.unfulfill_items(
+            uow=uow,
+            payload=payload
+        )
+        uow.commit()
+    return jsonify(bulk_read.model_dump(mode='json')), 200
+
 
 @customer_order_item_blueprint.route('/bulk-delete', methods=['DELETE'])
 def delete_order_items():

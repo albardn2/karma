@@ -33,11 +33,10 @@ class InventoryFulfillmentHandler:
         event_read = InventoryEventDomain.create_inventory_event(
             uow=uow,
             payload=InventoryEventCreate(
-                quantity=abs(po_item.quantity),
+                quantity=po_item.quantity,
                 event_type=InventoryEventType.PURCHASE_ORDER,
                 purchase_order_item_uuid=po_item.uuid,
                 inventory_uuid=inventory_uuid,
                 affect_original=True,
-            )
-            )
+            ))
         return event_read

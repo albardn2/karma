@@ -834,8 +834,6 @@ class PurchaseOrder(Base):
     vendor_uuid = Column(String(36), ForeignKey("vendor.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     currency = Column(String(120), nullable=False)
-    # status = Column(String(120), nullable=False)  # e.g., void, pending, paid, etc.
-    # paid_at = Column(DateTime, nullable=True)
     is_deleted = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)
     payout_due_date = Column(DateTime, nullable=True)
@@ -1260,8 +1258,7 @@ class FixedAsset(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     name = Column(String(120), nullable=False)
     description = Column(Text, nullable=True)
-    purchase_date = Column(DateTime, nullable=False)
-    current_value = Column(Float, nullable=False)
+    purchase_date = Column(DateTime, nullable=False,default=datetime.utcnow)
     annual_depreciation_rate = Column(Float, nullable=False)  # in percentage
     purchase_order_item_uuid = Column(String(36), ForeignKey("purchase_order_item.uuid"), nullable=True)
     is_deleted = Column(Boolean, default=False)
@@ -1273,6 +1270,12 @@ class FixedAsset(Base):
     purchase_order_item = relationship("PurchaseOrderItem", back_populates="fixed_asset")
     material = relationship("Material", back_populates="fixed_assets")
 
+    @property
+    def current_value(self):
+        # Calculate the current value based on the purchase date and annual depreciation rate
+        years = (datetime.utcnow() - self.purchase_date).days / 365.25
+        depreciation = (self.annual_depreciation_rate / 100) * years
+        return (self.price_per_unit * self.quantity) * (1 - depreciation)
 
     def __repr__(self):
         return (

@@ -65,10 +65,7 @@ def delete_expense(uuid: str):
 @expense_blueprint.route('/', methods=['GET'])
 def list_expenses():
     # Parse & validate query & pagination params
-    try:
-        params = ExpenseListParams(**request.args)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
+    params = ExpenseListParams(**request.args)
 
     # Build filters list based on DTO
     filters = [ExpenseModel.is_deleted == False]

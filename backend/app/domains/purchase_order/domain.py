@@ -19,11 +19,21 @@ class PurchaseOrderDomain:
 
         po = PurchaseOrderDomain.create_purchase_order(uow=uow, payload=payload.to_purchase_order_create())
         for item in payload.purchase_order_items:
+            material = uow.material_repository.find_one(uuid=item.material_uuid, is_deleted=False)
+            if not material:
+                raise NotFoundError("Material not found")
+
             item.purchase_order_uuid = po.uuid
             item.currency = po.currency
+            if item.unit:
+                valid_unit = item.unit == material.measure_unit
+                if not valid_unit:
+                    raise BadRequestError(f"Invalid unit: {item.unit}. Expected: {material.measure_unit}")
+            else:
+                # Set the unit to the material's unit if not provided
+                item.unit = material.measure_unit
         PurchaseOrderItemDomain.create_items(uow=uow, items=payload.purchase_order_items)
         return PurchaseOrderRead.from_orm(po)
-
 
 
     # ------------------------------------------------------------------
@@ -36,7 +46,6 @@ class PurchaseOrderDomain:
         """
         data = payload.model_dump(exclude_unset=True)
         po = PurchaseOrderModel(**data)
-        # po.status = PurchaseOrderStatus.PENDING.value
         uow.purchase_order_repository.save(model=po, commit=False)
         return po
 
@@ -68,7 +77,6 @@ class PurchaseOrderDomain:
         PurchaseOrderItemDomain.delete_items(uow=uow, uuids=po_item_uuids)
         po.is_deleted = True
         uow.purchase_order_repository.save(model=po, commit=False)
-        print(po.__dict__)
         return PurchaseOrderRead.from_orm(po)
 
     @staticmethod
@@ -80,5 +88,5 @@ class PurchaseOrderDomain:
         if payouts:
             raise BadRequestError("PurchaseOrder has payout")
 
-        if po.status == PurchaseOrderStatus.PAID.value or po.amount_paid > 0:
+        if po.is_paid or po.net_amount_paid > 0:
             raise BadRequestError("PurchaseOrder has been paid or partially paid")

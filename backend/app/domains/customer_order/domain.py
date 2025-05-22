@@ -64,6 +64,10 @@ class CustomerOrderDomain:
         if not invoice:
             raise NotFoundError("Invoice not found")
         invoice_read = InvoiceRead.from_orm(invoice)
+
+        # refresh customer order read:
+        customer_order = uow.customer_order_repository.find_one(uuid=customer_order_read.uuid,is_deleted=False)
+        customer_order_read = CustomerOrderRead.from_orm(customer_order)
         result = CustomerOrderWithItemsAndInvoiceRead(
             customer_order=customer_order_read,
             invoices=[invoice_read],
@@ -87,11 +91,6 @@ class CustomerOrderDomain:
             payload=payload,
             uow=uow
         )
-        for invoice in order.invoices:
-            InvoiceDomain.delete_invoice(
-                uuid=invoice.uuid,
-                uow=uow
-            )
         # delete invoice items
         for invoice in order.invoices:
             payload = InvoiceItemBulkDelete(
@@ -101,11 +100,18 @@ class CustomerOrderDomain:
                 uow=uow,
                 payload=payload
             )
+        for invoice in order.invoices:
+            InvoiceDomain.delete_invoice(
+                uuid=invoice.uuid,
+                uow=uow
+            )
         # delete customer order
         order.is_deleted = True
         uow.customer_order_repository.save(model=order, commit=False)
         result = CustomerOrderWithItemsAndInvoiceRead.from_customer_order_model(order)
         return result
+
+
 
     # ------------------------------------ CUSTOMER ORDER -----------------------------------
     @staticmethod
@@ -154,6 +160,12 @@ class CustomerOrderDomain:
             raise BadRequestError("Cannot delete a fulfilled customer order.")
 
         for invoice in customer_order.invoices:
-            if (not invoice.is_deleted) and invoice.is_paid or invoice.amount_paid > 0:
+            payments = [
+                payment for payment in invoice.payments if not payment.is_deleted
+            ]
+            if payments:
+                raise BadRequestError("Cannot delete a customer order with paid invoices.")
+
+            if (not invoice.is_deleted) and invoice.is_paid or invoice.net_amount_paid > 0:
                 raise BadRequestError("Cannot delete a customer order with paid invoices.")
 

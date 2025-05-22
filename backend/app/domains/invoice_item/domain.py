@@ -5,6 +5,9 @@ from models.common import InvoiceItem as InvoiceItemModel
 from app.entrypoint.routes.common.errors import NotFoundError
 from app.dto.invoice_item import InvoiceItemRead
 from app.dto.invoice_item import InvoiceItemBulkDelete
+from models.common import InvoiceItem
+
+from app.entrypoint.routes.common.errors import BadRequestError
 
 
 class InvoiceItemDomain:
@@ -44,6 +47,7 @@ class InvoiceItemDomain:
             item = uow.invoice_item_repository.find_one(uuid=item_uuid, is_deleted=False)
             if not item:
                 raise NotFoundError('InvoiceItem not found')
+            InvoiceItemDomain.validate_item_delete(item=item)
             item.is_deleted = True
             items.append(item)
 
@@ -51,3 +55,17 @@ class InvoiceItemDomain:
         return InvoiceItemBulkRead(
             items=[InvoiceItemRead.from_orm(item) for item in items]
         )
+
+    @staticmethod
+    def validate_item_delete(
+        item: InvoiceItem
+    ):
+        """
+        Validate if invoice items can be deleted.
+        """
+        debit_notes = [dn for dn in item.debit_note_items if not dn.is_deleted]
+        credit_notes = [cn for cn in item.credit_note_items if not cn.is_deleted]
+        if debit_notes or credit_notes:
+            raise BadRequestError(
+                f"InvoiceItem {item.uuid} cannot be deleted because it is referenced by debit notes {debit_notes} or credit notes {credit_notes}"
+            )

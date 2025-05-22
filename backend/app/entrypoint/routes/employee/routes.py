@@ -12,15 +12,13 @@ from app.dto.employee import (
 from models.common import Employee as EmployeeModel
 
 from app.entrypoint.routes.employee import employee_blueprint
+from app.entrypoint.routes.common.errors import NotFoundError
+from app.entrypoint.routes.common.errors import BadRequestError
 
 
 @employee_blueprint.route('/', methods=['POST'])
 def create_employee():
-    try:
-        payload = EmployeeCreate(**request.json)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = EmployeeCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
         data = payload.model_dump(mode='json')
         emp = EmployeeModel(**data)
@@ -35,24 +33,19 @@ def get_employee(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         emp = uow.employee_repository.find_one(uuid=uuid, is_deleted=False)
         if not emp:
-            return jsonify({'message': 'Employee not found'}), 404
+            raise NotFoundError('Employee not found')
         employee_data = EmployeeRead.from_orm(emp).model_dump(mode='json')
     return jsonify(employee_data), 200
 
 
 @employee_blueprint.route('/<string:uuid>', methods=['PUT'])
 def update_employee(uuid: str):
-    try:
-        payload = EmployeeUpdate(**request.json)
-        data = payload.model_dump(exclude_unset=True, mode='json')
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    payload = EmployeeUpdate(**request.json)
+    data = payload.model_dump(exclude_unset=True, mode='json')
     with SqlAlchemyUnitOfWork() as uow:
-        emp = uow.employee_repository.find_one(uuid=uuid)
-        if not emp or emp.is_deleted:
-            return jsonify({'message': 'Employee not found'}), 404
-
+        emp = uow.employee_repository.find_one(uuid=uuid, is_deleted=False)
+        if not emp:
+            raise NotFoundError('Employee not found')
         for field, val in data.items():
             setattr(emp, field, val)
         uow.employee_repository.save(model=emp, commit=True)
@@ -64,9 +57,13 @@ def update_employee(uuid: str):
 @employee_blueprint.route('/<string:uuid>', methods=['DELETE'])
 def delete_employee(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
-        emp = uow.employee_repository.find_one(uuid=uuid)
-        if not emp or emp.is_deleted:
-            return jsonify({'message': 'Employee not found'}), 404
+        emp = uow.employee_repository.find_one(uuid=uuid, is_deleted=False)
+        if not emp:
+            raise NotFoundError('Employee not found')
+
+        payouts = [p for p in emp.payouts if not p.is_deleted]
+        if payouts:
+            raise BadRequestError('Cannot delete employee with active payouts')
 
         emp.is_deleted = True
         uow.employee_repository.save(model=emp, commit=True)
@@ -78,18 +75,13 @@ def delete_employee(uuid: str):
 @employee_blueprint.route('/', methods=['GET'])
 def list_employees():
     # Parse & validate pagination params
-    try:
-        params = EmployeeListParams(**request.args)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    params = EmployeeListParams(**request.args)
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.employee_repository.find_all_paginated(
             page=params.page,
             per_page=params.per_page,
             is_deleted=False
         )
-
         items = [
             EmployeeRead.from_orm(e).model_dump(mode='json')
             for e in page_obj.items

@@ -13,6 +13,7 @@ from models.common import PurchaseOrderItem as PurchaseOrderItemModel
 from app.entrypoint.routes.purchase_order_item import poi_blueprint
 from app.domains.purchase_order_item.domain import PurchaseOrderItemDomain
 from app.dto.purchase_order_item import PurchaseOrderItemBulkFulfill
+from app.dto.purchase_order_item import PurchaseOrderItemBulkUnFulfill
 
 
 @poi_blueprint.route('/fulfill-items', methods=['POST'])
@@ -20,6 +21,16 @@ def fulfill_order_items():
     payload = PurchaseOrderItemBulkFulfill(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
         bulk_read = PurchaseOrderItemDomain.fulfill_items(
+            uow=uow,
+            payload=payload)
+        uow.commit()
+    return jsonify([r.model_dump(mode='json') for r in bulk_read]), 200
+
+@poi_blueprint.route('/unfulfill-items', methods=['POST'])
+def unfulfill_order_items():
+    payload = PurchaseOrderItemBulkUnFulfill(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        bulk_read = PurchaseOrderItemDomain.unfulfill_items(
             uow=uow,
             payload=payload)
         uow.commit()

@@ -13,6 +13,8 @@ class CustomerCategory(str, Enum):
     RESTAURANT = "restaurant"
     MINIMARKET = "minimarket"
     SUPERMARKET = "supermarket"
+    DISTRIBUTER = "distributer"
+
 
 
 class CustomerBase(BaseModel):
@@ -68,6 +70,7 @@ class CustomerReadList(BaseModel):
 class CustomerListParams(BaseModel):
     """Pagination parameters for listing customers."""
     model_config = ConfigDict()
+    uuid: Optional[UUID] = None
     category: Optional[CustomerCategory] = None
     customer_uuid: Optional[str] = None
     email_address: Optional[str] = None

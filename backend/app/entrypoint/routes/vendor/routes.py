@@ -25,7 +25,7 @@ def create_vendor():
     payload = VendorCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
         if payload.email_address:
-            existing_vendor = uow.vendor_repository.find_one(email_address=payload.email_address)
+            existing_vendor = uow.vendor_repository.find_first(email_address=payload.email_address)
             if existing_vendor:
                 raise BadRequestError(f"Email address {payload.email_address} already exists")
         data = payload.model_dump(mode='json')
@@ -75,6 +75,13 @@ def delete_vendor(uuid: str):
         # find relations:  purchase orders
         if uow.purchase_order_repository.find_first(vendor_uuid=uuid,is_deleted=False):
             raise BadRequestError(f"Vendor {uuid} has purchase orders")
+        # find debit notes
+        if uow.debit_note_repository.find_first(vendor_uuid=uuid,is_deleted=False):
+            raise BadRequestError(f"Vendor {uuid} has debit notes")
+        # find credit notes
+        if uow.credit_note_repository.find_first(vendor_uuid=uuid,is_deleted=False):
+            raise BadRequestError(f"Vendor {uuid} has credit notes")
+
         for k,val in v.balance_per_currency.items():
             if val != 0:
                 raise BadRequestError(f"Vendor {uuid} has balance {val} in {k}")

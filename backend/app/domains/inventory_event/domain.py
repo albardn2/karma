@@ -25,10 +25,10 @@ class InventoryEventDomain:
         event = uow.inventory_event_repository.find_one(uuid=uuid, is_deleted=False)
         if not event:
             raise NotFoundError("InventoryEvent not found")
-
+        if event.event_type != InventoryEventType.MANUAL.value:
+            raise BadRequestError("cannot delete this event")
         event_read = InventoryEventHandlerEntryPoint().delete_event(uow=uow, event=event)
         return event_read
-
 
     @staticmethod
     def validate_relations(uow: SqlAlchemyUnitOfWork, event: InventoryEventModel):

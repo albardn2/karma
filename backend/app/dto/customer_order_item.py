@@ -39,10 +39,21 @@ class FulfillItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     customer_order_item_uuid: str
     inventory_uuid: str
+
+class UnFulfillItem(BaseModel):
+    """Schema for fulfilling a customer order item."""
+    model_config = ConfigDict(extra="forbid")
+    customer_order_item_uuid: str
+
 class CustomerOrderItemBulkFulfill(BaseModel):
     """Schema for bulk fulfilling customer order items by UUID."""
     model_config = ConfigDict(extra="forbid")
     items: List[FulfillItem]
+
+class CustomerOrderItemBulkUnFulfill(BaseModel):
+    """Schema for bulk unfulfilling customer order items by UUID."""
+    model_config = ConfigDict(extra="forbid")
+    items: List[UnFulfillItem]
 
 class CustomerOrderItemBulkDelete(BaseModel):
     """Schema for bulk deleting (soft) customer order items by UUID."""

@@ -48,8 +48,6 @@ def update_inventory_event(uuid: str):
         for field, val in updates.items():
             setattr(ev, field, val)
         uow.inventory_event_repository.save(model=ev, commit=True)
-        # TODO: recalculate the inventory quantities from event
-        # TODO: recalculate inventory cost
         result = InventoryEventRead.from_orm(ev).model_dump(mode='json')
     return jsonify(result), 200
 
@@ -59,7 +57,6 @@ def delete_inventory_event(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         ev_read = InventoryEventDomain.delete_inventory_event(uow=uow, uuid=uuid)
         result = ev_read.model_dump(mode='json')
-        # TODO: recalculate inventory quantities from domain, model etc...
         uow.commit()
     return jsonify(result), 200
 

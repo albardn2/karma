@@ -23,6 +23,8 @@ class CreditNoteItemBase(BaseModel):
 
 class CreditNoteItemCreate(CreditNoteItemBase):
     """Fields required to create a new credit-note item."""
+    model_config = ConfigDict(extra="forbid")
+    create_payout: Optional[bool] = False
 
     @model_validator(mode="before")
     @classmethod
