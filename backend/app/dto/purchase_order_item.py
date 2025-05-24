@@ -9,6 +9,8 @@ from app.entrypoint.routes.common.errors import BadRequestError
 
 
 class PurchaseOrderItemBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     purchase_order_uuid: Optional[str] = None # for po with item create
     material_uuid:       str
     quantity:            int
@@ -18,11 +20,15 @@ class PurchaseOrderItemBase(BaseModel):
 
 class PurchaseOrderItemCreate(PurchaseOrderItemBase):
     """Fields required to create a new purchase order item."""
+    model_config = ConfigDict(extra="forbid")
+
     created_by_uuid: Optional[str]      = None
     quantity_received:   float           = 0.0
 
 class PurchaseOrderItemUpdate(BaseModel):
     """All fields optional for partial updates."""
+    model_config = ConfigDict(extra="forbid")
+
     purchase_order_uuid: Optional[str]      = None
     material_uuid:       Optional[str]      = None
     quantity:            Optional[int]       = None
@@ -36,7 +42,7 @@ class PurchaseOrderItemUpdate(BaseModel):
 
 class PurchaseOrderItemRead(BaseModel):
     """Response model for a single purchase order item, including total_price."""
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True,extra="forbid")
 
     uuid:               str
     created_by_uuid:    Optional[str] = None
@@ -56,7 +62,7 @@ class PurchaseOrderItemRead(BaseModel):
 
 class PurchaseOrderItemListParams(BaseModel):
     """Filters and pagination for listing purchase order items."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
 
     purchase_order_uuid: Optional[str]   = None
     material_uuid:       Optional[str]   = None
@@ -69,7 +75,7 @@ class PurchaseOrderItemListParams(BaseModel):
 
 class PurchaseOrderItemPage(BaseModel):
     """Paginated purchase order item list response."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
 
     items:       List[PurchaseOrderItemRead] = Field(..., description="Items on this page")
     total_count: int                        = Field(..., description="Total number of items")

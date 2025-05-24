@@ -40,7 +40,7 @@ class PaymentBase(BaseModel):
 
 class PaymentCreate(PaymentBase):
     """Fields required to create a new payment."""
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 class PaymentUpdate(BaseModel):
     """Fields optional for partial updates."""

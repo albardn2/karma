@@ -36,7 +36,8 @@ class InventoryEventBase(BaseModel):
 
 class InventoryEventCreate(InventoryEventBase):
     """Fields required to create a new inventory event."""
-    pass
+    model_config = ConfigDict(extra="forbid")
+
 
     @model_validator(mode="before")
     @classmethod

@@ -20,7 +20,7 @@ class PayoutBase(BaseModel):
 
 class PayoutCreate(PayoutBase):
     """Fields required to create a new payout."""
-    pass
+    model_config = ConfigDict(extra="forbid")
 
     # validate cannot have expense uuid, purchase order uuid or employee at the same time
     @model_validator(mode="before")

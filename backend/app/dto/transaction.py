@@ -19,6 +19,8 @@ class TransactionBase(BaseModel):
 
 class TransactionCreate(TransactionBase):
     """Fields required to create a new transaction."""
+    model_config = ConfigDict(extra="forbid")
+
     created_by_uuid: str | None = None
 
 class TransactionUpdate(BaseModel):

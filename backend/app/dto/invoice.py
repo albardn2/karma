@@ -29,7 +29,7 @@ class InvoiceBase(BaseModel):
 
 class InvoiceCreate(InvoiceBase):
     """Fields required to create a new invoice."""
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 class InvoiceUpdate(BaseModel):
     """Fields optional for partial updates."""

@@ -14,6 +14,8 @@ class EmployeeRole(str, Enum):
     SALES = "sales"
 
 class EmployeeBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     email_address: Optional[EmailStr] = None
     full_name: str
     phone_number: str
@@ -25,11 +27,15 @@ class EmployeeBase(BaseModel):
 
 class EmployeeCreate(EmployeeBase):
     """Fields required to create a new employee."""
+    model_config = ConfigDict(extra="forbid")
+
     full_name: str
     phone_number: str
 
 class EmployeeUpdate(BaseModel):
     """All fields optional for partial updates."""
+    model_config = ConfigDict(extra="forbid")
+
     email_address: Optional[EmailStr] = None
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
@@ -41,7 +47,7 @@ class EmployeeUpdate(BaseModel):
     is_deleted: Optional[bool] = None
 
 class EmployeeRead(EmployeeBase):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True,extra="forbid")
 
     uuid: UUID
     created_by_uuid: Optional[UUID] = None
@@ -50,7 +56,7 @@ class EmployeeRead(EmployeeBase):
 
 class EmployeeListParams(BaseModel):
     """Pagination parameters for listing employees."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
 
     page: int = Field(1, gt=0, description="Page number, starting from 1")
     per_page: int = Field(20, gt=0, le=100, description="Items per page, max 100")
@@ -58,7 +64,7 @@ class EmployeeListParams(BaseModel):
 
 class EmployeePage(BaseModel):
     """Paginated employee list response."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
 
     employees: List[EmployeeRead] = Field(..., description="List of employees on this page")
     total_count: int = Field(..., description="Total number of employees")

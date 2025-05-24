@@ -18,7 +18,7 @@ class CustomerCategory(str, Enum):
 
 
 class CustomerBase(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
 
     email_address: Optional[EmailStr] = None
     company_name: str
@@ -33,10 +33,13 @@ class CustomerBase(BaseModel):
 
 class CustomerCreate(CustomerBase):
     """What’s required when creating a new customer."""
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
 
 
 class CustomerUpdate(BaseModel):
     """All fields optional for partial updates."""
+    model_config = ConfigDict(extra="forbid")
+
     email_address: Optional[EmailStr] = None
     company_name: Optional[str] = None
     full_name: Optional[str] = None
@@ -49,27 +52,26 @@ class CustomerUpdate(BaseModel):
 
 class CustomerRead(CustomerBase):
     """What we return to clients."""
+    model_config = ConfigDict(extra="forbid")
+
     uuid: str
     created_at: datetime
     is_deleted: bool
     balance_per_currency: dict[Currency, float]
 
-    class Config:
-        orm_mode = True
-
 
 class CustomerReadList(BaseModel):
     """What we return to clients."""
+    model_config = ConfigDict(extra="forbid")
+
     customers: list[CustomerRead]
     total_count: int
 
-    class Config:
-        orm_mode = True
 
 
 class CustomerListParams(BaseModel):
     """Pagination parameters for listing customers."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
     uuid: Optional[UUID] = None
     category: Optional[CustomerCategory] = None
     customer_uuid: Optional[str] = None
@@ -84,7 +86,7 @@ class CustomerListParams(BaseModel):
 
 class CustomerPage(BaseModel):
     """Paginated customer list response."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
 
     customers: List[CustomerRead] = Field(..., description="List of customers on this page")
     total_count: int = Field(..., description="Total number of customers")

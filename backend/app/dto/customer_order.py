@@ -26,6 +26,7 @@ class CustomerOrderBase(BaseModel):
 
 class CustomerOrderCreate(CustomerOrderBase):
     """Fields required to create a new customer order."""
+    model_config = ConfigDict(extra="forbid")
 class CustomerOrderUpdate(BaseModel):
     """Fields optional for partial updates."""
     model_config = ConfigDict(extra="forbid")

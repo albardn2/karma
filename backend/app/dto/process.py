@@ -106,7 +106,7 @@ class ProcessBase(BaseModel):
 
 class ProcessCreate(ProcessBase):
     """Fields required to create a new process."""
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 class ProcessUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")

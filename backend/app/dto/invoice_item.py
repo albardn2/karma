@@ -15,7 +15,7 @@ class InvoiceItemBase(BaseModel):
 
 class InvoiceItemCreate(InvoiceItemBase):
     """Schema for a single invoice item creation (bulk)."""
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 class InvoiceItemBulkCreate(BaseModel):
     """Schema for bulk creating multiple invoice items."""

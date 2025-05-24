@@ -22,6 +22,8 @@ class PurchaseOrderStatus(str,Enum):
 
 
 class PurchaseOrderBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     vendor_uuid: str
     currency: Currency
     notes: Optional[str] = None
@@ -29,10 +31,14 @@ class PurchaseOrderBase(BaseModel):
 
 class PurchaseOrderCreate(PurchaseOrderBase):
     """Fields required to create a new purchase order."""
+    model_config = ConfigDict(extra="forbid")
+
     created_by_uuid: Optional[str] = None
 
 class PurchaseOrderCreateWithItems(PurchaseOrderCreate):
     """Fields required to create a new purchase order."""
+    model_config = ConfigDict(extra="forbid")
+
     created_by_uuid: Optional[str] = None
     purchase_order_items: List[PurchaseOrderItemCreate]
 
@@ -46,12 +52,14 @@ class PurchaseOrderCreateWithItems(PurchaseOrderCreate):
 
 class PurchaseOrderUpdate(BaseModel):
     """All fields optional for partial updates."""
+    model_config = ConfigDict(extra="forbid")
+
     notes: Optional[str] = None
     payout_due_date: Optional[datetime] = None
 
 class PurchaseOrderRead(BaseModel):
     """Response model for a single purchase order, including computed fields."""
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True,extra="forbid")
 
     uuid:             str
     created_by_uuid:  Optional[str] = None
@@ -75,7 +83,7 @@ class PurchaseOrderRead(BaseModel):
 
 class PurchaseOrderListParams(BaseModel):
     """Filters and pagination for listing purchase orders."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
     is_overdue: Optional[bool] = None
     uuid: Optional[str] = None
     vendor_uuid: Optional[str] = None
@@ -90,7 +98,7 @@ class PurchaseOrderListParams(BaseModel):
 
 class PurchaseOrderPage(BaseModel):
     """Paginated purchase order list response."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
 
     purchase_orders: List[PurchaseOrderRead] = Field(..., description="Orders on this page")
     total_count:      int                     = Field(..., description="Total number of orders")

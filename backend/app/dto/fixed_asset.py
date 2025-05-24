@@ -3,6 +3,8 @@ from typing import Optional, List
 from datetime import datetime
 
 class FixedAssetBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name:                         str
     description:                  Optional[str] = None
     purchase_date:                Optional[datetime] = None
@@ -31,7 +33,7 @@ class FixedAssetUpdate(BaseModel):
     price_per_unit:              Optional[float]   = None
 
 class FixedAssetRead(FixedAssetBase):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True,extra="forbid")
     uuid:            str
     created_by_uuid: Optional[str] = None
     created_at:      datetime
@@ -45,13 +47,15 @@ class FixedAssetRead(FixedAssetBase):
 
 class FixedAssetListParams(BaseModel):
     """Pagination and optional filters for listing fixed assets."""
+    model_config = ConfigDict(extra="forbid")
+
     page:                     int  = Field(1, gt=0, description="Page number (>=1)")
     per_page:                 int  = Field(20, gt=0, le=100, description="Items per page (<=100)")
     purchase_order_item_uuid: Optional[str] = None
     material_uuid:            Optional[str] = None
 
 class FixedAssetPage(BaseModel):
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
 
     fixed_assets: List[FixedAssetRead] = Field(..., description="Fixed assets on this page")
     total_count:   int                 = Field(..., description="Total number of assets")

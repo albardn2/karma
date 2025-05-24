@@ -4,6 +4,8 @@ from uuid import UUID
 from datetime import datetime
 
 class WarehouseBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     address: str
     coordinates: Optional[str] = None
@@ -12,17 +14,21 @@ class WarehouseBase(BaseModel):
 
 class WarehouseCreate(WarehouseBase):
     """Fields required to create a new warehouse."""
+    model_config = ConfigDict(extra="forbid")
+
     created_by_uuid: Optional[UUID] = None
 
 class WarehouseUpdate(BaseModel):
     """All fields optional for partial updates."""
+    model_config = ConfigDict(extra="forbid")
+
     name:        Optional[str] = None
     address:     Optional[str] = None
     coordinates: Optional[str] = None
     notes:       Optional[str] = None
 
 class WarehouseRead(WarehouseBase):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True,extra="forbid")
 
     uuid:            UUID
     created_by_uuid: Optional[UUID] = None
@@ -31,12 +37,14 @@ class WarehouseRead(WarehouseBase):
 
 class WarehouseListParams(BaseModel):
     """Pagination parameters for listing warehouses."""
+    model_config = ConfigDict(extra="forbid")
+
     page:     int = Field(1, gt=0, description="Page number (>=1)")
     per_page: int = Field(20, gt=0, le=100, description="Items per page (<=100)")
 
 class WarehousePage(BaseModel):
     """Paginated warehouse list response."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
 
     warehouses:  List[WarehouseRead] = Field(..., description="Warehouses on this page")
     total_count: int                 = Field(..., description="Total number of warehouses")

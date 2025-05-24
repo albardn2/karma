@@ -17,7 +17,7 @@ class MaterialType(str, Enum):
 
 class MaterialBase(BaseModel):
     # when converting from ORM objects
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True,extra="forbid")
 
     name: str
     measure_unit: Optional[UnitOfMeasure] = None
@@ -32,11 +32,14 @@ class MaterialCreate(MaterialBase):
     All the required fields to create a Material.
     Inherit name, sku, type, etc. from MaterialBase.
     """
+    model_config = ConfigDict(extra="forbid")
 
 class MaterialUpdate(BaseModel):
     """
     All fields optional for PATCH/PUT.
     """
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = None
     measure_unit: Optional[UnitOfMeasure] = None
     sku: Optional[str] = None
@@ -47,16 +50,16 @@ class MaterialRead(MaterialBase):
     """
     What we return to clients.
     """
+    model_config = ConfigDict(extra="forbid")
+
     uuid: str
     created_at: datetime
     is_deleted: Optional[bool] = None
 
-    class Config:
-        orm_mode = True
-
 class MaterialListParams(BaseModel):
     """Pagination parameters for listing materials."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
+
     type: Optional[MaterialType] = None
     page: int = Field(1, gt=0, description="Page number, starting at 1")
     per_page: int = Field(20, gt=0, le=100, description="Items per page, max 100")
@@ -64,7 +67,7 @@ class MaterialListParams(BaseModel):
 
 class MaterialPage(BaseModel):
     """Paginated material list response."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
 
     materials: List[MaterialRead] = Field(..., description="List of materials on this page")
     total_count: int = Field(..., description="Total number of materials")

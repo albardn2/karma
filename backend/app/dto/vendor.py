@@ -16,6 +16,8 @@ class VendorCategory(str, Enum):
 
 
 class VendorCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     created_by_uuid: Optional[UUID] = None
     email_address: Optional[EmailStr] = None
     company_name: str
@@ -30,6 +32,8 @@ class VendorCreate(BaseModel):
 
 
 class VendorUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     created_by_uuid: Optional[str] = None
     email_address: Optional[EmailStr] = None
     company_name: Optional[str] = None
@@ -43,7 +47,7 @@ class VendorUpdate(BaseModel):
 
 
 class VendorRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True,extra="forbid")
 
     uuid: UUID
     created_by_uuid: Optional[UUID] = None
@@ -63,6 +67,8 @@ class VendorRead(BaseModel):
 
 
 class VendorReadList(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     vendors: List[VendorRead]
     total_count: int
 
@@ -70,8 +76,9 @@ class VendorReadList(BaseModel):
 # Pagination DTOs
 class VendorListParams(BaseModel):
     """Pagination parameters for listing vendors."""
+    model_config = ConfigDict(extra="forbid")
+
     uuid: Optional[str] = None
-    model_config = ConfigDict()
     category: Optional[VendorCategory] = None
     company_name: Optional[str] = None
     full_name: Optional[str] = None
@@ -82,7 +89,7 @@ class VendorListParams(BaseModel):
 
 class VendorPage(BaseModel):
     """Paginated vendor list response."""
-    model_config = ConfigDict()
+    model_config = ConfigDict(extra="forbid")
 
     vendors: List[VendorRead] = Field(..., description="List of vendors on this page")
     total_count: int        = Field(..., description="Total number of vendors")
