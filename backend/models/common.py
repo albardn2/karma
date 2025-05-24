@@ -1531,8 +1531,6 @@ class CreditNoteItem(Base):
     amount = Column(Float, nullable=False)
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
-    # status = Column(String(120), nullable=False)  # e.g., void, pending, paid
-    # paid_at = Column(DateTime, nullable=True)
     invoice_item_uuid = Column(String(36), ForeignKey("invoice_item.uuid"), nullable=True)
     customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=True)
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=True)

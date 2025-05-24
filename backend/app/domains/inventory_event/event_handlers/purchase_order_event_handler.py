@@ -27,7 +27,6 @@ class PurchaseOrderEventHandler:
         return InventoryEventRead.from_orm(event_model)
 
     def run_delete(self,uow: SqlAlchemyUnitOfWork, event: InventoryEventRead):
-        # check inventory_uuid exists
         inventory = uow.inventory_repository.find_one(uuid=event.inventory_uuid, is_deleted=False)
         if not inventory:
             raise NotFoundError("Inventory not found")

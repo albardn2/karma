@@ -8,6 +8,9 @@ from app.dto.invoice import InvoiceStatus
 from app.domains.inventory_event.domain import InventoryEventDomain
 from app.dto.inventory_event import InventoryEventType, InventoryEventCreate
 
+from app.domains.payment.domain import PaymentDomain
+from app.dto.payment import PaymentCreate, PaymentMethod
+
 
 class DebitNoteItemDomain:
 
@@ -15,8 +18,9 @@ class DebitNoteItemDomain:
     def create_item(uow: SqlAlchemyUnitOfWork, payload: DebitNoteItemCreate) -> DebitNoteItemRead:
 
 
-        item = DebitNoteItemModel(**payload.model_dump(mode="json"))
-        # item.status = InvoiceStatus.PENDING.value
+        data = payload.model_dump(mode="json")
+        create_payment = data.pop("create_payment", False)
+        item = DebitNoteItemModel(**data)
         uow.debit_note_item_repository.save(model=item, commit=False)
 
         if item.invoice_item_uuid:
@@ -82,6 +86,19 @@ class DebitNoteItemDomain:
                     payload=payload
                 )
 
+        if create_payment:
+            payment_create = PaymentCreate(
+                debit_note_item_uuid=item.uuid,
+                amount=item.amount,
+                currency=item.currency,
+                notes="auto",
+                payment_method=PaymentMethod.CASH,
+            )
+            PaymentDomain.create_payment(
+                uow=uow,
+                payload=payment_create
+            )
+        uow.session.refresh(item)
         return DebitNoteItemRead.from_orm(item)
 
 
@@ -95,8 +112,8 @@ class DebitNoteItemDomain:
         if payment:
             raise BadRequestError("DebitNoteItem cannot be deleted, it has payment")
         inv_events = uow.inventory_event_repository.find_all(debit_note_item_uuid=m.uuid, is_deleted=False)
-        if inv_events:
-            raise BadRequestError("DebitNoteItem cannot be deleted, it has inventory events")
+        for event in inv_events:
+            InventoryEventDomain.delete_inventory_event(uow=uow, uuid=event.uuid)
 
         m.is_deleted = True
         uow.debit_note_item_repository.save(model=m, commit=False)

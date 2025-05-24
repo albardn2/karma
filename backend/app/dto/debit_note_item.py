@@ -22,6 +22,8 @@ class DebitNoteItemBase(BaseModel):
 
 class DebitNoteItemCreate(DebitNoteItemBase):
     """Fields required to create a new debit-note item."""
+    model_config = ConfigDict(extra="forbid")
+    create_payment: Optional[bool] = False
 
     @model_validator(mode="before")
     @classmethod
