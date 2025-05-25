@@ -76,11 +76,22 @@ def delete_employee(uuid: str):
 def list_employees():
     # Parse & validate pagination params
     params = EmployeeListParams(**request.args)
+    filters = [EmployeeModel.is_deleted == False]
+    if params.uuid:
+        filters.append(EmployeeModel.uuid == params.uuid)
+    if params.full_name:
+        filters.append(EmployeeModel.full_name.ilike(f"%{params.full_name}%"))
+    if params.phone_number:
+        filters.append(EmployeeModel.phone_number.ilike(f"%{params.phone_number}%"))
+    if params.email_address:
+        filters.append(EmployeeModel.email_address.ilike(f"%{params.email_address}%"))
+    if params.role:
+        filters.append(EmployeeModel.role == params.role.value)
     with SqlAlchemyUnitOfWork() as uow:
-        page_obj = uow.employee_repository.find_all_paginated(
+        page_obj = uow.employee_repository.find_all_by_filters_paginated(
+            filters=filters,
             page=params.page,
-            per_page=params.per_page,
-            is_deleted=False
+            per_page=params.per_page
         )
         items = [
             EmployeeRead.from_orm(e).model_dump(mode='json')

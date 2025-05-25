@@ -66,6 +66,10 @@ class UserListParams(BaseModel):
     username: Optional[str] = None
     email: Optional[str] = None
     permission_scope: Optional[PermissionScope] = None
+    phone_number: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    uuid
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
 

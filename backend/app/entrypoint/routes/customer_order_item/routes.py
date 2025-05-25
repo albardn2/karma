@@ -47,6 +47,8 @@ def list_order_items():
     filters = [CustomerOrderItemModel.is_deleted == False]
     if params.customer_order_uuid:
         filters.append(CustomerOrderItemModel.customer_order_uuid == params.customer_order_uuid)
+    if params.uuid:
+        filters.append(CustomerOrderItemModel.uuid == params.uuid)
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.customer_order_item_repository.find_all_by_filters_paginated(
             filters=filters,

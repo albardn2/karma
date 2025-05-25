@@ -78,6 +78,8 @@ class InventoryEventRead(InventoryEventBase):
 
 class InventoryEventListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    uuid: Optional[str] = None
     inventory_uuid: Optional[str] = None
     purchase_order_item_uuid: Optional[str] = None
     customer_order_item_uuid: Optional[str] = None

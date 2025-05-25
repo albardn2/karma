@@ -56,8 +56,11 @@ class PaymentRead(PaymentBase):
 
 class PaymentListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    uuid : Optional[str] = None
     invoice_uuid: Optional[str] = None
     financial_account_uuid: Optional[str] = None
+    debit_note_item_uuid: Optional[str] = None
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
 

@@ -60,7 +60,11 @@ class MaterialListParams(BaseModel):
     """Pagination parameters for listing materials."""
     model_config = ConfigDict(extra="forbid")
 
+    uuid : Optional[UUID] = None
     type: Optional[MaterialType] = None
+    sku : Optional[str] = None
+    name: Optional[str] = None
+
     page: int = Field(1, gt=0, description="Page number, starting at 1")
     per_page: int = Field(20, gt=0, le=100, description="Items per page, max 100")
 

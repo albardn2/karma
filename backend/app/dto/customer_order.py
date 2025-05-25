@@ -49,6 +49,7 @@ class CustomerOrderRead(CustomerOrderBase):
 class CustomerOrderListParams(BaseModel):
     """Optional filters plus pagination for listing orders."""
     model_config = ConfigDict(extra="forbid")
+    uuid: Optional[str] = None
     customer_uuid: Optional[str] = None
     is_paid: Optional[bool] = None
     is_fulfilled: Optional[bool] = None

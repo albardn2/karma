@@ -65,6 +65,8 @@ def delete_inventory_event(uuid: str):
 def list_inventory_events():
     params = InventoryEventListParams(**request.args)
     filters: list = [InventoryEventModel.is_deleted == False]
+    if params.uuid:
+        filters.append(InventoryEventModel.uuid == params.uuid)
     if params.inventory_uuid:
         filters.append(InventoryEventModel.inventory_uuid == params.inventory_uuid)
     if params.event_type:

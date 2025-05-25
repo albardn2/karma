@@ -52,6 +52,7 @@ class PayoutRead(PayoutBase):
 
 class PayoutListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    uuid : Optional[str] = None
     credit_note_item_uuid: Optional[str] = None
     purchase_order_uuid: Optional[str] = None
     expense_uuid:     Optional[str] = None

@@ -68,18 +68,18 @@ def list_fixed_assets():
         return jsonify(e.errors()), 400
 
     # assemble filter kwargs
-    filters = {}
+    filters = [FixedAssetModel.is_deleted == False]
+    if params.uuid:
+        filters.append(FixedAssetModel.uuid == params.uuid)
     if params.purchase_order_item_uuid:
-        filters['purchase_order_item_uuid'] = params.purchase_order_item_uuid
+        filters.append(FixedAssetModel.purchase_order_item_uuid == params.purchase_order_item_uuid)
     if params.material_uuid:
-        filters['material_uuid'] = params.material_uuid
-
+        filters.append(FixedAssetModel.material_uuid == params.material_uuid)
     with SqlAlchemyUnitOfWork() as uow:
-        page_obj = uow.fixed_asset_repository.find_all_paginated(
-            is_deleted=False,
+        page_obj = uow.fixed_asset_repository.find_all_by_filters_paginated(
+            filters=filters,
             page=params.page,
-            per_page=params.per_page,
-            **filters
+            per_page=params.per_page
         )
         items = [FixedAssetRead.from_orm(fa).model_dump(mode='json') for fa in page_obj.items]
         result = FixedAssetPage(

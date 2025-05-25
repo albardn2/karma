@@ -67,14 +67,15 @@ def delete_warehouse(uuid: str):
 
 @warehouse_blueprint.route('/', methods=['GET'])
 def list_warehouses():
-    try:
-        params = WarehouseListParams(**request.args)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    params = WarehouseListParams(**request.args)
+    filters = [WarehouseModel.is_deleted == False]
+    if params.uuid:
+        filters.append(WarehouseModel.uuid == params.uuid)
+    if params.name:
+        filters.append(WarehouseModel.name.ilike(f"%{params.name}%"))
     with SqlAlchemyUnitOfWork() as uow:
-        page_obj = uow.warehouse_repository.find_all_paginated(
-            is_deleted=False,
+        page_obj = uow.warehouse_repository.find_all_by_filters_paginated(
+            filters=filters,
             page=params.page,
             per_page=params.per_page
         )

@@ -44,6 +44,7 @@ class PricingRead(BaseModel):
 class PricingListParams(BaseModel):
     """Pagination parameters for listing pricings."""
     model_config = ConfigDict(extra="forbid")
+    uuid : Optional[str] = None
     material_uuid: Optional[str] = None
     currency: Optional[Currency] = None
     page: int = Field(1, gt=0, description="Page number (>=1)")

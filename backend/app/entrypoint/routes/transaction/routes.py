@@ -66,6 +66,8 @@ def list_transactions():
         filters.append(TransactionModel.created_at >= params.start_date)
     if params.end_date:
         filters.append(TransactionModel.created_at <= params.end_date)
+    if params.uuid:
+        filters.append(TransactionModel.uuid == params.uuid)
 
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.transaction_repository.find_all_by_filters_paginated(

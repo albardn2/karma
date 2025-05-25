@@ -74,6 +74,8 @@ def list_pricings():
 
     params = PricingListParams(**request.args)
     filters = [PricingModel.is_deleted == False]
+    if params.uuid:
+        filters.append(PricingModel.uuid == params.uuid)
     if params.material_uuid:
         filters.append(PricingModel.material_uuid == params.material_uuid)
     if params.currency:

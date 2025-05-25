@@ -101,13 +101,13 @@ def list_vendors():
     if params.category:
         filters.append(VendorModel.category == params.category)
     if params.company_name:
-        filters.append(VendorModel.company_name == params.company_name)
+        filters.append(VendorModel.company_name.ilike(f"%{params.company_name}%"))
     if params.full_name:
-        filters.append(VendorModel.full_name == params.full_name)
+        filters.append(VendorModel.full_name.ilike(f"%{params.full_name}%"))
     if params.phone_number:
-        filters.append(VendorModel.phone_number == params.phone_number)
+        filters.append(VendorModel.phone_number.ilike(f"%{params.phone_number}%"))
     if params.email_address:
-        filters.append(VendorModel.email_address == params.email_address)
+        filters.append(VendorModel.email_address.ilike(f"%{params.email_address}%"))
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.vendor_repository.find_all_by_filters_paginated(
             filters=filters,

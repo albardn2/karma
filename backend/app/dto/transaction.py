@@ -49,6 +49,7 @@ class TransactionListParams(BaseModel):
     end_date:          Optional[datetime] = Field(
         None, description="Filter on or before this datetime"
     )
+    uuid : Optional[str] = None
     page:     int  = Field(1, gt=0, description="Page number (>=1)")
     per_page: int  = Field(20, gt=0, le=100, description="Items per page (<=100)")
 

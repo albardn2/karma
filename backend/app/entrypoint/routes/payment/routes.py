@@ -57,6 +57,10 @@ def delete_payment(uuid: str):
 def list_payments():
     params = PaymentListParams(**request.args)
     filters = [PaymentModel.is_deleted == False]
+    if params.debit_note_item_uuid:
+        filters.append(PaymentModel.debit_note_item_uuid == params.debit_note_item_uuid)
+    if params.uuid:
+        filters.append(PaymentModel.uuid == params.uuid)
     if params.invoice_uuid:
         filters.append(PaymentModel.invoice_uuid == params.invoice_uuid)
     if params.financial_account_uuid:

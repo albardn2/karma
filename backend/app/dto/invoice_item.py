@@ -47,6 +47,8 @@ class InvoiceItemBulkRead(BaseModel):
 
 class InvoiceItemListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    uuid : Optional[str] = None
+    customer_order_item_uuid: Optional[str] = None
     invoice_uuid: Optional[str] = None
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)

@@ -69,6 +69,8 @@ def list_expenses():
 
     # Build filters list based on DTO
     filters = [ExpenseModel.is_deleted == False]
+    if params.uuid:
+        filters.append(ExpenseModel.uuid == str(params.uuid))
     if params.vendor_uuid:
         filters.append(ExpenseModel.vendor_uuid == str(params.vendor_uuid))
     if params.category:

@@ -59,6 +59,8 @@ def delete_inventory(uuid: str):
 def list_inventories():
     params = InventoryListParams(**request.args)
     filters = [InventoryModel.is_deleted == False]
+    if params.uuid:
+        filters.append(InventoryModel.uuid == params.uuid)
     if params.material_uuid:
         filters.append(InventoryModel.material_uuid == params.material_uuid)
     if params.warehouse_uuid:

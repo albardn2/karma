@@ -95,6 +95,8 @@ def list_items():
         return jsonify(e.errors()), 400
 
     filters = [PurchaseOrderItemModel.is_deleted == False]
+    if params.uuid:
+        filters.append(PurchaseOrderItemModel.uuid == params.uuid)
     if params.purchase_order_uuid:
         filters.append(PurchaseOrderItemModel.purchase_order_uuid == params.purchase_order_uuid)
     if params.material_uuid:

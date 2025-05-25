@@ -68,7 +68,7 @@ class ExpenseReadList(BaseModel):
 
 class ExpenseListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
+    uuid : Optional[str] = None
     vendor_uuid: Optional[str] = None
     category:    Optional[ExpenseCategory] = None
     status :    Optional[InvoiceStatus] = None

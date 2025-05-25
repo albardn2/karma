@@ -38,6 +38,8 @@ class WarehouseRead(WarehouseBase):
 class WarehouseListParams(BaseModel):
     """Pagination parameters for listing warehouses."""
     model_config = ConfigDict(extra="forbid")
+    uuid : Optional[UUID] = None
+    name: Optional[str] = None
 
     page:     int = Field(1, gt=0, description="Page number (>=1)")
     per_page: int = Field(20, gt=0, le=100, description="Items per page (<=100)")

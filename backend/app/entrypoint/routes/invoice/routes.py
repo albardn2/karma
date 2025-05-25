@@ -59,6 +59,10 @@ def list_invoices():
         filters.append(InvoiceModel.customer_uuid == params.customer_uuid)
     if params.status:
         filters.append(InvoiceModel.status == params.status.value)
+    if params.customer_order_uuid:
+        filters.append(InvoiceModel.customer_order_uuid == params.customer_order_uuid)
+    if params.uuid:
+        filters.append(InvoiceModel.uuid == params.uuid)
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.invoice_repository.find_all_by_filters_paginated(
             filters=filters,

@@ -46,6 +46,8 @@ class InventoryRead(InventoryBase):
 
 class InventoryListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    uuid : Optional[str] = None
     material_uuid: Optional[str] = None
     warehouse_uuid: Optional[str] = None
     is_active: Optional[bool] = None

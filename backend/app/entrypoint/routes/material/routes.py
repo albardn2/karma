@@ -77,6 +77,13 @@ def list_materials():
     filters = [MaterialModel.is_deleted == False]
     if params.type:
         filters.append(MaterialModel.type == params.type.value)
+    if params.sku:
+        filters.append(MaterialModel.sku == params.sku)
+    if params.name:
+        filters.append(MaterialModel.name.ilike(f"%{params.name}%"))
+    if params.uuid:
+        filters.append(MaterialModel.uuid == params.uuid)
+
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.material_repository.find_all_by_filters_paginated(
             filters=filters,

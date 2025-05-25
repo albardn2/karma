@@ -58,6 +58,8 @@ def delete_debit_note_item(uuid: str):
 def list_debit_note_items():
     params = DebitNoteItemListParams(**request.args)
     filters = [DebitNoteItemModel.is_deleted == False]
+    if params.uuid:
+        filters.append(DebitNoteItemModel.uuid == params.uuid)
     if params.invoice_item_uuid:
         filters.append(DebitNoteItemModel.invoice_item_uuid == params.invoice_item_uuid)
     if params.customer_order_item_uuid:

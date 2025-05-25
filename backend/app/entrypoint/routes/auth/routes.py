@@ -113,6 +113,14 @@ def list_users():
 
     # build SQLAlchemy filters
     filters = [UserModel.is_deleted == False]
+    if params.uuid:
+        filters.append(UserModel.uuid == params.uuid)
+    if params.first_name:
+        filters.append(UserModel.first_name == params.first_name)
+    if params.last_name:
+        filters.append(UserModel.last_name == params.last_name)
+    if params.phone_number:
+        filters.append(UserModel.phone_number == params.phone_number)
     if params.username:
         filters.append(UserModel.username == params.username)
     if params.email:

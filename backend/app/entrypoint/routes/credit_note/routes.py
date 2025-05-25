@@ -61,6 +61,11 @@ def delete_credit_note_item(uuid: str):
 def list_credit_note_items():
     params = CreditNoteItemListParams(**request.args)
     filters = [CreditNoteItemModel.is_deleted == False]
+
+    if params.is_paid is not None:
+        filters.append(CreditNoteItemModel.is_paid == params.is_paid)
+    if params.uuid:
+        filters.append(CreditNoteItemModel.uuid == params.uuid)
     if params.invoice_item_uuid:
         filters.append(CreditNoteItemModel.invoice_item_uuid == params.invoice_item_uuid)
     if params.customer_order_item_uuid:

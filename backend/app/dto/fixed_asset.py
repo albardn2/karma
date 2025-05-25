@@ -51,6 +51,7 @@ class FixedAssetListParams(BaseModel):
 
     page:                     int  = Field(1, gt=0, description="Page number (>=1)")
     per_page:                 int  = Field(20, gt=0, le=100, description="Items per page (<=100)")
+    uuid :                Optional[str] = None
     purchase_order_item_uuid: Optional[str] = None
     material_uuid:            Optional[str] = None
 

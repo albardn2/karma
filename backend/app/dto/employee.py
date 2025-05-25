@@ -57,7 +57,11 @@ class EmployeeRead(EmployeeBase):
 class EmployeeListParams(BaseModel):
     """Pagination parameters for listing employees."""
     model_config = ConfigDict(extra="forbid")
-
+    uuid: Optional[UUID] = None
+    phone_number: Optional[str] = None
+    email_address: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    role: Optional[EmployeeRole] = None
     page: int = Field(1, gt=0, description="Page number, starting from 1")
     per_page: int = Field(20, gt=0, le=100, description="Items per page, max 100")
 

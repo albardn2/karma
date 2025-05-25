@@ -120,6 +120,7 @@ class ProcessRead(ProcessBase):
 
 class ProcessListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    uuid : Optional[str] = None
     type: Optional[ProcessType] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None

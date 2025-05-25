@@ -69,6 +69,7 @@ class PurchaseOrderItemListParams(BaseModel):
     is_fulfilled:        Optional[bool]   = None
     start_date:          Optional[datetime] = Field(None, description="Filter created_at >=")
     end_date:            Optional[datetime] = Field(None, description="Filter created_at <=")
+    uuid : Optional[str] = None
 
     page:     int = Field(1, gt=0, description="Page number >=1")
     per_page: int = Field(20, gt=0, le=100, description="Items per page <=100")

@@ -61,6 +61,7 @@ class DebitNoteItemRead(DebitNoteItemBase):
 
 class DebitNoteItemListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    uuid: Optional[str] = None
     invoice_item_uuid: Optional[str] = None
     customer_order_item_uuid: Optional[str] = None
     purchase_order_item_uuid: Optional[str] = None

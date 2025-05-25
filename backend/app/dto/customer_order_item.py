@@ -67,6 +67,7 @@ class CustomerOrderItemBulkRead(BaseModel):
 
 class CustomerOrderItemListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    uuid: Optional[str] = None
     customer_order_uuid: Optional[str] = None
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
