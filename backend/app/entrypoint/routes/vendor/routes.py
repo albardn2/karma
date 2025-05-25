@@ -18,12 +18,24 @@ from app.entrypoint.routes.vendor import vendor_blueprint
 from app.entrypoint.routes.common.errors import NotFoundError
 
 from app.entrypoint.routes.common.errors import BadRequestError
+from app.dto.vendor import VendorCategory
 
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 @vendor_blueprint.route('/', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER.value
+                 )
 def create_vendor():
+    current_user_uuid = get_jwt_identity()
     payload = VendorCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=payload)
         if payload.email_address:
             existing_vendor = uow.vendor_repository.find_first(email_address=payload.email_address)
             if existing_vendor:
@@ -37,6 +49,12 @@ def create_vendor():
 
 
 @vendor_blueprint.route('/<string:uuid>', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER.value,
+                 PermissionScope.ACCOUNTANT.value
+                 )
 def get_vendor(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         v = uow.vendor_repository.find_one(uuid=uuid,is_deleted=False)
@@ -47,6 +65,11 @@ def get_vendor(uuid: str):
 
 
 @vendor_blueprint.route('/<string:uuid>', methods=['PUT'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER.value,
+                 )
 def update_vendor(uuid: str):
     payload = VendorUpdate(**request.json)
     data = payload.model_dump(exclude_unset=True, mode='json')
@@ -67,6 +90,10 @@ def update_vendor(uuid: str):
 
 
 @vendor_blueprint.route('/<string:uuid>', methods=['DELETE'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value
+                 )
 def delete_vendor(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         v = uow.vendor_repository.find_one(uuid=uuid,is_deleted=False)
@@ -93,6 +120,11 @@ def delete_vendor(uuid: str):
 
 
 @vendor_blueprint.route('/', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER.value
+                 )
 def list_vendors():
     params = VendorListParams(**request.args)
     filters = [VendorModel.is_deleted == False]
@@ -127,3 +159,9 @@ def list_vendors():
         ).model_dump(mode='json')
 
     return jsonify(result), 200
+
+@vendor_blueprint.route('/categories', methods=['GET'])
+def list_vendor_categories():
+    values = [cat.value for cat in VendorCategory]
+    return jsonify(values), 200
+

@@ -18,12 +18,27 @@ from app.dto.customer_order_item import CustomerOrderItemBulkDelete
 
 from app.dto.customer_order_item import CustomerOrderItemBulkUnFulfill
 
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 @customer_order_item_blueprint.route('/bulk-create', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER,
+                 PermissionScope.ACCOUNTANT
+                 )
 def create_order_items():
     # Expect a JSON object with an 'items' list
+    current_user_uuid = get_jwt_identity()
     payload = CustomerOrderItemBulkCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        # Add the logged user to the payload
+        for item in payload.items:
+            add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=item)
         bulk_read = CustomerOrderItemDomain.create_items(
             uow=uow,
             payload=payload
@@ -33,6 +48,13 @@ def create_order_items():
     return jsonify(bulk_read.model_dump(mode='json')), 201
 
 @customer_order_item_blueprint.route('/<string:uuid>', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER,
+                 PermissionScope.ACCOUNTANT
+                 )
 def get_order_item(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         m = uow.customer_order_item_repository.find_one(uuid=uuid, is_deleted=False)
@@ -42,6 +64,13 @@ def get_order_item(uuid: str):
     return jsonify(dto), 200
 
 @customer_order_item_blueprint.route('/', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER,
+                 PermissionScope.ACCOUNTANT
+                 )
 def list_order_items():
     params = CustomerOrderItemListParams(**request.args)
     filters = [CustomerOrderItemModel.is_deleted == False]
@@ -67,6 +96,12 @@ def list_order_items():
     return jsonify(result), 200
 #
 @customer_order_item_blueprint.route('/fulfill-items', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.OPERATION_MANAGER.value)
 def fulfill_order_items():
     payload = CustomerOrderItemBulkFulfill(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
@@ -77,6 +112,11 @@ def fulfill_order_items():
     return jsonify(bulk_read.model_dump(mode='json')), 200
 
 @customer_order_item_blueprint.route('/unfulfill-items', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.OPERATION_MANAGER.value)
 def unfulfill_order_items():
     payload = CustomerOrderItemBulkUnFulfill(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
@@ -89,6 +129,9 @@ def unfulfill_order_items():
 
 
 @customer_order_item_blueprint.route('/bulk-delete', methods=['DELETE'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value)
 def delete_order_items():
     payload = CustomerOrderItemBulkDelete(**request.json)
     with SqlAlchemyUnitOfWork() as uow:

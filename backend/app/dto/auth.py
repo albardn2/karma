@@ -7,7 +7,7 @@ from datetime import datetime
 class PermissionScope(str, Enum):
     SUPER_ADMIN = "superuser"
     ADMIN = "admin"
-    MANAGER = "manager"
+    OPERATION_MANAGER = "operation_manager"
     ACCOUNTANT = "accountant"
     OPERATOR = "operator"
     DRIVER = "driver"
@@ -69,7 +69,7 @@ class UserListParams(BaseModel):
     phone_number: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    uuid
+    uuid: Optional[str] = None
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
 

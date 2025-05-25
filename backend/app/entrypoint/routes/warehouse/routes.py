@@ -11,16 +11,29 @@ from app.dto.warehouse import (
 
 from models.common import Warehouse as WarehouseModel
 from app.entrypoint.routes.warehouse import warehouse_blueprint
-
 from app.entrypoint.routes.common.errors import NotFoundError
-
 from app.entrypoint.routes.common.errors import BadRequestError
-
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 @warehouse_blueprint.route('/', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER.value,
+                 PermissionScope.OPERATOR.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.ACCOUNTANT.value
+
+                 )
 def create_warehouse():
+    current_user_uuid = get_jwt_identity()
     payload = WarehouseCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=payload)
         data = payload.model_dump(mode='json',exclude_unset=True)
         wh = WarehouseModel(**data)
         if uow.warehouse_repository.find_first(name=wh.name):
@@ -30,6 +43,16 @@ def create_warehouse():
     return jsonify(result), 201
 
 @warehouse_blueprint.route('/<string:uuid>', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER.value,
+                 PermissionScope.OPERATOR.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.ACCOUNTANT.value
+
+                 )
 def get_warehouse(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         wh = uow.warehouse_repository.find_one(uuid=uuid, is_deleted=False)
@@ -39,6 +62,15 @@ def get_warehouse(uuid: str):
     return jsonify(result), 200
 
 @warehouse_blueprint.route('/<string:uuid>', methods=['PUT'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER.value,
+                 PermissionScope.OPERATOR.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.ACCOUNTANT.value
+                 )
 def update_warehouse(uuid: str):
     payload = WarehouseUpdate(**request.json)
     updates = payload.model_dump(exclude_unset=True, mode='json')
@@ -53,6 +85,10 @@ def update_warehouse(uuid: str):
     return jsonify(result), 200
 
 @warehouse_blueprint.route('/<string:uuid>', methods=['DELETE'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 )
 def delete_warehouse(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         wh = uow.warehouse_repository.find_one(uuid=uuid, is_deleted=False)
@@ -66,6 +102,15 @@ def delete_warehouse(uuid: str):
     return jsonify(result), 200
 
 @warehouse_blueprint.route('/', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER.value,
+                 PermissionScope.OPERATOR.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.ACCOUNTANT.value
+                 )
 def list_warehouses():
     params = WarehouseListParams(**request.args)
     filters = [WarehouseModel.is_deleted == False]

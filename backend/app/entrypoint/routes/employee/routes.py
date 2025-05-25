@@ -15,11 +15,22 @@ from app.entrypoint.routes.employee import employee_blueprint
 from app.entrypoint.routes.common.errors import NotFoundError
 from app.entrypoint.routes.common.errors import BadRequestError
 
+from app.dto.employee import EmployeeRole
+
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+from flask_jwt_extended import get_jwt_identity, jwt_required
+
 
 @employee_blueprint.route('/', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def create_employee():
+    current_uuid = get_jwt_identity()
     payload = EmployeeCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        add_logged_user_to_payload(uow=uow, user_uuid=current_uuid, payload=payload)
         data = payload.model_dump(mode='json')
         emp = EmployeeModel(**data)
         uow.employee_repository.save(model=emp, commit=True)
@@ -29,6 +40,11 @@ def create_employee():
 
 
 @employee_blueprint.route('/<string:uuid>', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.OPERATION_MANAGER)
 def get_employee(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         emp = uow.employee_repository.find_one(uuid=uuid, is_deleted=False)
@@ -39,6 +55,9 @@ def get_employee(uuid: str):
 
 
 @employee_blueprint.route('/<string:uuid>', methods=['PUT'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value)
 def update_employee(uuid: str):
     payload = EmployeeUpdate(**request.json)
     data = payload.model_dump(exclude_unset=True, mode='json')
@@ -55,6 +74,9 @@ def update_employee(uuid: str):
 
 
 @employee_blueprint.route('/<string:uuid>', methods=['DELETE'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value)
 def delete_employee(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         emp = uow.employee_repository.find_one(uuid=uuid, is_deleted=False)
@@ -73,6 +95,11 @@ def delete_employee(uuid: str):
 
 
 @employee_blueprint.route('/', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.OPERATION_MANAGER)
 def list_employees():
     # Parse & validate pagination params
     params = EmployeeListParams(**request.args)
@@ -107,3 +134,8 @@ def list_employees():
         ).model_dump(mode='json')
 
     return jsonify(result), 200
+
+@employee_blueprint.route('/roles', methods=['GET'])
+def list_roles():
+    roles = [role.value for role in EmployeeRole]
+    return jsonify(roles), 200

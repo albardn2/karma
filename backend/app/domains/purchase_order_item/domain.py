@@ -65,13 +65,16 @@ class PurchaseOrderItemDomain:
             uow.inventory_event_repository.save(model=inventory_events[0], commit=False)
 
             # delete inventory entry if no event are attached, else raise exception
-            InventoryDomain.delete_inventory(
-                uow=uow,
-                uuid=inventory_events[0].inventory_uuid
-            )
-            items.append(po_item)
-
-
+            inventory = uow.inventory_repository.find_one(uuid=inventory_events[0].inventory_uuid, is_deleted=False)
+            if not inventory:
+                raise NotFoundError("Inventory not found")
+            if len(inventory.inventory_events) == 0:
+                # otherewise the PO was added to existing inventory
+                InventoryDomain.delete_inventory(
+                    uow=uow,
+                    uuid=inventory_events[0].inventory_uuid
+                )
+                items.append(po_item)
 
         uow.purchase_order_item_repository.batch_save(models=items, commit=False)
         return [PurchaseOrderItemRead.from_orm(po_item) for po_item in items]

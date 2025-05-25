@@ -47,6 +47,8 @@ class ProcessDomain:
         for output in process.data["outputs"]:
             if output["inventory_uuid"] is None:
                 raise BadRequestError("Output inventory uuid is None")
+
+            ProcessDomain.validate_inventory_material(uow=uow, inventory_uuid=output["inventory_uuid"], material_uuid=output["material_uuid"])
             # load output to dto
             output = ProcessOutputItem(**output)
             InventoryEventDomain.create_inventory_event(
@@ -153,3 +155,16 @@ class ProcessDomain:
                     payload=payload,
                 )
                 output["inventory_uuid"] = inv_read.uuid
+
+    @staticmethod
+    def validate_inventory_material(
+        uow: SqlAlchemyUnitOfWork,
+        inventory_uuid: str,
+        material_uuid: str,
+    ) -> None:
+        """Validate that the inventory and material match."""
+        existing_inventory = uow.inventory_repository.find_one(uuid=inventory_uuid, is_deleted=False)
+        if not existing_inventory:
+            raise NotFoundError("Inventory not found")
+        if existing_inventory.material_uuid != material_uuid:
+            raise BadRequestError("Material not found in inventory")

@@ -82,5 +82,5 @@ class UserDomain:
 
         if username_changed and uow.user_repository.find_one(username=payload.username):
             raise BadRequestError(f"Username {payload.username!r} already taken")
-        if email_changed and payload.email and uow.user_repository.find_one(email=payload.email, is_deleted=False):
+        if email_changed and payload.email and uow.user_repository.find_one(email=payload.email):
             raise BadRequestError(f"Email {payload.email!r} already registered")

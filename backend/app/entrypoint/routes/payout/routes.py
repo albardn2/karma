@@ -13,17 +13,37 @@ from models.common import Payout as PayoutModel
 from app.domains.payout.domain import PayoutDomain
 from app.entrypoint.routes.payout import payout_blueprint
 
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 @payout_blueprint.route('/', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.OPERATION_MANAGER
+                 )
 def create_payout():
+    current_user_uuid = get_jwt_identity()
     payload = PayoutCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=payload)
         payout_read = PayoutDomain.create_payout(uow=uow, payload=payload)
         result = payout_read.model_dump(mode='json')
         uow.commit()
     return jsonify(result), 201
 
 @payout_blueprint.route('/<string:uuid>', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.OPERATION_MANAGER
+                 )
 def get_payout(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         po = uow.payout_repository.find_one(uuid=uuid, is_deleted=False)
@@ -33,6 +53,13 @@ def get_payout(uuid: str):
     return jsonify(result), 200
 
 @payout_blueprint.route('/<string:uuid>', methods=['PUT'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.OPERATION_MANAGER
+                 )
 def update_payout(uuid: str):
     payload = PayoutUpdate(**request.json)
     updates = payload.model_dump(exclude_unset=True, mode='json')
@@ -47,6 +74,10 @@ def update_payout(uuid: str):
     return jsonify(result), 200
 
 @payout_blueprint.route('/<string:uuid>', methods=['DELETE'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 )
 def delete_payout(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         payout_read = PayoutDomain.delete_payout(uow=uow, uuid=uuid)
@@ -55,6 +86,13 @@ def delete_payout(uuid: str):
     return jsonify(result), 200
 
 @payout_blueprint.route('/', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.OPERATION_MANAGER
+                 )
 def list_payouts():
     params = PayoutListParams(**request.args)
     filters = [PayoutModel.is_deleted == False]

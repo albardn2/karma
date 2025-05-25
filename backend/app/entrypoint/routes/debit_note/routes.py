@@ -15,16 +15,26 @@ from app.domains.debit_note_item.domain import DebitNoteItemDomain
 
 from app.entrypoint.routes.debit_note import debit_note_item_blueprint
 
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 @debit_note_item_blueprint.route("/", methods=["POST"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def create_debit_note_item():
+    current_uuid = get_jwt_identity()
     payload = DebitNoteItemCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        add_logged_user_to_payload(uow=uow, user_uuid=current_uuid, payload=payload)
         dto = DebitNoteItemDomain.create_item(uow=uow, payload=payload)
         uow.commit()
     return jsonify(dto.model_dump(mode="json")), 201
 
 @debit_note_item_blueprint.route("/<string:uuid>", methods=["GET"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value, PermissionScope.ACCOUNTANT.value)
 def get_debit_note_item(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         m = uow.debit_note_item_repository.find_one(uuid=uuid, is_deleted=False)
@@ -34,6 +44,8 @@ def get_debit_note_item(uuid: str):
     return jsonify(dto), 200
 #
 @debit_note_item_blueprint.route("/<string:uuid>", methods=["PUT"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def update_debit_note_item(uuid: str):
     payload = DebitNoteItemUpdate(**request.json)
     updates = payload.model_dump(exclude_unset=True, mode="json")
@@ -48,6 +60,8 @@ def update_debit_note_item(uuid: str):
     return jsonify(dto), 200
 
 @debit_note_item_blueprint.route("/<string:uuid>", methods=["DELETE"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def delete_debit_note_item(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         dto = DebitNoteItemDomain.delete_item(uow=uow, uuid=uuid)
@@ -55,6 +69,8 @@ def delete_debit_note_item(uuid: str):
     return jsonify(dto.model_dump(mode="json")), 200
 #
 @debit_note_item_blueprint.route("/", methods=["GET"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value, PermissionScope.ACCOUNTANT.value)
 def list_debit_note_items():
     params = DebitNoteItemListParams(**request.args)
     filters = [DebitNoteItemModel.is_deleted == False]

@@ -5,7 +5,8 @@ from app.dto.purchase_order_item import PurchaseOrderItemRead, POFulfillItem
 
 from app.domains.inventory.domain import InventoryDomain
 from app.dto.inventory import InventoryCreate
-from app.dto.inventory_event import InventoryEventRead
+
+from app.entrypoint.routes.common.errors import BadRequestError
 
 
 class InventoryFulfillmentHandler:
@@ -20,6 +21,7 @@ class InventoryFulfillmentHandler:
         inventory_uuid = None
         if po_item_fulfillment_payload.inventory_uuid:
             inventory_uuid = po_item_fulfillment_payload.inventory_uuid
+            self.validate_material(uow=uow,inventory_uuid=inventory_uuid,material_uuid=po_item.material_uuid)
         elif po_item_fulfillment_payload.warehouse_uuid:
             # create a new inventory entry with the po item and warehouse
             inv_create_payload = InventoryCreate(
@@ -40,3 +42,10 @@ class InventoryFulfillmentHandler:
                 affect_original=True,
             ))
         return event_read
+
+    def validate_material(self,uow: SqlAlchemyUnitOfWork,inventory_uuid:str, material_uuid: str):
+        existing_inventory = uow.inventory_repository.find_one(uuid=inventory_uuid, is_deleted=False)
+        if not existing_inventory:
+            raise BadRequestError("Inventory not found")
+        if existing_inventory.material_uuid != material_uuid:
+            raise BadRequestError("Material not found in inventory")

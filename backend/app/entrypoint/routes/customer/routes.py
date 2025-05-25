@@ -1,4 +1,5 @@
 from flask import  request, jsonify
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from pydantic import  ValidationError
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
@@ -11,11 +12,24 @@ from app.dto.customer import CustomerUpdate, CustomerReadList,CustomerListParams
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.entrypoint.routes.common.errors import NotFoundError
 
+from app.dto.customer import CustomerCategory
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+
+
 
 @customer_blueprint.route('/', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value)
 def create_customer():
+    current_uuid = get_jwt_identity()
     payload = CustomerCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        add_logged_user_to_payload(uow=uow, user_uuid=current_uuid, payload=payload)
         if uow.customer_repository.find_one(email_address=payload.email_address):
             raise BadRequestError(f"Customer with email {payload.email_address} already exists")
 
@@ -27,6 +41,12 @@ def create_customer():
 
 
 @customer_blueprint.route('/<string:uuid>', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.ACCOUNTANT.value)
 def get_customer(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         customer = uow.customer_repository.find_one(uuid=uuid,is_deleted=False)
@@ -37,6 +57,9 @@ def get_customer(uuid: str):
 
 
 @customer_blueprint.route('/<string:uuid>', methods=['PUT'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value)
 def update_customer(uuid: str):
     payload = CustomerUpdate(**request.json)
     data = payload.model_dump(exclude_unset=True)
@@ -57,6 +80,9 @@ def update_customer(uuid: str):
 
 
 @customer_blueprint.route('/<string:uuid>', methods=['DELETE'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value)
 def delete_customer(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         customer = uow.customer_repository.find_one(uuid=uuid, is_deleted=False)
@@ -84,6 +110,12 @@ def delete_customer(uuid: str):
 
 
 @customer_blueprint.route('/', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.ACCOUNTANT.value)
 def list_customers():
     # Parse & validate pagination params
     params = CustomerListParams(**request.args)
@@ -123,3 +155,9 @@ def list_customers():
         ).model_dump(mode='json')
 
     return jsonify(result), 200
+
+
+@customer_blueprint.route('/categories', methods=['GET'])
+def list_customer_categories():
+    categories = [category.value for category in CustomerCategory]
+    return jsonify(categories), 200

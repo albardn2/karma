@@ -15,15 +15,21 @@ from app.entrypoint.routes.pricing import pricing_blueprint
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.errors import NotFoundError
 
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 @pricing_blueprint.route('/', methods=['POST'])
 @jwt_required()
-@scopes_required("admin", "superuser")
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value
+                 )
 def create_pricing():
     payload = PricingCreate(**request.json)
     current_user_uuid = get_jwt_identity()
-    payload.created_by_uuid = current_user_uuid
     with SqlAlchemyUnitOfWork() as uow:
+        add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=payload)
         data = payload.model_dump(mode='json')
         pr = PricingModel(**data)
         uow.pricing_repository.save(model=pr, commit=True)
@@ -32,6 +38,13 @@ def create_pricing():
     return jsonify(pricing_data), 201
 
 @pricing_blueprint.route('/<string:uuid>', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value
+                 )
 def get_pricing(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         pr = uow.pricing_repository.find_one(uuid=uuid, is_deleted=False)
@@ -42,6 +55,10 @@ def get_pricing(uuid: str):
     return jsonify(pricing_data), 200
 
 @pricing_blueprint.route('/<string:uuid>', methods=['PUT'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value
+                 )
 def update_pricing(uuid: str):
     payload = PricingUpdate(**request.json)
     data    = payload.model_dump(exclude_unset=True, mode='json')
@@ -57,6 +74,10 @@ def update_pricing(uuid: str):
     return jsonify(pricing_data), 200
 
 @pricing_blueprint.route('/<string:uuid>', methods=['DELETE'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value
+                 )
 def delete_pricing(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         pr = uow.pricing_repository.find_one(uuid=uuid, is_deleted=False)
@@ -70,6 +91,13 @@ def delete_pricing(uuid: str):
     return jsonify(pricing_data), 200
 
 @pricing_blueprint.route('/', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value
+                 )
 def list_pricings():
 
     params = PricingListParams(**request.args)

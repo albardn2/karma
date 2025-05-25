@@ -12,17 +12,33 @@ from app.entrypoint.routes.transaction import transaction_blueprint
 from app.domains.transaction.domain import TransactionDomain
 from app.entrypoint.routes.common.errors import NotFoundError
 
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 @transaction_blueprint.route('/', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value
+                 )
 def create_transaction():
+    current_user_uuid = get_jwt_identity()
     payload = TransactionCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=payload)
         transaction_read = TransactionDomain.create_transaction(uow, payload)
         result = transaction_read.model_dump(mode='json')
         uow.commit()
     return jsonify(result), 201
 
 @transaction_blueprint.route('/<string:uuid>', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value
+                 )
 def get_transaction(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         tx = uow.transaction_repository.find_one(uuid=uuid, is_deleted=False)
@@ -32,6 +48,11 @@ def get_transaction(uuid: str):
     return jsonify(result), 200
 
 @transaction_blueprint.route('/<string:uuid>', methods=['PUT'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value
+                 )
 def update_transaction(uuid: str):
     payload = TransactionUpdate(**request.json)
     updates = payload.model_dump(exclude_unset=True, mode='json')
@@ -46,6 +67,10 @@ def update_transaction(uuid: str):
     return jsonify(result), 200
 
 @transaction_blueprint.route('/<string:uuid>', methods=['DELETE'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value
+                 )
 def delete_transaction(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         transaction_read = TransactionDomain.delete_transaction(uow, uuid)
@@ -54,6 +79,11 @@ def delete_transaction(uuid: str):
     return jsonify(result), 200
 
 @transaction_blueprint.route('/', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value
+                 )
 def list_transactions():
     params = TransactionListParams(**request.args)
     # assemble SQLAlchemy filters

@@ -15,8 +15,17 @@ from app.domains.purchase_order_item.domain import PurchaseOrderItemDomain
 from app.dto.purchase_order_item import PurchaseOrderItemBulkFulfill
 from app.dto.purchase_order_item import PurchaseOrderItemBulkUnFulfill
 
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 @poi_blueprint.route('/fulfill-items', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER
+                 )
 def fulfill_order_items():
     payload = PurchaseOrderItemBulkFulfill(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
@@ -27,6 +36,11 @@ def fulfill_order_items():
     return jsonify([r.model_dump(mode='json') for r in bulk_read]), 200
 
 @poi_blueprint.route('/unfulfill-items', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER
+                 )
 def unfulfill_order_items():
     payload = PurchaseOrderItemBulkUnFulfill(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
@@ -37,13 +51,16 @@ def unfulfill_order_items():
     return jsonify([r.model_dump(mode='json') for r in bulk_read]), 200
 
 @poi_blueprint.route('/', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER
+                 )
 def create_item():
-    try:
-        payload = PurchaseOrderItemCreate(**request.json)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
+    current_user_uuid = get_jwt_identity()
+    payload = PurchaseOrderItemCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=payload)
         data = payload.model_dump(mode='json')
         item = PurchaseOrderItemModel(**data)
         uow.purchase_order_item_repository.save(model=item, commit=True)
@@ -51,6 +68,12 @@ def create_item():
     return jsonify(result), 201
 
 @poi_blueprint.route('/<string:uuid>', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER,
+                 PermissionScope.ACCOUNTANT.value
+                 )
 def get_item(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         item = uow.purchase_order_item_repository.find_one(uuid=uuid, is_deleted=False)
@@ -60,6 +83,11 @@ def get_item(uuid: str):
     return jsonify(result), 200
 
 @poi_blueprint.route('/<string:uuid>', methods=['PUT'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER
+                 )
 def update_item(uuid: str):
     try:
         payload = PurchaseOrderItemUpdate(**request.json)
@@ -77,6 +105,10 @@ def update_item(uuid: str):
     return jsonify(result), 200
 
 @poi_blueprint.route('/<string:uuid>', methods=['DELETE'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value
+                 )
 def delete_item(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         item = uow.purchase_order_item_repository.find_one(uuid=uuid, is_deleted=False)
@@ -88,6 +120,12 @@ def delete_item(uuid: str):
     return jsonify(result), 200
 
 @poi_blueprint.route('/', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER,
+                 PermissionScope.ACCOUNTANT.value
+                 )
 def list_items():
     try:
         params = PurchaseOrderItemListParams(**request.args)

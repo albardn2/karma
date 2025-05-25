@@ -17,14 +17,21 @@ from app.entrypoint.routes.common.auth import scopes_required
 
 from app.domains.financial_account.domain import FinancialAccountDomain
 
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 @financial_account_blueprint.route('/', methods=['POST'])
 @jwt_required()
-@scopes_required("admin", "superuser")
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value)
 def create_account():
+    """Create a new financial account."""
     payload = FinancialAccountCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
         current_user_uuid = get_jwt_identity()
+        add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=payload)
         data = payload.model_dump(mode='json')
         acct = FinancialAccountModel(**data)
         acct.created_by_uuid = current_user_uuid
@@ -34,7 +41,9 @@ def create_account():
 
 @financial_account_blueprint.route('/<string:uuid>', methods=['GET'])
 @jwt_required()
-@scopes_required("admin", "superuser")
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value)
 def get_account(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         acct = uow.financial_account_repository.find_one(uuid=uuid, is_deleted=False)
@@ -45,7 +54,8 @@ def get_account(uuid: str):
 
 @financial_account_blueprint.route('/<string:uuid>', methods=['PUT'])
 @jwt_required()
-@scopes_required("admin", "superuser")
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value)
 def update_account(uuid: str):
     payload = FinancialAccountUpdate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
@@ -56,7 +66,8 @@ def update_account(uuid: str):
 
 @financial_account_blueprint.route('/<string:uuid>', methods=['DELETE'])
 @jwt_required()
-@scopes_required("admin", "superuser")
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value)
 def delete_account(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         acct_read = FinancialAccountDomain.delete_financial_account(uow=uow, uuid=uuid)
@@ -66,7 +77,9 @@ def delete_account(uuid: str):
 
 @financial_account_blueprint.route('/', methods=['GET'])
 @jwt_required()
-@scopes_required("admin", "superuser")
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value)
 def list_accounts():
     params = FinancialAccountListParams(**request.args)
     with SqlAlchemyUnitOfWork() as uow:

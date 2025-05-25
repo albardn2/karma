@@ -29,7 +29,7 @@ from app.dto.auth import PermissionScope
 
 
 @auth_blueprint.route("/register", methods=["POST"])
-@scopes_required("admin","superuser")
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def register():
     payload = RegisterRequest(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
@@ -70,7 +70,7 @@ def logout():
 
 @auth_blueprint.route("/user/<string:user_uuid>", methods=["GET"])
 @jwt_required()
-@scopes_required("admin","superuser")
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def profile(user_uuid: str):
     current_uuid = get_jwt_identity()
     with SqlAlchemyUnitOfWork() as uow:
@@ -88,7 +88,7 @@ def profile(user_uuid: str):
 
 @auth_blueprint.route("/user/<string:user_uuid>", methods=["PUT"])
 @jwt_required()
-@scopes_required("admin","superuser")
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def update_user(user_uuid: str):
     req = UserUpdate(**request.json)
     current_user_uuid = get_jwt_identity()
@@ -106,7 +106,7 @@ def update_user(user_uuid: str):
 
 @auth_blueprint.route("/users", methods=["GET"])
 @jwt_required()
-@scopes_required("admin","superuser")
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def list_users():
     # validate query-string args
     params = UserListParams(**request.args)
@@ -153,7 +153,7 @@ def list_users():
 
 @auth_blueprint.route("/user/<string:user_uuid>", methods=["DELETE"])
 @jwt_required()
-@scopes_required("admin","superuser")
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def delete_user(user_uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         user_read = UserDomain.delete_user(uow=uow, user_uuid=user_uuid)

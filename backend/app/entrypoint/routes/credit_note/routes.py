@@ -9,22 +9,33 @@ from app.dto.credit_note_item import (
     CreditNoteItemListParams,
     CreditNoteItemPage,
 )
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from models.common import CreditNoteItem as CreditNoteItemModel
 from app.domains.credit_note_item.domain import CreditNoteItemDomain
 
 from app.entrypoint.routes.credit_note import credit_note_item_blueprint
 
+from app.dto.auth import PermissionScope
+from app.entrypoint.routes.common.auth import scopes_required
+from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+
 
 @credit_note_item_blueprint.route("/", methods=["POST"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def create_credit_note_item():
+    current_uuid = get_jwt_identity()
     payload = CreditNoteItemCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
+        add_logged_user_to_payload(uow=uow, user_uuid=current_uuid, payload=payload)
         dto = CreditNoteItemDomain.create_item(uow=uow, payload=payload)
         uow.commit()
     return jsonify(dto.model_dump(mode="json")), 201
 
 
 @credit_note_item_blueprint.route("/<string:uuid>", methods=["GET"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value, PermissionScope.ACCOUNTANT.value)
 def get_credit_note_item(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         m = uow.credit_note_item_repository.find_one(uuid=uuid, is_deleted=False)
@@ -35,6 +46,8 @@ def get_credit_note_item(uuid: str):
 
 
 @credit_note_item_blueprint.route("/<string:uuid>", methods=["PUT"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def update_credit_note_item(uuid: str):
     payload = CreditNoteItemUpdate(**request.json)
     updates = payload.model_dump(exclude_unset=True, mode="json")
@@ -50,6 +63,8 @@ def update_credit_note_item(uuid: str):
 
 
 @credit_note_item_blueprint.route("/<string:uuid>", methods=["DELETE"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def delete_credit_note_item(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         dto = CreditNoteItemDomain.delete_item(uow=uow, uuid=uuid)
@@ -58,10 +73,11 @@ def delete_credit_note_item(uuid: str):
 
 
 @credit_note_item_blueprint.route("/", methods=["GET"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value, PermissionScope.ACCOUNTANT.value)
 def list_credit_note_items():
     params = CreditNoteItemListParams(**request.args)
     filters = [CreditNoteItemModel.is_deleted == False]
-
     if params.is_paid is not None:
         filters.append(CreditNoteItemModel.is_paid == params.is_paid)
     if params.uuid:
