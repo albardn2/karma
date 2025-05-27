@@ -32,8 +32,9 @@ from app.entrypoint.routes.debit_note import debit_note_item_blueprint
 from app.entrypoint.routes.credit_note import credit_note_item_blueprint
 from app.entrypoint.routes.process import process_blueprint
 from app.entrypoint.routes.auth import auth_blueprint
-
-
+from app.entrypoint.routes.workflow import workflow_blueprint
+from app.entrypoint.routes.task import task_blueprint
+from app.entrypoint.routes.workflow_execution import workflow_execution_blueprint
 
 jwt = JWTManager()
 load_dotenv()
@@ -80,6 +81,10 @@ def create_app(config_object=Config):
     app.register_blueprint(credit_note_item_blueprint, url_prefix='/credit-note-item')
     app.register_blueprint(process_blueprint, url_prefix='/process')
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
+    app.register_blueprint(workflow_blueprint, url_prefix='/workflow')
+    app.register_blueprint(task_blueprint, url_prefix='/task')
+    app.register_blueprint(workflow_execution_blueprint, url_prefix='/workflow-execution')
+
 
     register_error_handlers(app)
 

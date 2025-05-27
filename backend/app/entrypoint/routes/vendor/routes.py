@@ -1,8 +1,5 @@
 # app/entrypoint/routes/vendor.py
-
 from flask import Blueprint, request, jsonify
-from pydantic import ValidationError
-
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.dto.vendor import (
     VendorCreate,
@@ -13,13 +10,10 @@ from app.dto.vendor import (
     VendorPage
 )
 from models.common import Vendor as VendorModel
-
 from app.entrypoint.routes.vendor import vendor_blueprint
 from app.entrypoint.routes.common.errors import NotFoundError
-
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.dto.vendor import VendorCategory
-
 from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.auth import add_logged_user_to_payload
@@ -29,8 +23,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 @jwt_required()
 @scopes_required(PermissionScope.ADMIN.value,
                  PermissionScope.SUPER_ADMIN.value,
-                 PermissionScope.OPERATION_MANAGER.value
-                 )
+                 PermissionScope.OPERATION_MANAGER.value)
 def create_vendor():
     current_user_uuid = get_jwt_identity()
     payload = VendorCreate(**request.json)
@@ -44,7 +37,6 @@ def create_vendor():
         v = VendorModel(**data)
         uow.vendor_repository.save(model=v, commit=True)
         vendor_data = VendorRead.from_orm(v).model_dump(mode='json')
-
     return jsonify(vendor_data), 201
 
 
@@ -68,8 +60,7 @@ def get_vendor(uuid: str):
 @jwt_required()
 @scopes_required(PermissionScope.ADMIN.value,
                  PermissionScope.SUPER_ADMIN.value,
-                 PermissionScope.OPERATION_MANAGER.value,
-                 )
+                 PermissionScope.OPERATION_MANAGER.value)
 def update_vendor(uuid: str):
     payload = VendorUpdate(**request.json)
     data = payload.model_dump(exclude_unset=True, mode='json')
@@ -123,8 +114,7 @@ def delete_vendor(uuid: str):
 @jwt_required()
 @scopes_required(PermissionScope.ADMIN.value,
                  PermissionScope.SUPER_ADMIN.value,
-                 PermissionScope.OPERATION_MANAGER.value
-                 )
+                 PermissionScope.OPERATION_MANAGER.value)
 def list_vendors():
     params = VendorListParams(**request.args)
     filters = [VendorModel.is_deleted == False]
@@ -157,7 +147,6 @@ def list_vendors():
             per_page=page_obj.per_page,
             pages=page_obj.pages
         ).model_dump(mode='json')
-
     return jsonify(result), 200
 
 @vendor_blueprint.route('/categories', methods=['GET'])

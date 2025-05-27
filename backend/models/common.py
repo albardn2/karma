@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 
 import bcrypt
 from sqlalchemy import create_engine, Column, String, DateTime, Text, Float, JSON, select, exists, and_, case, \
-    CheckConstraint, false, true, func, literal
+    CheckConstraint, false, true, func, literal, cast
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import declarative_base, sessionmaker, validates
@@ -1626,3 +1627,103 @@ class CreditNoteItem(Base):
     def is_paid(cls):
         return cls.amount_due == literal(0)
 
+class Workflow(Base):
+    __tablename__ = "workflow"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    name = Column(String(120), nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    description = Column(Text, nullable=True)
+    tags = Column(ARRAY(String), nullable=True,default=list)
+    is_deleted = Column(Boolean, default=False)
+
+    # relations
+    tasks = relationship("Task", back_populates="workflow")
+    workflow_executions = relationship("WorkflowExecution", back_populates="workflow")
+
+
+class Task(Base):
+    __tablename__ = "task"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    workflow_uuid = Column(String(36), ForeignKey("workflow.uuid"), nullable=False)
+    parent_task_uuid = Column(String(36), ForeignKey("task.uuid"), nullable=True)  # Self-referencing foreign key
+    name = Column(String(120), nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    operator = Column(String(120), nullable=False)
+    task_inputs = Column(MutableDict.as_mutable(JSON), default=dict)
+    depends_on = Column(ARRAY(String), nullable=True, default=[])  # List of task names this task depends on
+    is_deleted = Column(Boolean, default=False)
+
+    # Relations
+    workflow = relationship("Workflow", back_populates="tasks")
+    parent_task = relationship("Task", remote_side=[uuid])  # Remove backref here
+    child_tasks = relationship("Task", back_populates="parent_task")  # Automatically creates the reverse relationship
+    task_executions = relationship("TaskExecution", back_populates="task")
+
+class WorkflowExecution(Base):
+    __tablename__ = "workflow_execution"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    workflow_uuid = Column(String(36), ForeignKey("workflow.uuid"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    status = Column(String(120), nullable=False)  # e.g. in_progress, completed, failed
+    result = Column(MutableDict.as_mutable(JSON), default=dict)
+    parameters = Column(MutableDict.as_mutable(JSON), default=dict)
+    error_message = Column(Text, nullable=True)
+    start_time = Column(DateTime, nullable=True)
+    end_time = Column(DateTime, nullable=True)
+    # relations
+    workflow = relationship("Workflow", back_populates="workflow_executions")
+    task_executions = relationship("TaskExecution", back_populates="workflow_execution")
+
+    @hybrid_property
+    def name(self):
+        return self.workflow.name if self.workflow else None
+
+    @name.expression
+    def name(cls):
+        return select(Workflow.name).where(Workflow.uuid == cls.workflow_uuid).scalar_subquery()
+
+    @hybrid_property
+    def tags(self):
+        return self.workflow.tags if self.workflow else []
+
+    @tags.expression
+    def tags(cls):
+        # build the scalar subquery…
+        sq = (
+            select(Workflow.tags)
+            .where(Workflow.uuid == cls.workflow_uuid)
+            .scalar_subquery()
+        )
+        # then cast it explicitly to Postgres ARRAY(String)
+        return cast(sq, ARRAY(String))
+
+class TaskExecution(Base):
+    __tablename__ = "task_execution"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    completed_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    task_uuid = Column(String(36), ForeignKey("task.uuid"), nullable=True) # nullable for child tasks
+    parent_task_execution_uuid = Column(String(36), ForeignKey("task_execution.uuid"), nullable=True)  # Parent TaskExecution if this is a child task
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    status = Column(String(120), nullable=False)  # e.g., in_progress, completed, failed
+    result = Column(MutableDict.as_mutable(JSON), default=dict)
+    error_message = Column(Text, nullable=True)
+    start_time = Column(DateTime, nullable=True)
+    end_time = Column(DateTime, nullable=True)
+    depends_on = Column(ARRAY(String), nullable=True, default=[])  # List of task_execution_uuids this execution depends on
+    workflow_execution_uuid = Column(String(36), ForeignKey("workflow_execution.uuid"), nullable=False)
+
+
+    # Relations
+    task = relationship("Task", back_populates="task_executions")
+    workflow_execution = relationship("WorkflowExecution", back_populates="task_executions")
+    parent_task_execution = relationship("TaskExecution", remote_side=[uuid], back_populates="child_task_executions")
+    child_task_executions = relationship("TaskExecution", back_populates="parent_task_execution")  # Reverse relationship for child task executions

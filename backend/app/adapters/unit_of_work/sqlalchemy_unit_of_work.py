@@ -27,6 +27,11 @@ from app.adapters.repositories.debit_note_item_repository import DebitNoteItemRe
 from app.adapters.repositories.credit_note_item_repository import CreditNoteItemRepository
 from app.adapters.repositories.process_repository import ProcessRepository
 from app.adapters.repositories.user_repository import UserRepository
+from app.adapters.repositories.workflow_repository import WorkflowRepository
+from app.adapters.repositories.task_repository import TaskRepository  # Placeholder for task repository
+from app.adapters.repositories.workflow_execution_repository import WorkflowExecutionRepository
+from app.adapters.repositories.task_execution_repository import TaskExecutionRepository
+
 
 
 SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")  # type: ignore
@@ -66,6 +71,10 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.credit_note_item_repository = CreditNoteItemRepository(session=self.session)
         self.process_repository = ProcessRepository(session=self.session)
         self.user_repository = UserRepository(session=self.session)
+        self.workflow_repository = WorkflowRepository(session=self.session)
+        self.task_repository = TaskRepository(session=self.session)
+        self.workflow_execution_repository = WorkflowExecutionRepository(session=self.session)
+        self.task_execution_repository = TaskExecutionRepository(session=self.session)
 
         return self
 
