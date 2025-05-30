@@ -19,7 +19,7 @@ class InventoryDomain:
         if not inventory.lot_id:
             inventory.lot_id = InventoryDomain.generate_lot_id_dashed()
 
-        uow.inventory_repository.save(model=inventory)
+        uow.inventory_repository.save(model=inventory,commit=False)
         dto = InventoryRead.from_orm(inventory)
         InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=dto)
         return dto
@@ -39,7 +39,7 @@ class InventoryDomain:
             raise NotFoundError('Inventory has inventory events, cannot be deleted')
 
         inventory.is_deleted = True
-        uow.inventory_repository.save(model=inventory)
+        uow.inventory_repository.save(model=inventory,commit=False)
         return InventoryRead.from_orm(inventory)
 
     @staticmethod

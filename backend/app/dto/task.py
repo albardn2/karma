@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Union
 from uuid import UUID
 from datetime import datetime
-
+from app.dto.task_execution import OperatorType
 
 
 class FieldType(str, Enum):
@@ -51,9 +51,10 @@ class TaskBase(BaseModel):
 
     name: str
     description: Optional[str] = None
-    operator: str
+    operator: OperatorType
     task_inputs: Optional[TaskInput] = None  # Representing the task inputs as a dictionary
     depends_on: Optional[List[str]] = []  # List of task names this task depends on
+    callback_fns: Optional[List[str]] = None  # List of callback function names to be executed after task completion
 
 # DTO for creating a new Task
 class TaskCreate(TaskBase):
@@ -69,9 +70,10 @@ class TaskUpdate(BaseModel):
 
     name: Optional[str] = None
     description: Optional[str] = None
-    operator: Optional[str] = None
+    operator: Optional[OperatorType] = None
     task_inputs: Optional[dict] = None # TODO: add dto for task inputs depending on opertor etc..
     depends_on: Optional[List[str]] = []  # List of task names this task depends on
+    callback_fns: Optional[List[str]] = None  # List of callback function names to be executed after task completion
 
 # DTO for reading a Task
 class TaskRead(TaskBase):

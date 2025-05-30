@@ -22,6 +22,13 @@ class WorkflowExecutionDomain:
         if not workflow:
             raise NotFoundError(f"Workflow not found with uuid: {workflow_uuid}")
 
+        # use workflow parameters and update if the same key exists in payload
+        parameters = workflow.parameters or {}
+        if payload.parameters:
+            for key, value in payload.parameters.items():
+                parameters[key] = value
+        payload.parameters = parameters
+
         workflow = WorkflowExecutionModel(
             workflow_uuid=workflow_uuid,
             parameters=payload.parameters or {},

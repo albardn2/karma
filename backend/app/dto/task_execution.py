@@ -1,7 +1,16 @@
+from enum import Enum
+
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Dict, Any, List
-from uuid import UUID
 from datetime import datetime
+
+class OperatorType(str, Enum):
+
+    IO_PROCESS_OPERATOR = "io_process_operator"
+    QC_OPERATOR = "qc_operator"
+    TRIP_OPERATOR = "trip_operator"
+    TRIP_STOP_OPERATOR = "trip_stop_operator"
+
 
 # Base DTO for TaskExecution
 class TaskExecutionBase(BaseModel):
@@ -18,10 +27,10 @@ class TaskExecutionBase(BaseModel):
 class TaskExecutionCreate(TaskExecutionBase):
     model_config = ConfigDict(extra="forbid")
 
-    task_uuid: UUID  # UUID of the task this execution belongs to
-    workflow_execution_uuid: UUID  # UUID of the workflow execution
-    created_by_uuid: Optional[UUID] = None  # UUID of the user who created the execution
-    parent_task_execution_uuid: Optional[UUID] = None  # Optional parent task execution if this is a child
+    task_uuid: str  # str of the task this execution belongs to
+    workflow_execution_uuid: str  # str of the workflow execution
+    created_by_uuid: Optional[str] = None  # str of the user who created the execution
+    parent_task_execution_uuid: Optional[str] = None  # Optional parent task execution if this is a child
 
 # DTO for updating a TaskExecution
 class TaskExecutionUpdate(TaskExecutionBase):
@@ -38,24 +47,27 @@ class TaskExecutionUpdate(TaskExecutionBase):
 class TaskExecutionRead(TaskExecutionBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-    uuid: UUID  # UUID of the task execution
-    task_uuid: UUID  # UUID of the associated task
-    workflow_execution_uuid: UUID  # UUID of the associated workflow execution
-    created_by_uuid: Optional[UUID] = None  # UUID of the user who created the execution
+    uuid: str  # str of the task execution
+    task_uuid: str  # str of the associated task
+    workflow_execution_uuid: str  # str of the associated workflow execution
+    created_by_uuid: Optional[str] = None  # str of the user who created the execution
     created_at: datetime  # Time when the task execution was created
-    parent_task_execution_uuid: Optional[UUID] = None  # Parent task execution UUID if this is a child task
+    parent_task_execution_uuid: Optional[str] = None  # Parent task execution str if this is a child task
+    name: Optional[str] = None  # Name of the task execution, if applicable
 
 # DTO for pagination and filtering when listing TaskExecutions
 class TaskExecutionListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    uuid: Optional[UUID] = None
-    task_uuid: Optional[UUID] = None  # Filter by task UUID
-    workflow_execution_uuid: Optional[UUID] = None  # Filter by workflow execution UUID
+    uuid: Optional[str] = None
+    task_uuid: Optional[str] = None  # Filter by task str
+    workflow_execution_uuid: Optional[str] = None  # Filter by workflow execution str
+    parent_task_execution_uuid: Optional[str] = None  # Filter by parent task execution str
     status: Optional[str] = None  # Filter by execution status (e.g., in_progress, completed)
-    created_by_uuid: Optional[UUID] = None
+    created_by_uuid: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+    name: Optional[str] = None  # Filter by task execution name
 
     page: int = Field(1, gt=0, description="Page number (>=1)")
     per_page: int = Field(20, gt=0, le=100, description="Items per page (<=100)")
@@ -69,3 +81,10 @@ class TaskExecutionPage(BaseModel):
     page: int = Field(..., description="Current page number")
     per_page: int = Field(..., description="Number of items per page")
     pages: int = Field(..., description="Total pages available")
+
+
+class TaskExecutionComplete(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    completed_by_uuid: Optional[str] = None  # UUID of the user completing the task execution
+    uuid: str  # UUID of the task execution to complete
+    result: Optional[Dict[str, Any]] = {}  # Result data to store

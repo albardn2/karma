@@ -15,6 +15,8 @@ class WorkflowBase(BaseModel):
     name: str
     description: Optional[str] = None
     tags: Optional[List[WorkflowTags]] = None
+    parameters: Optional[dict] = None  # Additional parameters for the workflow
+    callback_fns: Optional[List[str]] = None  # List of callback function names to be executed after workflow completion
 
 # DTO for creating a new Workflow
 class WorkflowCreate(WorkflowBase):
@@ -28,6 +30,9 @@ class WorkflowUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     tags: Optional[List[str]] = None
+    callback_fns:Optional[List[str]] = None
+    parameters: Optional[dict] = None  # Additional parameters for the workflow
+
 
 # DTO for reading a Workflow
 class WorkflowRead(WorkflowBase):
@@ -37,6 +42,7 @@ class WorkflowRead(WorkflowBase):
     created_by_uuid: Optional[str] = None
     created_at: datetime
     is_deleted: bool = False
+# DTO for reading a Workflow with additional fields
 
 # DTO for pagination and filtering when listing Workflows
 class WorkflowListParams(BaseModel):

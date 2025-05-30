@@ -1302,9 +1302,11 @@ class Process(Base):
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
     data = Column(MutableDict.as_mutable(JSON), default=dict)
+    workflow_execution_uuid = Column(String(36), ForeignKey("workflow_execution.uuid"), nullable=True)
 
     # relations
     inventory_events = relationship("InventoryEvent", back_populates="process")
+    workflow_execution = relationship("WorkflowExecution", back_populates="processes")
 
 
 class Warehouse(Base):
@@ -1637,6 +1639,9 @@ class Workflow(Base):
     description = Column(Text, nullable=True)
     tags = Column(ARRAY(String), nullable=True,default=list)
     is_deleted = Column(Boolean, default=False)
+    parameters = Column(MutableDict.as_mutable(JSON), default=dict)
+    callback_fns = Column(ARRAY(String), nullable=True,default=list)
+
 
     # relations
     tasks = relationship("Task", back_populates="workflow")
@@ -1656,6 +1661,7 @@ class Task(Base):
     operator = Column(String(120), nullable=False)
     task_inputs = Column(MutableDict.as_mutable(JSON), default=dict)
     depends_on = Column(ARRAY(String), nullable=True, default=[])  # List of task names this task depends on
+    callback_fns = Column(ARRAY(String), nullable=True, default=list)
     is_deleted = Column(Boolean, default=False)
 
     # Relations
@@ -1680,6 +1686,7 @@ class WorkflowExecution(Base):
     # relations
     workflow = relationship("Workflow", back_populates="workflow_executions")
     task_executions = relationship("TaskExecution", back_populates="workflow_execution")
+    processes = relationship("Process", back_populates="workflow_execution")
 
     @hybrid_property
     def name(self):
@@ -1704,6 +1711,10 @@ class WorkflowExecution(Base):
         # then cast it explicitly to Postgres ARRAY(String)
         return cast(sq, ARRAY(String))
 
+    @hybrid_property
+    def callback_fns(self):
+        return self.workflow.callback_fns if self.workflow else []
+
 class TaskExecution(Base):
     __tablename__ = "task_execution"
 
@@ -1721,9 +1732,24 @@ class TaskExecution(Base):
     depends_on = Column(ARRAY(String), nullable=True, default=[])  # List of task_execution_uuids this execution depends on
     workflow_execution_uuid = Column(String(36), ForeignKey("workflow_execution.uuid"), nullable=False)
 
-
     # Relations
     task = relationship("Task", back_populates="task_executions")
     workflow_execution = relationship("WorkflowExecution", back_populates="task_executions")
     parent_task_execution = relationship("TaskExecution", remote_side=[uuid], back_populates="child_task_executions")
     child_task_executions = relationship("TaskExecution", back_populates="parent_task_execution")  # Reverse relationship for child task executions
+
+    @hybrid_property
+    def name(self):
+        return self.task.name if self.task else None
+
+    @name.expression
+    def name(cls):
+        return select(Task.name).where(Task.uuid == cls.task_uuid).scalar_subquery()
+
+    @hybrid_property
+    def callback_fns(self):
+        return self.task.callback_fns if self.task else []
+
+    @hybrid_property
+    def operator(self):
+        return self.task.operator

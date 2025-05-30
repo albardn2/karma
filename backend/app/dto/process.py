@@ -103,6 +103,7 @@ class ProcessBase(BaseModel):
     type: ProcessType
     notes: Optional[str] = None
     data: ProcessData
+    workflow_execution_uuid: Optional[str] = None
 
 class ProcessCreate(ProcessBase):
     """Fields required to create a new process."""

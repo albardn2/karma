@@ -10,6 +10,11 @@ from app.dto.workflow_execution import (
     WorkflowStatus
 )
 
+from app.dto.task_execution import TaskExecutionComplete
+from app.domains.task_execution.workflow_operators.operator_entry_point import OperatorEntryPoint
+from app.domains.task_execution.callback_functions import CALLBACK_FN_MAPPER
+
+
 class TaskExecutionDomain:
 
     @staticmethod
@@ -75,3 +80,26 @@ class TaskExecutionDomain:
             task_execution.error_message = "Task execution was cancelled by user"
             uow.task_execution_repository.save(model=task_execution, commit=False)
 
+    @staticmethod
+    def complete_task_execution(uow: SqlAlchemyUnitOfWork,
+                                payload:TaskExecutionComplete) -> TaskExecutionRead:
+
+        task_exe = uow.task_execution_repository.find_one(uuid=payload.uuid)
+        if not task_exe:
+            raise NotFoundError(f"TaskExecution not found with uuid: {payload.uuid}")
+
+        if task_exe.status in [WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value,WorkflowStatus.NOT_STARTED]:
+            raise BadRequestError(f"TaskExecution cannot be completed with status: {task_exe.status}")
+
+        # execute
+        OperatorEntryPoint().execute(
+            uow=uow,
+            payload=payload,
+            operator_type=task_exe.task.operator
+        )
+        uow.task_execution_repository.save(model=task_exe, commit=False)
+        for fn_name in task_exe.callback_fns:
+            CALLBACK_FN_MAPPER[fn_name](uow=uow,
+                                        task_execution_uuid=task_exe.uuid)
+
+        return TaskExecutionRead.from_orm(task_exe)

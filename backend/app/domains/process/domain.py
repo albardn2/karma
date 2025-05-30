@@ -1,3 +1,5 @@
+import time
+
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.dto.process import ProcessCreate, ProcessRead
 from app.entrypoint.routes.common.errors import NotFoundError
@@ -155,6 +157,7 @@ class ProcessDomain:
                     payload=payload,
                 )
                 output["inventory_uuid"] = inv_read.uuid
+            time.sleep(1)  # Sleep to ensure the inventory is created before the next operation
 
     @staticmethod
     def validate_inventory_material(
