@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, Column, String, DateTime, Text, Float, JSO
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.mutable import MutableDict
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, sessionmaker, validates
 import uuid
 from datetime import datetime
@@ -1301,12 +1302,14 @@ class Process(Base):
     type = Column(String(120), nullable=False)  # e.g., powder_preparation, coated_peanuts
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
-    data = Column(MutableDict.as_mutable(JSON), default=dict)
+    data = Column(MutableDict.as_mutable(JSONB), default=dict)
     workflow_execution_uuid = Column(String(36), ForeignKey("workflow_execution.uuid"), nullable=True)
 
     # relations
     inventory_events = relationship("InventoryEvent", back_populates="process")
     workflow_execution = relationship("WorkflowExecution", back_populates="processes")
+    quality_control = relationship("QualityControl", back_populates="process", uselist=False)
+
 
 
 class Warehouse(Base):
@@ -1639,9 +1642,8 @@ class Workflow(Base):
     description = Column(Text, nullable=True)
     tags = Column(ARRAY(String), nullable=True,default=list)
     is_deleted = Column(Boolean, default=False)
-    parameters = Column(MutableDict.as_mutable(JSON), default=dict)
+    parameters = Column(MutableDict.as_mutable(JSONB), default=dict)
     callback_fns = Column(ARRAY(String), nullable=True,default=list)
-
 
     # relations
     tasks = relationship("Task", back_populates="workflow")
@@ -1659,7 +1661,7 @@ class Task(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     operator = Column(String(120), nullable=False)
-    task_inputs = Column(MutableDict.as_mutable(JSON), default=dict)
+    task_inputs = Column(MutableDict.as_mutable(JSONB), default=dict)
     depends_on = Column(ARRAY(String), nullable=True, default=[])  # List of task names this task depends on
     callback_fns = Column(ARRAY(String), nullable=True, default=list)
     is_deleted = Column(Boolean, default=False)
@@ -1678,8 +1680,8 @@ class WorkflowExecution(Base):
     workflow_uuid = Column(String(36), ForeignKey("workflow.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     status = Column(String(120), nullable=False)  # e.g. in_progress, completed, failed
-    result = Column(MutableDict.as_mutable(JSON), default=dict)
-    parameters = Column(MutableDict.as_mutable(JSON), default=dict)
+    result = Column(MutableDict.as_mutable(JSONB), default=dict)
+    parameters = Column(MutableDict.as_mutable(JSONB), default=dict)
     error_message = Column(Text, nullable=True)
     start_time = Column(DateTime, nullable=True)
     end_time = Column(DateTime, nullable=True)
@@ -1725,7 +1727,7 @@ class TaskExecution(Base):
     parent_task_execution_uuid = Column(String(36), ForeignKey("task_execution.uuid"), nullable=True)  # Parent TaskExecution if this is a child task
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     status = Column(String(120), nullable=False)  # e.g., in_progress, completed, failed
-    result = Column(MutableDict.as_mutable(JSON), default=dict)
+    result = Column(MutableDict.as_mutable(JSONB), default=dict)
     error_message = Column(Text, nullable=True)
     start_time = Column(DateTime, nullable=True)
     end_time = Column(DateTime, nullable=True)
@@ -1753,3 +1755,20 @@ class TaskExecution(Base):
     @hybrid_property
     def operator(self):
         return self.task.operator
+
+
+
+class QualityControl(Base):
+    __tablename__ = "quality_control"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    data = Column(MutableDict.as_mutable(JSONB), default=dict, nullable=True)
+    notes = Column(Text, nullable=True)
+    process_uuid = Column(String(36), ForeignKey("process.uuid"), nullable=False)
+    type = Column(String(120), nullable=False)  # e.g., quality_check, inspection
+
+    # relations
+    process = relationship("Process", back_populates="quality_control")
+

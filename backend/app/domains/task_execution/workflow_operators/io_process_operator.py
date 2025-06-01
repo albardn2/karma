@@ -9,6 +9,9 @@ from app.dto.workflow_execution import (
     WorkflowStatus
 )
 
+from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+
+
 class InputItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     inventory_uuid: str
@@ -34,7 +37,10 @@ class IOProcessOperatorSchema(BaseModel):
 
 class IOProcessOperator(OperatorInterface):
 
-    def execute(self,uow, payload:TaskExecutionComplete, *args, **kwargs):
+    def execute(self,uow:SqlAlchemyUnitOfWork,
+                payload:TaskExecutionComplete,
+                parameter: Optional[dict] = None,
+                *args, **kwargs):
 
         # load the operator schema
         operator_schema = IOProcessOperatorSchema(**payload.result)

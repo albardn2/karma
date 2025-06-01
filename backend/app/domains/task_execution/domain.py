@@ -95,11 +95,46 @@ class TaskExecutionDomain:
         OperatorEntryPoint().execute(
             uow=uow,
             payload=payload,
-            operator_type=task_exe.task.operator
+            operator_type=task_exe.task.operator,
+            parameters=task_exe.workflow_execution.parameters,
         )
         uow.task_execution_repository.save(model=task_exe, commit=False)
         for fn_name in task_exe.callback_fns:
             CALLBACK_FN_MAPPER[fn_name](uow=uow,
                                         task_execution_uuid=task_exe.uuid)
 
+        # If the task execution is completed, unblock dependent tasks
+        TaskExecutionDomain.unblock_dependent_task_executions(
+            uow=uow, task_execution=task_exe
+        )
         return TaskExecutionRead.from_orm(task_exe)
+
+    @staticmethod
+    def unblock_dependent_task_executions(
+        uow: SqlAlchemyUnitOfWork, task_execution: TaskExecutionModel
+    ):
+        """
+        Unblock dependent task executions by setting their status to IN_PROGRESS.
+        """
+        if task_execution.status != WorkflowStatus.COMPLETED.value:
+            raise BadRequestError(f"TaskExecution with uuid {task_execution.uuid} is not completed.")
+
+        # Find all dependent task executions
+        workflow_exe_tasks = task_execution.workflow_execution.task_executions
+        name_status_mapper = {task.name: task.status for task in workflow_exe_tasks}
+
+        # now loop through the tasks and mark in progress if dependent names are completed
+        for task in workflow_exe_tasks:
+            if task.depends_on and all(name_status_mapper[dep] == WorkflowStatus.COMPLETED.value for dep in task.depends_on):
+                TaskExecutionDomain.mark_dependent_task_in_progress(uow=uow, dependent_task=task)
+
+    @staticmethod
+    def mark_dependent_task_in_progress(
+        uow: SqlAlchemyUnitOfWork, dependent_task: TaskExecutionModel
+    ):
+        """
+        Mark a dependent task as IN_PROGRESS if all its dependencies are completed.
+        """
+        dependent_task.status = WorkflowStatus.IN_PROGRESS.value
+        dependent_task.start_time = datetime.now()
+        uow.task_execution_repository.save(model=dependent_task, commit=False)

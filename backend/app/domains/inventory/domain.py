@@ -56,7 +56,7 @@ class InventoryDomain:
             raise NotFoundError('Inventory not found')
 
 
-        events = [event for event in inventory.inventory_events if not event.is_deleted and event.affect_original]
+        events = [event for event in inventory.inventory_events if (not event.is_deleted) and event.affect_original]
         if not events:
             inventory_dto.cost_per_unit = 0
 
@@ -75,7 +75,7 @@ class InventoryDomain:
                     uow=uow,
                     process=process,
                     output_inventory_uuid=inventory_dto.uuid
-                )
+                ) or 0
                 agg_total_costs.append(cost_per_unit * event.quantity)
 
         if not agg_total_costs:

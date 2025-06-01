@@ -49,7 +49,7 @@ class InventoryEventCreate(InventoryEventBase):
         currency = bool(values.get("currency"))
         is_manual = bool(values.get("event_type") == InventoryEventType.MANUAL.value)
 
-        if not (po or co or process or (cpu and currency)):
+        if (not (po or co or process or (cpu and currency))) and (not is_manual):
             raise BadRequestError("At least one of purchase_order_item_uuid, customer_order_item_uuid, process_uuid, cost_per_unit and currency must be set.")
         if (po + co + process + cpu) > 1:
             raise BadRequestError("Only one of purchase_order_item_uuid, customer_order_item_uuid, debit_note_item_uuid, credit_note_item_uuid or process_uuid can be set.")

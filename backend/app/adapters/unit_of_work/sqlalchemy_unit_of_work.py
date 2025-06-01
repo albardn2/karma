@@ -31,6 +31,9 @@ from app.adapters.repositories.workflow_repository import WorkflowRepository
 from app.adapters.repositories.task_repository import TaskRepository  # Placeholder for task repository
 from app.adapters.repositories.workflow_execution_repository import WorkflowExecutionRepository
 from app.adapters.repositories.task_execution_repository import TaskExecutionRepository
+from app.adapters.repositories.quality_control_repository import QualityControlRepository
+
+
 
 
 
@@ -75,6 +78,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.task_repository = TaskRepository(session=self.session)
         self.workflow_execution_repository = WorkflowExecutionRepository(session=self.session)
         self.task_execution_repository = TaskExecutionRepository(session=self.session)
+        self.quality_control_repository = QualityControlRepository(session=self.session)
 
         return self
 

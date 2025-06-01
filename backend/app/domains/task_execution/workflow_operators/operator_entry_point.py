@@ -4,6 +4,9 @@ from app.dto.task_execution import TaskExecutionComplete
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 
 from app.entrypoint.routes.common.errors import BadRequestError
+from app.domains.task_execution.workflow_operators.material_refill_operator import MaterialRefillOperator
+from app.domains.task_execution.workflow_operators.qc_operator import QualityControlOperator
+from app.domains.task_execution.workflow_operators.inventory_dump_operator import InventoryDumpOperator
 
 
 class OperatorEntryPoint:
@@ -16,6 +19,9 @@ class OperatorEntryPoint:
             """
             self.mapper = {
                 OperatorType.IO_PROCESS_OPERATOR: IOProcessOperator(),
+                OperatorType.MATERIAL_REFILL_OPERATOR: MaterialRefillOperator(),  # Assuming MaterialRefillOperator is similar to IOProcessOperator
+                OperatorType.QC_OPERATOR: QualityControlOperator(),
+                OperatorType.INVENTORY_DUMP_OPERATOR: InventoryDumpOperator()
             }
 
 

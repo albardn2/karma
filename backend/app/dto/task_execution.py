@@ -7,9 +7,11 @@ from datetime import datetime
 class OperatorType(str, Enum):
 
     IO_PROCESS_OPERATOR = "io_process_operator"
+    MATERIAL_REFILL_OPERATOR = "material_refill_operator"
     QC_OPERATOR = "qc_operator"
     TRIP_OPERATOR = "trip_operator"
     TRIP_STOP_OPERATOR = "trip_stop_operator"
+    INVENTORY_DUMP_OPERATOR = "inventory_dump_operator"
 
 
 # Base DTO for TaskExecution

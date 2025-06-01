@@ -22,6 +22,7 @@ class ProcessInputItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     inventory_uuid: str
     quantity: float
+    material_uuid: Optional[str] = None
     cost_per_unit: Optional[float] = None
 
 
@@ -30,6 +31,8 @@ class InputsUsedItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     inventory_uuid: str
     quantity: float
+
+
 
 class ProcessOutputItem(BaseModel):
     model_config = ConfigDict(extra="forbid")

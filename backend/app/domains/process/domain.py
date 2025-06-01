@@ -12,10 +12,11 @@ from app.dto.inventory import InventoryCreate
 from app.dto.inventory_event import InventoryEventCreate, InventoryEventType
 from app.dto.process import ProcessOutputItem, ProcessInputItem
 from app.entrypoint.routes.common.errors import BadRequestError
-
 from app.dto.inventory import InventoryRead
-
 from app.domains.inventory.domain import InventoryDomain
+from app.dto.process import InputsUsedItem
+from sqlalchemy.orm.attributes import flag_modified
+from app.dto.process import ProcessData
 
 
 class ProcessDomain:
@@ -33,6 +34,11 @@ class ProcessDomain:
 
         # create inventory events from process
         for input in process.data["inputs"]:
+
+            input_inventory= uow.inventory_repository.find_one(uuid=input["inventory_uuid"], is_deleted=False)
+            if not input_inventory:
+                raise NotFoundError(f"Inventory with uuid {input['inventory_uuid']} not found")
+            input["material_uuid"] = input_inventory.material_uuid
             # load
             input = ProcessInputItem(**input)
             InventoryEventDomain.create_inventory_event(
@@ -45,6 +51,7 @@ class ProcessDomain:
                     affect_original=False,
                 ),
             )
+        flag_modified(process, "data")
 
         for output in process.data["outputs"]:
             if output["inventory_uuid"] is None:
@@ -66,6 +73,43 @@ class ProcessDomain:
 
 
         return ProcessRead.from_orm(process)
+
+    @staticmethod
+    def add_process_input(
+        uow: SqlAlchemyUnitOfWork,
+        process_uuid: str,
+        input_data: ProcessInputItem,
+    ):
+        process = uow.process_repository.find_one(uuid=process_uuid, is_deleted=False)
+        if not process:
+            raise NotFoundError("Process not found")
+
+        # add input to process data
+        process.data["inputs"].append(input_data.model_dump(mode="json"))
+        for output in process.data["outputs"]:
+            input_used = InputsUsedItem(
+                inventory_uuid=input_data.inventory_uuid,
+                quantity=input_data.quantity / len(process.data["outputs"]),
+            )
+            output["inputs_used"].append(input_used.model_dump(mode="json"))
+
+        process = ProcessDomain._calculate_cost_per_unit(uow, process)
+
+        InventoryEventDomain.create_inventory_event(
+            uow=uow,
+            payload=InventoryEventCreate(
+                inventory_uuid=input_data.inventory_uuid,
+                quantity=-abs(input_data.quantity),
+                process_uuid=process_uuid,
+                event_type=InventoryEventType.PROCESS.value,
+                affect_original=False,
+            ),
+        )
+        print(process.data)
+        #load process data for validation
+        ProcessData(**process.data)
+        flag_modified(process, "data")
+        uow.process_repository.save(model=process, commit=False)
 
     @staticmethod
     def update_process(uow: SqlAlchemyUnitOfWork, uuid:str, payload:ProcessUpdate) -> ProcessRead:
