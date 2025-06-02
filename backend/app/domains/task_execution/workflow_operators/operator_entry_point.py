@@ -7,6 +7,7 @@ from app.entrypoint.routes.common.errors import BadRequestError
 from app.domains.task_execution.workflow_operators.material_refill_operator import MaterialRefillOperator
 from app.domains.task_execution.workflow_operators.qc_operator import QualityControlOperator
 from app.domains.task_execution.workflow_operators.inventory_dump_operator import InventoryDumpOperator
+from app.domains.task_execution.workflow_operators.noop_operator import NoopOperator
 
 
 class OperatorEntryPoint:
@@ -21,7 +22,8 @@ class OperatorEntryPoint:
                 OperatorType.IO_PROCESS_OPERATOR: IOProcessOperator(),
                 OperatorType.MATERIAL_REFILL_OPERATOR: MaterialRefillOperator(),  # Assuming MaterialRefillOperator is similar to IOProcessOperator
                 OperatorType.QC_OPERATOR: QualityControlOperator(),
-                OperatorType.INVENTORY_DUMP_OPERATOR: InventoryDumpOperator()
+                OperatorType.INVENTORY_DUMP_OPERATOR: InventoryDumpOperator(),
+                OperatorType.NOOP_OPERATOR: NoopOperator()
             }
 
 
