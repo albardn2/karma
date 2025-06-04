@@ -1,5 +1,7 @@
 import uuid
 from datetime import datetime, timezone
+from geoalchemy2 import Geometry
+
 
 import bcrypt
 from sqlalchemy import create_engine, Column, String, DateTime, Text, Float, JSON, select, exists, and_, case, \
@@ -1771,4 +1773,40 @@ class QualityControl(Base):
 
     # relations
     process = relationship("Process", back_populates="quality_control")
+
+
+class Vehicle(Base):
+    __tablename__ = "vehicle"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    plate_number = Column(String(120), nullable=False, unique=True)
+    model = Column(String(120), nullable=False)
+    make = Column(String(120), nullable=False)
+    year = Column(Integer, nullable=False)
+    color = Column(String(120), nullable=False)
+    notes = Column(Text, nullable=True)
+    is_deleted = Column(Boolean, default=False)
+    vin = Column(String(120), nullable=True, unique=True)
+    status = Column(String(120), nullable=False)
+
+
+
+class ServiceArea(Base):
+    __tablename__ = "service_area"
+    uuid        = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name        = Column(String(120), nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+    geometry        = Column(Geometry("POLYGON", srid=4326), nullable=False)
+    is_deleted  = Column(Boolean, default=False)
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+
+
+
+
+
 

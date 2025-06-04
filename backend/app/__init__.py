@@ -37,7 +37,7 @@ from app.entrypoint.routes.task import task_blueprint
 from app.entrypoint.routes.workflow_execution import workflow_execution_blueprint
 from app.entrypoint.routes.task_execution import task_execution_blueprint
 from app.entrypoint.routes.quality_control import quality_control_blueprint
-
+from app.entrypoint.routes.vehicle import vehicle_blueprint
 
 jwt = JWTManager()
 load_dotenv()
@@ -89,6 +89,7 @@ def create_app(config_object=Config):
     app.register_blueprint(workflow_execution_blueprint, url_prefix='/workflow-execution')
     app.register_blueprint(task_execution_blueprint, url_prefix='/task-execution')
     app.register_blueprint(quality_control_blueprint, url_prefix='/quality-control')
+    app.register_blueprint(vehicle_blueprint, url_prefix='/vehicle')
 
 
 
