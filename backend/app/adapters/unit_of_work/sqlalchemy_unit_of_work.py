@@ -33,6 +33,7 @@ from app.adapters.repositories.workflow_execution_repository import WorkflowExec
 from app.adapters.repositories.task_execution_repository import TaskExecutionRepository
 from app.adapters.repositories.quality_control_repository import QualityControlRepository
 from app.adapters.repositories.vehicle_repository import VehicleRepository
+from app.adapters.repositories.service_area_repository import ServiceAreaRepository
 
 SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")  # type: ignore
 DEFAULT_SESSION_FACTORY = sessionmaker(autocommit=False, autoflush=True, bind=create_engine(SQLALCHEMY_DATABASE_URI))
@@ -74,6 +75,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.task_execution_repository = TaskExecutionRepository(session=self.session)
         self.quality_control_repository = QualityControlRepository(session=self.session)
         self.vehicle_repository = VehicleRepository(session=self.session)
+        self.service_area_repository = ServiceAreaRepository(session=self.session)
 
         return self
 
