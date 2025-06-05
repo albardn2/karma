@@ -1691,6 +1691,7 @@ class WorkflowExecution(Base):
     workflow = relationship("Workflow", back_populates="workflow_executions")
     task_executions = relationship("TaskExecution", back_populates="workflow_execution")
     processes = relationship("Process", back_populates="workflow_execution")
+    trips = relationship("Trip", back_populates="workflow_execution")
 
     @hybrid_property
     def name(self):
@@ -1791,6 +1792,9 @@ class Vehicle(Base):
     vin = Column(String(120), nullable=True, unique=True)
     status = Column(String(120), nullable=False)
 
+    # relations
+    trips = relationship("Trip", back_populates="vehicle")
+
 
 
 class ServiceArea(Base):
@@ -1802,6 +1806,40 @@ class ServiceArea(Base):
     is_deleted  = Column(Boolean, default=False)
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # relations
+    trips = relationship("Trip", back_populates="service_area")
+
+
+
+class Trip(Base):
+    __tablename__ = "trip"
+    uuid        = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    vehicle_uuid = Column(String(36), ForeignKey("vehicle.uuid"), nullable=False)
+    service_area_uuid = Column(String(36), ForeignKey("service_area.uuid"), nullable=True)
+    distribution_area = Column(Geometry("POLYGON", srid=4326), nullable=True)  # Area covered by the trip
+    notes = Column(Text, nullable=True)
+    status = Column(String(120), nullable=False)  # e.g., planned, in_progress, completed, cancelled
+    start_warehouse_uuid = Column(String(36), ForeignKey("warehouse.uuid"), nullable=True)
+    end_warehouse_uuid = Column(String(36), ForeignKey("warehouse.uuid"), nullable=True)
+    start_time = Column(DateTime, nullable=True)
+    end_time = Column(DateTime, nullable=True)
+    start_point = Column(Geometry("POINT", srid=4326), nullable=True)  # Starting point of the trip
+    end_point = Column(Geometry("POINT", srid=4326), nullable=True)  # Ending point of the trip
+    data = Column(MutableDict.as_mutable(JSONB), default=dict, nullable=True)
+    workflow_execution_uuid = Column(String(36), ForeignKey("workflow_execution.uuid"), nullable=True)
+
+    # relations
+    vehicle = relationship("Vehicle", back_populates="trips")
+    service_area = relationship("ServiceArea", back_populates="trips")
+    workflow_execution = relationship("WorkflowExecution", back_populates="trips")
+
+
+
+
+
 
 
 
