@@ -77,13 +77,14 @@ class Customer(Base):
     business_cards = Column(Text, nullable=True)  # URL(s) or file path(s)
     notes = Column(Text, nullable=True)
     category = Column(String(120), nullable=False)  # e.g., roastery, cafe, etc.
-    coordinates = Column(String(120), nullable=True)
+    coordinates = Column(Geometry("POINT", srid=4326), nullable=True)
     is_deleted = Column(Boolean, default=False)
 
     # relations
     orders = relationship("CustomerOrder", back_populates="customer")
     debit_note_items = relationship("DebitNoteItem", back_populates="customer")
     credit_note_items = relationship("CreditNoteItem", back_populates="customer")
+    trip_stops = relationship("TripStop", back_populates="customer")
 
     def _calculate_balance_per_currency(self, currency):
         order_total = 0
@@ -129,11 +130,13 @@ class CustomerOrder(Base):
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_deleted = Column(Boolean, default=False)
+    trip_stop_uuid = Column(String(36), ForeignKey("trip_stop.uuid"), nullable=True)
 
     # relations
     customer_order_items = relationship("CustomerOrderItem", back_populates="customer_order")
     invoices = relationship("Invoice", back_populates="customer_order")
     customer = relationship("Customer", back_populates="orders")
+    trip_stop = relationship("TripStop", back_populates="customer_orders")
 
     @hybrid_property
     def is_fulfilled(self):
@@ -737,7 +740,7 @@ class Vendor(Base):
     business_cards = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
     category = Column(String(120), nullable=True)
-    coordinates = Column(String(120), nullable=True)
+    coordinates = Column(Geometry("POINT", srid=4326), nullable=True)
     is_deleted = Column(Boolean, default=False)
 
     # relations
@@ -1321,7 +1324,7 @@ class Warehouse(Base):
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     name = Column(String(120), nullable=False, unique=True)
     address = Column(Text, nullable=False)
-    coordinates = Column(String(120), nullable=True)
+    coordinates = Column(Geometry("POINT", srid=4326), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
@@ -1811,7 +1814,6 @@ class ServiceArea(Base):
     trips = relationship("Trip", back_populates="service_area")
 
 
-
 class Trip(Base):
     __tablename__ = "trip"
     uuid        = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -1835,6 +1837,28 @@ class Trip(Base):
     vehicle = relationship("Vehicle", back_populates="trips")
     service_area = relationship("ServiceArea", back_populates="trips")
     workflow_execution = relationship("WorkflowExecution", back_populates="trips")
+    stops = relationship("TripStop", back_populates="trip")
+
+
+class TripStop(Base):
+    __tablename__ = "trip_stop"
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    trip_uuid = Column(String(36), ForeignKey("trip.uuid"), nullable=False)
+    coordinates = Column(Geometry("POINT", srid=4326), nullable=False)  # Location of the stop
+    notes = Column(Text, nullable=True)
+    status = Column(String(120), nullable=False)  # e.g., planned, completed, skipped
+    customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=True)  # Optional customer for the stop
+    skip_reason = Column(Text, nullable=True)  # Reason for skipping the stop, if applicable
+
+    # relations
+    trip = relationship("Trip", back_populates="stops")
+    customer = relationship("Customer", back_populates="trip_stops")
+    customer_orders = relationship("CustomerOrder", back_populates="trip_stop")
+
+
+
 
 
 

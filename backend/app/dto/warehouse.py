@@ -1,7 +1,10 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
+
+from app.utils.geom_utils import lat_lon_to_wkt, wkt_or_wkb_to_lat_lon
+
 
 class WarehouseBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -18,6 +21,17 @@ class WarehouseCreate(WarehouseBase):
 
     created_by_uuid: Optional[UUID] = None
 
+    @field_validator("coordinates", mode="before")
+    def parse_latlon_to_wkt(cls, v: str) -> str:
+        """
+        Expect `coordinates` as "lat,lon" (e.g. "29.7604,-95.3698").
+        Convert to a WKT Point in the form "POINT(lon lat)".
+        """
+        if v is None:
+            return v # optional
+        return lat_lon_to_wkt(coords=v)  # This will raise BadRequestError if invalid
+
+
 class WarehouseUpdate(BaseModel):
     """All fields optional for partial updates."""
     model_config = ConfigDict(extra="forbid")
@@ -27,6 +41,17 @@ class WarehouseUpdate(BaseModel):
     coordinates: Optional[str] = None
     notes:       Optional[str] = None
 
+    @field_validator("coordinates", mode="before")
+    def parse_latlon_to_wkt(cls, v: str) -> str:
+        """
+        Expect `coordinates` as "lat,lon" (e.g. "29.7604,-95.3698").
+        Convert to a WKT Point in the form "POINT(lon lat)".
+        """
+        if v is None:
+            return v # optional
+        return lat_lon_to_wkt(coords=v)  # This will raise BadRequestError if invalid
+
+
 class WarehouseRead(WarehouseBase):
     model_config = ConfigDict(from_attributes=True,extra="forbid")
 
@@ -34,6 +59,21 @@ class WarehouseRead(WarehouseBase):
     created_by_uuid: Optional[UUID] = None
     created_at:      datetime
     is_deleted:      bool
+
+    @field_validator("coordinates", mode="before")
+    def _wkb_or_wkt_to_latlon(cls, v):
+        """
+        Accept any of:
+        - WKTElement → v.data is WKT
+        - WKBElement → convert via to_shape
+        - bytes/bytearray → shapely.wkb.loads
+        - str (WKT) → shapely.wkt.loads
+        Then extract lat,lon and return "lat,lon".
+        """
+        if v is None:
+            return v
+        return wkt_or_wkb_to_lat_lon(v)  # This will raise BadRequestError if invalid
+
 
 class WarehouseListParams(BaseModel):
     """Pagination parameters for listing warehouses."""

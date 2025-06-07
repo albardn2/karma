@@ -1,10 +1,12 @@
 # app/dto/vendor.py
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
+from app.utils.geom_utils import lat_lon_to_wkt, wkt_or_wkb_to_lat_lon
+
 
 # ← import your real enum here
 
@@ -30,6 +32,17 @@ class VendorCreate(BaseModel):
     category: Optional[VendorCategory] = None
     coordinates: Optional[str] = None
 
+    @field_validator("coordinates", mode="before")
+    def parse_latlon_to_wkt(cls, v: str) -> str:
+        """
+        Expect `coordinates` as "lat,lon" (e.g. "29.7604,-95.3698").
+        Convert to a WKT Point in the form "POINT(lon lat)".
+        """
+        if v is None:
+            return v # optional
+        return lat_lon_to_wkt(coords=v)  # This will raise BadRequestError if invalid
+
+
 
 class VendorUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -44,6 +57,16 @@ class VendorUpdate(BaseModel):
     notes: Optional[str] = None
     category: Optional[VendorCategory] = None
     coordinates: Optional[str] = None
+
+    @field_validator("coordinates", mode="before")
+    def parse_latlon_to_wkt(cls, v: str) -> str:
+        """
+        Expect `coordinates` as "lat,lon" (e.g. "29.7604,-95.3698").
+        Convert to a WKT Point in the form "POINT(lon lat)".
+        """
+        if v is None:
+            return v # optional
+        return lat_lon_to_wkt(coords=v)  # This will raise BadRequestError if invalid
 
 
 class VendorRead(BaseModel):
@@ -64,6 +87,20 @@ class VendorRead(BaseModel):
     category: Optional[VendorCategory] = None
     coordinates: Optional[str] = None
     is_deleted: bool
+
+    @field_validator("coordinates", mode="before")
+    def _wkb_or_wkt_to_latlon(cls, v):
+        """
+        Accept any of:
+        - WKTElement → v.data is WKT
+        - WKBElement → convert via to_shape
+        - bytes/bytearray → shapely.wkb.loads
+        - str (WKT) → shapely.wkt.loads
+        Then extract lat,lon and return "lat,lon".
+        """
+        if v is None:
+            return v
+        return wkt_or_wkb_to_lat_lon(v)  # This will raise BadRequestError if invalid
 
 
 class VendorReadList(BaseModel):

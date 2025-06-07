@@ -35,6 +35,7 @@ from app.adapters.repositories.quality_control_repository import QualityControlR
 from app.adapters.repositories.vehicle_repository import VehicleRepository
 from app.adapters.repositories.service_area_repository import ServiceAreaRepository
 from app.adapters.repositories.trip_repository import TripRepository
+from app.adapters.repositories.trip_stop_repository import TripStopRepository
 
 SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")  # type: ignore
 DEFAULT_SESSION_FACTORY = sessionmaker(autocommit=False, autoflush=True, bind=create_engine(SQLALCHEMY_DATABASE_URI))
@@ -78,6 +79,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.vehicle_repository = VehicleRepository(session=self.session)
         self.service_area_repository = ServiceAreaRepository(session=self.session)
         self.trip_repository = TripRepository(session=self.session)
+        self.trip_stop_repository = TripStopRepository(session=self.session)
 
         return self
 
