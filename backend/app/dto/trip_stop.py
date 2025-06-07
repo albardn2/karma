@@ -20,6 +20,7 @@ from app.utils.geom_utils import wkt_or_wkb_to_lat_lon
 
 class TripStopStatus(str, Enum):
     PLANNED = "planned"
+    IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     SKIPPED = "skipped"
 
