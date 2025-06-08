@@ -12,6 +12,7 @@ class WorkflowStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    SKIPPED = "skipped"
 
 
 # Base DTO for WorkflowExecution

@@ -13,6 +13,10 @@ class OperatorType(str, Enum):
     TRIP_STOP_OPERATOR = "trip_stop_operator"
     INVENTORY_DUMP_OPERATOR = "inventory_dump_operator"
     NOOP_OPERATOR = "noop_operator"
+    START_TRIP_OPERATOR = "start_trip_operator"
+    TRIP_ADD_INVENTORY_OPERATOR = "trip_add_inventory_operator"
+    TRIP_ROUTE_OPERATOR = "trip_route_operator"
+    TRIP_CREATE_OPERATOR = "trip_create_operator"
 
 
 # Base DTO for TaskExecution

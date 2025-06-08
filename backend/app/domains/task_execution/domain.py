@@ -13,9 +13,17 @@ from app.dto.workflow_execution import (
 from app.dto.task_execution import TaskExecutionComplete
 from app.domains.task_execution.workflow_operators.operator_entry_point import OperatorEntryPoint
 from app.domains.task_execution.callback_functions import CALLBACK_FN_MAPPER
+from app.dto.task_execution import TaskExecutionCreate
 
 
 class TaskExecutionDomain:
+
+    @staticmethod
+    def create_task_execution(uow:SqlAlchemyUnitOfWork,payload:TaskExecutionCreate) -> TaskExecutionRead:
+        data = payload.model_dump()
+        task_execution = TaskExecutionModel(**data)
+        uow.task_execution_repository.save(model=task_execution, commit=False)
+        return TaskExecutionRead.from_orm(task_execution)
 
     @staticmethod
     def create_task_executions(uow: SqlAlchemyUnitOfWork, workflow_execution_uuid:str) -> TaskExecutionRead:
@@ -75,6 +83,12 @@ class TaskExecutionDomain:
             if task_execution.status in [WorkflowStatus.COMPLETED.value, WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value]:
                 continue
 
+            for child in task_execution.children:
+                if child.status not in [WorkflowStatus.COMPLETED.value, WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value]:
+                    child.status = WorkflowStatus.CANCELLED.value
+                    child.end_time = datetime.now()
+                    child.error_message = "Task execution was cancelled by user"
+                    uow.task_execution_repository.save(model=child, commit=False)
             task_execution.status = WorkflowStatus.CANCELLED.value
             task_execution.end_time = datetime.now()
             task_execution.error_message = "Task execution was cancelled by user"

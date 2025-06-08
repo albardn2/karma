@@ -42,7 +42,7 @@ class DistributionAlgorithm:
             customer_categories: list[str] = None,
             materials_filter: list = None,
 
-            ):
+            ) -> Tuple[List[Customer], List[Tuple[float, float]], List[Tuple[float, float]]]:
 
         customers: List[Customer] = (self.
         uow.

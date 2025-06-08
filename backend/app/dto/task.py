@@ -41,8 +41,8 @@ class TaskInputField(BaseModel):
 class TaskInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    inputs: List[TaskInputField] = []
-
+    fields: List[TaskInputField] = []
+    data: Optional[dict] = None
 
 
 # Common Base DTO for Task

@@ -26,6 +26,7 @@ class CustomerOrderBase(BaseModel):
 
 class CustomerOrderCreate(CustomerOrderBase):
     """Fields required to create a new customer order."""
+    trip_stop_uuid: Optional[str] = None
     model_config = ConfigDict(extra="forbid")
 class CustomerOrderUpdate(BaseModel):
     """Fields optional for partial updates."""
@@ -44,6 +45,7 @@ class CustomerOrderRead(CustomerOrderBase):
     customer_order_items: Optional[List[CustomerOrderItemRead]] = None
     net_amount_due: Optional[float] = None
     net_amount_paid: Optional[float] = None
+    trip_stop_uuid: Optional[str] = None
     is_paid: Optional[bool] = None
 
 class CustomerOrderListParams(BaseModel):
@@ -81,12 +83,14 @@ class CustomerOrderWithItemsAndInvoiceCreate(BaseModel):
     created_by_uuid: Optional[str] = None
     customer_uuid: str
     currency: Currency
+    trip_stop_uuid: Optional[str] = None
     notes: Optional[str] = None
     due_date: Optional[datetime]
     items: List[CustomerOrderAndInvoiceItemCreate]
 
     def to_customer_order_create(self):
         return CustomerOrderCreate(
+            trip_stop_uuid=self.trip_stop_uuid,
             created_by_uuid=self.created_by_uuid,
             customer_uuid=self.customer_uuid,
             notes=self.notes,

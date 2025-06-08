@@ -16,6 +16,28 @@ class TripStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+
+
+class InventoryInput(BaseModel):
+    inventory_uuid:str
+    quantity: float
+    material_name: Optional[str] = None
+    lot_id: Optional[str] = None
+
+
+
+class Tripoutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    cash_collected: float
+    inventory_left: list[InventoryInput]
+
+
+class TripData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    input_inventory: Optional[List[InventoryInput]] = None
+    output: Optional[Tripoutput] = None
+
+
 class TripCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

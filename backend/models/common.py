@@ -1762,6 +1762,10 @@ class TaskExecution(Base):
     def operator(self):
         return self.task.operator
 
+    @hybrid_property
+    def task_inputs(self):
+        return self.task.task_inputs if self.task else {}
+
 
 
 class QualityControl(Base):
@@ -1839,6 +1843,65 @@ class Trip(Base):
     workflow_execution = relationship("WorkflowExecution", back_populates="trips")
     stops = relationship("TripStop", back_populates="trip")
 
+    @hybrid_property
+    def expected_cash(self):
+        all_orders = []
+        for stop in self.stops:
+            orders = [order for order in stop.customer_orders if not order.is_deleted]
+            all_orders.extend(orders)
+
+        # get amount paid
+        return sum(order.amount_paid for order in all_orders)
+
+    @hybrid_property
+    def expected_inventory_map(self):
+        trip_input_inventory = self.data.get("input_inventory")
+        if not trip_input_inventory:
+            return {}
+
+        # get customer order item fulfilled inventory and subtract quantity
+        all_orders = []
+        for stop in self.stops:
+            orders = [order for order in stop.customer_orders if not order.is_deleted]
+            all_orders.extend(orders)
+
+        all_fulfilled_order_items = []
+        for order in all_orders:
+            fulfilled_items = [item for item in order.customer_order_items if not item.is_deleted and item.is_fulfilled]
+            all_fulfilled_order_items.extend(fulfilled_items)
+
+        inventory_sale_mapper = {}
+        for item in all_fulfilled_order_items:
+            events = [event for event in item.inventory_events if not event.is_deleted and event.event_type == "sale"]
+            for event in events:
+                if event.inventory_uuid not in inventory_sale_mapper:
+                    inventory_sale_mapper[event.inventory_uuid] = {
+                        "quantity": 0
+                    }
+                inventory_sale_mapper[event.inventory_uuid]["quantity"] += event.quantity
+
+        # now add the quantity from the inventory_map
+        for inventory_uuid, inventory_data in trip_input_inventory.items():
+            if inventory_uuid not in inventory_sale_mapper:
+                inventory_sale_mapper[inventory_uuid] = {
+                    "quantity": 0
+                }
+            inventory_sale_mapper[inventory_uuid]["quantity"] += inventory_data["quantity"]
+
+        return inventory_sale_mapper
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class TripStop(Base):
     __tablename__ = "trip_stop"
@@ -1851,6 +1914,7 @@ class TripStop(Base):
     status = Column(String(120), nullable=False)  # e.g., planned, completed, skipped
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=True)  # Optional customer for the stop
     skip_reason = Column(Text, nullable=True)  # Reason for skipping the stop, if applicable
+    no_sale_reason = Column(Text, nullable=True)  # Reason for skipping the stop, if applicable
 
     # relations
     trip = relationship("Trip", back_populates="stops")

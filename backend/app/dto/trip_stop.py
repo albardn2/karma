@@ -35,6 +35,7 @@ class TripStopCreate(BaseModel):
     status: TripStopStatus
     customer_uuid: Optional[str] = None
     skip_reason: Optional[str] = None
+    no_sale_reason: Optional[str] = None
 
     # either pass coordinates or customer_uuid but not both
 
@@ -69,6 +70,7 @@ class TripStopUpdate(BaseModel):
     status: Optional[TripStopStatus] = None
     customer_uuid: Optional[str] = None
     skip_reason: Optional[str] = None
+    no_sale_reason: Optional[str] = None
 
     @field_validator("coordinates", mode="before")
     def parse_latlon_to_wkt(cls, v: str) -> str:
@@ -94,6 +96,7 @@ class TripStopRead(BaseModel):
     status: TripStopStatus
     customer_uuid: Optional[str]
     skip_reason: Optional[str]
+    no_sale_reason: Optional[str] = None
 
     @field_validator("coordinates", mode="before")
     def _wkb_or_wkt_to_latlon(cls, v):
