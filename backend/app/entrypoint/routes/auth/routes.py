@@ -43,12 +43,19 @@ def login():
     req = LoginRequest(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
         user = None
-        if req.username:
-            user = uow.user_repository.find_one(username=req.username, is_deleted=False)
-        elif req.email:
-            user = uow.user_repository.find_one(email=req.email, is_deleted=False)
-        if not user or not user.verify_password(req.password):
-            raise Unauthorized("Bad credentials")
+        if req.username_or_email:
+            user = uow.user_repository.find_one(username=req.username_or_email, is_deleted=False)
+            if not user:
+                user = uow.user_repository.find_one(email=req.username_or_email, is_deleted=False)
+
+            if not user or not user.verify_password(req.password):
+                raise Unauthorized("Bad credentials")
+        elif req.rfid_token:
+            user = uow.user_repository.find_one(rfid_token=req.rfid_token, is_deleted=False)
+            if not user:
+                raise Unauthorized("RFID token not found or invalid")
+        else:
+            raise BadRequestError("username_or_email or rfid_token must be provided")
 
         scopes = user.permission_scope.split(",")  # e.g. "read,write,admin"
         access_token = create_access_token(
@@ -166,3 +173,17 @@ def delete_user(user_uuid: str):
 def list_permissions():
     permissions = [p.value for p in PermissionScope]
     return jsonify(permissions), 200
+
+
+# me endpoint
+@auth_blueprint.route("/me", methods=["GET"])
+@jwt_required()
+def me():
+    current_uuid = get_jwt_identity()
+    with SqlAlchemyUnitOfWork() as uow:
+        user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
+        if not user:
+            raise NotFoundError("User not found")
+        dto = UserRead.from_orm(user).model_dump(mode="json")
+        return jsonify(dto), 200
+

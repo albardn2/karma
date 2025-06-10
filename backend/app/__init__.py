@@ -4,6 +4,7 @@ from dotenv import load_dotenv, dotenv_values
 from flask import Flask
 from app.config import Config
 from flask_jwt_extended import JWTManager
+from flask_cors import CORS
 
 from app.entrypoint.routes.common.errors import register_error_handlers
 from app.entrypoint.routes.customer import customer_blueprint
@@ -45,6 +46,10 @@ jwt = JWTManager()
 load_dotenv()
 def create_app(config_object=Config):
     app = Flask(__name__)
+
+    # CORS(app, supports_credentials=True)
+    # CORS FOR ANY ORIGIN
+    CORS(app)
 
     # load configs from .env
     app.config.from_object(Config)

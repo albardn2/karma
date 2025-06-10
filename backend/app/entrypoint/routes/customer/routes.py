@@ -1,5 +1,6 @@
 from flask import  request, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
+from geoalchemy2 import WKTElement
 from pydantic import  ValidationError
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
@@ -68,11 +69,13 @@ def update_customer(uuid: str):
         if not customer:
             return NotFoundError("Customer not found")
 
-        if payload.email_address != customer.email_address:
+        if payload.email_address and payload.email_address != customer.email_address:
             if uow.customer_repository.find_one(email_address=payload.email_address):
                 raise BadRequestError(f"Customer with email {payload.email_address} already exists")
-
-        customer.update(**data)
+        # Update customer fields
+        for key, value in data.items():
+            if hasattr(customer, key):
+                setattr(customer, key, value)
         uow.customer_repository.save(model=customer, commit=True)
         customer_data = CustomerRead.from_orm(customer).model_dump(mode='json')
 
@@ -124,17 +127,33 @@ def list_customers():
         filters.append(CustomerModel.uuid == params.uuid)
     if params.category:
         filters.append(CustomerModel.category == params.category.value)
-    if params.customer_uuid:
-        filters.append(CustomerModel.uuid == params.customer_uuid)
     if params.email_address:
-        filters.append(CustomerModel.email_address == params.email_address)
+        #like
+        filters.append(CustomerModel.email_address.ilike(f"%{params.email_address}%"))
     if params.company_name:
-        filters.append(CustomerModel.company_name == params.company_name)
+        filters.append(CustomerModel.company_name.ilike(f"%{params.company_name}%"))
     if params.full_name:
-        filters.append(CustomerModel.full_name == params.full_name)
+        filters.append(CustomerModel.full_name.ilike(f"%{params.full_name}%"))
     if params.phone_number:
-        filters.append(CustomerModel.phone_number == params.phone_number)
-
+        filters.append(CustomerModel.phone_number.ilike(f"%{params.phone_number}%"))
+    if params.within_polygon:
+        try:
+            # Wrap your WKT string in a WKTElement (with the correct SRID)
+            poly = WKTElement(
+                params.within_polygon,
+                srid=CustomerModel.coordinates.type.srid  # e.g. 4326
+            )
+            filters.append(
+                # call the ST_Within comparator
+                CustomerModel.coordinates.ST_Within(poly)
+            )
+            # bump per_page so your polygon filter returns everything
+            params.per_page = 10000
+        except ValidationError as e:
+            raise BadRequestError(f"Invalid polygon: {e}")
+    if params.within_polygon:
+        # make per page a very high number to avoid pagination
+        params.per_page = 10000
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.customer_repository.find_all_by_filters_paginated(
             filters=filters,

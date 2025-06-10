@@ -2,7 +2,6 @@ from enum import Enum
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 from typing import Optional, List
-from uuid import UUID
 from datetime import datetime
 from app.dto.common_enums import Currency
 
@@ -111,16 +110,16 @@ class CustomerReadList(BaseModel):
 class CustomerListParams(BaseModel):
     """Pagination parameters for listing customers."""
     model_config = ConfigDict(extra="forbid")
-    uuid: Optional[UUID] = None
+    uuid: Optional[str] = None
     category: Optional[CustomerCategory] = None
-    customer_uuid: Optional[str] = None
     email_address: Optional[str] = None
     company_name: Optional[str] = None
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
+    within_polygon: Optional[str] = None  # WKT Polygon string
 
     page: int = Field(1, gt=0, description="Page number, starting from 1")
-    per_page: int = Field(20, gt=0, le=100, description="Items per page, max 100")
+    per_page: int = Field(20, gt=0, le=1000, description="Items per page, max 100")
 
 
 class CustomerPage(BaseModel):

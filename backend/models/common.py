@@ -35,6 +35,7 @@ class User(Base):
     first_name = Column(String(50), nullable=False)
     last_name = Column(String(50), nullable=False)
     password = Column(String(128), nullable=False)
+    rfid_token = Column(String(128), nullable=True, unique=True)
     email = Column(String(120), nullable=True, unique=True)
     permission_scope = Column(String(256), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

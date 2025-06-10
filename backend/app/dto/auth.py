@@ -1,8 +1,11 @@
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field
+import pydantic
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
 from typing import Optional, List
 from datetime import datetime
+from app.entrypoint.routes.common.errors import BadRequestError
+
 
 class PermissionScope(str, Enum):
     SUPER_ADMIN = "superuser"
@@ -20,9 +23,19 @@ class RegisterRequest(BaseModel):
     last_name: str
     password: str
     permission_scope: Optional[PermissionScope] = PermissionScope.OPERATOR.value
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
     phone_number: Optional[str] = None
     language: Optional[str] = None
+    rfid_token: Optional[str] = None  # RFID token for user identification
+
+    @pydantic.model_validator(mode="after")
+    def username_not_email(cls, values):
+        username = values.username
+        # crude check – you can tighten this regex if you like
+        if "@" in username:
+            raise ValueError("username must not be an email address")
+        return values
+
 
 class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -33,14 +46,24 @@ class UserUpdate(BaseModel):
     phone_number: Optional[str] = None
     language: Optional[str] = None
     password: Optional[str] = None
+    rfid_token: Optional[str] = None  # RFID token for user identification
     # only admins may change this:
     permission_scope: Optional[PermissionScope] = None
 
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    username: Optional[str] = None
-    email: Optional[str] = None
-    password: str
+    username_or_email: Optional[str] = None
+    password: Optional[str] = None
+    rfid_token: Optional[str] = None
+
+    @pydantic.model_validator(mode="after")
+    def check_credentials(cls, values):
+        if not values.username_or_email and not values.rfid_token:
+            raise BadRequestError("Either username_or_email or rfid_token must be provided")
+        if values.username_or_email and values.rfid_token:
+            raise BadRequestError("Only one of username_or_email or rfid_token should be provided")
+        return values
+
 
 class TokenResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
