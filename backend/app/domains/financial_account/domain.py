@@ -60,10 +60,10 @@ class FinancialAccountDomain:
 
         """
         if (
-            uow.payments.find_first(financial_account_uuid=financial_account.uuid, is_deleted=False) or
-            uow.payouts.find_first(financial_account_uuid=financial_account.uuid, is_deleted=False) or
-            uow.transactions.find_first(from_account_uuid=financial_account.uuid, is_deleted=False) or
-            uow.transactions.find_first(to_account_uuid=financial_account.uuid, is_deleted=False)
+            uow.payment_repository.find_first(financial_account_uuid=financial_account.uuid, is_deleted=False) or
+            uow.payout_repository.find_first(financial_account_uuid=financial_account.uuid, is_deleted=False) or
+            uow.transaction_repository.find_first(from_account_uuid=financial_account.uuid, is_deleted=False) or
+            uow.transaction_repository.find_first(to_account_uuid=financial_account.uuid, is_deleted=False)
         ):
             return False
 

@@ -22,7 +22,7 @@ class RegisterRequest(BaseModel):
     first_name: str
     last_name: str
     password: str
-    permission_scope: Optional[PermissionScope] = PermissionScope.OPERATOR.value
+    permission_scope: Optional[str] = PermissionScope.OPERATOR.value
     email: Optional[EmailStr] = None
     phone_number: Optional[str] = None
     language: Optional[str] = None
@@ -48,7 +48,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     rfid_token: Optional[str] = None  # RFID token for user identification
     # only admins may change this:
-    permission_scope: Optional[PermissionScope] = None
+    permission_scope: Optional[str] = None
 
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -80,7 +80,7 @@ class UserRead(BaseModel):
     phone_number: Optional[str]
     language: Optional[str]
     created_at: datetime
-    permission_scope: Optional[PermissionScope]
+    permission_scope: Optional[str]
     is_deleted: bool
 
 

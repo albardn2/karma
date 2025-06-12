@@ -6,9 +6,7 @@ from app.dto.common_enums import Currency
 
 class FinancialAccountBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
     account_name: str
-    balance: float
     currency: Currency
     notes: Optional[str] = None
 
@@ -23,7 +21,6 @@ class FinancialAccountUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     account_name: Optional[str]   = None
-    balance:      Optional[float] = None
     notes:        Optional[str]   = None
     currency:     Optional[Currency] = None
 
@@ -33,6 +30,7 @@ class FinancialAccountRead(FinancialAccountBase):
     uuid:            str
     created_by_uuid: Optional[str] = None
     created_at:      datetime
+    balance: float
     is_deleted:      bool
 
 class FinancialAccountListParams(BaseModel):
