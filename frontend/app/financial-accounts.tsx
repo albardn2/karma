@@ -224,6 +224,45 @@ export default function FinancialAccountsScreen() {
     return '#6b7280';
   };
 
+  const TableHeader = () => (
+    <View style={styles.tableHeader}>
+      <ThemedText style={[styles.tableHeaderText, styles.nameHeaderColumn]}>Account</ThemedText>
+      <ThemedText style={[styles.tableHeaderText, styles.balanceHeaderColumn]}>Balance</ThemedText>
+      <ThemedText style={[styles.tableHeaderText, styles.createdHeaderColumn]}>Created</ThemedText>
+      <View style={styles.arrowHeaderColumn} />
+    </View>
+  );
+
+  const AccountRow = ({ account }: { account: FinancialAccount }) => (
+    <TouchableOpacity
+      style={styles.tableRow}
+      onPress={() => handleAccountPress(account)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.nameColumn}>
+        <ThemedText style={styles.rowAccountName} numberOfLines={1}>
+          {account.account_name}
+        </ThemedText>
+        <ThemedText style={styles.rowAccountCurrency} numberOfLines={1}>
+          {account.currency.toUpperCase()}
+        </ThemedText>
+      </View>
+      <View style={styles.balanceColumn}>
+        <ThemedText
+          style={[styles.balanceValue, { color: getBalanceColor(account.balance) }]}
+        >
+          {formatCurrency(account.balance, account.currency)}
+        </ThemedText>
+      </View>
+      <View style={styles.createdColumn}>
+        <ThemedText style={styles.createdText}>{formatDate(account.created_at)}</ThemedText>
+      </View>
+      <View style={styles.arrowColumn}>
+        <ThemedText style={styles.arrow}>›</ThemedText>
+      </View>
+    </TouchableOpacity>
+  );
+
   const FilterSection = () => (
     <View style={[
       styles.filterSection,
@@ -368,39 +407,47 @@ export default function FinancialAccountsScreen() {
           </View>
         ) : (
           <>
-            {accounts.map((account) => (
-              <TouchableOpacity
-                key={account.uuid}
-                style={styles.accountCard}
-                onPress={() => handleAccountPress(account)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.accountHeader}>
-                  <View style={styles.accountInfo}>
-                    <ThemedText style={styles.accountName}>{account.account_name}</ThemedText>
-                    <ThemedText style={styles.accountCurrency}>{account.currency.toUpperCase()}</ThemedText>
+            {isMobileWeb ? (
+              <>
+                <TableHeader />
+                {accounts.map(account => (
+                  <AccountRow key={account.uuid} account={account} />
+                ))}
+              </>
+            ) : (
+              accounts.map((account) => (
+                <TouchableOpacity
+                  key={account.uuid}
+                  style={styles.accountCard}
+                  onPress={() => handleAccountPress(account)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.accountHeader}>
+                    <View style={styles.accountInfo}>
+                      <ThemedText style={styles.accountName}>{account.account_name}</ThemedText>
+                      <ThemedText style={styles.accountCurrency}>{account.currency.toUpperCase()}</ThemedText>
+                    </View>
+                    <View style={styles.accountBalance}>
+                      <ThemedText
+                        style={[styles.balanceAmount, { color: getBalanceColor(account.balance) }]}
+                      >
+                        {formatCurrency(account.balance, account.currency)}
+                      </ThemedText>
+                    </View>
                   </View>
-                  <View style={styles.accountBalance}>
-                    <ThemedText style={[
-                      styles.balanceAmount,
-                      { color: getBalanceColor(account.balance) }
-                    ]}>
-                      {formatCurrency(account.balance, account.currency)}
+                  {account.notes && (
+                    <ThemedText style={styles.accountNotes} numberOfLines={2}>
+                      {account.notes}
+                    </ThemedText>
+                  )}
+                  <View style={styles.accountFooter}>
+                    <ThemedText style={styles.accountDate}>
+                      Created {formatDate(account.created_at)}
                     </ThemedText>
                   </View>
-                </View>
-                {account.notes && (
-                  <ThemedText style={styles.accountNotes} numberOfLines={2}>
-                    {account.notes}
-                  </ThemedText>
-                )}
-                <View style={styles.accountFooter}>
-                  <ThemedText style={styles.accountDate}>
-                    Created {formatDate(account.created_at)}
-                  </ThemedText>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              ))
+            )}
 
             {/* Pagination */}
             {totalPages > 1 && (
@@ -845,6 +892,95 @@ const styles = StyleSheet.create({
   accountDate: {
     fontSize: 12,
     color: '#9ca3af',
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 2,
+    borderBottomColor: '#e2e8f0',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 1,
+  },
+  tableHeaderText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    lineHeight: 12,
+  },
+  nameHeaderColumn: {
+    flex: 2.8,
+    marginRight: 8,
+  },
+  balanceHeaderColumn: {
+    flex: 1.8,
+    textAlign: 'right',
+    marginRight: 8,
+  },
+  createdHeaderColumn: {
+    flex: 1.3,
+    textAlign: 'right',
+    marginRight: 4,
+  },
+  arrowHeaderColumn: {
+    width: 16,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minHeight: 48,
+  },
+  nameColumn: {
+    flex: 2.8,
+    marginRight: 8,
+  },
+  rowAccountName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 1,
+  },
+  rowAccountCurrency: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '400',
+  },
+  balanceColumn: {
+    flex: 1.8,
+    alignItems: 'flex-end',
+    marginRight: 8,
+  },
+  balanceValue: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  createdColumn: {
+    flex: 1.3,
+    alignItems: 'flex-end',
+    marginRight: 4,
+  },
+  createdText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'right',
+    color: '#64748b',
+  },
+  arrowColumn: {
+    width: 16,
+    alignItems: 'center',
+  },
+  arrow: {
+    fontSize: 14,
+    color: '#9ca3af',
+    fontWeight: '300',
   },
   pagination: {
     flexDirection: 'row',
