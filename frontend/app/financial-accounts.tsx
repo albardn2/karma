@@ -388,6 +388,9 @@ export default function FinancialAccountsScreen() {
                       {formatCurrency(account.balance, account.currency)}
                     </ThemedText>
                   </View>
+                  <View style={styles.arrowColumn}>
+                    <ThemedText style={styles.arrow}>›</ThemedText>
+                  </View>
                 </View>
                 {account.notes && (
                   <ThemedText style={styles.accountNotes} numberOfLines={2}>
@@ -447,7 +450,10 @@ export default function FinancialAccountsScreen() {
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalBackdrop} />
-            <View style={styles.filterModal}>
+            <View style={[
+              styles.filterModal,
+              (isMobileWeb || isNative) && styles.mobileFilterModal
+            ]}>
               <View style={styles.filterHeader}>
                 <ThemedText style={styles.filterTitle}>Filter Financial Accounts</ThemedText>
                 <TouchableOpacity 
@@ -831,6 +837,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  arrowColumn: {
+    width: 16,
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  arrow: {
+    fontSize: 20,
+    color: '#9ca3af',
+    fontWeight: '300',
+  },
   accountNotes: {
     fontSize: 14,
     color: '#6b7280',
@@ -879,7 +895,7 @@ const styles = StyleSheet.create({
   // Filter Modal Styles
   modalContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
   },
   modalBackdrop: {
@@ -892,12 +908,18 @@ const styles = StyleSheet.create({
   },
   filterModal: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    width: '90%',
-    maxWidth: 600,
-    maxHeight: '80%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: '90%',
+    minHeight: '90%',
+    width: '100%',
     overflow: 'hidden',
     zIndex: 1,
+  },
+  mobileFilterModal: {
+    borderRadius: 0,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   closeButtonContainer: {
     padding: 4,

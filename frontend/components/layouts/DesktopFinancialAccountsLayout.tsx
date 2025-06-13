@@ -166,9 +166,14 @@ export const DesktopFinancialAccountsLayout: React.FC<DesktopFinancialAccountsLa
       activeOpacity={0.7}
     >
       <View style={styles.accountHeader}>
-        <ThemedText style={styles.accountName}>{account.account_name}</ThemedText>
-        <View style={styles.currencyBadge}>
-          <ThemedText style={styles.currencyText}>{account.currency.toUpperCase()}</ThemedText>
+        <View style={styles.accountInfo}>
+          <ThemedText style={styles.accountName}>{account.account_name}</ThemedText>
+          <View style={styles.currencyBadge}>
+            <ThemedText style={styles.currencyText}>{account.currency.toUpperCase()}</ThemedText>
+          </View>
+        </View>
+        <View style={styles.arrowColumn}>
+          <ThemedText style={styles.arrow}>›</ThemedText>
         </View>
       </View>
       <ThemedText style={styles.accountDetail}>
@@ -518,11 +523,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  accountInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   accountName: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
-    flex: 1,
+    flexShrink: 1,
   },
   currencyBadge: {
     paddingVertical: 4,
@@ -542,6 +553,16 @@ const styles = StyleSheet.create({
   },
   balanceAmount: {
     fontWeight: '700',
+  },
+  arrowColumn: {
+    width: 16,
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  arrow: {
+    fontSize: 20,
+    color: '#9ca3af',
+    fontWeight: '300',
   },
   createdContainer: {
     marginTop: 8,
