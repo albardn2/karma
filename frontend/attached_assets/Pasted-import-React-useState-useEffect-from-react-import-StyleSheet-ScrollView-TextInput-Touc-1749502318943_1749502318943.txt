@@ -1,0 +1,268 @@
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Platform, Dimensions, Animated } from 'react-native';
+import { View } from 'react-native';
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/components/ThemedView';
+import { useRouter } from 'expo-router';
+import { apiCall } from '@/utils/api';
+import { LinearGradient } from 'expo-linear-gradient';
+
+interface CustomerForm {
+  full_name: string;
+  email_address: string;
+  phone_number: string;
+  company_name: string;
+  full_address: string;
+  category: 'roastery' | 'restaurant' | 'minimarket' | 'supermarket' | 'distributer';
+  business_cards: string;
+  notes: string;
+  coordinates: string;
+}
+
+export default function CreateCustomerScreen() {
+  const [form, setForm] = useState<CustomerForm>({
+    full_name: '',
+    email_address: '',
+    phone_number: '',
+    company_name: '',
+    full_address: '',
+    category: 'restaurant',
+    business_cards: '',
+    notes: '',
+    coordinates: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<string[]>(['restaurant', 'roastery', 'minimarket', 'supermarket', 'distributer']);
+  const [screenData, setScreenData] = useState(Dimensions.get('window'));
+  const [banner, setBanner] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const bannerAnimation = useState(new Animated.Value(0))[0];
+  const router = useRouter();
+
+  // Platform detection
+  const isWeb = Platform.OS === 'web';
+  const isNative = Platform.OS === 'ios' || Platform.OS === 'android';
+  const isMobileWeb = isWeb && screenData.width < 768;
+  const isDesktop = isWeb && screenData.width >= 768;
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await apiCall<string[]>('/customer/categories');
+
+      if (response.status === 200 && response.data) {
+        setCategories(response.data);
+        if (response.data.length > 0 && !response.data.includes(form.category)) {
+          setForm(prev => ({ ...prev, category: response.data[0] as any }));
+        }
+      } else {
+        console.error('Error fetching categories:', response.error);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const updateForm = (field: keyof CustomerForm, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const showBanner = (type: 'success' | 'error', message: string) => {
+    setBanner({ type, message });
+    Animated.sequence([
+      Animated.timing(bannerAnimation, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.delay(3000),
+      Animated.timing(bannerAnimation, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(() => setBanner(null));
+  };
+
+  const validateForm = (): boolean => {
+    if (!form.full_name.trim()) {
+      Alert.alert('Validation Error', 'Customer name is required');
+      return false;
+    }
+    if (!form.company_name.trim()) {
+      Alert.alert('Validation Error', 'Company name is required');
+      return false;
+    }
+    if (!form.phone_number.trim()) {
+      Alert.alert('Validation Error', 'Phone number is required');
+      return false;
+    }
+    if (!form.full_address.trim()) {
+      Alert.alert('Validation Error', 'Full address is required');
+      return false;
+    }
+    if (form.email_address.trim() && !/\S+@\S+\.\S+/.test(form.email_address)) {
+      Alert.alert('Validation Error', 'Please enter a valid email address');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    console.log('▶️ handleSubmit');
+    if (!validateForm()) return;
+
+    setLoading(true);
+    try {
+      const payload: any = {
+        company_name: form.company_name.trim(),
+        full_name:    form.full_name.trim(),
+        phone_number: form.phone_number.trim(),
+        full_address: form.full_address.trim(),
+        category:     form.category,
+      };
+      if (form.email_address.trim())  payload.email_address   = form.email_address.trim();
+      if (form.business_cards.trim()) payload.business_cards  = form.business_cards.trim();
+      if (form.notes.trim())          payload.notes           = form.notes.trim();
+      if (form.coordinates.trim())    payload.coordinates     = form.coordinates.trim();
+
+      console.log('Submitting payload:', payload);
+      const response = await apiCall('/customer/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      console.log('API response:', response);
+      if (response.status === 200 || response.status === 201) {
+        showBanner('success', 'Customer created successfully!');
+        setTimeout(() => router.replace('/customers'), 1500);
+        return;
+      }
+
+      let errorMsg = 'Failed to create customer';
+      if (response.error) {
+        try {
+          const err = typeof response.error === 'string' ? JSON.parse(response.error) : response.error;
+          errorMsg = err.detail || err.message || errorMsg;
+        } catch {}
+      }
+      showBanner('error', errorMsg);
+
+    } catch (e) {
+      console.error('Network error:', e);
+      showBanner('error', 'Network error – please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => router.back();
+
+  return (
+    <ThemedView style={styles.container}>
+      {banner && (
+        <Animated.View style={[
+          styles.banner,
+          banner.type === 'success' ? styles.successBanner : styles.errorBanner,
+          { opacity: bannerAnimation, transform: [{ translateY: bannerAnimation.interpolate({ inputRange: [0,1], outputRange: [-100,0] }) }] }
+        ]}>
+          <ThemedText style={styles.bannerText}>{banner.message}</ThemedText>
+        </Animated.View>
+      )}
+
+      <View style={[
+        styles.header,
+        isDesktop ? styles.desktopHeader : (isMobileWeb || isNative) ? styles.mobileHeader : undefined
+      ]}>
+        <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
+          <ThemedText style={styles.backButtonText}>← Back</ThemedText>
+        </TouchableOpacity>
+        <ThemedText style={[
+          styles.title,
+          isDesktop ? styles.desktopTitle : styles.mobileTitle
+        ]}>
+          Create Customer
+        </ThemedText>
+        <View style={styles.placeholder} />
+      </View>
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={[
+        styles.formContainer,
+        isDesktop ? styles.desktopForm : styles.mobileForm
+      ]} showsVerticalScrollIndicator={false}>
+        <View style={styles.formCard}>
+          {/* Customer Name */}
+          <View style={styles.fieldContainer}>
+            <ThemedText style={styles.label}>Customer Name *</ThemedText>
+            <TextInput style={styles.input}
+              value={form.full_name}
+              onChangeText={(v) => updateForm('full_name', v)}
+              placeholder="Enter customer full name"
+              placeholderTextColor="#9ca3af" />
+          </View>
+
+          {/* Company Name */}
+          <View style={styles.fieldContainer}>
+            <ThemedText style={styles.label}>Company Name *</ThemedText>
+            <TextInput style={styles.input}
+              value={form.company_name}
+              onChangeText={(v) => updateForm('company_name', v)}
+              placeholder="Enter company name"
+              placeholderTextColor="#9ca3af" />
+          </View>
+
+          {/* Phone */}
+          <View style={styles.fieldContainer}>
+            <ThemedText style={styles.label}>Phone Number *</ThemedText>
+            <TextInput style={styles.input}
+              value={form.phone_number}
+              onChangeText={(v) => updateForm('phone_number', v)}
+              placeholder="Enter phone number"
+              keyboardType="phone-pad"
+              placeholderTextColor="#9ca3af" />
+          </View>
+
+          {/* Email */}
+          <View style={styles.fieldContainer}>
+            <ThemedText style={styles.label}>Email Address</ThemedText>
+            <TextInput style={styles.input}
+              value={form.email_address}
+              onChangeText={(v) => updateForm('email_address', v)}
+              placeholder="Enter email address (optional)"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholderTextColor="#9ca3af" />
+          </View>
+
+          {/* Contact Note */}
+          <View style={styles.fieldContainer}>
+            <ThemedText style={styles.contactNote}>
+              * If you don’t have an email, phone number is required.
+            </ThemedText>
+          </View>
+
+          {/* Category */}
+          <View style={styles.fieldContainer}>
+            <ThemedText style={styles.label}>Customer Category *</ThemedText>
+            <View style={styles.categoryContainer}>
+              {categories.map(cat => (
+                <TouchableOpacity key={cat}
+                  style={[styles.categoryButton, form.category===cat && styles.activeCategoryButton]}
+                  onPress={()=>updateForm('category',cat as any)}>
+                  <ThemedText style={[styles.categoryButtonText, form.category===cat && styles.activeCategoryButtonText]}>
+                    {cat.charAt(0).toUpperCase()+cat.slice(1)}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Full Address */}
+          <View style={styles.fieldContainer}>
+            <ThemedText style={styles.label}>Full Address *</ThemedText>
+            <TextInput style={[styles.input, styles.textArea]}
+              value={form.full_address}
+              onChangeText={(v)=>updateForm('full_address',v)}
+              placeholder="Enter full address"
+              multiline numberOfLines={3}
+              placeholderTextColor="#9ca3af" />
+          </View>
+
+          {/* Business Cards */}
+          <View style={styles.fieldContainer}>
+            <ThemedText style={styles.label}>Business Cards</n…
