@@ -9,6 +9,7 @@ from app.dto.vendor import (
     VendorListParams,
     VendorPage
 )
+from geoalchemy2 import WKTElement
 from models.common import Vendor as VendorModel
 from app.entrypoint.routes.vendor import vendor_blueprint
 from app.entrypoint.routes.common.errors import NotFoundError
@@ -18,6 +19,8 @@ from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.auth import add_logged_user_to_payload
 from flask_jwt_extended import get_jwt_identity, jwt_required
+from pydantic import ValidationError
+
 
 @vendor_blueprint.route('/', methods=['POST'])
 @jwt_required()
@@ -94,10 +97,10 @@ def delete_vendor(uuid: str):
         if uow.purchase_order_repository.find_first(vendor_uuid=uuid,is_deleted=False):
             raise BadRequestError(f"Vendor {uuid} has purchase orders")
         # find debit notes
-        if uow.debit_note_repository.find_first(vendor_uuid=uuid,is_deleted=False):
+        if uow.debit_note_item_repository.find_first(vendor_uuid=uuid,is_deleted=False):
             raise BadRequestError(f"Vendor {uuid} has debit notes")
         # find credit notes
-        if uow.credit_note_repository.find_first(vendor_uuid=uuid,is_deleted=False):
+        if uow.credit_note_item_repository.find_first(vendor_uuid=uuid,is_deleted=False):
             raise BadRequestError(f"Vendor {uuid} has credit notes")
 
         for k,val in v.balance_per_currency.items():
@@ -130,6 +133,28 @@ def list_vendors():
         filters.append(VendorModel.phone_number.ilike(f"%{params.phone_number}%"))
     if params.email_address:
         filters.append(VendorModel.email_address.ilike(f"%{params.email_address}%"))
+    if params.within_polygon:
+        try:
+            # Wrap your WKT string in a WKTElement (with the correct SRID)
+            poly = WKTElement(
+                params.within_polygon,
+                srid=VendorModel.coordinates.type.srid  # e.g. 4326
+            )
+            # Add the ST_Within filter
+            filters.append(
+                # call the ST_Within comparator
+                # coordinates cannot be None
+                VendorModel.coordinates.ST_Within(poly)  # type: ignore[call-overload,attr-defined]
+
+            )
+            filters.append(VendorModel.coordinates.is_not(None))  # ensure coordinates are not None
+            # bump per_page so your polygon filter returns everything
+            params.per_page = 10000
+        except ValidationError as e:
+            raise BadRequestError(f"Invalid polygon: {e}")
+    if params.within_polygon:
+        # make per page a very high number to avoid pagination
+        params.per_page = 10000
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.vendor_repository.find_all_by_filters_paginated(
             filters=filters,

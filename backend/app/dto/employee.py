@@ -2,7 +2,6 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from typing import Optional, List
-from uuid import UUID
 from datetime import datetime
 
 class EmployeeRole(str, Enum):
@@ -28,9 +27,8 @@ class EmployeeBase(BaseModel):
 class EmployeeCreate(EmployeeBase):
     """Fields required to create a new employee."""
     model_config = ConfigDict(extra="forbid")
+    created_by_uuid: Optional[str] = None
 
-    full_name: str
-    phone_number: str
 
 class EmployeeUpdate(BaseModel):
     """All fields optional for partial updates."""
@@ -49,15 +47,15 @@ class EmployeeUpdate(BaseModel):
 class EmployeeRead(EmployeeBase):
     model_config = ConfigDict(from_attributes=True,extra="forbid")
 
-    uuid: UUID
-    created_by_uuid: Optional[UUID] = None
+    uuid: str
+    created_by_uuid: Optional[str] = None
     created_at: datetime
     is_deleted: bool
 
 class EmployeeListParams(BaseModel):
     """Pagination parameters for listing employees."""
     model_config = ConfigDict(extra="forbid")
-    uuid: Optional[UUID] = None
+    uuid: Optional[str] = None
     phone_number: Optional[str] = None
     email_address: Optional[EmailStr] = None
     full_name: Optional[str] = None

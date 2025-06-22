@@ -1,7 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
-from uuid import UUID
 from datetime import datetime
 
 from app.dto.common_enums import UnitOfMeasure
@@ -60,7 +59,7 @@ class MaterialListParams(BaseModel):
     """Pagination parameters for listing materials."""
     model_config = ConfigDict(extra="forbid")
 
-    uuid : Optional[UUID] = None
+    uuid : Optional[str] = None
     type: Optional[MaterialType] = None
     sku : Optional[str] = None
     name: Optional[str] = None

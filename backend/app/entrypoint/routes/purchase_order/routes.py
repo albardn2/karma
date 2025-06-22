@@ -128,13 +128,15 @@ def list_orders():
     # build SQLAlchemy filters
     filters = [PurchaseOrderModel.is_deleted == False]
     if params.uuid:
-        filters.append(PurchaseOrderModel.uuid == params.uuid)
+        # ilike
+        filters.append(PurchaseOrderModel.uuid.ilike(f'%{params.uuid}%'))
     if params.is_overdue is not None:
         filters.append(PurchaseOrderModel.is_overdue == params.is_overdue)
     if params.is_fulfilled is not None:
         filters.append(PurchaseOrderModel.is_fulfilled == params.is_fulfilled)
     if params.vendor_uuid:
-        filters.append(PurchaseOrderModel.vendor_uuid == params.vendor_uuid)
+        # ilike
+        filters.append(PurchaseOrderModel.vendor_uuid.ilike(f'%{params.vendor_uuid}%'))
     if params.status:
         filters.append(PurchaseOrderModel.status == params.status)
     if params.is_paid is not None:

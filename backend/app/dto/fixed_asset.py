@@ -54,6 +54,7 @@ class FixedAssetListParams(BaseModel):
     uuid :                Optional[str] = None
     purchase_order_item_uuid: Optional[str] = None
     material_uuid:            Optional[str] = None
+    name:                Optional[str] = None
 
 class FixedAssetPage(BaseModel):
     model_config = ConfigDict(extra="forbid")

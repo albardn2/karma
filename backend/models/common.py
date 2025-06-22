@@ -70,7 +70,7 @@ class Customer(Base):
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    email_address = Column(String(120), nullable=True, unique=True)
+    email_address = Column(String(120), nullable=True)
     company_name = Column(String(120), nullable=False)
     full_name = Column(String(120), nullable=False)  # for person
     phone_number = Column(String(50), nullable=False)
@@ -850,6 +850,11 @@ class PurchaseOrder(Base):
     payouts = relationship("Payout", back_populates="purchase_order")
 
     @hybrid_property
+    def vendor_name(self):
+        return self.vendor.company_name if self.vendor else None
+
+
+    @hybrid_property
     def total_amount(self):
         return sum(
             item.total_price
@@ -933,19 +938,22 @@ class PurchaseOrder(Base):
     @status.expression
     def status(cls):
         return case(
-            [
-                (cls.is_deleted, literal("void")),
-                (cls.is_paid,    literal("paid")),
-            ],
+            (cls.is_deleted, literal("void")),
+            (cls.is_paid,    literal("paid")),
             else_=literal("pending")
         )
 
     @hybrid_property
     def is_overdue(self):
+        due = (
+            self.payout_due_date
+            if self.payout_due_date.tzinfo is not None
+            else self.payout_due_date.replace(tzinfo=timezone.utc)
+        )
         return (
                 not self.is_paid
                 and self.payout_due_date is not None
-                and self.payout_due_date < datetime.utcnow()
+                and due < datetime.now(timezone.utc)
         )
 
     @is_overdue.expression
@@ -1023,6 +1031,10 @@ class PurchaseOrderItem(Base):
     debit_note_items = relationship("DebitNoteItem", back_populates="purchase_order_item")
     credit_note_items = relationship("CreditNoteItem", back_populates="purchase_order_item")
     inventory_events = relationship("InventoryEvent", back_populates="purchase_order_item")
+
+    @hybrid_property
+    def material_name(self):
+        return self.material.name
 
     @hybrid_property
     def total_price(self):

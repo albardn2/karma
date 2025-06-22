@@ -68,12 +68,12 @@ class MaterialDomain:
         inventory_events = relationship("InventoryEvent", back_populates="material")
         """
         if (
-            uow.pricing.find_first(material_uuid=m.uuid, is_deleted=False) or
-            uow.customer_order_items.find_first(material_uuid=m.uuid, is_deleted=False) or
-            uow.inventory.find_first(material_uuid=m.uuid, is_deleted=False) or
-            uow.purchase_order_items.find_first(material_uuid=m.uuid, is_deleted=False) or
-            uow.fixed_assets.find_first(material_uuid=m.uuid, is_deleted=False) or
-            uow.inventory_events.find_first(material_uuid=m.uuid, is_deleted=False)
+            uow.pricing_repository.find_first(material_uuid=m.uuid, is_deleted=False) or
+            uow.customer_order_item_repository.find_first(material_uuid=m.uuid, is_deleted=False) or
+            uow.inventory_repository.find_first(material_uuid=m.uuid, is_deleted=False) or
+            uow.purchase_order_item_repository.find_first(material_uuid=m.uuid, is_deleted=False) or
+            uow.fixed_asset_repository.find_first(material_uuid=m.uuid, is_deleted=False) or
+            uow.inventory_event_repository.find_first(material_uuid=m.uuid, is_deleted=False)
         ):
             return False
         return True

@@ -1,5 +1,7 @@
 # app/entrypoint/routes/service_area/routes.py
 from flask import Blueprint, request, jsonify
+from geoalchemy2 import WKTElement
+from pydantic import ValidationError
 from sqlalchemy import func
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.common.errors import NotFoundError
@@ -17,6 +19,7 @@ from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required, add_logged_user_to_payload
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.entrypoint.routes.service_area import service_area_blueprint
+from app.entrypoint.routes.common.errors import BadRequestError
 
 
 @service_area_blueprint.route("/", methods=["POST"])
@@ -103,9 +106,24 @@ def list_service_areas():
     if params.name:
         filters.append(ServiceAreaModel.name.ilike(f"%{params.name}%"))
     if params.intersects_polygon:
-        geom_expr = func.ST_GeomFromText(params.intersects_polygon, 4326)
-        filters.append(func.ST_Intersects(ServiceAreaModel.geometry, geom_expr))
+        try:
+            # Wrap your WKT string in a WKTElement (with the correct SRID)
+            poly = WKTElement(
+                params.intersects_polygon,
+                srid=4326,  # Assuming WGS 84
+            )
+            # Add the ST_Within filter
+            filters.append(
+                # call the ST_Within comparator
+                # coordinates cannot be None
+                ServiceAreaModel.geometry.ST_Intersects(poly)  # type: ignore[call-overload,attr-defined]
 
+            )
+            filters.append(ServiceAreaModel.geometry.is_not(None))  # ensure coordinates are not None
+            # bump per_page so your polygon filter returns everything
+            params.per_page = 10000
+        except ValidationError as e:
+            raise BadRequestError(f"Invalid polygon: {e}")
     with SqlAlchemyUnitOfWork() as uow:
         page = uow.service_area_repository.find_all_by_filters_paginated(
             filters=filters,
