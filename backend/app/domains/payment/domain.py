@@ -77,8 +77,8 @@ class PaymentDomain:
 
         pay.is_deleted = True
         uow.payment_repository.save(model=pay, commit=False)
-        pay.financial_account.balance -= pay.amount
-        if pay.invoice.status == InvoiceStatus.PAID.value:
-            pay.invoice.status = InvoiceStatus.PENDING.value
-            pay.invoice.paid_at = None
+        # pay.financial_account.balance -= pay.amount
+        # if pay.invoice.status == InvoiceStatus.PAID.value:
+        #     pay.invoice.status = InvoiceStatus.PENDING.value
+        #     pay.invoice.paid_at = None
         return PaymentRead.from_orm(pay)

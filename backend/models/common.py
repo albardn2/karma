@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import declarative_base, sessionmaker, validates
+from sqlalchemy.orm import declarative_base, sessionmaker, validates, aliased
 import uuid
 from datetime import datetime
 from sqlalchemy import (
@@ -139,6 +139,13 @@ class CustomerOrder(Base):
     customer = relationship("Customer", back_populates="orders")
     trip_stop = relationship("TripStop", back_populates="customer_orders")
 
+    @hybrid_property
+    def currency(self):
+        # return the currency of the first invoice, or None if no invoices exist
+        for inv in self.invoices:
+            if not inv.is_deleted:
+                return inv.currency
+        return None
     @hybrid_property
     def is_fulfilled(self):
         # all non-deleted items have a fulfilled_at timestamp
@@ -308,6 +315,10 @@ class CustomerOrderItem(Base):
             f"<CustomerOrderItem(uuid={self.uuid}, material_name={self.material.name}, "
             f"quantity={self.quantity})>"
         )
+
+    @hybrid_property
+    def material_name(self):
+        return self.material.name
 
 # ------------------------------
 # Invoice & Payment Models
@@ -1373,23 +1384,49 @@ class Inventory(Base):
     warehouse = relationship("Warehouse", back_populates="inventories")
     inventory_events = relationship("InventoryEvent", back_populates="inventory")
 
-    @property
+    @hybrid_property
     def total_original_cost(self):
         return self.original_quantity * self.cost_per_unit
 
-    @property
+    @hybrid_property
     def original_quantity(self):
         events = [event for event in self.inventory_events if not event.is_deleted]
         if events:
             return sum([event.quantity for event in events if event.affect_original])
         return 0
 
-    @property
+    @original_quantity.expression
+    def original_quantity(cls):
+        IE = aliased(InventoryEvent)
+        return (
+            select(func.coalesce(func.sum(IE.quantity), 0))
+            .where(
+                IE.inventory_uuid == cls.uuid,
+                IE.is_deleted       == False,
+                IE.affect_original  == True,
+                )
+            .scalar_subquery()
+        )
+
+
+    @hybrid_property
     def current_quantity(self):
         events = [event for event in self.inventory_events if not event.is_deleted]
         if events:
             return self.original_quantity + sum([event.quantity for event in events if not event.affect_original])
         return 0
+
+    @current_quantity.expression
+    def current_quantity(cls):
+        IE = aliased(InventoryEvent)
+        return (
+            select(func.coalesce(func.sum(IE.quantity), 0))
+            .where(
+                IE.inventory_uuid == cls.uuid,
+                IE.is_deleted      == False,
+                )
+            .scalar_subquery()
+        )
 
     def __repr__(self):
         return (

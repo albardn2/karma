@@ -47,6 +47,7 @@ class CustomerOrderRead(CustomerOrderBase):
     net_amount_paid: Optional[float] = None
     trip_stop_uuid: Optional[str] = None
     is_paid: Optional[bool] = None
+    currency: Optional[Currency] = None
 
 class CustomerOrderListParams(BaseModel):
     """Optional filters plus pagination for listing orders."""

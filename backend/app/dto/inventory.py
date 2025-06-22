@@ -64,3 +64,11 @@ class InventoryPage(BaseModel):
     page: int
     per_page: int
     pages: int
+
+
+class InventoryFIFOOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    inventory_uuid: str
+    material_uuid:str
+    quantity: float
+
