@@ -29,9 +29,6 @@ class CreditNoteItemDomain:
                 raise NotFoundError("InvoiceItem not found")
 
             invoice = invoice_item.invoice
-            if invoice.net_amount_due < 0:
-                raise BadRequestError("Invoice amount due is negative")
-
             item.customer_uuid = invoice_item.invoice.customer_uuid
             item.customer_order_item_uuid = invoice_item.customer_order_item_uuid
             if item.amount > invoice_item.total_price or item.currency != invoice_item.currency:

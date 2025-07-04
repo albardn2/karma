@@ -29,7 +29,9 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
                  )
 def create_process():
     current_user_uuid = get_jwt_identity()
+    print(request.json)
     payload = ProcessCreate(**request.json)
+    print(payload)
     with SqlAlchemyUnitOfWork() as uow:
         add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=payload)
         dto = ProcessDomain.create_process(uow=uow, payload=payload)
