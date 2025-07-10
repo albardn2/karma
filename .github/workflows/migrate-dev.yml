@@ -1,0 +1,28 @@
+name: CD – Migrate Dev DB
+
+# run this by clicking “Run workflow” in the Actions tab
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    name: Run Alembic migrations on Dev droplet
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      # load your SSH key (add your private key as GH secret DROPLET_SSH_KEY)
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.DROPLET_SSH_KEY }}
+
+      - name: Pull & run migrations
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} << 'EOF'
+            cd /srv/myapp             # where your docker-compose.yml lives
+            docker-compose pull       # grab latest-dev image
+            docker-compose run --rm migrate
+          EOF

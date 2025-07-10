@@ -51,6 +51,11 @@ def run_migrations_online():
         with context.begin_transaction():
             context.run_migrations()
 
+
+url = os.getenv('DATABASE_URL') or os.getenv('SQLALCHEMY_DATABASE_URI')
+if not url:
+    raise RuntimeError("No DATABASE_URL or SQLALCHEMY_DATABASE_URI set")
+config.set_main_option("sqlalchemy.url", url)
 if context.is_offline_mode():
     run_migrations_offline()
 else:
