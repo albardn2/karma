@@ -1,5 +1,10 @@
 name: CI – Build Dev Image
 
+
+permissions:
+  contents: read
+  packages: write
+
 on:
   pull_request:
     branches:
