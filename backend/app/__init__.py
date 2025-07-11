@@ -60,7 +60,7 @@ def create_app(config_object=Config):
     app.config['JWT_SECRET_KEY'] = "super-secret-change-me"
     # accept tokens from both headers and cookies
     app.config['JWT_TOKEN_LOCATION'] = ["headers", "cookies"]
-    app.config['JWT_COOKIE_SECURE']   = True     # only over HTTPS in prod
+    app.config['JWT_COOKIE_SECURE']   = False     # only over HTTPS in prod
     app.config['JWT_COOKIE_SAMESITE'] = 'Lax'
     app.config['JWT_ACCESS_COOKIE_PATH'] = '/'
     app.config["JWT_COOKIE_CSRF_PROTECT"] = False # TESTING
