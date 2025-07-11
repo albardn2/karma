@@ -50,9 +50,10 @@ jobs:
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
-          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
+          sshpass -p "$PASS" ssh -tt -o StrictHostKeyChecking=no \
             "$USER@$HOST" << 'EOF'
             cd /srv/myapp
-            docker-compose pull               # optional: grab the latest images
-            docker-compose run --rm migrate   # run your migrate service
+            # use the built-in Compose plugin
+            docker compose pull
+            docker compose run --rm migrate
           EOF
