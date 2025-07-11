@@ -49,7 +49,7 @@ jobs:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
-          GHCR_USER: ${{ github.actor }}
+          GHCR_USER: albardn2
           GHCR_PAT : ${{ secrets.CR_PAT }}
         run: |
           sshpass -p "$PASS" \
