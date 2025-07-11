@@ -1,28 +1,48 @@
 name: CD – Migrate Dev DB
 
-# run this by clicking “Run workflow” in the Actions tab
 on:
   workflow_dispatch:
 
-jobs:
-  migrate:
-    name: Run Alembic migrations on Dev droplet
-    runs-on: ubuntu-latest
+permissions:
+  contents: read
+  packages: write
 
+jobs:
+  sync-compose:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
-      # load your SSH key (add your private key as GH secret DROPLET_SSH_KEY)
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.8.1
-        with:
-          ssh-private-key: ${{ secrets.DROPLET_SSH_KEY }}
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Pull & run migrations
+      - name: Rsync docker-compose.yml with password
+        env:
+          HOST: ${{ secrets.DEV_DROPLET_HOST }}
+          USER: root
+          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
-          ssh -o StrictHostKeyChecking=no \
-              ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} << 'EOF'
-            cd /srv/myapp             # where your docker-compose.yml lives
-            docker-compose pull       # grab latest-dev image
+          sshpass -p "$PASS" rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            ./docker-compose.yml \
+            "$USER@$HOST:/srv/myapp/docker-compose.yml"
+
+  migrate:
+    runs-on: ubuntu-latest
+    needs: sync-compose
+    steps:
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Pull image & run migrations
+        env:
+          HOST: ${{ secrets.DEV_DROPLET_HOST }}
+          USER: root
+          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
+        run: |
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
+            "$USER@$HOST" << 'EOF'
+            cd /srv/myapp
+            docker-compose pull
             docker-compose run --rm migrate
           EOF
