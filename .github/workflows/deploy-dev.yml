@@ -3,24 +3,60 @@ name: CD – Deploy Dev Stack
 on:
   workflow_dispatch:
 
-jobs:
-  deploy:
-    name: Update & restart services
-    runs-on: ubuntu-latest
+permissions:
+  contents: read
+  packages: write
 
+jobs:
+  sync-compose:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.8.1
-        with:
-          ssh-private-key: ${{ secrets.DROPLET_SSH_KEY }}
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Pull & restart
+      - name: Prepare remote directory
+        env:
+          HOST: ${{ secrets.DEV_DROPLET_HOST }}
+          USER: root
+          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
-          ssh -o StrictHostKeyChecking=no \
-              ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} << 'EOF'
-            cd /srv/myapp
-            docker-compose pull
-            docker-compose up -d --remove-orphans
-          EOF
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
+            "$USER@$HOST" "mkdir -p /srv/myapp"
+
+      - name: Rsync docker-compose.yaml
+        env:
+          HOST: ${{ secrets.DEV_DROPLET_HOST }}
+          USER: root
+          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
+        run: |
+          sshpass -p "$PASS" rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
+            "$USER@$HOST:/srv/myapp/docker-compose.yaml"
+
+  deploy:
+    name: Pull & restart db & web
+    needs: sync-compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: SSH, login to GHCR & deploy services
+        run: |
+          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
+            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "\
+              # ensure Docker & Compose are available
+              apt-get update && apt-get install -y curl && \
+              curl -fsSL https://get.docker.com | sh && \
+              systemctl enable --now docker && \
+              # login to GHCR for private images
+              echo '${{ secrets.CR_PAT }}' | docker login ghcr.io \
+                -u 'albardn2' --password-stdin && \
+              cd /srv/myapp && \
+              # pull & restart only db and web
+              docker compose pull db web && \
+              docker compose up -d db web --remove-orphans\
+            "
