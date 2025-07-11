@@ -44,23 +44,22 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: SSH, install Docker, and run migrations
+      - name: SSH, install Docker & run migrations
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
-          sshpass -p "$PASS" ssh -tt -o StrictHostKeyChecking=no \
-            "$USER@$HOST" << 'EOF'
-          
-            # 1. Install Docker Engine & Compose plugin
-            apt-get update
-            apt-get install -y docker.io docker-compose-plugin
-            systemctl enable --now docker
-
-            # 2. Run your migrations
-            cd /srv/myapp
-            docker compose pull
-            docker compose run --rm migrate
-
-            EOF
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no "$USER@$HOST" "\
+            # install prerequisites
+            apt-get update && \
+            apt-get install -y curl python3-pip && \
+            # install Docker & enable it
+            curl -fsSL https://get.docker.com | sh && \
+            systemctl enable --now docker && \
+            # sync’d compose file is already in /srv/myapp
+            cd /srv/myapp && \
+            # run your migrations
+            docker compose pull && \
+            docker compose run --rm migrate\
+          "
