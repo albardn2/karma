@@ -25,7 +25,7 @@ jobs:
           sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
             "$USER@$HOST" "mkdir -p /srv/myapp"
 
-      - name: Rsync docker-compose.yaml
+      - name: Rsync docker-compose + nginx configs
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
@@ -34,10 +34,11 @@ jobs:
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
-            "$USER@$HOST:/srv/myapp/docker-compose.yaml"
+            "$GITHUB_WORKSPACE/backend/nginx" \
+            "$USER@$HOST:/srv/myapp/"
 
   deploy:
-    name: Pull & restart db & web
+    name: Pull & restart db, web, and nginx
     needs: sync-compose
     runs-on: ubuntu-latest
     steps:
@@ -56,7 +57,7 @@ jobs:
               echo '${{ secrets.CR_PAT }}' | docker login ghcr.io \
                 -u 'albardn2' --password-stdin && \
               cd /srv/myapp && \
-              # pull & restart only db and web
-              docker compose pull db web && \
-              docker compose up -d db web --remove-orphans\
+              # pull & restart only db, web, nginx
+              docker compose pull db web nginx && \
+              docker compose up -d db web nginx --remove-orphans\
             "

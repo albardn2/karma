@@ -28,5 +28,25 @@ services:
       - "5000:5000"
     environment:
       - SQLALCHEMY_DATABASE_URI=postgresql://local:local@db:5432/backend
+    networks:
+      - proxy
+
+  nginx:
+    image: nginx:stable-alpine
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+#      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+#      - certs:/etc/letsencrypt     # for Let’s Encrypt
+    networks:
+      - proxy
 volumes:
   postgres_data:
+  certs:
+
+networks:
+  proxy:
+    driver: bridge
