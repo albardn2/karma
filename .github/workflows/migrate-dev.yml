@@ -45,23 +45,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
       - name: SSH, login to GHCR & run migrations
-        env:
-          HOST: ${{ secrets.DEV_DROPLET_HOST }}
-          USER: root
-          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
-          GHCR_USER: albardn2
-          GHCR_PAT : ${{ secrets.CR_PAT }}
         run: |
-          sshpass -p "$PASS" \
-            ssh -o StrictHostKeyChecking=no "$USER@$HOST" "\
-              # install or ensure Docker is running (skip if you pre-provisioned)
+          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
+            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "\
+              # ensure Docker is installed and running
               apt-get update && apt-get install -y curl && \
               curl -fsSL https://get.docker.com | sh && \
               systemctl enable --now docker && \
-              # login to GHCR so private images can be pulled
-              echo \"\$GHCR_PAT\" | docker login ghcr.io -u \"\$GHCR_USER\" --password-stdin && \
-              # go to your app folder and pull + migrate
+              # log in to GHCR (secret PAT masked in logs)
+              echo '${{ secrets.CR_PAT }}' | docker login ghcr.io \
+                -u 'albardn2' --password-stdin && \
+              # pull & run your migrate service
               cd /srv/myapp && \
               docker compose pull && \
               docker compose run --rm migrate\
-          "
+            "
