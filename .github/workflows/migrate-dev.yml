@@ -44,7 +44,7 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: SSH, login to GHCR & run migrations
+      - name: SSH, login & run migrations
         run: |
           sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
             ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "\
@@ -52,11 +52,17 @@ jobs:
               apt-get update && apt-get install -y curl && \
               curl -fsSL https://get.docker.com | sh && \
               systemctl enable --now docker && \
-              # log in to GHCR (secret PAT masked in logs)
+              # login to GHCR
               echo '${{ secrets.CR_PAT }}' | docker login ghcr.io \
                 -u 'albardn2' --password-stdin && \
-              # pull & run your migrate service
               cd /srv/myapp && \
+              # pull latest images
               docker compose pull && \
+              # start only the DB in the background
+              docker compose up -d db && \
+              # wait for the database to be ready
+              echo 'Waiting for Postgres…' && \
+              until docker compose exec db pg_isready -U local; do sleep 1; done && \
+              # now run migrations
               docker compose run --rm migrate\
             "
