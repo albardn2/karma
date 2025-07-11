@@ -26,14 +26,13 @@ jobs:
           sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
             "$USER@$HOST" "mkdir -p /srv/myapp"
 
-      - name: Rsync from backend folder
+      - name: Rsync docker-compose.yml with password
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
-        working-directory: karma/backend
         run: |
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
-            docker-compose.yml \
+            "$GITHUB_WORKSPACE/karma/backend/docker-compose.yml" \
             "$USER@$HOST:/srv/myapp/docker-compose.yml"
