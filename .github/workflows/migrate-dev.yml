@@ -34,5 +34,5 @@ jobs:
         run: |
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
-            "$GITHUB_WORKSPACE/karma/backend/docker-compose.yml" \
+            "./backend/docker-compose.yml" \
             "$USER@$HOST:/srv/myapp/docker-compose.yml"
