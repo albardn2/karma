@@ -1,4 +1,5 @@
 version: "3.8"
+
 services:
   db:
     image: postgis/postgis:13-3.1-alpine
@@ -11,15 +12,19 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - proxy
 
   migrate:
     image: ghcr.io/albardn2/karma-backend:latest-dev
     depends_on:
-     - db
+      - db
     entrypoint: ["alembic", "upgrade", "head"]
     environment:
-      # pass the correct URI into Alembic
       SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+    networks:
+      - proxy
+
   web:
     image: ghcr.io/albardn2/karma-backend:latest-dev
     depends_on:
@@ -37,12 +42,11 @@ services:
       - web
     ports:
       - "80:80"
-#      - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-#      - certs:/etc/letsencrypt     # for Let’s Encrypt
     networks:
       - proxy
+
 volumes:
   postgres_data:
   certs:
