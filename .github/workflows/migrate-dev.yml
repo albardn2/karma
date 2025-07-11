@@ -44,22 +44,24 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: SSH, install Docker & run migrations
+      - name: SSH, login to GHCR & run migrations
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_PAT : ${{ secrets.CR_PAT }}
         run: |
-          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no "$USER@$HOST" "\
-            # install prerequisites
-            apt-get update && \
-            apt-get install -y curl python3-pip && \
-            # install Docker & enable it
-            curl -fsSL https://get.docker.com | sh && \
-            systemctl enable --now docker && \
-            # sync’d compose file is already in /srv/myapp
-            cd /srv/myapp && \
-            # run your migrations
-            docker compose pull && \
-            docker compose run --rm migrate\
+          sshpass -p "$PASS" \
+            ssh -o StrictHostKeyChecking=no "$USER@$HOST" "\
+              # install or ensure Docker is running (skip if you pre-provisioned)
+              apt-get update && apt-get install -y curl && \
+              curl -fsSL https://get.docker.com | sh && \
+              systemctl enable --now docker && \
+              # login to GHCR so private images can be pulled
+              echo \"\$GHCR_PAT\" | docker login ghcr.io -u \"\$GHCR_USER\" --password-stdin && \
+              # go to your app folder and pull + migrate
+              cd /srv/myapp && \
+              docker compose pull && \
+              docker compose run --rm migrate\
           "
