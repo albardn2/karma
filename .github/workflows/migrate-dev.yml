@@ -26,17 +26,13 @@ jobs:
           sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
             "$USER@$HOST" "mkdir -p /srv/myapp"
 
-      - name: List workspace tree
-        run: ls -R "$GITHUB_WORKSPACE"
-
-      - name: Rsync from backend folder
+      - name: Rsync docker-compose.yaml with password
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
-        working-directory: backend
         run: |
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
-            docker-compose.yml \
-            "$USER@$HOST:/srv/myapp/docker-compose.yml"
+            "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
+            "$USER@$HOST:/srv/myapp/docker-compose.yaml"
