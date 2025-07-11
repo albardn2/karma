@@ -80,7 +80,7 @@ class WarehouseListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
     uuid : Optional[UUID] = None
     name: Optional[str] = None
-
+    within_polygon: Optional[str] = None  # WKT Polygon
     page:     int = Field(1, gt=0, description="Page number (>=1)")
     per_page: int = Field(20, gt=0, le=100, description="Items per page (<=100)")
 

@@ -32,7 +32,6 @@ class ServiceAreaCreate(BaseModel):
 
         try:
             geom = shapely_wkt.loads(v)
-            print(f"Parsed geometry: {geom}")
         except Exception as e:
             raise BadRequestError(f"Invalid WKT format: {e}")
 
@@ -67,7 +66,6 @@ class ServiceAreaUpdate(BaseModel):
 
         try:
             geom = shapely_wkt.loads(v)
-            print(f"Parsed geometry: {geom}")
         except Exception as e:
             raise BadRequestError(f"Invalid WKT format: {e}")
 

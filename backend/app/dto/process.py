@@ -20,9 +20,9 @@ class ProcessType(str, Enum):
 
 class ProcessInputItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    inventory_uuid: str
+    inventory_uuid: Optional[str] = None
     quantity: float
-    material_uuid: Optional[str] = None
+    material_uuid: str
     cost_per_unit: Optional[float] = None
 
 
@@ -36,7 +36,7 @@ class InputsUsedItem(BaseModel):
 
 class ProcessOutputItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    inputs_used: List[InputsUsedItem]
+    inputs_used: Optional[List[InputsUsedItem]] = None
     material_uuid: str
     quantity: float
     inventory_uuid: Optional[str] = None
@@ -50,14 +50,14 @@ class ProcessData(BaseModel):
     outputs: List[ProcessOutputItem]
     output_warehouse_uuid: Optional[str] = None
 
-    @model_validator(mode="after")
-    def check_duplicate_input_uuids(self) -> "ProcessData":
-        seen = set()
-        for inp in self.inputs:
-            if inp.inventory_uuid in seen:
-                raise BadRequestError("Duplicate inventory uuids found in inputs.")
-            seen.add(inp.inventory_uuid)
-        return self
+    # @model_validator(mode="after")
+    # def check_duplicate_input_uuids(self) -> "ProcessData":
+    #     seen = set()
+    #     for inp in self.inputs:
+    #         if inp.inventory_uuid in seen:
+    #             raise BadRequestError("Duplicate inventory uuids found in inputs.")
+    #         seen.add(inp.inventory_uuid)
+    #     return self
 
     @model_validator(mode="after")
     def check_duplicate_output_uuids_and_materials(self) -> "ProcessData":
@@ -74,32 +74,32 @@ class ProcessData(BaseModel):
                 seen_mat.add(out.material_uuid)
         return self
 
-    @model_validator(mode="after")
-    def check_warehouse_for_untracked_outputs(self) -> "ProcessData":
-        for output in self.outputs:
-            for input_used in output.inputs_used:
-                if input_used.inventory_uuid is None and self.warehouse_uuid is None:
-                    raise BadRequestError(
-                        "If input_used has None inventory_uuid, warehouse_uuid must be set."
-                    )
-        return self
+    # @model_validator(mode="after")
+    # def check_warehouse_for_untracked_outputs(self) -> "ProcessData":
+    #     for output in self.outputs:
+    #         for input_used in output.inputs_used:
+    #             if input_used.inventory_uuid is None and self.warehouse_uuid is None:
+    #                 raise BadRequestError(
+    #                     "If input_used has None inventory_uuid, warehouse_uuid must be set."
+    #                 )
+    #     return self
 
-    @model_validator(mode="after")
-    def validate_input_used_is_equal_to_output(self) -> "ProcessData":
-        used_by_inv: dict[str, float] = {}
-        for out in self.outputs:
-            for iu in out.inputs_used:
-                used_by_inv[iu.inventory_uuid] = used_by_inv.get(iu.inventory_uuid, 0) + iu.quantity
-
-        for inp in self.inputs:
-            if inp.inventory_uuid not in used_by_inv:
-                raise BadRequestError(f"Input {inp.inventory_uuid} not found in outputs.")
-            if inp.quantity != used_by_inv[inp.inventory_uuid]:
-                raise BadRequestError(
-                    f"Input quantity {inp.quantity} does not match used quantity "
-                    f"{used_by_inv[inp.inventory_uuid]} for inventory {inp.inventory_uuid}."
-                )
-        return self
+    # @model_validator(mode="after")
+    # def validate_input_used_is_equal_to_output(self) -> "ProcessData":
+    #     used_by_inv: dict[str, float] = {}
+    #     for out in self.outputs:
+    #         for iu in out.inputs_used:
+    #             used_by_inv[iu.inventory_uuid] = used_by_inv.get(iu.inventory_uuid, 0) + iu.quantity
+    #
+    #     for inp in self.inputs:
+    #         if inp.inventory_uuid not in used_by_inv:
+    #             raise BadRequestError(f"Input {inp.inventory_uuid} not found in outputs.")
+    #         if inp.quantity != used_by_inv[inp.inventory_uuid]:
+    #             raise BadRequestError(
+    #                 f"Input quantity {inp.quantity} does not match used quantity "
+    #                 f"{used_by_inv[inp.inventory_uuid]} for inventory {inp.inventory_uuid}."
+    #             )
+    #     return self
 class ProcessBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
     created_by_uuid: Optional[str] = None

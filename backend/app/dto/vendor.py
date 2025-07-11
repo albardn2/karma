@@ -121,6 +121,7 @@ class VendorListParams(BaseModel):
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
     email_address: Optional[EmailStr] = None
+    within_polygon: Optional[str] = None  # Expect WKT Polygon string
     page: int = Field(1, gt=0, description="Page number, starting at 1")
     per_page: int = Field(20, gt=0, le=100, description="Items per page, max 100")
 

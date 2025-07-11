@@ -39,7 +39,7 @@ class PricingRead(BaseModel):
     currency: Currency
     created_at: datetime
     is_deleted: bool
-    unit: UnitOfMeasure = None
+    unit: Optional[UnitOfMeasure] = None
 
 class PricingListParams(BaseModel):
     """Pagination parameters for listing pricings."""

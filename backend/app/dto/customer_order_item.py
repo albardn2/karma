@@ -27,6 +27,7 @@ class CustomerOrderItemRead(BaseModel):
     quantity: int
     unit: UnitOfMeasure
     material_uuid: str
+    material_name: str
     uuid: str
     is_fulfilled: bool
     is_deleted: bool
@@ -38,7 +39,7 @@ class FulfillItem(BaseModel):
     """Schema for fulfilling a customer order item."""
     model_config = ConfigDict(extra="forbid")
     customer_order_item_uuid: str
-    inventory_uuid: str
+    inventory_uuid: Optional[str] = None
 
 class UnFulfillItem(BaseModel):
     """Schema for fulfilling a customer order item."""

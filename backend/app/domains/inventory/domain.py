@@ -5,6 +5,7 @@ from models.common import Inventory as InventoryModel
 from app.dto.inventory import InventoryCreate
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.common.errors import NotFoundError
+from app.dto.inventory import InventoryFIFOOutput
 
 
 class InventoryDomain:
@@ -83,3 +84,45 @@ class InventoryDomain:
 
         else:
             inventory_dto.cost_per_unit = sum(agg_total_costs) / sum([event.quantity for event in events])
+
+
+    @staticmethod
+    def get_fifo_inventories_for_material(uow: SqlAlchemyUnitOfWork, material_uuid:str, quantity:float) -> list[InventoryFIFOOutput]:
+        inventories = uow.inventory_repository.get_fifo_inventories_for_material(
+            material_uuid=material_uuid,
+            quantity=quantity
+        )
+
+        result = []
+        remaining_quantity = quantity
+        for inventory in inventories:
+            if remaining_quantity <= 0:
+                break
+
+            if inventory.current_quantity <= 0:
+                continue
+
+            if inventory.current_quantity >= remaining_quantity:
+                dto = InventoryFIFOOutput(
+                    inventory_uuid=inventory.uuid,
+                    material_uuid=inventory.material_uuid,
+                    quantity=remaining_quantity
+                )
+                result.append(dto)
+                remaining_quantity = 0
+            else:
+                dto = InventoryFIFOOutput(
+                    inventory_uuid=inventory.uuid,
+                    material_uuid=inventory.material_uuid,
+                    quantity=inventory.current_quantity
+                )
+                result.append(dto)
+                remaining_quantity -= inventory.current_quantity
+
+        if remaining_quantity > 0:
+            raise NotFoundError(
+                f"Insufficient inventory for material {material_uuid}: "
+                f"requested {quantity}, available {quantity - remaining_quantity}"
+            )
+
+        return result

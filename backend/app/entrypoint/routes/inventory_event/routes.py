@@ -73,8 +73,6 @@ def update_inventory_event(uuid: str):
         ev = uow.inventory_event_repository.find_one(uuid=uuid,is_deleted=False)
         if not ev:
             raise NotFoundError('InventoryEvent not found')
-        if ev.event_type != InventoryEventType.MANUAL.value:
-            raise BadRequestError('InventoryEvent not found')
         for field, val in updates.items():
             setattr(ev, field, val)
         uow.inventory_event_repository.save(model=ev, commit=True)

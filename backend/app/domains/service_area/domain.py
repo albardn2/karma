@@ -25,7 +25,11 @@ class ServiceAreaDomain:
 
         updates = payload.model_dump(exclude_unset=True)
         for field, val in updates.items():
-            setattr(service_area, field, val)
+            if field == 'geometry':
+                print(f"Updating geometry for service area {uuid} with value: {val}")
+                setattr(service_area, field, WKTElement(val, srid=4326))
+            else:
+                setattr(service_area, field, val)
         uow.service_area_repository.save(model=service_area, commit=False)
         return ServiceAreaRead.from_orm(service_area)
 

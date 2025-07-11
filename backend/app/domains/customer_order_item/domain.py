@@ -17,6 +17,9 @@ from app.entrypoint.routes.common.errors import BadRequestError
 
 from app.dto.customer_order_item import CustomerOrderItemBulkUnFulfill
 
+from app.domains.inventory.domain import InventoryDomain
+from app.dto.inventory import InventoryRead, InventoryFIFOOutput
+
 
 class CustomerOrderItemDomain:
 
@@ -53,16 +56,31 @@ class CustomerOrderItemDomain:
             customer_order_item.is_fulfilled = True
             customer_order_item.fulfilled_at = datetime.now()
             # create inventory event
-            InventoryEventDomain.create_inventory_event(
-                uow=uow,
-                payload=InventoryEventCreate(
-                    quantity=-(abs(customer_order_item.quantity)),
-                    event_type=InventoryEventType.SALE,
+
+            if item.inventory_uuid:
+                inventories = [InventoryFIFOOutput(
                     inventory_uuid=item.inventory_uuid,
-                    customer_order_item_uuid=customer_order_item.uuid,
-                    affect_original=False
+                    quantity=abs(customer_order_item.quantity),
+                    material_uuid=customer_order_item.material_uuid
+                )]
+            else:
+                inventories: list[InventoryFIFOOutput] = InventoryDomain.get_fifo_inventories_for_material(
+                    uow=uow,
+                    material_uuid=customer_order_item.material_uuid,
+                    quantity=abs(customer_order_item.quantity)
                 )
-            )
+
+            for inv in inventories:
+                InventoryEventDomain.create_inventory_event(
+                    uow=uow,
+                    payload=InventoryEventCreate(
+                        quantity=-(abs(inv.quantity)),
+                        event_type=InventoryEventType.SALE,
+                        inventory_uuid=inv.inventory_uuid,
+                        customer_order_item_uuid=customer_order_item.uuid,
+                        affect_original=False
+                    )
+                )
             items.append(customer_order_item)
         uow.customer_order_item_repository.batch_save(models=items, commit=False)
         bulk_read = CustomerOrderItemBulkRead(items=[CustomerOrderItemRead.from_orm(m) for m in items])
@@ -84,8 +102,6 @@ class CustomerOrderItemDomain:
             customer_order_item.fulfilled_at = None
             # create inventory event
             inventory_events = [event for event in customer_order_item.inventory_events if not event.is_deleted and event.event_type == InventoryEventType.SALE.value]
-            if len(inventory_events) !=1:
-                raise BadRequestError("CustomerOrderItem sale inventory event count is not 1")
             InventoryEventDomain.delete_inventory_event(
                 uow=uow,
                 uuid=inventory_events[0].uuid
@@ -126,3 +142,4 @@ class CustomerOrderItemDomain:
             raise BadRequestError(
                 f"CustomerOrderItem {item.uuid} cannot be deleted because it is referenced by inventory events"
             )
+

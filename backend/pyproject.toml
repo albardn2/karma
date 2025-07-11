@@ -3,7 +3,7 @@ name = "backend"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "zaid",email = "zaid.al-bardan@tomtom.com"}
+    {name = "zaid",email = "zaid.bardan@gmail.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.10,<4"
@@ -24,7 +24,8 @@ dependencies = [
     "bcrypt (>=4.3.0,<5.0.0)",
     "psycopg2 (>=2.9.10,<3.0.0)",
     "flask-cors (>=6.0.0,<7.0.0)",
-    "alembic (>=1.16.1,<2.0.0)"
+    "alembic (>=1.16.1,<2.0.0)",
+    "gunicorn (>=23.0.0,<24.0.0)"
 ]
 
 

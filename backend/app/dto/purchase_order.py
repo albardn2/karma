@@ -64,6 +64,7 @@ class PurchaseOrderRead(BaseModel):
     uuid:             str
     created_by_uuid:  Optional[str] = None
     vendor_uuid:      str
+    vendor_name:      str
     currency:         Currency
     status:           PurchaseOrderStatus
     created_at:       datetime

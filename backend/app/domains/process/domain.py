@@ -17,6 +17,7 @@ from app.domains.inventory.domain import InventoryDomain
 from app.dto.process import InputsUsedItem
 from sqlalchemy.orm.attributes import flag_modified
 from app.dto.process import ProcessData
+from app.dto.inventory import InventoryFIFOOutput
 
 
 class ProcessDomain:
@@ -24,8 +25,13 @@ class ProcessDomain:
     @staticmethod
     def create_process(uow: SqlAlchemyUnitOfWork, payload: ProcessCreate) -> ProcessRead:
         """Create a process."""
-        process = ProcessModel(**payload.model_dump(mode='json'))
 
+        payload = ProcessDomain.fifo_derive_inventory_uuids_from_materials(uow,payload)
+        payload = ProcessDomain.distribute_inputs_used(payload)
+
+        print(payload.data)
+
+        process = ProcessModel(**payload.model_dump(mode='json'))
         process = ProcessDomain._calculate_cost_per_unit(uow, process)
         uow.process_repository.save(model=process, commit=False)
 
@@ -34,12 +40,10 @@ class ProcessDomain:
 
         # create inventory events from process
         for input in process.data["inputs"]:
-
             input_inventory= uow.inventory_repository.find_one(uuid=input["inventory_uuid"], is_deleted=False)
             if not input_inventory:
                 raise NotFoundError(f"Inventory with uuid {input['inventory_uuid']} not found")
             input["material_uuid"] = input_inventory.material_uuid
-            # load
             input = ProcessInputItem(**input)
             InventoryEventDomain.create_inventory_event(
                 uow=uow,
@@ -215,3 +219,49 @@ class ProcessDomain:
             raise NotFoundError("Inventory not found")
         if existing_inventory.material_uuid != material_uuid:
             raise BadRequestError("Material not found in inventory")
+
+
+    @staticmethod
+    def fifo_derive_inventory_uuids_from_materials(uow:SqlAlchemyUnitOfWork,payload: ProcessCreate) -> ProcessCreate:
+        """Derive inventory uuids from materials for inputs."""
+        inputs = []
+
+        for input in payload.data.inputs:
+            material_uuid = input.material_uuid
+            quantity = input.quantity
+            inventories: list[InventoryFIFOOutput] = InventoryDomain.get_fifo_inventories_for_material(
+                uow=uow,
+                material_uuid=material_uuid,
+                quantity=abs(quantity)
+            )
+            for inventory in inventories:
+                input_item = ProcessInputItem(
+                    material_uuid=inventory.material_uuid,
+                    quantity=inventory.quantity,
+                    inventory_uuid=inventory.inventory_uuid,
+                )
+                inputs.append(input_item)
+
+        payload.data.inputs = inputs
+        return payload
+
+    @staticmethod
+    def distribute_inputs_used(payload: ProcessCreate) -> ProcessCreate:
+        total_output_quantity = sum(output.quantity for output in payload.data.outputs)
+        if total_output_quantity == 0:
+            raise BadRequestError("No outputs defined in process data")
+
+        for output in payload.data.outputs:
+            output.inputs_used = []
+            proportion = output.quantity / total_output_quantity
+            for input in payload.data.inputs:
+                quantity_used = input.quantity * proportion
+                input_used = InputsUsedItem(
+                    inventory_uuid=input.inventory_uuid,
+                    quantity=quantity_used,
+                )
+                output.inputs_used.append(input_used)
+
+        return payload
+
+

@@ -31,7 +31,7 @@ def create_customer():
     payload = CustomerCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
         add_logged_user_to_payload(uow=uow, user_uuid=current_uuid, payload=payload)
-        if uow.customer_repository.find_one(email_address=payload.email_address):
+        if payload.email_address and uow.customer_repository.find_one(email_address=payload.email_address):
             raise BadRequestError(f"Customer with email {payload.email_address} already exists")
 
         cust = CustomerModel(**payload.model_dump())
@@ -143,10 +143,14 @@ def list_customers():
                 params.within_polygon,
                 srid=CustomerModel.coordinates.type.srid  # e.g. 4326
             )
+            # Add the ST_Within filter
             filters.append(
                 # call the ST_Within comparator
-                CustomerModel.coordinates.ST_Within(poly)
+                # coordinates cannot be None
+                CustomerModel.coordinates.ST_Within(poly)  # type: ignore[call-overload,attr-defined]
+
             )
+            filters.append(CustomerModel.coordinates.is_not(None))  # ensure coordinates are not None
             # bump per_page so your polygon filter returns everything
             params.per_page = 10000
         except ValidationError as e:

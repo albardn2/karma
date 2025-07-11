@@ -1,4 +1,5 @@
 from flask import request, jsonify
+from geoalchemy2 import WKTElement
 from pydantic import ValidationError
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.dto.warehouse import (
@@ -118,6 +119,28 @@ def list_warehouses():
         filters.append(WarehouseModel.uuid == params.uuid)
     if params.name:
         filters.append(WarehouseModel.name.ilike(f"%{params.name}%"))
+    if params.within_polygon:
+        try:
+            # Wrap your WKT string in a WKTElement (with the correct SRID)
+            poly = WKTElement(
+                params.within_polygon,
+                srid=WarehouseModel.coordinates.type.srid  # e.g. 4326
+            )
+            # Add the ST_Within filter
+            filters.append(
+                # call the ST_Within comparator
+                # coordinates cannot be None
+                WarehouseModel.coordinates.ST_Within(poly)  # type: ignore[call-overload,attr-defined]
+
+            )
+            filters.append(WarehouseModel.coordinates.is_not(None))  # ensure coordinates are not None
+            # bump per_page so your polygon filter returns everything
+            params.per_page = 10000
+        except ValidationError as e:
+            raise BadRequestError(f"Invalid polygon: {e}")
+    if params.within_polygon:
+        # make per page a very high number to avoid pagination
+        params.per_page = 10000
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.warehouse_repository.find_all_by_filters_paginated(
             filters=filters,

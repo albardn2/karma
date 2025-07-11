@@ -52,6 +52,8 @@ class InventoryListParams(BaseModel):
     warehouse_uuid: Optional[str] = None
     is_active: Optional[bool] = None
     currency: Optional[Currency] = None
+    current_quantity: Optional[float] = None
+    original_quantity: Optional[float] = None
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
 
@@ -62,3 +64,11 @@ class InventoryPage(BaseModel):
     page: int
     per_page: int
     pages: int
+
+
+class InventoryFIFOOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    inventory_uuid: str
+    material_uuid:str
+    quantity: float
+

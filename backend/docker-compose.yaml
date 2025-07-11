@@ -1,18 +1,52 @@
-version: '3.8'
-
+version: "3.8"
 services:
   db:
-    image: postgis/postgis:13-3.1-alpine #postgres:13-alpine
+    image: postgis/postgis:13-3.1-alpine
     environment:
-      POSTGRES_USER: local
+      POSTGRES_USER:  local
       POSTGRES_PASSWORD: local
-      POSTGRES_DB: backend
+      POSTGRES_DB:     backend
     command: postgres -c listen_addresses='*'
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
 
+  migrate:
+    image: ghcr.io/albardn2/karma-backend:latest-dev
+    depends_on:
+     - db
+    entrypoint: ["alembic", "upgrade", "head"]
+    environment:
+      # pass the correct URI into Alembic
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+  web:
+    image: ghcr.io/albardn2/karma-backend:latest-dev
+    depends_on:
+      - db
+    ports:
+      - "5000:5000"
+    environment:
+      - SQLALCHEMY_DATABASE_URI=postgresql://local:local@db:5432/backend
 volumes:
   postgres_data:
+
+
+#version: '3.8'
+#
+#services:
+#  db:
+#    image: postgis/postgis:13-3.1-alpine #postgres:13-alpine
+#    environment:
+#      POSTGRES_USER: local
+#      POSTGRES_PASSWORD: local
+#      POSTGRES_DB: backend
+#    command: postgres -c listen_addresses='*'
+#    ports:
+#      - "5432:5432"
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#    restart: unless-stopped
+#
+#volumes:
+#  postgres_data:

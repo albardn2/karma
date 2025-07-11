@@ -97,11 +97,17 @@ def list_fixed_assets():
     # assemble filter kwargs
     filters = [FixedAssetModel.is_deleted == False]
     if params.uuid:
-        filters.append(FixedAssetModel.uuid == params.uuid)
+        # ilike
+        filters.append(FixedAssetModel.uuid.ilike(f"%{params.uuid}%"))
     if params.purchase_order_item_uuid:
-        filters.append(FixedAssetModel.purchase_order_item_uuid == params.purchase_order_item_uuid)
+        # ilike
+        filters.append(FixedAssetModel.purchase_order_item_uuid.ilike(f"%{params.purchase_order_item_uuid}%"))
     if params.material_uuid:
-        filters.append(FixedAssetModel.material_uuid == params.material_uuid)
+        #ilike
+        filters.append(FixedAssetModel.material_uuid.ilike(f"%{params.material_uuid}%"))
+    if params.name:
+        # ilike
+        filters.append(FixedAssetModel.name.ilike(f"%{params.name}%"))
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.fixed_asset_repository.find_all_by_filters_paginated(
             filters=filters,

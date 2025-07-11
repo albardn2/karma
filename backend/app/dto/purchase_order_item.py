@@ -58,6 +58,7 @@ class PurchaseOrderItemRead(BaseModel):
     created_at:         datetime
     is_deleted:         bool
     total_price:        float  # computed
+    material_name:   str
 
 
 class PurchaseOrderItemListParams(BaseModel):
