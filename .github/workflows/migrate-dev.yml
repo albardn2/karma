@@ -16,7 +16,6 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      # ensure remote directory exists
       - name: Prepare remote directory
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
@@ -26,7 +25,7 @@ jobs:
           sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
             "$USER@$HOST" "mkdir -p /srv/myapp"
 
-      - name: Rsync docker-compose.yaml with password
+      - name: Rsync docker-compose.yaml
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
@@ -36,3 +35,24 @@ jobs:
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
             "$USER@$HOST:/srv/myapp/docker-compose.yaml"
+
+  migrate:
+    name: Run DB migrations
+    needs: sync-compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: SSH & run migrations
+        env:
+          HOST: ${{ secrets.DEV_DROPLET_HOST }}
+          USER: root
+          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
+        run: |
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
+            "$USER@$HOST" << 'EOF'
+            cd /srv/myapp
+            docker-compose pull               # optional: grab the latest images
+            docker-compose run --rm migrate   # run your migrate service
+          EOF
