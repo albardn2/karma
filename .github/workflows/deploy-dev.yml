@@ -1,3 +1,4 @@
+# .github/workflows/deploy.yml
 name: CD – Deploy Dev Stack
 
 on:
@@ -8,13 +9,22 @@ permissions:
   packages: write
 
 jobs:
-  sync:
+  sync-compose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Prepare remote directory
+        env:
+          HOST: ${{ secrets.DEV_DROPLET_HOST }}
+          USER: root
+          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
+        run: |
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
+            "$USER@$HOST" 'mkdir -p /srv/myapp'
 
       - name: Rsync docker-compose + nginx configs
         env:
@@ -27,36 +37,38 @@ jobs:
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
             "$GITHUB_WORKSPACE/backend/nginx" \
             "$GITHUB_WORKSPACE/backend/nginx/letsencrypt" \
+            "$GITHUB_WORKSPACE/certs" \
             "$USER@$HOST:/srv/myapp/"
 
   deploy:
-    needs: sync
+    needs: sync-compose
     runs-on: ubuntu-latest
     steps:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Start DB & App
+      - name: Pull & start services
         run: |
           sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
-          ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
+            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
             'cd /srv/myapp && \
-             docker compose pull db web && \
-             docker compose up -d db web'
+             docker compose pull && \
+             docker compose up -d --force-recreate db web nginx --remove-orphans'
 
-      - name: Obtain / Renew Cert
+      - name: Request / renew Let’s Encrypt cert
         run: |
           sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
-          ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
+            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
             'cd /srv/myapp && \
              docker compose run --rm certbot certonly \
-               --standalone --non-interactive \
-               --agree-tos --email zaid@karma-grp.com \
+               --non-interactive --agree-tos \
+               --email zaid@karma-grp.com \
+               --webroot -w /var/www/certbot \
                -d api-dev.karma-grp.com || true'
 
-      - name: Launch Nginx + Migrations
+      - name: Reload nginx to pick up new cert
         run: |
           sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
-          ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
+            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
             'cd /srv/myapp && \
-             docker compose up -d nginx migrate'
+             docker compose exec nginx nginx -s reload'
