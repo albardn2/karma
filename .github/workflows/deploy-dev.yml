@@ -17,16 +17,21 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Prepare remote directory
+      - name: Prepare remote dirs
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
           sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
-            "$USER@$HOST" 'mkdir -p /srv/myapp /srv/myapp/certs/nginx/html'
+            "$USER@$HOST" <<'EOF'
+            mkdir -p /srv/myapp
+            mkdir -p /srv/myapp/certs
+            mkdir -p /srv/myapp/nginx/html/.well-known/acme-challenge
+            mkdir -p /srv/myapp/nginx/conf.d
+          EOF
 
-      - name: Rsync docker-compose + nginx configs
+      - name: Rsync docker-compose + nginx config
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
@@ -35,7 +40,7 @@ jobs:
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
-            "$GITHUB_WORKSPACE/backend/nginx/" \
+            "$GITHUB_WORKSPACE/backend/nginx" \
             "$USER@$HOST:/srv/myapp/"
 
   deploy:
@@ -45,7 +50,7 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Pull, issue cert & start services
+      - name: Pull images, issue cert & restart
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
@@ -60,24 +65,24 @@ jobs:
             # 1) Pull latest images
             docker compose pull
 
-            # 2) Start/refresh DB, web & nginx
+            # 2) Bring up db & web (nginx must already be running for webroot)
             docker compose up -d --force-recreate --remove-orphans db web nginx
 
-            # 3) Issue a cert via webroot if missing
+            # 3) Ensure challenge dir exists (just in case)
+            mkdir -p nginx/html/.well-known/acme-challenge
+
+            # 4) Run Certbot via webroot (auto-removes the container)
             if [ ! -d certs/live/$DOMAIN ]; then
-              echo "⚙️ No existing cert for $DOMAIN, requesting via webroot…"
-              docker run --rm \
-                -v \$(pwd)/nginx/html:/var/www/certbot \
-                -v \$(pwd)/certs:/etc/letsencrypt \
-                certbot/certbot certonly \
-                  --non-interactive --agree-tos --no-eff-email \
-                  --email "$CERTBOT_EMAIL" \
-                  --webroot -w /var/www/certbot \
-                  -d "$DOMAIN"
+              echo "⚙️  No cert for $DOMAIN, requesting via webroot…"
+              docker compose run --rm certbot certonly \
+                --non-interactive --agree-tos --no-eff-email \
+                --email "$CERTBOT_EMAIL" \
+                --webroot -w /var/www/certbot \
+                -d "$DOMAIN"
             else
-              echo "✅ Cert for $DOMAIN already exists, skipping issuance."
+              echo "✅  Cert for $DOMAIN already exists, skipping."
             fi
 
-            # 4) Reload nginx to pick up new cert
+            # 5) Reload nginx to pick up any new cert
             docker compose kill -s HUP nginx
           EOF
