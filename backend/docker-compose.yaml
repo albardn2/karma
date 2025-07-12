@@ -2,6 +2,7 @@ version: '3.8'
 services:
   db:
     image: postgis/postgis:13-3.1-alpine
+    restart: always
     environment:
       POSTGRES_USER: local
       POSTGRES_PASSWORD: local
@@ -29,6 +30,7 @@ services:
 
   web:
     image: ghcr.io/albardn2/karma-backend:latest-dev
+    restart: always
     depends_on:
       - db
     ports:
@@ -46,6 +48,7 @@ services:
   nginx-proxy:
     image: jwilder/nginx-proxy
     restart: always
+    container_name: nginx-proxy  # Optional, for easier reference
     ports:
       - "80:80"
       - "443:443"
@@ -54,8 +57,6 @@ services:
       - certs:/etc/nginx/certs
       - vhost:/etc/nginx/vhost.d
       - html:/usr/share/nginx/html
-    labels:
-      com.github.nginx-proxy.nginx: "true"
     networks:
       - proxy
 
@@ -64,6 +65,8 @@ services:
     restart: always
     depends_on:
       - nginx-proxy
+    environment:
+      NGINX_PROXY_CONTAINER: nginx-proxy  # or just "nginx-proxy" if you’ve overridden container_name
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - certs:/etc/nginx/certs
