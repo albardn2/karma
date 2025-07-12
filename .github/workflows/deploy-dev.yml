@@ -16,19 +16,17 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Push compose + nginx to Droplet
+      - name: Rsync docker-compose + nginx configs
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
-          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no "$USER@$HOST" 'mkdir -p /srv/myapp'
-          rsync -avz --delete \
+          sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
-            backend/docker-compose.yaml \
-            backend/nginx/ \
-            backend/nginx/html/ \
-            certs/ \
+            "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
+            "$GITHUB_WORKSPACE/backend/nginx" \
+            "$GITHUB_WORKSPACE/backend/nginx/letsencrypt" \
             "$USER@$HOST:/srv/myapp/"
 
   deploy:
