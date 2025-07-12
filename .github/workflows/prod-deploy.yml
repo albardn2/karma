@@ -83,9 +83,9 @@ jobs:
             REGISTRY_URL=${REGISTRY_URL}
             EMAIL=${EMAIL}
             EOF
-            docker compose down
-            docker compose pull
-            docker compose run --rm migrate
+            docker compose -f docker-compose.prod.yaml down
+            docker compose -f docker-compose.prod.yaml pull
+            docker compose -f docker-compose.prod.yaml run --rm migrate
 
   deploy:
     name: Deploy prod stack
@@ -117,6 +117,6 @@ jobs:
             REGISTRY_URL=${REGISTRY_URL}
             EMAIL=${EMAIL}
             EOF
-            docker compose down
-            docker compose pull
-            docker compose up -d --scale migrate=0 --remove-orphans
+            docker compose -f docker-compose.prod.yaml down
+            docker compose -f docker-compose.prod.yaml pull
+            docker compose -f docker-compose.prod.yaml up -d --scale migrate=0 --remove-orphans
