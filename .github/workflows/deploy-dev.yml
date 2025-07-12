@@ -31,25 +31,34 @@ jobs:
             mkdir -p /srv/myapp/nginx/html/.well-known/acme-challenge
           EOF
 
-      - name: Sync docker-compose & nginx configs
+      - name: Rsync docker-compose.yaml (no delete!)
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
-          # Push docker-compose.yaml
-          sshpass -p "$PASS" rsync -avz --delete \
+          sshpass -p "$PASS" rsync -avz \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
-            "$USER@$HOST:/srv/myapp/"
+            "$USER@$HOST:/srv/myapp/docker-compose.yaml"
 
-          # Push only conf.d
+      - name: Rsync nginx/conf.d (delete old configs)
+        env:
+          HOST: ${{ secrets.DEV_DROPLET_HOST }}
+          USER: root
+          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
+        run: |
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/nginx/conf.d/" \
             "$USER@$HOST:/srv/myapp/nginx/conf.d/"
 
-          # Push only letsencrypt snippets
+      - name: Rsync nginx/letsencrypt (delete old snippets)
+        env:
+          HOST: ${{ secrets.DEV_DROPLET_HOST }}
+          USER: root
+          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
+        run: |
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/nginx/letsencrypt/" \
@@ -62,7 +71,7 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Pull images, install real cert & reload nginx
+      - name: Pull, bootstrap dummy, issue real cert & reload nginx
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
@@ -77,7 +86,7 @@ jobs:
             echo "🔄 Pulling latest images…"
             docker compose pull
 
-            echo "🛠  Bootstrapping dummy self-signed cert (if missing)…"
+            echo "🛠  Bootstrap dummy cert if missing…"
             if [ ! -f certs/live/$DOMAIN/fullchain.pem ]; then
               mkdir -p certs/live/$DOMAIN
               docker run --rm \
@@ -95,18 +104,18 @@ jobs:
             echo "🚀 Starting db, web & nginx"
             docker compose up -d --force-recreate --remove-orphans db web nginx
 
-            echo "🗑  Removing dummy cert to force real issuance…"
+            echo "🗑  Remove dummy to force real issuance…"
             rm -rf certs/live/$DOMAIN \
                    certs/archive/$DOMAIN \
                    certs/renewal/$DOMAIN.conf || true
 
-            echo "⚙️  Requesting a real cert via webroot…"
+            echo "⚙️  Request real cert via webroot…"
             docker compose run --rm --entrypoint certbot certbot certonly \
               --non-interactive --agree-tos --no-eff-email \
               --email "$CERTBOT_EMAIL" \
               --webroot -w /var/www/certbot \
               -d "$DOMAIN"
 
-            echo "♻️  Reloading nginx to pick up the Let’s Encrypt cert"
+            echo "♻️  Reload nginx for new cert"
             docker compose kill -s HUP nginx
           EOF
