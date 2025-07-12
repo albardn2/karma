@@ -1,5 +1,5 @@
 # .github/workflows/deploy.yml
-name: CD – Deploy Dev Stack
+name: CD – Migrate Dev Stack
 
 on:
   workflow_dispatch:
