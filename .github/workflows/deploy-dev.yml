@@ -24,33 +24,34 @@ jobs:
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
           sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no $USER@$HOST <<'EOF'
+            # base paths
             mkdir -p /srv/myapp
             mkdir -p /srv/myapp/certs
+            # nginx subfolders
             mkdir -p /srv/myapp/nginx/conf.d
             mkdir -p /srv/myapp/nginx/letsencrypt
-            # Ensure the webroot and ACME challenge path exist, but never rsync this
             mkdir -p /srv/myapp/nginx/html/.well-known/acme-challenge
           EOF
 
-      - name: Sync docker-compose and nginx config
+      - name: Rsync compose + nginx configs
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
-          # 1) Compose file
+          # push docker-compose.yaml
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
             "$USER@$HOST:/srv/myapp/"
 
-          # 2) Nginx conf.d
+          # push only conf.d
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/nginx/conf.d/" \
             "$USER@$HOST:/srv/myapp/nginx/conf.d/"
 
-          # 3) Nginx letsencrypt snippets
+          # push only letsencrypt snippets
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/nginx/letsencrypt/" \
@@ -63,7 +64,7 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Pull images, issue cert & reload nginx
+      - name: Pull images, bootstrap dummy cert, issue real cert & reload nginx
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
@@ -75,24 +76,36 @@ jobs:
             set -e
             cd /srv/myapp
 
-            # 1) Pull latest images
+            echo "🔄 Pulling latest images…"
             docker compose pull
 
-            # 2) Bring up db, web & nginx so webroot is live
-            docker compose up -d --force-recreate --remove-orphans db web nginx
-
-            # 3) Webroot issuance (override the sleep-entrypoint!)
-            if [ ! -d certs/live/$DOMAIN ]; then
-              echo "⚙️ No cert for $DOMAIN yet—requesting via webroot…"
-              docker compose run --rm --entrypoint certbot certbot certonly \
-                --non-interactive --agree-tos --no-eff-email \
-                --email "$CERTBOT_EMAIL" \
-                --webroot -w /var/www/certbot \
-                -d "$DOMAIN"
+            echo "🛠  Bootstrapping dummy self-signed cert (if missing)…"
+            if [ ! -f certs/live/$DOMAIN/fullchain.pem ]; then
+              mkdir -p certs/live/$DOMAIN
+              docker run --rm \
+                -v \$(pwd)/certs:/etc/letsencrypt \
+                alpine:latest sh -c "\
+                  apk add --no-cache openssl && \
+                  openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+                    -keyout /etc/letsencrypt/live/$DOMAIN/privkey.pem \
+                    -out   /etc/letsencrypt/live/$DOMAIN/fullchain.pem \
+                    -subj '/CN=$DOMAIN' \
+                "
+              echo "✅ Dummy cert created."
             else
-              echo "✅ Cert already exists, skipping issuance."
+              echo "ℹ️ Dummy/live cert already present."
             fi
 
-            # 4) Reload nginx so it picks up the new cert
+            echo "🚀 Starting db, web & nginx"
+            docker compose up -d --force-recreate --remove-orphans db web nginx
+
+            echo "⚙️  Requesting a real cert via webroot (force-renewal)…"
+            docker compose run --rm --entrypoint certbot certbot certonly \
+              --non-interactive --agree-tos --no-eff-email --force-renewal \
+              --email "$CERTBOT_EMAIL" \
+              --webroot -w /var/www/certbot \
+              -d "$DOMAIN"
+
+            echo "♻️  Reloading nginx to pick up the Let’s Encrypt cert"
             docker compose kill -s HUP nginx
           EOF
