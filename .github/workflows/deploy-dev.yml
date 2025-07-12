@@ -111,7 +111,7 @@ jobs:
             docker compose run --rm --entrypoint certbot certbot certonly \
               --non-interactive --agree-tos --no-eff-email \
               --email "$CERTBOT_EMAIL" \
-              --webroot -w /var/www/certbot \
+              --staging --webroot -w /var/www/certbot \
               -d "$DOMAIN"
 
             echo "♻️ Reloading nginx to pick up the new certificate…"
