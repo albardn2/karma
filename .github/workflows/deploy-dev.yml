@@ -37,7 +37,6 @@ jobs:
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
             "$GITHUB_WORKSPACE/backend/nginx" \
             "$GITHUB_WORKSPACE/backend/nginx/letsencrypt" \
-            "$GITHUB_WORKSPACE/certs" \
             "$USER@$HOST:/srv/myapp/"
 
   deploy:
