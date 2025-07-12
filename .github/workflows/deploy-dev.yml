@@ -38,36 +38,21 @@ jobs:
             "$USER@$HOST:/srv/myapp/"
 
   deploy:
-    name: Pull & restart db, web, and nginx
     needs: sync-compose
     runs-on: ubuntu-latest
     steps:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Pull & start services
-        run: |
-          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "
-            cd /srv/myapp && \
-            docker compose pull db web nginx && \
-            docker compose up -d --force-recreate db web nginx --remove-orphans
-          "
-
-      - name: Request / renew Let's Encrypt cert
-        run: |
-          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "
-            cd /srv/myapp && \
-            # this will request if missing, or renew if expiring
-            docker compose run --rm certbot certonly \
-              --non-interactive \
-              --agree-tos \
-              --email zaid@karma-grp.com \
-              --webroot -w /var/www/certbot \
-              -d api-dev.karma-grp.com || true
-          "
-
-      - name: Reload nginx to pick up new cert
+      - name: Pull, update certs, and restart
         run: |
           sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
             ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
-              'cd /srv/myapp && docker compose exec nginx nginx -s reload'
+              'cd /srv/myapp && \
+               docker compose pull && \
+               docker compose run --rm certbot certonly \
+                 --non-interactive --agree-tos \
+                 --email zaid@karma-grp.com \
+                 --webroot -w /var/www/certbot \
+                 -d api-dev.karma-grp.com || true && \
+               docker compose up -d --force-recreate --remove-orphans'
