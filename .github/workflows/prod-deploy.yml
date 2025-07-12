@@ -92,17 +92,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: migrate
     steps:
-      - name: Copy compose to prod server
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ env.PROD_HOST }}
-          username: ${{ env.PROD_USER }}
-          password: ${{ env.PROD_PASS }}
-          port: 22
-          source: |
-            ./backend/docker-compose.prod.yaml
-          target: /root/app
-
       - name: SSH & deploy
         uses: appleboy/ssh-action@v0.1.7
         with:
