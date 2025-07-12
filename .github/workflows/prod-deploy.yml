@@ -83,8 +83,9 @@ jobs:
             REGISTRY_URL=${REGISTRY_URL}
             EMAIL=${EMAIL}
             EOF
+            docker compose down
             docker compose pull
-            docker compose run --rm migrate
+            docker compose run --rm migrate --remove-orphans
 
   deploy:
     name: Deploy prod stack
@@ -116,5 +117,6 @@ jobs:
             REGISTRY_URL=${REGISTRY_URL}
             EMAIL=${EMAIL}
             EOF
+            docker compose down
             docker compose pull
             docker compose up -d --scale migrate=0 --remove-orphans
