@@ -39,7 +39,7 @@ jobs:
         run: |
           sshpass -p "$PASS" rsync -avz \
             -e "ssh -o StrictHostKeyChecking=no" \
-            "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
+            "$GITHUB_WORKSPACE/backend/docker-compose.dev.yaml" \
             "$USER@$HOST:/srv/myapp/docker-compose.yaml"
 
       - name: Rsync nginx configs & letsencrypt snippets

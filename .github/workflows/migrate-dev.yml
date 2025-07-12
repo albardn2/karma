@@ -33,7 +33,7 @@ jobs:
         run: |
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
-            "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
+            "$GITHUB_WORKSPACE/backend/docker-compose.dev.yaml" \
             "$USER@$HOST:/srv/myapp/docker-compose.yaml"
 
   migrate:
