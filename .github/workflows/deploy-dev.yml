@@ -53,17 +53,17 @@ jobs:
           CERTBOT_EMAIL: zaid.bardan@gmail.com
           DOMAIN: api-dev.karma-grp.com
         run: |
-          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no $USER@$HOST << 'EOF'
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no $USER@$HOST <<EOF
             set -e
             cd /srv/myapp
 
-            # 1) Pull the latest images
+            # 1) Pull latest images
             docker compose pull
 
-            # 2) Force-recreate DB & web so we have fresh containers
+            # 2) Force-recreate DB & web
             docker compose up -d --force-recreate --remove-orphans db web
 
-            # 3) Issue a cert if the live directory doesn't exist
+            # 3) Issue certificate if missing
             if [ ! -d certs/live/$DOMAIN ]; then
               echo "⚙️ No existing cert for $DOMAIN, requesting via standalone…"
               docker compose run --rm \
