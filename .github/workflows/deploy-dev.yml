@@ -23,25 +23,31 @@ jobs:
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
-          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
-            "$USER@$HOST" <<'EOF'
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no $USER@$HOST <<'EOF'
             mkdir -p /srv/myapp
-            mkdir -p /srv/myapp/certs
-            mkdir -p /srv/myapp/nginx/html/.well-known/acme-challenge
             mkdir -p /srv/myapp/nginx/conf.d
+            mkdir -p /srv/myapp/nginx/html/.well-known/acme-challenge
+            mkdir -p /srv/myapp/nginx/letsencrypt
+            mkdir -p /srv/myapp/certs
           EOF
 
-      - name: Rsync docker-compose + nginx config
+      - name: Rsync compose + nginx tree
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
+          # 1) docker-compose.yaml
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
-            "$GITHUB_WORKSPACE/backend/nginx" \
             "$USER@$HOST:/srv/myapp/"
+
+          # 2) Entire nginx folder into /srv/myapp/nginx
+          sshpass -p "$PASS" rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            "$GITHUB_WORKSPACE/backend/nginx/" \
+            "$USER@$HOST:/srv/myapp/nginx/"
 
   deploy:
     needs: sync-compose
@@ -65,13 +71,13 @@ jobs:
             # 1) Pull latest images
             docker compose pull
 
-            # 2) Bring up db & web (nginx must already be running for webroot)
+            # 2) Bring up db, web & nginx (so webroot is served)
             docker compose up -d --force-recreate --remove-orphans db web nginx
 
-            # 3) Ensure challenge dir exists (just in case)
+            # 3) Ensure challenge dir exists still
             mkdir -p nginx/html/.well-known/acme-challenge
 
-            # 4) Run Certbot via webroot (auto-removes the container)
+            # 4) Issue TLS via webroot if missing
             if [ ! -d certs/live/$DOMAIN ]; then
               echo "⚙️  No cert for $DOMAIN, requesting via webroot…"
               docker compose run --rm certbot certonly \
