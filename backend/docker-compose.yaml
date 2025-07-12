@@ -1,4 +1,3 @@
-# docker-compose.yaml
 version: "3.8"
 
 services:
@@ -46,8 +45,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - webroot:/var/www/certbot:ro                # ACME challenge folder (ro)
-      - certs:/etc/letsencrypt                     # Let’s Encrypt live/ archive etc. (rw!)
+      - ./nginx/html:/var/www/certbot:ro          # ACME challenge files
+      - ./certs:/etc/letsencrypt                  # full cert store (rw)
       - ./nginx/letsencrypt/options-ssl-nginx.conf:/etc/letsencrypt/options-ssl-nginx.conf:ro
       - ./nginx/letsencrypt/ssl-dhparams.pem:/etc/letsencrypt/ssl-dhparams.pem:ro
     networks:
@@ -55,16 +54,15 @@ services:
 
   certbot:
     image: certbot/certbot
+    entrypoint: ["sleep", "infinity"]             # so we can run commands on demand
     volumes:
-      - webroot:/var/www/certbot
-      - certs:/etc/letsencrypt
+      - ./nginx/html:/var/www/certbot
+      - ./certs:/etc/letsencrypt
     networks:
       - proxy
 
 volumes:
   postgres_data:
-  certs:
-  webroot:
 
 networks:
   proxy:

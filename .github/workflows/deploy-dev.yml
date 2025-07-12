@@ -8,7 +8,7 @@ permissions:
   packages: write
 
 jobs:
-  sync-compose:
+  sync:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -16,58 +16,49 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Prepare remote directory
+      - name: Push compose + nginx to Droplet
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
-          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
-            "$USER@$HOST" 'mkdir -p /srv/myapp'
-
-      - name: Rsync docker-compose + nginx configs
-        env:
-          HOST: ${{ secrets.DEV_DROPLET_HOST }}
-          USER: root
-          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
-        run: |
-          sshpass -p "$PASS" rsync -avz --delete \
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no "$USER@$HOST" 'mkdir -p /srv/myapp'
+          rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
-            "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
-            "$GITHUB_WORKSPACE/backend/nginx" \
-            "$GITHUB_WORKSPACE/backend/nginx/letsencrypt" \
+            backend/docker-compose.yaml \
+            backend/nginx/ \
+            backend/nginx/html/ \
+            certs/ \
             "$USER@$HOST:/srv/myapp/"
 
   deploy:
-    needs: sync-compose
+    needs: sync
     runs-on: ubuntu-latest
     steps:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Pull & start services
+      - name: Start DB & App
         run: |
           sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
-            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
             'cd /srv/myapp && \
-             docker compose pull db web nginx && \
-             docker compose up -d --force-recreate db web nginx --remove-orphans'
+             docker compose pull db web && \
+             docker compose up -d db web'
 
-      - name: Request / renew Let’s Encrypt cert
+      - name: Obtain / Renew Cert
         run: |
           sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
-            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
             'cd /srv/myapp && \
              docker compose run --rm certbot certonly \
-               --non-interactive \
-               --agree-tos \
-               --email zaid@karma-grp.com \
-               --webroot -w /var/www/certbot \
+               --standalone --non-interactive \
+               --agree-tos --email zaid@karma-grp.com \
                -d api-dev.karma-grp.com || true'
 
-      - name: Reload nginx to pick up new cert
+      - name: Launch Nginx + Migrations
         run: |
           sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
-            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
             'cd /srv/myapp && \
-             docker compose kill -s HUP nginx'
+             docker compose up -d nginx migrate'
