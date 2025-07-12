@@ -51,7 +51,7 @@ jobs:
           # conf.d
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
-            "$GITHUB_WORKSPACE/backend/nginx/dev/conf.d/" \
+            "$GITHUB_WORKSPACE/backend/nginx/conf.d/" \
             "$USER@$HOST:/srv/myapp/nginx/conf.d/"
           # letsencrypt
           sshpass -p "$PASS" rsync -avz --delete \
