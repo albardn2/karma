@@ -23,7 +23,7 @@ jobs:
           password: ${{ secrets.DEV_DROPLET_PASSWORD }}
           port: 22
           source: |
-            ./backend/docker-compose.yml
+            ./backend/docker-compose.yaml
           target: /root/app
 
       - name: Deploy via SSH
