@@ -1,0 +1,152 @@
+name: Prod – Build, Migrate & Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  HOST: ${{ secrets.PROD_DROPLET_HOST }}
+  USER: root
+  PASS: ${{ secrets.PROD_DROPLET_PASSWORD }}
+  CERTBOT_EMAIL: zaid.bardan@gmail.com
+  DOMAIN: api-prod.karma-grp.com
+  CERT_PATH: /srv/myapp/certs
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Determine short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Build & push images
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/albardn2/karma-backend:latest-prod
+            ghcr.io/albardn2/karma-backend:${{ env.SHORT_SHA }}-prod
+
+  migrate:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install sshpass
+        run: |
+          sudo apt-get update \
+          && sudo apt-get install -y sshpass
+
+      - name: Prepare remote directory
+        run: |
+          sshpass -p "${{ env.PASS }}" ssh -o StrictHostKeyChecking=no \
+            "${{ env.USER }}@${{ env.HOST }}" mkdir -p /srv/myapp
+
+      - name: Rsync docker-compose for prod
+        run: |
+          sshpass -p "${{ env.PASS }}" \
+            rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" \
+            "${{ github.workspace }}/backend/docker-compose.prod.yaml" \
+            "${{ env.USER }}@${{ env.HOST }}:/srv/myapp/docker-compose.yaml"
+
+      - name: SSH, login & run migrations
+        run: |
+          sshpass -p "${{ env.PASS }}" ssh -o StrictHostKeyChecking=no \
+            "${{ env.USER }}@${{ env.HOST }}" << 'EOF'
+          set -e
+          apt-get update && apt-get install -y curl
+          curl -fsSL https://get.docker.com | sh
+          systemctl enable --now docker
+          echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          cd /srv/myapp
+          docker compose pull
+          docker compose up -d db
+          until docker compose exec db pg_isready -U local; do sleep 1; done
+          docker compose run --rm migrate
+          EOF
+
+  deploy:
+    needs: migrate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install sshpass
+        run: |
+          sudo apt-get update \
+          && sudo apt-get install -y sshpass
+
+      - name: Rsync docker-compose & nginx configs
+        run: |
+          sshpass -p "${{ env.PASS }}" \
+            rsync -avz -e "ssh -o StrictHostKeyChecking=no" \
+            "${{ github.workspace }}/backend/docker-compose.prod.yaml" \
+            "${{ env.USER }}@${{ env.HOST }}:/srv/myapp/docker-compose.yaml"
+          sshpass -p "${{ env.PASS }}" \
+            rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" \
+            "${{ github.workspace }}/backend/nginx/prod/conf.d/" \
+            "${{ env.USER }}@${{ env.HOST }}:/srv/myapp/nginx/conf.d/"
+          sshpass -p "${{ env.PASS }}" \
+            rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" \
+            "${{ github.workspace }}/backend/nginx/letsencrypt/" \
+            "${{ env.USER }}@${{ env.HOST }}:/srv/myapp/nginx/letsencrypt/"
+
+      - name: Pull images, bootstrap certs & reload nginx
+        run: |
+          sshpass -p "${{ env.PASS }}" ssh -o StrictHostKeyChecking=no \
+            "${{ env.USER }}@${{ env.HOST }}" << 'EOF'
+          set -e
+          cd /srv/myapp
+          echo "🔄 Pulling latest images…"
+          docker compose pull
+
+          echo "🛠 Bootstrapping dummy cert if missing…"
+          if [ ! -f $CERT_PATH/live/$DOMAIN/fullchain.pem ]; then
+            mkdir -p $CERT_PATH/live/$DOMAIN
+            docker run --rm -v $CERT_PATH:/etc/letsencrypt alpine:latest sh -euxc \
+              "apk add --no-cache openssl && \
+               openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+                 -keyout /etc/letsencrypt/live/$DOMAIN/privkey.pem \
+                 -out /etc/letsencrypt/live/$DOMAIN/fullchain.pem \
+                 -subj '/CN=$DOMAIN'"
+            echo "✅ Dummy cert created"
+          else
+            echo "ℹ️ Dummy cert already exists."
+          fi
+
+          echo "🚀 Starting services…"
+          docker compose up -d --force-recreate --remove-orphans db web nginx
+
+          echo "🗑️ Removing dummy certs…"
+          rm -rf "$CERT_PATH/live/$DOMAIN" "$CERT_PATH/archive/$DOMAIN" "$CERT_PATH/renewal/$DOMAIN.conf" || true
+
+          echo "⚙️ Requesting real Let’s Encrypt cert…"
+          docker compose run --rm --entrypoint certbot certbot certonly \
+            --non-interactive --agree-tos --no-eff-email \
+            --email "${{ env.CERTBOT_EMAIL }}" \
+            --webroot -w /var/www/certbot \
+            -d "$DOMAIN"
+
+          echo "♻️ Reloading nginx…"
+          docker compose kill -s HUP nginx
+          EOF
