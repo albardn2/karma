@@ -16,7 +16,16 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Rsync docker-compose.yml with password
+      - name: Prepare remote directory
+        env:
+          HOST: ${{ secrets.DEV_DROPLET_HOST }}
+          USER: root
+          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
+        run: |
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
+            "$USER@$HOST" "mkdir -p /srv/myapp"
+
+      - name: Rsync docker-compose.yaml
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
@@ -24,25 +33,36 @@ jobs:
         run: |
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
-            ./docker-compose.yml \
-            "$USER@$HOST:/srv/myapp/docker-compose.yml"
+            "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
+            "$USER@$HOST:/srv/myapp/docker-compose.yaml"
 
   migrate:
-    runs-on: ubuntu-latest
+    name: Run DB migrations
     needs: sync-compose
+    runs-on: ubuntu-latest
     steps:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Pull image & run migrations
-        env:
-          HOST: ${{ secrets.DEV_DROPLET_HOST }}
-          USER: root
-          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
+      - name: SSH, login & run migrations
         run: |
-          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
-            "$USER@$HOST" << 'EOF'
-            cd /srv/myapp
-            docker-compose pull
-            docker-compose run --rm migrate
-          EOF
+          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
+            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "\
+              # ensure Docker is installed and running
+              apt-get update && apt-get install -y curl && \
+              curl -fsSL https://get.docker.com | sh && \
+              systemctl enable --now docker && \
+              # login to GHCR
+              echo '${{ secrets.CR_PAT }}' | docker login ghcr.io \
+                -u 'albardn2' --password-stdin && \
+              cd /srv/myapp && \
+              # pull latest images
+              docker compose pull && \
+              # start only the DB in the background
+              docker compose up -d db && \
+              # wait for the database to be ready
+              echo 'Waiting for Postgres…' && \
+              until docker compose exec db pg_isready -U local; do sleep 1; done && \
+              # now run migrations
+              docker compose run --rm migrate\
+            "
