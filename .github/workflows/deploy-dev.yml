@@ -34,7 +34,7 @@ jobs:
           password: ${{ secrets.DEV_DROPLET_PASSWORD }}
           port: 22
           script: |
-            cd /root/app
+            cd /root/app/backend
             # Generate .env from GitHub Secrets
             cat <<EOF > .env
             APP_HOST=api-dev.karma-grp.com
