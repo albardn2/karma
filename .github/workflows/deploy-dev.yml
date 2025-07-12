@@ -42,4 +42,4 @@ jobs:
             EMAIL=zaid.bardan@gmail.com
             EOF
             docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose up -d --scale migrate=0 --remove-orphans
