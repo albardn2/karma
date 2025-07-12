@@ -35,8 +35,7 @@ jobs:
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
-            "$GITHUB_WORKSPACE/backend/nginx" \
-            "$GITHUB_WORKSPACE/backend/nginx/letsencrypt" \
+            "$GITHUB_WORKSPACE/backend/nginx/" \
             "$USER@$HOST:/srv/myapp/"
 
   deploy:
@@ -46,27 +45,40 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Pull & start services
+      - name: Pull, issue cert & start services
+        env:
+          HOST: ${{ secrets.DEV_DROPLET_HOST }}
+          USER: root
+          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
+          CERTBOT_EMAIL: zaid.bardan@gmail.com
+          DOMAIN: api-dev.karma-grp.com
         run: |
-          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
-            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
-            'cd /srv/myapp && \
-             docker compose pull && \
-             docker compose up -d --force-recreate db web nginx --remove-orphans'
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no $USER@$HOST << 'EOF'
+            set -e
+            cd /srv/myapp
 
-      - name: Issue cert if missing & reload nginx
-        run: |
-          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
-            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
-            'cd /srv/myapp && \
-             if [ ! -f certs/live/api-dev.karma-grp.com/fullchain.pem ]; then \
-               echo "No cert found, issuing…"; \
-               docker compose run --rm certbot certonly \
-                 --webroot -w /var/www/certbot \
-                 -d api-dev.karma-grp.com \
-                 --non-interactive --agree-tos --email zaid@karma-grp.com; \
-             else \
-               echo "Cert already exists, skipping issuance."; \
-             fi && \
-             echo "Reloading nginx…"; \
-             docker compose kill -s HUP nginx'
+            # 1) Pull the latest images
+            docker compose pull
+
+            # 2) Force-recreate DB & web so we have fresh containers
+            docker compose up -d --force-recreate --remove-orphans db web
+
+            # 3) Issue a cert if the live directory doesn't exist
+            if [ ! -d certs/live/$DOMAIN ]; then
+              echo "⚙️ No existing cert for $DOMAIN, requesting via standalone…"
+              docker compose run --rm \
+                --entrypoint certbot certbot \
+                certonly \
+                --non-interactive \
+                --agree-tos \
+                --no-eff-email \
+                --email "$CERTBOT_EMAIL" \
+                --standalone \
+                -d "$DOMAIN"
+            else
+              echo "✅ Cert for $DOMAIN already exists, skipping issuance."
+            fi
+
+            # 4) Force-recreate nginx so it picks up the new cert
+            docker compose up -d --force-recreate --remove-orphans nginx
+          EOF
