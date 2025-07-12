@@ -40,6 +40,6 @@ jobs:
             REGISTRY_URL=ghcr.io/albardn2/karma-backend
             EMAIL=zaid.bardan@gmail.com
             EOF
-            docker compose down
-            docker compose pull
-            docker compose run --rm migrate
+            docker compose -f docker-compose.dev.yaml down
+            docker compose -f docker-compose.dev.yaml pull
+            docker compose -f docker-compose.dev.yaml run --rm migrate
