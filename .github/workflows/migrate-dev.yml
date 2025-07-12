@@ -22,7 +22,7 @@ jobs:
           password: ${{ secrets.DEV_DROPLET_PASSWORD }}
           port: 22
           source: |
-            ./backend/docker-compose.yaml
+            ./backend/docker-compose.dev.yaml
           target: /root/app
 
       - name: Migrate via SSH
