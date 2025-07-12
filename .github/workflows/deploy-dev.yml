@@ -63,6 +63,9 @@ jobs:
             # 2) Force-recreate DB & web
             docker compose up -d --force-recreate --remove-orphans db web
 
+            # 2.5) Stop any running nginx so standalone can bind port 80
+            docker compose stop nginx || true
+
             # 3) Issue certificate if missing
             if [ ! -d certs/live/$DOMAIN ]; then
               echo "⚙️ No existing cert for $DOMAIN, requesting via standalone…"
