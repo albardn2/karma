@@ -42,8 +42,20 @@ services:
       - web
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - webroot:/var/www/certbot:ro                # ACME challenge
+      - certs:/etc/letsencrypt:ro                  # your certs
+    networks:
+      - proxy
+
+  certbot:
+    image: certbot/certbot
+    # we’ll run this in “docker compose run --rm” mode
+    volumes:
+      - webroot:/var/www/certbot
+      - certs:/etc/letsencrypt
     networks:
       - proxy
 

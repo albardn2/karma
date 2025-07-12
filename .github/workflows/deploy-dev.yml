@@ -45,19 +45,29 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: SSH, login to GHCR & deploy services
+      - name: Pull & start services
         run: |
-          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
-            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "\
-              # ensure Docker & Compose are available
-              apt-get update && apt-get install -y curl && \
-              curl -fsSL https://get.docker.com | sh && \
-              systemctl enable --now docker && \
-              # login to GHCR for private images
-              echo '${{ secrets.CR_PAT }}' | docker login ghcr.io \
-                -u 'albardn2' --password-stdin && \
-              cd /srv/myapp && \
-              # pull & restart only db, web, nginx
-              docker compose pull db web nginx && \
-              docker compose up -d --force-recreate db web nginx --remove-orphans\
-            "
+          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "
+            cd /srv/myapp && \
+            docker compose pull db web nginx && \
+            docker compose up -d --force-recreate db web nginx --remove-orphans
+          "
+
+      - name: Request / renew Let's Encrypt cert
+        run: |
+          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "
+            cd /srv/myapp && \
+            # this will request if missing, or renew if expiring
+            docker compose run --rm certbot certonly \
+              --non-interactive \
+              --agree-tos \
+              --email zaid@karma-grp.com \
+              --webroot -w /var/www/certbot \
+              -d api-dev.karma-grp.com || true
+          "
+
+      - name: Reload nginx to pick up new cert
+        run: |
+          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "
+            cd /srv/myapp && \
+            docker compose exec nginx nginx -s reload
