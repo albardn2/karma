@@ -1,0 +1,93 @@
+version: '3.8'
+services:
+  db:
+    image: postgis/postgis:13-3.1-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: local
+      POSTGRES_PASSWORD: local
+      POSTGRES_DB: backend
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "local", "-d", "backend" ]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+    command: postgres -c listen_addresses='*'
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - proxy
+
+  migrate:
+    image: ghcr.io/albardn2/karma-backend:latest-prod
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["alembic", "upgrade", "head"]
+    environment:
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+      VIRTUAL_HOST: ${APP_HOST}
+      LETSENCRYPT_HOST: ${APP_HOST}
+      LETSENCRYPT_EMAIL: ${EMAIL}
+    networks:
+      - proxy
+
+  web:
+    image: ghcr.io/albardn2/karma-backend:latest-prod
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - "5000:5000"
+    environment:
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+      # Proxy & Let's Encrypt settings:
+      VIRTUAL_HOST: ${APP_HOST}
+      LETSENCRYPT_HOST: ${APP_HOST}
+      LETSENCRYPT_EMAIL: ${EMAIL}
+      VIRTUAL_PORT: 5000
+    networks:
+      - proxy
+
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    restart: always
+    container_name: nginx-proxy  # Optional, for easier reference
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - certs:/etc/nginx/certs
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+    networks:
+      - proxy
+
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    restart: always
+    depends_on:
+      - nginx-proxy
+    environment:
+      NGINX_PROXY_CONTAINER: nginx-proxy  # or just "nginx-proxy" if you’ve overridden container_name
+      ACME_CA_URI: https://acme-staging-v02.api.letsencrypt.org/directory
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - certs:/etc/nginx/certs
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+    networks:
+      - proxy
+
+volumes:
+  postgres_data:
+  certs:
+  vhost:
+  html:
+
+networks:
+  proxy:
+    driver: bridge

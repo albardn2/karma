@@ -22,7 +22,7 @@ jobs:
           password: ${{ secrets.DEV_DROPLET_PASSWORD }}
           port: 22
           source: |
-            ./backend/docker-compose.yaml
+            ./backend/docker-compose.dev.yaml
           target: /root/app
 
       - name: Migrate via SSH
@@ -40,5 +40,6 @@ jobs:
             REGISTRY_URL=ghcr.io/albardn2/karma-backend
             EMAIL=zaid.bardan@gmail.com
             EOF
+            docker compose down
             docker compose pull
             docker compose run --rm migrate
