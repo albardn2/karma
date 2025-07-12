@@ -68,6 +68,6 @@ jobs:
 
       - name: Reload nginx to pick up new cert
         run: |
-          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "
-            cd /srv/myapp && \
-            docker compose exec nginx nginx -s reload
+          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
+            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
+              'cd /srv/myapp && docker compose exec nginx nginx -s reload'
