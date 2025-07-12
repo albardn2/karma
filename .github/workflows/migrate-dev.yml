@@ -26,7 +26,7 @@ jobs:
             ./backend/docker-compose.yaml
           target: /root/app
 
-      - name: Deploy via SSH
+      - name: Migrate via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.DEV_DROPLET_HOST }}
@@ -42,4 +42,4 @@ jobs:
             EMAIL=zaid.bardan@gmail.com
             EOF
             docker compose pull
-            docker compose run --rm migrate\
+            docker compose run --rm migrate
