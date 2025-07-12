@@ -83,20 +83,20 @@ jobs:
             docker compose pull
 
             echo "🛠  Bootstrapping dummy cert (if missing)…"
-            if [ ! -f "\$CERT_PATH/live/$DOMAIN/fullchain.pem" ]; then
-              mkdir -p "\$CERT_PATH/live/$DOMAIN"
-              docker run --rm \
-                -v "\$CERT_PATH:/etc/letsencrypt" \
-                alpine:latest sh -euxc "\
-                  apk add --no-cache openssl && \
-                  openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
-                    -keyout /etc/letsencrypt/live/$DOMAIN/privkey.pem \
-                    -out   /etc/letsencrypt/live/$DOMAIN/fullchain.pem \
-                    -subj '/CN=$DOMAIN' \
-                "
-              echo "✅ Dummy cert created at \$CERT_PATH/live/$DOMAIN/fullchain.pem"
+            if [ ! -f /srv/myapp/certs/live/$DOMAIN/fullchain.pem ]; then
+            mkdir -p /srv/myapp/certs/live/$DOMAIN
+            docker run --rm \
+            -v /srv/myapp/certs:/etc/letsencrypt \
+            alpine:latest sh -euxc "\
+            apk add --no-cache openssl && \
+            openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+            -keyout /etc/letsencrypt/live/$DOMAIN/privkey.pem \
+            -out   /etc/letsencrypt/live/$DOMAIN/fullchain.pem \
+            -subj '/CN=$DOMAIN' \
+            "
+            echo "✅ Dummy cert created at /srv/myapp/certs/live/$DOMAIN/fullchain.pem"
             else
-              echo "ℹ️ Dummy cert already exists."
+            echo "ℹ️ Dummy cert already exists."
             fi
 
             echo "🚀 Starting db, web & nginx"
