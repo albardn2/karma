@@ -21,6 +21,9 @@ services:
     entrypoint: ["alembic", "upgrade", "head"]
     environment:
       SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+      VIRTUAL_HOST: ${APP_HOST}
+      LETSENCRYPT_HOST: ${APP_HOST}
+      LETSENCRYPT_EMAIL: ${EMAIL}
     networks:
       - proxy
 
