@@ -24,7 +24,7 @@ jobs:
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
           sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
-            "$USER@$HOST" 'mkdir -p /srv/myapp /srv/myapp/certs'
+            "$USER@$HOST" 'mkdir -p /srv/myapp /srv/myapp/certs/nginx/html'
 
       - name: Rsync docker-compose + nginx configs
         env:
@@ -60,28 +60,24 @@ jobs:
             # 1) Pull latest images
             docker compose pull
 
-            # 2) Force-recreate DB & web
-            docker compose up -d --force-recreate --remove-orphans db web
+            # 2) Start/refresh DB, web & nginx
+            docker compose up -d --force-recreate --remove-orphans db web nginx
 
-            # 2.5) Stop any running nginx so standalone can bind port 80
-            docker compose stop nginx || true
-
-            # 3) Issue certificate if missing
+            # 3) Issue a cert via webroot if missing
             if [ ! -d certs/live/$DOMAIN ]; then
-              echo "⚙️ No existing cert for $DOMAIN, requesting via standalone…"
-              docker compose run --rm \
-                --entrypoint certbot certbot \
-                certonly \
-                --non-interactive \
-                --agree-tos \
-                --no-eff-email \
-                --email "$CERTBOT_EMAIL" \
-                --standalone \
-                -d "$DOMAIN"
+              echo "⚙️ No existing cert for $DOMAIN, requesting via webroot…"
+              docker run --rm \
+                -v \$(pwd)/nginx/html:/var/www/certbot \
+                -v \$(pwd)/certs:/etc/letsencrypt \
+                certbot/certbot certonly \
+                  --non-interactive --agree-tos --no-eff-email \
+                  --email "$CERTBOT_EMAIL" \
+                  --webroot -w /var/www/certbot \
+                  -d "$DOMAIN"
             else
               echo "✅ Cert for $DOMAIN already exists, skipping issuance."
             fi
 
-            # 4) Force-recreate nginx so it picks up the new cert
-            docker compose up -d --force-recreate --remove-orphans nginx
+            # 4) Reload nginx to pick up new cert
+            docker compose kill -s HUP nginx
           EOF
