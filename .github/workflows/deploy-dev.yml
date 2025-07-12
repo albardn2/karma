@@ -54,17 +54,19 @@ jobs:
              docker compose pull && \
              docker compose up -d --force-recreate db web nginx --remove-orphans'
 
-      - name: Renew Let’s Encrypt cert (if needed) & reload Nginx
+      - name: Issue cert if missing & reload nginx
         run: |
           sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
             ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
             'cd /srv/myapp && \
-             docker compose run --rm certbot renew --non-interactive --quiet && \
+             if [ ! -f certs/live/api-dev.karma-grp.com/fullchain.pem ]; then \
+               echo "No cert found, issuing…"; \
+               docker compose run --rm certbot certonly \
+                 --webroot -w /var/www/certbot \
+                 -d api-dev.karma-grp.com \
+                 --non-interactive --agree-tos --email zaid@karma-grp.com; \
+             else \
+               echo "Cert already exists, skipping issuance."; \
+             fi && \
+             echo "Reloading nginx…"; \
              docker compose kill -s HUP nginx'
-
-      - name: Reload nginx to pick up new cert
-        run: |
-          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
-            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} \
-            'cd /srv/myapp && \
-             docker compose exec nginx nginx -s reload'
