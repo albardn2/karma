@@ -24,34 +24,32 @@ jobs:
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
           sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no $USER@$HOST <<'EOF'
-            # base paths
             mkdir -p /srv/myapp
             mkdir -p /srv/myapp/certs
-            # nginx subfolders
             mkdir -p /srv/myapp/nginx/conf.d
             mkdir -p /srv/myapp/nginx/letsencrypt
             mkdir -p /srv/myapp/nginx/html/.well-known/acme-challenge
           EOF
 
-      - name: Rsync compose + nginx configs
+      - name: Sync docker-compose & nginx configs
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
-          # push docker-compose.yaml
+          # Push docker-compose.yaml
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
             "$USER@$HOST:/srv/myapp/"
 
-          # push only conf.d
+          # Push only conf.d
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/nginx/conf.d/" \
             "$USER@$HOST:/srv/myapp/nginx/conf.d/"
 
-          # push only letsencrypt snippets
+          # Push only letsencrypt snippets
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/nginx/letsencrypt/" \
@@ -64,7 +62,7 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Pull images, bootstrap dummy cert, issue real cert & reload nginx
+      - name: Pull images, install real cert & reload nginx
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
@@ -92,16 +90,19 @@ jobs:
                     -subj '/CN=$DOMAIN' \
                 "
               echo "✅ Dummy cert created."
-            else
-              echo "ℹ️ Dummy/live cert already present."
             fi
 
             echo "🚀 Starting db, web & nginx"
             docker compose up -d --force-recreate --remove-orphans db web nginx
 
-            echo "⚙️  Requesting a real cert via webroot (force-renewal)…"
+            echo "🗑  Removing dummy cert to force real issuance…"
+            rm -rf certs/live/$DOMAIN \
+                   certs/archive/$DOMAIN \
+                   certs/renewal/$DOMAIN.conf || true
+
+            echo "⚙️  Requesting a real cert via webroot…"
             docker compose run --rm --entrypoint certbot certbot certonly \
-              --non-interactive --agree-tos --no-eff-email --force-renewal \
+              --non-interactive --agree-tos --no-eff-email \
               --email "$CERTBOT_EMAIL" \
               --webroot -w /var/www/certbot \
               -d "$DOMAIN"
