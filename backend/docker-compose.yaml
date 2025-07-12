@@ -67,6 +67,7 @@ services:
       - nginx-proxy
     environment:
       NGINX_PROXY_CONTAINER: nginx-proxy  # or just "nginx-proxy" if you’ve overridden container_name
+      ACME_CA_URI: https://acme-staging-v02.api.letsencrypt.org/directory
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - certs:/etc/nginx/certs
