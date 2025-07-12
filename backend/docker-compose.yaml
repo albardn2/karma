@@ -39,6 +39,7 @@ services:
       VIRTUAL_HOST: ${APP_HOST}
       LETSENCRYPT_HOST: ${APP_HOST}
       LETSENCRYPT_EMAIL: ${EMAIL}
+      VIRTUAL_PORT: 5000
     networks:
       - proxy
 
