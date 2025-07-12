@@ -1,0 +1,67 @@
+services:
+  db:
+    image: postgis/postgis:13-3.1-alpine
+    environment:
+      POSTGRES_USER:  local
+      POSTGRES_PASSWORD: local
+      POSTGRES_DB:     backend
+    command: postgres -c listen_addresses='*'
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - proxy
+
+  migrate:
+    image: ghcr.io/albardn2/karma-backend:latest-dev
+    depends_on:
+      - db
+    entrypoint: ["alembic", "upgrade", "head"]
+    environment:
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+    networks:
+      - proxy
+
+  web:
+    image: ghcr.io/albardn2/karma-backend:latest-dev
+    depends_on:
+      - db
+    ports:
+      - "5000:5000"
+    environment:
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+    networks:
+      - proxy
+
+  nginx:
+    image: nginx:stable-alpine
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/dev/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/html:/var/www/certbot:ro
+      - ./certs:/etc/letsencrypt
+      - ./nginx/letsencrypt/options-ssl-nginx.conf:/etc/letsencrypt/options-ssl-nginx.conf:ro
+      - ./nginx/letsencrypt/ssl-dhparams.pem:/etc/letsencrypt/ssl-dhparams.pem:ro
+    networks:
+      - proxy
+
+  certbot:
+    image: certbot/certbot
+    entrypoint: ["sleep", "infinity"]
+    volumes:
+      - ./nginx/html:/var/www/certbot
+      - ./certs:/etc/letsencrypt
+    networks:
+      - proxy
+
+volumes:
+  postgres_data:
+
+networks:
+  proxy:
+    driver: bridge

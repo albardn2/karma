@@ -25,7 +25,7 @@ jobs:
           sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
             "$USER@$HOST" "mkdir -p /srv/myapp"
 
-      - name: Rsync docker-compose.yaml
+      - name: Rsync docker-compose.dev.yaml
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root

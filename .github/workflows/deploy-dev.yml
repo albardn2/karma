@@ -31,7 +31,7 @@ jobs:
             mkdir -p /srv/myapp/nginx/html/.well-known/acme-challenge
           EOF
 
-      - name: Rsync docker-compose.yaml (keep certs untouched)
+      - name: Rsync docker-compose.dev.yaml (keep certs untouched)
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
