@@ -41,5 +41,5 @@ jobs:
             REGISTRY_URL=ghcr.io/albardn2/karma-backend
             EMAIL=zaid.bardan@gmail.com
             EOF
-            docker-compose pull
-            docker-compose up -d --remove-orphans
+            docker compose pull
+            docker compose up -d --remove-orphans
