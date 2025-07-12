@@ -17,7 +17,7 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Prepare remote dirs
+      - name: Prepare remote directories
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
@@ -25,29 +25,36 @@ jobs:
         run: |
           sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no $USER@$HOST <<'EOF'
             mkdir -p /srv/myapp
-            mkdir -p /srv/myapp/nginx/conf.d
-            mkdir -p /srv/myapp/nginx/html/.well-known/acme-challenge
-            mkdir -p /srv/myapp/nginx/letsencrypt
             mkdir -p /srv/myapp/certs
+            mkdir -p /srv/myapp/nginx/conf.d
+            mkdir -p /srv/myapp/nginx/letsencrypt
+            # Ensure the webroot and ACME challenge path exist, but never rsync this
+            mkdir -p /srv/myapp/nginx/html/.well-known/acme-challenge
           EOF
 
-      - name: Rsync compose + nginx tree
+      - name: Sync docker-compose and nginx config
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
           PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
         run: |
-          # 1) docker-compose.yaml
+          # 1) Compose file
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
             "$USER@$HOST:/srv/myapp/"
 
-          # 2) Entire nginx folder into /srv/myapp/nginx
+          # 2) Nginx conf.d
           sshpass -p "$PASS" rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
-            "$GITHUB_WORKSPACE/backend/nginx/" \
-            "$USER@$HOST:/srv/myapp/nginx/"
+            "$GITHUB_WORKSPACE/backend/nginx/conf.d/" \
+            "$USER@$HOST:/srv/myapp/nginx/conf.d/"
+
+          # 3) Nginx letsencrypt snippets
+          sshpass -p "$PASS" rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            "$GITHUB_WORKSPACE/backend/nginx/letsencrypt/" \
+            "$USER@$HOST:/srv/myapp/nginx/letsencrypt/"
 
   deploy:
     needs: sync-compose
@@ -68,27 +75,24 @@ jobs:
             set -e
             cd /srv/myapp
 
-            # 1) Pull latest images
+            # 1) Pull your updated images
             docker compose pull
 
-            # 2) Bring up db, web & nginx (so webroot is served)
+            # 2) Bring up DB, web & nginx so that port 80 is serving your static ACME path
             docker compose up -d --force-recreate --remove-orphans db web nginx
 
-            # 3) Ensure challenge dir exists still
-            mkdir -p nginx/html/.well-known/acme-challenge
-
-            # 4) Issue TLS via webroot if missing
+            # 3) Run Certbot via webroot (writes into nginx/html/.well-known/...)
             if [ ! -d certs/live/$DOMAIN ]; then
-              echo "⚙️  No cert for $DOMAIN, requesting via webroot…"
+              echo "⚙️ No cert for $DOMAIN yet—requesting via webroot…"
               docker compose run --rm certbot certonly \
                 --non-interactive --agree-tos --no-eff-email \
                 --email "$CERTBOT_EMAIL" \
                 --webroot -w /var/www/certbot \
                 -d "$DOMAIN"
             else
-              echo "✅  Cert for $DOMAIN already exists, skipping."
+              echo "✅ Cert already exists, skipping issuance."
             fi
 
-            # 5) Reload nginx to pick up any new cert
+            # 4) Reload nginx to pick up any new cert without downtime
             docker compose kill -s HUP nginx
           EOF
