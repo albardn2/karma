@@ -51,6 +51,7 @@ jobs:
             ghcr.io/albardn2/karma-backend:${{ env.SHORT_SHA }}-prod
 
   sync-compose:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -111,6 +112,7 @@ jobs:
 
 
   sync-compose-deploy:
+    needs: migrate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -161,7 +163,7 @@ jobs:
             "$USER@$HOST:/srv/myapp/nginx/letsencrypt/"
 
   deploy:
-    needs: sync-compose
+    needs: sync-compose-deploy
     runs-on: ubuntu-latest
     steps:
       - name: Install sshpass
