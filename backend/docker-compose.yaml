@@ -7,6 +7,11 @@ services:
       POSTGRES_USER: local
       POSTGRES_PASSWORD: local
       POSTGRES_DB: backend
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "local", "-d", "backend" ]
+      interval: 5s
+      timeout: 2s
+      retries: 5
     command: postgres -c listen_addresses='*'
     ports:
       - "5432:5432"
@@ -18,7 +23,8 @@ services:
   migrate:
     image: ghcr.io/albardn2/karma-backend:latest-dev
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     entrypoint: ["alembic", "upgrade", "head"]
     environment:
       SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
