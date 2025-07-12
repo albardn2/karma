@@ -44,15 +44,18 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - webroot:/var/www/certbot:ro                # ACME challenge
-      - certs:/etc/letsencrypt:ro                  # your certs
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro           # your server blocks
+      - webroot:/var/www/certbot:ro                   # ACME challenge files
+      - certs:/etc/letsencrypt:ro                     # Let's Encrypt cert store
+      # now mount the global config files so `include` works:
+      - ./nginx/letsencrypt/options-ssl-nginx.conf:/etc/letsencrypt/options-ssl-nginx.conf:ro
+      - ./nginx/letsencrypt/ssl-dhparams.pem:/etc/letsencrypt/ssl-dhparams.pem:ro
     networks:
       - proxy
 
   certbot:
     image: certbot/certbot
-    # we’ll run this in “docker compose run --rm” mode
+    # run via `docker compose run --rm certbot …`
     volumes:
       - webroot:/var/www/certbot
       - certs:/etc/letsencrypt

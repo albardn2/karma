@@ -35,6 +35,7 @@ jobs:
             -e "ssh -o StrictHostKeyChecking=no" \
             "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
             "$GITHUB_WORKSPACE/backend/nginx" \
+            "$GITHUB_WORKSPACE/backend/nginx/letsencrypt" \
             "$USER@$HOST:/srv/myapp/"
 
   deploy:
