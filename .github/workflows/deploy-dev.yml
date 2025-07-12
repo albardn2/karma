@@ -63,7 +63,7 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Pull images, issue cert & restart
+      - name: Pull images, issue cert & reload nginx
         env:
           HOST: ${{ secrets.DEV_DROPLET_HOST }}
           USER: root
@@ -75,16 +75,16 @@ jobs:
             set -e
             cd /srv/myapp
 
-            # 1) Pull your updated images
+            # 1) Pull latest images
             docker compose pull
 
-            # 2) Bring up DB, web & nginx so that port 80 is serving your static ACME path
+            # 2) Bring up db, web & nginx so webroot is live
             docker compose up -d --force-recreate --remove-orphans db web nginx
 
-            # 3) Run Certbot via webroot (writes into nginx/html/.well-known/...)
+            # 3) Webroot issuance (override the sleep-entrypoint!)
             if [ ! -d certs/live/$DOMAIN ]; then
               echo "⚙️ No cert for $DOMAIN yet—requesting via webroot…"
-              docker compose run --rm certbot certonly \
+              docker compose run --rm --entrypoint certbot certbot certonly \
                 --non-interactive --agree-tos --no-eff-email \
                 --email "$CERTBOT_EMAIL" \
                 --webroot -w /var/www/certbot \
@@ -93,6 +93,6 @@ jobs:
               echo "✅ Cert already exists, skipping issuance."
             fi
 
-            # 4) Reload nginx to pick up any new cert without downtime
+            # 4) Reload nginx so it picks up the new cert
             docker compose kill -s HUP nginx
           EOF
