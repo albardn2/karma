@@ -9,111 +9,37 @@ permissions:
   packages: write
 
 jobs:
-  sync-compose:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install sshpass
-        run: sudo apt-get update && sudo apt-get install -y sshpass
-
-      - name: Prepare remote dirs
-        env:
-          HOST: ${{ secrets.DEV_DROPLET_HOST }}
-          USER: root
-          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
-        run: |
-          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no $USER@$HOST <<'EOF'
-            mkdir -p /srv/myapp
-            mkdir -p /srv/myapp/certs
-            mkdir -p /srv/myapp/nginx/conf.d
-            mkdir -p /srv/myapp/nginx/letsencrypt
-            mkdir -p /srv/myapp/nginx/html/.well-known/acme-challenge
-          EOF
-
-      - name: Rsync docker-compose.yaml (keep certs untouched)
-        env:
-          HOST: ${{ secrets.DEV_DROPLET_HOST }}
-          USER: root
-          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
-        run: |
-          sshpass -p "$PASS" rsync -avz \
-            -e "ssh -o StrictHostKeyChecking=no" \
-            "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
-            "$USER@$HOST:/srv/myapp/docker-compose.yaml"
-
-      - name: Rsync nginx configs & letsencrypt snippets
-        env:
-          HOST: ${{ secrets.DEV_DROPLET_HOST }}
-          USER: root
-          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
-        run: |
-          # conf.d
-          sshpass -p "$PASS" rsync -avz --delete \
-            -e "ssh -o StrictHostKeyChecking=no" \
-            "$GITHUB_WORKSPACE/backend/nginx/conf.d/" \
-            "$USER@$HOST:/srv/myapp/nginx/conf.d/"
-          # letsencrypt
-          sshpass -p "$PASS" rsync -avz --delete \
-            -e "ssh -o StrictHostKeyChecking=no" \
-            "$GITHUB_WORKSPACE/backend/nginx/letsencrypt/" \
-            "$USER@$HOST:/srv/myapp/nginx/letsencrypt/"
-
   deploy:
-    needs: sync-compose
     runs-on: ubuntu-latest
     steps:
-      - name: Install sshpass
-        run: sudo apt-get update && sudo apt-get install -y sshpass
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Pull images, bootstrap & replace cert, reload nginx
-        env:
-          HOST: ${{ secrets.DEV_DROPLET_HOST }}
-          USER: root
-          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
-          CERTBOT_EMAIL: zaid.bardan@gmail.com
-          DOMAIN: api-dev.karma-grp.com
-          CERT_PATH: /srv/myapp/certs
-        run: |
-          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no $USER@$HOST <<EOF
-            set -e
+      - name: Copy compose to server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.DEV_DROPLET_HOST }}
+          username: root
+          password: ${{ secrets.DEV_DROPLET_PASSWORD }}
+          port: 22
+          source: |
+            ./backend/docker-compose.yaml
+          target: /root/app
 
-            echo "🔄 Pulling latest images…"
-            cd /srv/myapp
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.DEV_DROPLET_HOST }}
+          username: root
+          password: ${{ secrets.DEV_DROPLET_PASSWORD }}
+          port: 22
+          script: |
+            cd /root/app/backend
+            # Generate .env from GitHub Secrets
+            cat <<EOF > .env
+            APP_HOST=api-dev.karma-grp.com
+            REGISTRY_URL=ghcr.io/albardn2/karma-backend
+            EMAIL=zaid.bardan@gmail.com
+            EOF
             docker compose pull
-
-            echo "🛠  Bootstrapping dummy cert (if missing)…"
-            if [ ! -f /srv/myapp/certs/live/$DOMAIN/fullchain.pem ]; then
-            mkdir -p /srv/myapp/certs/live/$DOMAIN
-            docker run --rm \
-            -v /srv/myapp/certs:/etc/letsencrypt \
-            alpine:latest sh -euxc "\
-            apk add --no-cache openssl && \
-            openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
-            -keyout /etc/letsencrypt/live/$DOMAIN/privkey.pem \
-            -out   /etc/letsencrypt/live/$DOMAIN/fullchain.pem \
-            -subj '/CN=$DOMAIN' \
-            "
-            echo "✅ Dummy cert created at /srv/myapp/certs/live/$DOMAIN/fullchain.pem"
-            else
-            echo "ℹ️ Dummy cert already exists."
-            fi
-
-            echo "🚀 Starting db, web & nginx"
-            docker compose up -d --force-recreate --remove-orphans db web nginx
-
-            echo "🗑️ Removing dummy so Certbot will always fetch a real one…"
-            rm -rf "\$CERT_PATH/live/$DOMAIN" \
-                   "\$CERT_PATH/archive/$DOMAIN" \
-                   "\$CERT_PATH/renewal/$DOMAIN.conf" || true
-
-            echo "⚙️  Requesting real Let’s Encrypt cert via webroot…"
-            docker compose run --rm --entrypoint certbot certbot certonly \
-              --non-interactive --agree-tos --no-eff-email \
-              --email "$CERTBOT_EMAIL" \
-              --webroot -w /var/www/certbot \
-              -d "$DOMAIN"
-
-            echo "♻️ Reloading nginx to pick up the new certificate…"
-            docker compose kill -s HUP nginx
-          EOF
+            docker compose up -d --scale migrate=0 --remove-orphans

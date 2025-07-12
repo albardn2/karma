@@ -1,4 +1,4 @@
-name: CD – Migrate Dev DB
+name: CD – Migrate Dev Stack
 
 on:
   workflow_dispatch:
@@ -8,61 +8,37 @@ permissions:
   packages: write
 
 jobs:
-  sync-compose:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install sshpass
-        run: sudo apt-get update && sudo apt-get install -y sshpass
-
-      - name: Prepare remote directory
-        env:
-          HOST: ${{ secrets.DEV_DROPLET_HOST }}
-          USER: root
-          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
-        run: |
-          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no \
-            "$USER@$HOST" "mkdir -p /srv/myapp"
-
-      - name: Rsync docker-compose.yaml
-        env:
-          HOST: ${{ secrets.DEV_DROPLET_HOST }}
-          USER: root
-          PASS: ${{ secrets.DEV_DROPLET_PASSWORD }}
-        run: |
-          sshpass -p "$PASS" rsync -avz --delete \
-            -e "ssh -o StrictHostKeyChecking=no" \
-            "$GITHUB_WORKSPACE/backend/docker-compose.yaml" \
-            "$USER@$HOST:/srv/myapp/docker-compose.yaml"
-
   migrate:
-    name: Run DB migrations
-    needs: sync-compose
     runs-on: ubuntu-latest
     steps:
-      - name: Install sshpass
-        run: sudo apt-get update && sudo apt-get install -y sshpass
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: SSH, login & run migrations
-        run: |
-          sshpass -p "${{ secrets.DEV_DROPLET_PASSWORD }}" \
-            ssh -o StrictHostKeyChecking=no root@${{ secrets.DEV_DROPLET_HOST }} "\
-              # ensure Docker is installed and running
-              apt-get update && apt-get install -y curl && \
-              curl -fsSL https://get.docker.com | sh && \
-              systemctl enable --now docker && \
-              # login to GHCR
-              echo '${{ secrets.CR_PAT }}' | docker login ghcr.io \
-                -u 'albardn2' --password-stdin && \
-              cd /srv/myapp && \
-              # pull latest images
-              docker compose pull && \
-              # start only the DB in the background
-              docker compose up -d db && \
-              # wait for the database to be ready
-              echo 'Waiting for Postgres…' && \
-              until docker compose exec db pg_isready -U local; do sleep 1; done && \
-              # now run migrations
-              docker compose run --rm migrate\
-            "
+      - name: Copy compose to server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.DEV_DROPLET_HOST }}
+          username: root
+          password: ${{ secrets.DEV_DROPLET_PASSWORD }}
+          port: 22
+          source: |
+            ./backend/docker-compose.yaml
+          target: /root/app
+
+      - name: Migrate via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.DEV_DROPLET_HOST }}
+          username: root
+          password: ${{ secrets.DEV_DROPLET_PASSWORD }}
+          port: 22
+          script: |
+            cd /root/app/backend
+            # Generate .env from GitHub Secrets
+            cat <<EOF > .env
+            APP_HOST=api-dev.karma-grp.com
+            REGISTRY_URL=ghcr.io/albardn2/karma-backend
+            EMAIL=zaid.bardan@gmail.com
+            EOF
+            docker compose pull
+            docker compose run --rm migrate
