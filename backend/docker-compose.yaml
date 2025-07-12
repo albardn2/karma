@@ -42,11 +42,11 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - .deploy/dev/nginx/conf.d:/etc/nginx/conf.d:ro
-      - .deploy/dev/nginx/html:/var/www/certbot:ro
+      - .nginx/conf.d:/etc/nginx/conf.d:ro
+      - .nginx/html:/var/www/certbot:ro
       - ./certs:/etc/letsencrypt
-      - .deploy/dev/nginx/letsencrypt/options-ssl-nginx.conf:/etc/letsencrypt/options-ssl-nginx.conf:ro
-      - .deploy/dev/nginx/letsencrypt/ssl-dhparams.pem:/etc/letsencrypt/ssl-dhparams.pem:ro
+      - .nginx/letsencrypt/options-ssl-nginx.conf:/etc/letsencrypt/options-ssl-nginx.conf:ro
+      - .nginx/letsencrypt/ssl-dhparams.pem:/etc/letsencrypt/ssl-dhparams.pem:ro
     networks:
       - proxy
 
@@ -54,7 +54,7 @@ services:
     image: certbot/certbot
     entrypoint: ["sleep", "infinity"]
     volumes:
-      - .deploy/dev/nginx/html:/var/www/certbot
+      - .nginx/html:/var/www/certbot
       - ./certs:/etc/letsencrypt
     networks:
       - proxy
