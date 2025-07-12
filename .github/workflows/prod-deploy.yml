@@ -70,7 +70,7 @@ jobs:
           target: /root/app
 
       - name: SSH & migrate
-        uses: appleboy/ssh-action@v1.7.5
+        uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.PROD_DROPLET_HOST }}
           username: root
@@ -104,7 +104,7 @@ jobs:
           target: /root/app
 
       - name: SSH & deploy
-        uses: appleboy/ssh-action@v1.7.5
+        uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ env.PROD_HOST }}
           username: ${{ env.PROD_USER }}
