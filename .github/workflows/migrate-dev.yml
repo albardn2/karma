@@ -42,4 +42,4 @@ jobs:
             EOF
             docker compose down
             docker compose pull
-            docker compose run --rm migrate --remove-orphans
+            docker compose run --rm migrate
