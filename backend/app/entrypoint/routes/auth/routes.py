@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from flask import Blueprint, request, jsonify
 from werkzeug.exceptions import Unauthorized, Conflict
 from flask_jwt_extended import (
@@ -59,9 +61,15 @@ def login():
 
         scopes = user.permission_scope.split(",")  # e.g. "read,write,admin"
         access_token = create_access_token(
-            identity=user.uuid, additional_claims={"scopes": scopes}
+            identity=user.uuid,
+            additional_claims={"scopes": scopes},
+            expires_delta=timedelta(days=1)
         )
-        refresh_token = create_refresh_token(identity=user.uuid)
+        # 14-day refresh token
+        refresh_token = create_refresh_token(
+            identity=user.uuid,
+            expires_delta=timedelta(days=14)
+        )
         resp = jsonify(TokenResponse(access_token=access_token,
                                      refresh_token=refresh_token).model_dump(mode="json"))
         # also set it as a secure cookie
