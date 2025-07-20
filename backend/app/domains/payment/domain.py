@@ -21,7 +21,8 @@ class PaymentDomain:
         if not payload.financial_account_uuid:
             financial_account = uow.financial_account_repository.find_one(
                 currency=payload.currency.value,
-                is_deleted=False
+                is_deleted=False,
+                is_external=False
             )
             if not financial_account:
                 raise NotFoundError('Financial account not found')

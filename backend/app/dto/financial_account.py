@@ -8,6 +8,7 @@ class FinancialAccountBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
     account_name: str
     currency: Currency
+    is_external: bool = False
     notes: Optional[str] = None
 
 class FinancialAccountCreate(FinancialAccountBase):
@@ -23,6 +24,7 @@ class FinancialAccountUpdate(BaseModel):
     account_name: Optional[str]   = None
     notes:        Optional[str]   = None
     currency:     Optional[Currency] = None
+    is_external: Optional[bool] = None
 
 class FinancialAccountRead(FinancialAccountBase):
     model_config = ConfigDict(from_attributes=True,extra="forbid")

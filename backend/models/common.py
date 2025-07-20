@@ -672,6 +672,7 @@ class FinancialAccount(Base):
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
+    is_external = Column(Boolean, default=False, nullable=True)
 
     # relations
     payments = relationship("Payment", back_populates="financial_account")
