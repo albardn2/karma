@@ -14,7 +14,10 @@ class PayoutDomain:
         data = payload.model_dump(mode='json')
         po = PayoutModel(**data)
 
-        financial_account = uow.financial_account_repository.find_one(currency=payload.currency,is_deleted=False)
+        financial_account = uow.financial_account_repository.find_one(currency=payload.currency,
+                                                                      is_deleted=False,
+                                                                      is_external=False
+                                                                      )
         po.financial_account = financial_account
         uow.payout_repository.save(model=po, commit=False)
         PayoutDomain.validate_currencies(payout=po)
