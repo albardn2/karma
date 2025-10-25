@@ -83,7 +83,7 @@ class TaskExecutionDomain:
             if task_execution.status in [WorkflowStatus.COMPLETED.value, WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value]:
                 continue
 
-            for child in task_execution.children:
+            for child in task_execution.child_task_executions:
                 if child.status not in [WorkflowStatus.COMPLETED.value, WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value]:
                     child.status = WorkflowStatus.CANCELLED.value
                     child.end_time = datetime.now()
