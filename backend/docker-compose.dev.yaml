@@ -54,8 +54,8 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      APP_HOST: ${APP_HOST}
-      EMAIL: ${EMAIL}
+      APP_HOST: api-dev.karma-grp.com
+      EMAIL: zaid.bardan@gmail.com
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data

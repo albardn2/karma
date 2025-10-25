@@ -1,16 +1,16 @@
 {
-  email zaid.bardan@gmail.com
+  email {$EMAIL}
   # For first-time testing, you can use the staging CA to avoid rate-limits:
   # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 }
 
 # Redirect bare www -> apex (optional)
-www.api-dev.karma-grp.com {
-  redir https://api-dev.karma-grp.com{uri}
+www.{$APP_HOST} {
+  redir https://{$APP_HOST}{uri}
 }
 
 # Primary site
-api-dev.karma-grp.com {
+{$APP_HOST} {
   encode gzip
   reverse_proxy web:5000
 
