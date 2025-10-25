@@ -91,7 +91,7 @@ def task_complete():
         uow.commit()
     return jsonify(dto.model_dump(mode="json")), 200
 
-@task_execution_blueprint.route("/list/workflow-operators", methods=["GET"])
+@task_execution_blueprint.route("/workflow-operators", methods=["GET"])
 def list_task_operators():
     """
     List all workflow types (this is an example of how you might return an enum or list).
