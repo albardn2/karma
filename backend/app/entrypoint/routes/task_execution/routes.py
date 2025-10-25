@@ -12,6 +12,8 @@ from app.dto.task_execution import TaskExecutionRead
 from app.dto.task_execution import TaskExecutionListParams, TaskExecutionPage
 from app.domains.task_execution.domain import TaskExecutionDomain
 from app.dto.task_execution import TaskExecutionComplete
+from app.dto.task_execution import OperatorType
+
 
 
 @task_execution_blueprint.route("/<string:uuid>", methods=["GET"])
@@ -105,4 +107,13 @@ def task_complete():
         dto = TaskExecutionDomain.complete_task_execution(uow=uow,payload=payload)
         uow.commit()
     return jsonify(dto.model_dump(mode="json")), 200
+
+@task_execution_blueprint.route("/worflow-operators", methods=["GET"])
+def list_task_operators():
+    """
+    List all workflow types (this is an example of how you might return an enum or list).
+    """
+
+    values = [o.value for o in OperatorType]
+    return jsonify(values), 200
 
