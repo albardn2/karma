@@ -16,24 +16,7 @@ from app.dto.task_execution import OperatorType
 
 
 
-@task_execution_blueprint.route("/<string:uuid>", methods=["GET"])
-@jwt_required()
-@scopes_required(
-    PermissionScope.ADMIN.value,
-    PermissionScope.SUPER_ADMIN.value,
-    PermissionScope.OPERATION_MANAGER.value,
-    PermissionScope.OPERATOR.value,
-    PermissionScope.ACCOUNTANT.value,
-    PermissionScope.DRIVER.value,
-    PermissionScope.SALES.value)
-def get_task_execution(uuid: str):
-    with SqlAlchemyUnitOfWork() as uow:
-        task_exe = uow.task_execution_repository.find_one(uuid=uuid)
-        if not task_exe:
-            raise NotFoundError(f"task_exe not found with uuid: {uuid}")
 
-        dto = TaskExecutionRead.from_orm(task_exe).model_dump(mode="json")
-    return jsonify(dto), 200
 
 
 @task_execution_blueprint.route("/", methods=["GET"])
@@ -116,4 +99,24 @@ def list_task_operators():
 
     values = [o.value for o in OperatorType]
     return jsonify(values), 200
+
+
+@task_execution_blueprint.route("/<string:uuid>", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.OPERATOR.value,
+    PermissionScope.ACCOUNTANT.value,
+    PermissionScope.DRIVER.value,
+    PermissionScope.SALES.value)
+def get_task_execution(uuid: str):
+    with SqlAlchemyUnitOfWork() as uow:
+        task_exe = uow.task_execution_repository.find_one(uuid=uuid)
+        if not task_exe:
+            raise NotFoundError(f"task_exe not found with uuid: {uuid}")
+
+        dto = TaskExecutionRead.from_orm(task_exe).model_dump(mode="json")
+    return jsonify(dto), 200
 
