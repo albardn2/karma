@@ -28,6 +28,7 @@ class NoopOperator:
         if not task_exe:
             raise BadRequestError(f"TaskExecution not found with uuid: {payload.uuid}")
 
+        task_exe.result = payload.result
         task_exe.status = WorkflowStatus.COMPLETED.value
         task_exe.end_time = datetime.now()
         task_exe.completed_by_uuid = payload.completed_by_uuid

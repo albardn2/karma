@@ -8,6 +8,7 @@ from app.domains.task_execution.workflow_operators.material_refill_operator impo
 from app.domains.task_execution.workflow_operators.qc_operator import QualityControlOperator
 from app.domains.task_execution.workflow_operators.inventory_dump_operator import InventoryDumpOperator
 from app.domains.task_execution.workflow_operators.noop_operator import NoopOperator
+from app.domains.task_execution.workflow_operators.start_trip_operator import StartTripOperator
 
 
 class OperatorEntryPoint:
@@ -23,7 +24,8 @@ class OperatorEntryPoint:
                 OperatorType.MATERIAL_REFILL_OPERATOR: MaterialRefillOperator(),  # Assuming MaterialRefillOperator is similar to IOProcessOperator
                 OperatorType.QC_OPERATOR: QualityControlOperator(),
                 OperatorType.INVENTORY_DUMP_OPERATOR: InventoryDumpOperator(),
-                OperatorType.NOOP_OPERATOR: NoopOperator()
+                OperatorType.NOOP_OPERATOR: NoopOperator(),
+                OperatorType.START_TRIP_OPERATOR: StartTripOperator(),
             }
 
 
