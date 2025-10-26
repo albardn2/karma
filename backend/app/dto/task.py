@@ -92,8 +92,8 @@ class TaskRead(TaskBase):
     def from_orm_with_enrichment(cls, task, uow):
         # Custom from_orm to handle task_inputs deserialization
         obj = cls.from_orm(task)
-        if obj.task.task_inputs:
-            for f in obj.task.task_inputs.fields:
+        if obj.task_inputs:
+            for f in obj.task_inputs.fields:
                 if f.label == "service_areas":
                     service_areas = uow.service_area_repository.find_all(is_deleted=False)
                     f.options = [sa.name for sa in service_areas]
