@@ -49,7 +49,7 @@ def get_task(uuid: str):
         task = uow.task_repository.find_one(uuid=uuid, is_deleted=False)
         if not task:
             raise NotFoundError(f"Task not found with uuid: {uuid}")
-        dto = TaskRead.from_orm(task).model_dump(mode="json")
+        dto = TaskRead.from_orm_with_enrichment(task).model_dump(mode="json")
     return jsonify(dto), 200
 
 # Route to update a Task
@@ -107,7 +107,7 @@ def list_tasks():
             per_page=params.per_page
         )
         items = [
-            TaskRead.from_orm(task).model_dump(mode="json")
+            TaskRead.from_orm_with_enrichment(task).model_dump(mode="json")
             for task in page.items
         ]
         result = TaskPage(

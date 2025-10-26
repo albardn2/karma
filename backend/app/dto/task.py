@@ -41,7 +41,8 @@ class TaskInputField(BaseModel):
 class TaskInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    fields: List[TaskInputField] = []
+    # default emptylist
+    fields: List[TaskInputField] = Field(default_factory=list)
     data: Optional[dict] = None
 
 
@@ -85,6 +86,30 @@ class TaskRead(TaskBase):
     workflow_uuid: str
     is_deleted: bool = False  # Indicates if the task is deleted
     parent_task_uuid: Optional[str] = None  # Parent task UUID if this is a child task
+
+
+    @classmethod
+    def from_orm_with_enrichment(cls, task, uow):
+        # Custom from_orm to handle task_inputs deserialization
+        obj = cls.from_orm(task)
+        if obj.task.task_inputs:
+            for f in obj.task.task_inputs.fields:
+                if f.label == "service_areas":
+                    service_areas = uow.service_area_repository.find_all(is_deleted=False)
+                    f.options = [sa.name for sa in service_areas]
+                if f.label == "assigned_user_uuid":
+                    users = uow.user_repository.find_all(is_deleted=False)
+                    f.options = [user.first_name for user in users]
+                if f.label == "vehicle_uuid":
+                    vehicles = uow.vehicle_repository.find_all(is_deleted=False)
+                    f.options = [vehicle.license_plate for vehicle in vehicles]
+                if f.label == "start_warehouse_uuid":
+                    warehouses = uow.warehouse_repository.find_all(is_deleted=False)
+                    f.options = [wh.name for wh in warehouses]
+                if f.label == "end_warehouse_uuid":
+                    warehouses = uow.warehouse_repository.find_all(is_deleted=False)
+                    f.options = [wh.name for wh in warehouses]
+        return obj
 
 # DTO for pagination and filtering when listing Tasks
 class TaskListParams(BaseModel):
