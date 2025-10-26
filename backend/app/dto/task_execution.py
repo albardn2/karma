@@ -61,6 +61,8 @@ class TaskExecutionRead(TaskExecutionBase):
     created_at: datetime  # Time when the task execution was created
     parent_task_execution_uuid: Optional[str] = None  # Parent task execution str if this is a child task
     name: Optional[str] = None  # Name of the task execution, if applicable
+    result : Optional[Dict[str, Any]] = Field(default_factory=dict)  # Ensure result is always a dict
+
 
 # DTO for pagination and filtering when listing TaskExecutions
 class TaskExecutionListParams(BaseModel):
