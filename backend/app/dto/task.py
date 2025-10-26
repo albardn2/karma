@@ -6,6 +6,8 @@ from uuid import UUID
 from datetime import datetime
 from app.dto.task_execution import OperatorType
 
+from app.dto.customer import CustomerCategory
+
 
 class FieldType(str, Enum):
     TEXT = 'text'
@@ -100,6 +102,9 @@ class TaskRead(TaskBase):
                 if f.label == "assigned_user_uuid":
                     users = uow.user_repository.find_all(is_deleted=False)
                     f.options = [user.first_name for user in users]
+                if f.label == "customer_categories":
+                    categories = [category.value for category in CustomerCategory]
+                    f.options = categories
                 if f.label == "vehicle_uuid":
                     vehicles = uow.vehicle_repository.find_all(is_deleted=False)
                     f.options = [vehicle.license_plate for vehicle in vehicles]
