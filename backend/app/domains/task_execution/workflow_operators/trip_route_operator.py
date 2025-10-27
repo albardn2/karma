@@ -80,8 +80,8 @@ class TripRouteOperator(OperatorInterface):
             polygons=mp,
             start_point=start_point,
             end_point=end_point,
-            max_stops=min_stops,  # You can set these parameters as needed
-            min_stops=max_stops,
+            max_stops=max_stops,  # You can set these parameters as needed
+            min_stops=min_stops,
             customer_categories=customer_categories,
             last_visit_threshold_days=last_visit_threshold_days
         )
