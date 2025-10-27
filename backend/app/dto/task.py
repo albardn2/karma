@@ -108,10 +108,10 @@ class TaskRead(TaskBase):
                 if f.label == "vehicle_uuid":
                     vehicles = uow.vehicle_repository.find_all(is_deleted=False)
                     f.options = [vehicle.plate_number for vehicle in vehicles]
-                if f.label == "start_warehouse_uuid":
+                if f.label == "start_warehouse_name":
                     warehouses = uow.warehouse_repository.find_all(is_deleted=False)
                     f.options = [wh.name for wh in warehouses]
-                if f.label == "end_warehouse_uuid":
+                if f.label == "end_warehouse_name":
                     warehouses = uow.warehouse_repository.find_all(is_deleted=False)
                     f.options = [wh.name for wh in warehouses]
         return obj

@@ -56,14 +56,14 @@ class TripRouteOperator(OperatorInterface):
         mp = MultiPolygon(polys)                    # MultiPolygon of all parts
         geoms = from_shape(mp, srid=4326)     # set your SRID
 
-        start_warehouse_uuid = self.get_start_warehouse_uuid()
-        start_warehouse = uow.warehouse_repository.find_one(uuid=start_warehouse_uuid)
+        start_warehouse_name = self.get_start_warehouse_name()
+        start_warehouse = uow.warehouse_repository.find_one(name=start_warehouse_name)
         if not start_warehouse:
-            raise BadRequestError(f"Start Warehouse not found with uuid: {start_warehouse_uuid}")
-        end_warehouse_uuid =  self.get_end_warehouse_uuid()
-        end_warehouse = uow.warehouse_repository.find_one(uuid=end_warehouse_uuid)
+            raise BadRequestError(f"Start Warehouse not found with name: {start_warehouse_name}")
+        end_warehouse_name =  self.get_end_warehouse_name()
+        end_warehouse = uow.warehouse_repository.find_one(name=end_warehouse_name)
         if not end_warehouse:
-            raise BadRequestError(f"End Warehouse not found with uuid: {end_warehouse_uuid}")
+            raise BadRequestError(f"End Warehouse not found with name: {end_warehouse_name}")
 
         start_point = to_shape(start_warehouse.coordinates)
         end_point = to_shape(end_warehouse.coordinates)
@@ -115,23 +115,23 @@ class TripRouteOperator(OperatorInterface):
             if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("service_areas")
 
-    def get_start_warehouse_uuid(self) -> str:
+    def get_start_warehouse_name(self) -> str:
         """
         This method is a placeholder for retrieving the service area UUID.
         It should be implemented to return the actual service area UUID.
         """
         for task_exe in self.all_tasks_executions:
             if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
-                return task_exe.result.get("start_warehouse_uuid")
+                return task_exe.result.get("start_warehouse_name")
 
-    def get_end_warehouse_uuid(self) -> str:
+    def get_end_warehouse_name(self) -> str:
         """
         This method is a placeholder for retrieving the service area UUID.
         It should be implemented to return the actual service area UUID.
         """
         for task_exe in self.all_tasks_executions:
             if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
-                return task_exe.result.get("end_warehouse_uuid")
+                return task_exe.result.get("end_warehouse_name")
 
     def get_customer_categories(self) -> list[str]:
         """
