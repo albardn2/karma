@@ -52,7 +52,7 @@ class TripRouteOperator(OperatorInterface):
         filters.append(ServiceAreaModel.name.in_(service_area_names))
         service_areas = uow.service_area_repository._find_all_by_filters(filters=filters)
 
-        polys = [p for sa in service_areas for p in _parts(to_shape(sa.polygon))]
+        polys = [p for sa in service_areas for p in _parts(to_shape(sa.geometry))]
         mp = MultiPolygon(polys)                    # MultiPolygon of all parts
         geoms = from_shape(mp, srid=4326)     # set your SRID
 
