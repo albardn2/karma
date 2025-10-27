@@ -9,6 +9,7 @@ from app.domains.task_execution.workflow_operators.qc_operator import QualityCon
 from app.domains.task_execution.workflow_operators.inventory_dump_operator import InventoryDumpOperator
 from app.domains.task_execution.workflow_operators.noop_operator import NoopOperator
 from app.domains.task_execution.workflow_operators.start_trip_operator import StartTripOperator
+from app.domains.task_execution.workflow_operators.trip_route_operator import TripRouteOperator
 
 
 class OperatorEntryPoint:
@@ -26,6 +27,7 @@ class OperatorEntryPoint:
                 OperatorType.INVENTORY_DUMP_OPERATOR: InventoryDumpOperator(),
                 OperatorType.NOOP_OPERATOR: NoopOperator(),
                 OperatorType.START_TRIP_OPERATOR: StartTripOperator(),
+                OperatorType.TRIP_ROUTE_OPERATOR: TripRouteOperator()
             }
 
 
