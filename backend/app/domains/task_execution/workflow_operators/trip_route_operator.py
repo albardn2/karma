@@ -112,7 +112,7 @@ class TripRouteOperator(OperatorInterface):
         It should be implemented to return the actual service area UUID.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("service_areas")
 
     def get_start_warehouse_uuid(self) -> str:
@@ -121,7 +121,7 @@ class TripRouteOperator(OperatorInterface):
         It should be implemented to return the actual service area UUID.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("start_warehouse_uuid")
 
     def get_end_warehouse_uuid(self) -> str:
@@ -130,7 +130,7 @@ class TripRouteOperator(OperatorInterface):
         It should be implemented to return the actual service area UUID.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("end_warehouse_uuid")
 
     def get_customer_categories(self) -> list[str]:
@@ -139,7 +139,7 @@ class TripRouteOperator(OperatorInterface):
         It should be implemented to return the actual customer categories.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("customer_categories")
 
     def get_max_stops(self) -> int:
@@ -148,7 +148,7 @@ class TripRouteOperator(OperatorInterface):
         It should be implemented to return the actual customer categories.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("max_stops")
 
     def min_stops(self) -> int:
@@ -157,7 +157,7 @@ class TripRouteOperator(OperatorInterface):
         It should be implemented to return the actual customer categories.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("min_stops")
 
     def last_visit_threshold_days(self) -> int:
@@ -166,5 +166,5 @@ class TripRouteOperator(OperatorInterface):
         It should be implemented to return the actual customer categories.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("last_visit_threshold_days")
