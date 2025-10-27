@@ -87,8 +87,10 @@ class DistributionAlgorithm:
         if N < cluster_size:
             return customers, 0.0
 
+        print("CLUSTER SIZE " , cluster_size)
+        print("N SIZE " , N)
         if not (1 <= cluster_size <= N):
-            raise ValueError("cluster_size must be between 1 and N")
+            raise BadRequestError(f"cluster_size must be between 1 and N. cluster_size={cluster_size}, N={N}")
 
         # 1) Extract lat/lon and project to Web Mercator (meters)
         transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
