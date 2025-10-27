@@ -28,6 +28,8 @@ class StartTripOperatorSchema(BaseModel):
     end_point: Optional[str] = None
     assigned_user_uuid: Optional[str] = None
     customer_categories: Optional[list[str]] = None
+    max_stops: Optional[int] = None
+    min_stops: Optional[int] = None
 
 
 class StartTripOperator(OperatorInterface):
