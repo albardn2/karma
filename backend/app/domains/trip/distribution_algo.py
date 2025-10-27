@@ -1,6 +1,6 @@
 from typing import List, Tuple, Any
 
-from shapely import Point, Polygon
+from shapely import Point, Polygon, MultiPolygon
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 
 from app.entrypoint.routes.common.errors import BadRequestError
@@ -29,18 +29,14 @@ class DistributionAlgorithm:
     def __init__(self, uow: SqlAlchemyUnitOfWork):
         self.uow = uow
 
-        self.last_ordered_threshold_days = 7
-        self.default_max_stops = 20
-        self.default_min_stops = 1
-
     def run(self,
-            polygon: Polygon,
+            polygons: MultiPolygon,
             start_point: Point,
             end_point: Point,
             max_stops: Optional[int] = None,
             min_stops: Optional[int] = None,
             customer_categories: list[str] = None,
-            materials_filter: list = None,
+            last_visit_threshold_days: Optional[int] = None,
 
             ) -> Tuple[List[Customer], List[Tuple[float, float]], List[Tuple[float, float]]]:
 
@@ -48,10 +44,9 @@ class DistributionAlgorithm:
         uow.
         customer_repository.
         fetch_distribution_customers_for_polygon(
-            polygon=polygon,
-            categories=customer_categories,
-            last_ordered_threshold_days=self.last_ordered_threshold_days,
-            material_uuids=materials_filter
+            polygon=polygons,
+            customer_categories=customer_categories,
+            last_visit_threshold_days=last_visit_threshold_days
         )
         )
 
@@ -59,11 +54,11 @@ class DistributionAlgorithm:
             raise BadRequestError("No customers found in the specified polygon with the given filters.")
 
         clustered_customer, score = self.best_kmeans_cluster(customers,
-                                                             max_stops or self.default_max_stops,
+                                                             max_stops,
                                                              )
-        if len(clustered_customer) < (min_stops or self.default_min_stops):
+        if len(clustered_customer) < min_stops:
             raise BadRequestError(
-                f"Not enough customers found after clustering: {len(clustered_customer)} < {min_stops or self.default_min_stops}"
+                f"Not enough customers found after clustering: {len(clustered_customer)} < {min_stops}"
             )
 
         ordered_customers, waypoints, route_coords = self.sort_customers_by_route_3857(
