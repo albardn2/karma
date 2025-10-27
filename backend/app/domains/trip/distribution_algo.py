@@ -33,8 +33,8 @@ class DistributionAlgorithm:
             polygons: MultiPolygon,
             start_point: Point,
             end_point: Point,
-            max_stops: Optional[int] = None,
-            min_stops: Optional[int] = None,
+            max_stops,
+            min_stops,
             customer_categories: list[str] = None,
             last_visit_threshold_days: Optional[int] = None,
 
@@ -53,8 +53,8 @@ class DistributionAlgorithm:
         if not customers:
             raise BadRequestError("No customers found in the specified polygon with the given filters.")
 
-        clustered_customer, score = self.best_kmeans_cluster(customers,
-                                                             max_stops,
+        clustered_customer, score = self.best_kmeans_cluster(customers=customers,
+                                                             cluster_size=max_stops,
                                                              )
         if len(clustered_customer) < min_stops:
             raise BadRequestError(

@@ -70,6 +70,8 @@ class TripRouteOperator(OperatorInterface):
         customer_categories = self.get_customer_categories()
         min_stops = self.min_stops()
         max_stops = self.get_max_stops()
+        print("MAX STOPS =", max_stops)
+        print("MIN STOPS = ", min_stops)
 
         last_visit_threshold_days = self.last_visit_threshold_days()
 
