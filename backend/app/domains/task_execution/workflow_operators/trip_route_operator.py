@@ -42,7 +42,7 @@ class TripRouteOperator(OperatorInterface):
         if not task_exe:
             raise BadRequestError(f"TaskExecution not found with uuid: {payload.uuid}")
         self.task_exe = task_exe
-        self.all_tasks_executions = task_exe.workflow_execution.tasks_executions
+        self.all_tasks_executions = task_exe.workflow_execution.task_executions
 
         service_area_names = self.get_service_areas()
         # name is in service_area names
