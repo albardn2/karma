@@ -54,7 +54,6 @@ class TripRouteOperator(OperatorInterface):
 
         polys = [p for sa in service_areas for p in _parts(to_shape(sa.geometry))]
         mp = MultiPolygon(polys)                    # MultiPolygon of all parts
-        geoms = from_shape(mp, srid=4326)     # set your SRID
 
         start_warehouse_name = self.get_start_warehouse_name()
         start_warehouse = uow.warehouse_repository.find_one(name=start_warehouse_name)
@@ -76,7 +75,7 @@ class TripRouteOperator(OperatorInterface):
 
 
         ordered_customers, waypoints, route_coords = DistributionAlgorithm(uow=uow).run(
-            polygons=geoms,
+            polygons=mp,
             start_point=start_point,
             end_point=end_point,
             max_stops=min_stops,  # You can set these parameters as needed
