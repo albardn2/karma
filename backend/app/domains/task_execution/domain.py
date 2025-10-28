@@ -139,7 +139,7 @@ class TaskExecutionDomain:
 
         # now loop through the tasks and mark in progress if dependent names are completed
         for task in workflow_exe_tasks:
-            if task.depends_on and all(name_status_mapper[dep] == WorkflowStatus.COMPLETED.value for dep in task.depends_on):
+            if task.status in [WorkflowStatus.NOT_STARTED.value]  and task.depends_on and all(name_status_mapper[dep] == WorkflowStatus.COMPLETED.value for dep in task.depends_on):
                 TaskExecutionDomain.mark_dependent_task_in_progress(uow=uow, dependent_task=task)
 
     @staticmethod
