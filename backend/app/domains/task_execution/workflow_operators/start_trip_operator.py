@@ -1,5 +1,3 @@
-
-
 from datetime import datetime
 from typing import Optional
 
@@ -22,7 +20,7 @@ class StartTripOperatorSchema(BaseModel):
     service_areas: list[str]
     start_warehouse_name: str
     end_warehouse_name: str
-    vehicle_uuid: str
+    vehicle_plate: str
     last_visit_threshold_days:int
     start_point: Optional[str] = None
     end_point: Optional[str] = None
