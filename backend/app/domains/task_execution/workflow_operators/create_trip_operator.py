@@ -44,7 +44,7 @@ class CreateTripOperator(OperatorInterface):
         if not task_exe:
             raise BadRequestError(f"TaskExecution not found with uuid: {payload.uuid}")
         self.task_exe = task_exe
-        self.all_tasks_executions = task_exe.workflow_execution.tasks_executions
+        self.all_tasks_executions = task_exe.workflow_execution.task_executions
 
         vehicle_plate = self.get_vehicle_plate()
         vehicle = uow.vehicle_repository.find_one(plate_number=vehicle_plate, is_deleted=False)
