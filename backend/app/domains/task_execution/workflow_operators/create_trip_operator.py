@@ -160,7 +160,7 @@ class CreateTripOperator(OperatorInterface):
         It should be implemented to return the actual service area UUID.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("vehicle_plate")
 
     def get_start_warehouse_name(self) -> str:
@@ -169,7 +169,7 @@ class CreateTripOperator(OperatorInterface):
         It should be implemented to return the actual service area UUID.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("start_warehouse_name")
 
     def get_end_warehouse_name(self) -> str:
@@ -178,7 +178,7 @@ class CreateTripOperator(OperatorInterface):
         It should be implemented to return the actual service area UUID.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("end_warehouse_name")
 
     # def get_trip_data(self) -> TripData:
@@ -209,18 +209,18 @@ class CreateTripOperator(OperatorInterface):
         It should be implemented to return the actual customer UUIDs.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.TRIP_ROUTE_OPERATOR.value:
+            if task_exe.operator == OperatorType.TRIP_ROUTE_OPERATOR.value:
                 return task_exe.result.get("customer_uuids", [])
 
 
     def get_trip_operator_task_execution_uuid(self):
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.TRIP_OPERATOR.value:
                 return task_exe.uuid
 
     def get_trip_operator_task_uuid(self):
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.TRIP_OPERATOR.value:
                 return task_exe.task.uuid
 
 
