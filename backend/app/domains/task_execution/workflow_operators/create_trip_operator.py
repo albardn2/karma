@@ -102,7 +102,7 @@ class CreateTripOperator(OperatorInterface):
             task_create = TaskDomain.create_task(
                 uow=uow,
                 payload=TaskCreate(
-                    name=f"trip_stop_{customer.name}:{customer_uuid}",
+                    name=f"trip_stop_{customer.company_name}:{customer_uuid}",
                     created_by_uuid=payload.completed_by_uuid,
                     workflow_uuid = None, #task_exe.workflow_execution.workflow_uuid,
                     parent_task_uuid= None, #self.get_trip_operator_task_uuid(),
