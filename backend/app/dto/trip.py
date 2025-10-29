@@ -43,7 +43,8 @@ class TripCreate(BaseModel):
 
     created_by_uuid: Optional[str] = None
     vehicle_uuid: str
-    service_area_uuid: Optional[str] = None
+    # default to list
+    service_area_names: Optional[List[str]] = Field(default_factory=list)
     distribution_area: Optional[str] = None  # POLYGON WKT
     notes: Optional[str] = None
     status: TripStatus  # e.g., planned, in_progress, completed, cancelled
