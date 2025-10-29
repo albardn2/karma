@@ -64,7 +64,7 @@ class TaskCreate(TaskBase):
     model_config = ConfigDict(extra="forbid")
 
     created_by_uuid: Optional[str] = None
-    workflow_uuid: str  # Workflow this task belongs to
+    workflow_uuid: Optional[str] = None  # Workflow this task belongs to
     parent_task_uuid: Optional[str] = None  # Parent task if this is a child task
 
 # DTO for partial updates to a Task

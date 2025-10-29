@@ -1711,7 +1711,7 @@ class Task(Base):
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
-    workflow_uuid = Column(String(36), ForeignKey("workflow.uuid"), nullable=False)
+    workflow_uuid = Column(String(36), ForeignKey("workflow.uuid"), nullable=True)
     parent_task_uuid = Column(String(36), ForeignKey("task.uuid"), nullable=True)  # Self-referencing foreign key
     name = Column(String(120), nullable=False)
     description = Column(Text, nullable=True)
@@ -1865,17 +1865,12 @@ class ServiceArea(Base):
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    # relations
-    trips = relationship("Trip", back_populates="service_area")
-
-
 class Trip(Base):
     __tablename__ = "trip"
     uuid        = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     vehicle_uuid = Column(String(36), ForeignKey("vehicle.uuid"), nullable=False)
-    service_area_uuid = Column(String(36), ForeignKey("service_area.uuid"), nullable=True)
     distribution_area = Column(Geometry("POLYGON", srid=4326), nullable=True)  # Area covered by the trip
     notes = Column(Text, nullable=True)
     status = Column(String(120), nullable=False)  # e.g., planned, in_progress, completed, cancelled
@@ -1887,10 +1882,10 @@ class Trip(Base):
     end_point = Column(Geometry("POINT", srid=4326), nullable=True)  # Ending point of the trip
     data = Column(MutableDict.as_mutable(JSONB), default=dict, nullable=True)
     workflow_execution_uuid = Column(String(36), ForeignKey("workflow_execution.uuid"), nullable=True)
+    service_area_names = Column(ARRAY(String), nullable=True, default=list)
 
     # relations
     vehicle = relationship("Vehicle", back_populates="trips")
-    service_area = relationship("ServiceArea", back_populates="trips")
     workflow_execution = relationship("WorkflowExecution", back_populates="trips")
     stops = relationship("TripStop", back_populates="trip")
 
@@ -1940,13 +1935,6 @@ class Trip(Base):
             inventory_sale_mapper[inventory_uuid]["quantity"] += inventory_data["quantity"]
 
         return inventory_sale_mapper
-
-
-
-
-
-
-
 
 
 
