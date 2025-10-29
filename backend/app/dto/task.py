@@ -85,7 +85,7 @@ class TaskRead(TaskBase):
     uuid: str
     created_by_uuid: Optional[str] = None
     created_at: datetime
-    workflow_uuid: str
+    workflow_uuid: Optional[str] = None  # Workflow this task belongs to
     is_deleted: bool = False  # Indicates if the task is deleted
     parent_task_uuid: Optional[str] = None  # Parent task UUID if this is a child task
 
