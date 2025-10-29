@@ -88,7 +88,7 @@ class CreateTripOperator(OperatorInterface):
                 uow=uow,
                 payload=TripStopCreate(
                     created_by_uuid=payload.completed_by_uuid,
-                    trip_uuid=task_exe.workflow_execution.trip.uuid,
+                    trip_uuid=task_exe.workflow_execution.trips[0].uuid,
                     coordinates=wkt_or_wkb_to_lat_lon(customer.coordinates),
                     customer_uuid=customer_uuid,
                     status=TripStopStatus.IN_PROGRESS.value
