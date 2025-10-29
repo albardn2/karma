@@ -43,6 +43,9 @@ class CustomerRepository(AbstractRepository[Customer]):
 
         qry = self._session.query(Customer)
 
+        # remove customers with is_deleted=True
+        qry = qry.filter(Customer.is_deleted == False)
+
         # 1) Geo filter is always applied (point within polygon)
         geom = from_shape(polygon, srid=4326)
         qry = qry.filter(func.ST_Within(Customer.coordinates, geom))
