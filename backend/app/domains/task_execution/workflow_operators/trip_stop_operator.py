@@ -11,10 +11,8 @@ from app.entrypoint.routes.common.errors import BadRequestError
 from app.dto.workflow_execution import (
     WorkflowStatus
 )
-
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
-
-from backend.app.dto.trip_stop import TripStopStatus
+from app.dto.trip_stop import TripStopStatus
 
 
 class SkipReason(str, Enum):
