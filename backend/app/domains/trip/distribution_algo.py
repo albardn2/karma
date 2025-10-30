@@ -23,7 +23,7 @@ from pyproj import Transformer
 from geoalchemy2.shape import to_shape
 
 from models.common import Customer
-
+from osmnx import truncate
 
 class DistributionAlgorithm:
 
@@ -167,7 +167,9 @@ class DistributionAlgorithm:
         # 1) Build WGS84 graph
         visit_pts = [to_shape(c.coordinates) for c in customers]
         area_ll = MultiPoint([start_pt, end_pt, *visit_pts]).convex_hull.buffer(buffer_deg)
-        G_ll = ox.graph_from_polygon(area_ll, network_type="drive_service")  # lat/lon graph
+        G_ll = ox.graph_from_polygon(area_ll, network_type="drive_service",simplify=True)  # lat/lon graph
+        G_ll = truncate.largest_component(G_ll, strongly=False)
+
 
         # 2) Project graph to EPSG:3857
         G = ox.project_graph(G_ll, to_crs="EPSG:3857")
