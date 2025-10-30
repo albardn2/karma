@@ -88,7 +88,6 @@ class TripStopOperator(OperatorInterface):
         trip_stop_uuid = self.task_exe.task_inputs.get("data", {}).get("trip_stop_uuid")
         trip_stop = uow.trip_stop_repository.find_one(
             uuid=trip_stop_uuid,
-            is_deleted=False
         )
         if not trip_stop:
             raise BadRequestError(f"TripStop not found with uuid: {trip_stop_uuid}")
