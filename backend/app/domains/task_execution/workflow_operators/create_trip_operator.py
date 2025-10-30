@@ -23,6 +23,8 @@ from app.dto.trip import TripData, InventoryInput
 from app.dto.trip_stop import TripStopCreate, TripStopStatus
 from app.utils.geom_utils import wkt_or_wkb_to_lat_lon
 
+from backend.app.dto.customer import CustomerRead
+
 
 class CreateTripOperatorSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -96,7 +98,9 @@ class CreateTripOperator(OperatorInterface):
             )
 
             task_input = TaskInput(
-                data = {"trip_stop_uuid":trip_stop.uuid}
+                data = {"trip_stop_uuid":trip_stop.uuid,
+                        "customer": CustomerRead.from_orm(trip_stop.customer).model_dump(mode='json')
+                        }
             )
 
             task_create = TaskDomain.create_task(
