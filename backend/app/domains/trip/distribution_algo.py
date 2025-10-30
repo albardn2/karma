@@ -188,7 +188,7 @@ class DistributionAlgorithm:
         G_ll = ox.graph_from_polygon(area_ll, network_type="drive", simplify=True, retain_all=False)
 
         # Keep only largest weakly connected component
-        G_ll = ox.utils_graph.get_largest_component(G_ll, strongly=False)
+        G_ll = truncate.largest_component(G_ll, strongly=False)
 
         # 2) Nearest nodes in WGS84 (pass lon, lat directly)
         sx, sy = start_pt.x, start_pt.y
