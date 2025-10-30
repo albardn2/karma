@@ -25,6 +25,9 @@ from geoalchemy2.shape import to_shape
 from models.common import Customer
 from osmnx import truncate
 
+from app.domains.trip.saleman_router import SalesmanRouterMixin
+
+
 class DistributionAlgorithm:
 
     def __init__(self, uow: SqlAlchemyUnitOfWork):
@@ -75,7 +78,7 @@ class DistributionAlgorithm:
         end_clustering = time.time()
 
         start_ordering = time.time()
-        ordered_customers, waypoints, route_coords = self.sort_customers_by_route_wgs84(
+        ordered_customers, waypoints, route_coords = SalesmanRouterMixin.run(
             clustered_customer,
             start_pt=start_point,
             end_pt=end_point,
