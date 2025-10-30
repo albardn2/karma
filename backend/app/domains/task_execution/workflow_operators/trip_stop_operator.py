@@ -85,7 +85,7 @@ class TripStopOperator(OperatorInterface):
 
     def get_trip_stop(self,uow:SqlAlchemyUnitOfWork):
 
-        trip_stop_uuid = self.task_exe.task_inputs.data.get("trip_stop_uuid")
+        trip_stop_uuid = self.task_exe.task_inputs.get("data", {}).get("trip_stop_uuid")
         trip_stop = uow.trip_stop_repository.find_one(
             uuid=trip_stop_uuid,
             is_deleted=False
