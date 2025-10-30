@@ -4,6 +4,8 @@ from shapely.geometry import MultiPoint, Point
 from shapely.wkb import loads as to_shape  # adjust if you actually use to_shape from shapely.ops
 import requests
 from models.common import Customer
+from app.utils.geom_utils import wkt_or_wkb_to_shape
+
 
 def _haversine_km(lat1, lon1, lat2, lon2):
     R = 6371.0088
@@ -69,7 +71,7 @@ class SalesmanRouterMixin:
             customers: List[Customer],
             start_pt: Point,  # in lon/lat WGS84
             end_pt: Point,    # in lon/lat WGS84
-    ) -> tuple[list["Customer"], list[tuple[float, float]], list[tuple[float, float]]]:
+    ) -> tuple[list[Customer], list[tuple[float, float]], list[tuple[float, float]]]:
         """
         Simplified implementation using OSRM:
           1) Build a duration matrix via OSRM /table for [start, all customers, end].
@@ -89,7 +91,7 @@ class SalesmanRouterMixin:
 
         cust_ll: List[Tuple[float, float]] = []
         for c in customers:
-            shp = to_shape(c.coordinates)
+            shp = wkt_or_wkb_to_shape(c.coordinates)  # should yield a Point
             cust_ll.append((float(shp.x), float(shp.y)))
 
         # Build the combined coordinate list: [start, customers..., end]

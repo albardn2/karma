@@ -58,3 +58,35 @@ def wkt_or_wkb_to_lat_lon(value: str) -> str:
     lat = geom.y
     lon = geom.x
     return f"{lat},{lon}"
+
+def wkt_or_wkb_to_shape(value) -> Point:
+    """
+    Convert a WKT or WKB representation to a Shapely Point.
+    """
+    if value is None:
+        raise BadRequestError("`coordinates` cannot be None")
+
+    # 1) If it's a WKTElement, v.data is WKT string
+    if isinstance(value, WKTElement):
+        geom = shapely_wkt.loads(value.data)
+
+    # 2) If it's a WKBElement, convert to shapely via to_shape
+    elif isinstance(value, WKBElement):
+        from geoalchemy2.shape import to_shape
+        geom = to_shape(value)
+
+    # 3) If raw bytes, interpret as WKB
+    elif isinstance(value, (bytes, bytearray)):
+        geom = shapely_wkb.loads(bytes(value))
+
+    # 4) If it's already a WKT string
+    elif isinstance(value, str):
+        geom = shapely_wkt.loads(value)
+
+    else:
+        raise BadRequestError("Unsupported type for coordinates")
+
+    if not isinstance(geom, Point) or not geom.is_valid:
+        raise BadRequestError("`coordinates` did not resolve to a valid Point")
+
+    return geom
