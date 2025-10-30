@@ -1,3 +1,4 @@
+import time
 from typing import List, Tuple, Any
 
 from shapely import Point, Polygon, MultiPolygon
@@ -39,7 +40,9 @@ class DistributionAlgorithm:
             last_visit_threshold_days: Optional[int] = None,
 
             ) -> Tuple[List[Customer], List[Tuple[float, float]], List[Tuple[float, float]]]:
+        # latency for each method
 
+        start_customer_fetch = time.time()
         customers: List[Customer] = (self.
         uow.
         customer_repository.
@@ -53,20 +56,38 @@ class DistributionAlgorithm:
         if not customers:
             raise BadRequestError("No customers found in the specified polygon with the given filters.")
 
+        end_customer_fetch = time.time()
+
+        start_clustering = time.time()
+
+        print("NUMBER OF CUSTOMERS FETCHED: ", len(customers))
+        print("MAX STOPS: ", max_stops)
         clustered_customer, score = self.best_kmeans_cluster(customers=customers,
                                                              cluster_size=max_stops,
                                                              )
+        print(f"Clustering score: {score:.2f}")
+        print("NUMBER OF CUSTOMERS AFTER CLUSTERING: ", len(clustered_customer))
+
         if len(clustered_customer) < min_stops:
             raise BadRequestError(
                 f"Not enough customers found after clustering: {len(clustered_customer)} < {min_stops}"
             )
+        end_clustering = time.time()
 
+        start_ordering = time.time()
         ordered_customers, waypoints, route_coords = self.sort_customers_by_route_3857(
             clustered_customer,
             start_pt=start_point,
             end_pt=end_point,
             buffer_deg=0.02
         )
+        end_ordering = time.time()
+
+        print(f"timespan customer fetch {end_customer_fetch - start_customer_fetch:.2f} s")
+        print(f"timespan clustering {end_clustering - start_clustering:.2f} s")
+        print(f"timespan ordering {end_ordering - start_ordering:.2f} s")
+
+
 
         return ordered_customers, waypoints, route_coords
 
@@ -146,7 +167,7 @@ class DistributionAlgorithm:
         # 1) Build WGS84 graph
         visit_pts = [to_shape(c.coordinates) for c in customers]
         area_ll = MultiPoint([start_pt, end_pt, *visit_pts]).convex_hull.buffer(buffer_deg)
-        G_ll = ox.graph_from_polygon(area_ll, network_type="drive")  # lat/lon graph
+        G_ll = ox.graph_from_polygon(area_ll, network_type="drive_service")  # lat/lon graph
 
         # 2) Project graph to EPSG:3857
         G = ox.project_graph(G_ll, to_crs="EPSG:3857")
