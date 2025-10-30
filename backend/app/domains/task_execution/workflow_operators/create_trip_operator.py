@@ -113,7 +113,7 @@ class CreateTripOperator(OperatorInterface):
                 )
             )
 
-            depends_on = [self.task_exe.name] if not created_task_names else [created_task_names[-1]]
+            depends_on = [self.get_trip_operator_task_execution_name()] if not created_task_names else [created_task_names[-1]]
             task_execution = TaskExecutionDomain.create_task_execution(
                 uow=uow,
                 payload=TaskExecutionCreate(
@@ -217,6 +217,11 @@ class CreateTripOperator(OperatorInterface):
         for task_exe in self.all_tasks_executions:
             if task_exe.operator == OperatorType.TRIP_OPERATOR.value:
                 return task_exe.uuid
+
+    def get_trip_operator_task_execution_name(self):
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.TRIP_OPERATOR.value:
+                return task_exe.name
 
     def get_trip_operator_task_uuid(self):
         for task_exe in self.all_tasks_executions:
