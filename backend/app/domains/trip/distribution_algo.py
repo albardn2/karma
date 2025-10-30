@@ -75,7 +75,7 @@ class DistributionAlgorithm:
         end_clustering = time.time()
 
         start_ordering = time.time()
-        ordered_customers, waypoints, route_coords = self.sort_customers_by_route_3857(
+        ordered_customers, waypoints, route_coords = self.sort_customers_by_route_wgs84(
             clustered_customer,
             start_pt=start_point,
             end_pt=end_point,
@@ -156,6 +156,87 @@ class DistributionAlgorithm:
 
         best_cluster = [customers[i] for i in best_idxs]
         return best_cluster, best_score
+
+    def sort_customers_by_route_wgs84(
+            self,
+            customers: List[Customer],
+            start_pt: Point,  # lon/lat WGS84
+            end_pt: Point,    # lon/lat WGS84
+            buffer_deg: float = 0.05
+    ) -> tuple[list[Customer], list[tuple[float, float]], list[tuple[float, float]]]:
+        """
+        Memory-safe version:
+        - Builds/keeps the graph in WGS84 (no projection to 3857).
+        - Uses OSMnx's 'length' (meters) for path weights.
+        - Returns: (ordered_customers, waypoints (lat, lon), route_coords_ll (lat, lon))
+        """
+        import networkx as nx
+        import osmnx as ox
+        from shapely.geometry import MultiPoint
+        from shapely.ops import unary_union
+
+        # 1) Build a small WGS84 graph (avoid 'drive_service' to shrink size)
+        visit_pts = [to_shape(c.coordinates) for c in customers]
+        hull = MultiPoint([start_pt, end_pt, *visit_pts]).convex_hull
+        area_ll = hull.buffer(buffer_deg)
+
+        # Defensive: if buffer creates multiparts, dissolve to one polygon
+        if area_ll.geom_type == "MultiPolygon":
+            area_ll = unary_union([p for p in area_ll.geoms])
+
+        # Smaller graph -> much lower memory
+        G_ll = ox.graph_from_polygon(area_ll, network_type="drive", simplify=True, retain_all=False)
+
+        # Keep only largest weakly connected component
+        G_ll = ox.utils_graph.get_largest_component(G_ll, strongly=False)
+
+        # 2) Nearest nodes in WGS84 (pass lon, lat directly)
+        sx, sy = start_pt.x, start_pt.y
+        ex, ey = end_pt.x, end_pt.y
+        start_node = ox.distance.nearest_nodes(G_ll, sx, sy)
+        end_node = ox.distance.nearest_nodes(G_ll, ex, ey)
+
+        visit_nodes = []
+        for c in customers:
+            pt = to_shape(c.coordinates)
+            visit_nodes.append(ox.distance.nearest_nodes(G_ll, pt.x, pt.y))
+
+        # 3) Greedy nearest-neighbor tour on the *unprojected* graph
+        #    Use edge weight 'length' (meters) which OSMnx has already computed.
+        route = [start_node]
+        remaining = set(visit_nodes)
+        while remaining:
+            last = route[-1]
+            lengths = nx.single_source_dijkstra_path_length(G_ll, last, weight="length")
+            nxt = min(remaining, key=lambda n: lengths.get(n, float("inf")))
+            route.append(nxt)
+            remaining.remove(nxt)
+        route.append(end_node)
+
+        # 4) Map route nodes → Customers
+        node_to_cust = {n: c for n, c in zip(visit_nodes, customers)}
+        ordered_customers = [node_to_cust[n] for n in route if n in node_to_cust]
+
+        # 5) Simple waypoints (lat, lon) for each customer in visiting order
+        waypoints = [(start_pt.y, start_pt.x)]
+        for cust in ordered_customers:
+            pt = to_shape(cust.coordinates)
+            waypoints.append((pt.y, pt.x))
+        waypoints.append((end_pt.y, end_pt.x))
+
+        # 6) Build full route polyline in WGS84 (lat, lon)
+        path_nodes = []
+        for u, v in zip(route[:-1], route[1:]):
+            sp = nx.shortest_path(G_ll, u, v, weight="length")
+            if path_nodes and sp[0] == path_nodes[-1]:
+                sp = sp[1:]
+            path_nodes.extend(sp)
+
+        # Nodes store lon/lat as x/y; output (lat, lon) tuples
+        route_coords_ll = [(G_ll.nodes[n]["y"], G_ll.nodes[n]["x"]) for n in path_nodes]
+
+        return ordered_customers, waypoints, route_coords_ll
+
 
     def sort_customers_by_route_3857(
             self,
