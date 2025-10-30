@@ -56,15 +56,16 @@ class TripStopOperator(OperatorInterface):
         task_exe = uow.task_execution_repository.find_one(uuid=payload.uuid)
         if not task_exe:
             raise BadRequestError(f"TaskExecution not found with uuid: {payload.uuid}")
+        self.task_exe = task_exe
 
         trip_stop = self.get_trip_stop(uow=uow)
-        if operator_schema.skip_reason:
-            trip_stop.status = TripStopStatus.SKIPPED.value
-            trip_stop.skip_reason = operator_schema.skip_reason.value
-        elif operator_schema.no_sale_reason:
-            trip_stop.status = TripStopStatus.COMPLETED.value
-            trip_stop.no_sale_reason = operator_schema.no_sale_reason.value
-
+        # if operator_schema.skip_reason:
+        #     trip_stop.status = TripStopStatus.SKIPPED.value
+        #     trip_stop.skip_reason = operator_schema.skip_reason.value
+        # elif operator_schema.no_sale_reason:
+        #     trip_stop.status = TripStopStatus.COMPLETED.value
+        #     trip_stop.no_sale_reason = operator_schema.no_sale_reason.value
+        #
         # task_exe.result = operator_schema.model_dump(mode="json")
         task_exe.status = WorkflowStatus.COMPLETED.value
         task_exe.end_time = datetime.now()
@@ -85,7 +86,6 @@ class TripStopOperator(OperatorInterface):
     def get_trip_stop(self,uow:SqlAlchemyUnitOfWork):
 
         trip_stop_uuid = self.task_exe.task_inputs.data.get("trip_stop_uuid")
-
         trip_stop = uow.trip_stop_repository.find_one(
             uuid=trip_stop_uuid,
             is_deleted=False
