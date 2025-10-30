@@ -69,7 +69,6 @@ class SalesmanRouterMixin:
             customers: List[Customer],
             start_pt: Point,  # in lon/lat WGS84
             end_pt: Point,    # in lon/lat WGS84
-            buffer_deg: float = 0.05
     ) -> tuple[list["Customer"], list[tuple[float, float]], list[tuple[float, float]]]:
         """
         Simplified implementation using OSRM:
