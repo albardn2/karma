@@ -79,7 +79,7 @@ class DistributionAlgorithm:
 
         start_ordering = time.time()
         ordered_customers, waypoints, route_coords = SalesmanRouterMixin.run(
-            clustered_customer,
+            customers=clustered_customer,
             start_pt=start_point,
             end_pt=end_point,
             buffer_deg=0.05
