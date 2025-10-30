@@ -79,7 +79,7 @@ class DistributionAlgorithm:
             clustered_customer,
             start_pt=start_point,
             end_pt=end_point,
-            buffer_deg=0.02
+            buffer_deg=0.05
         )
         end_ordering = time.time()
 
@@ -162,7 +162,7 @@ class DistributionAlgorithm:
             customers: List[Customer],
             start_pt: Point,  # in lon/lat WGS84
             end_pt: Point,  # in lon/lat WGS84
-            buffer_deg: float = 0.02
+            buffer_deg: float = 0.05
     ) -> tuple[list[Customer], list[tuple[float, float]], list[tuple[float,float]]]:
         # 1) Build WGS84 graph
         visit_pts = [to_shape(c.coordinates) for c in customers]
