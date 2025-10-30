@@ -22,8 +22,7 @@ from app.dto.task_execution import TaskExecutionCreate
 from app.dto.trip import TripData, InventoryInput
 from app.dto.trip_stop import TripStopCreate, TripStopStatus
 from app.utils.geom_utils import wkt_or_wkb_to_lat_lon
-
-from backend.app.dto.customer import CustomerRead
+from app.dto.customer import CustomerRead
 
 
 class CreateTripOperatorSchema(BaseModel):
