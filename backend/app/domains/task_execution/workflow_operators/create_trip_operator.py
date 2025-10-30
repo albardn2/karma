@@ -98,7 +98,7 @@ class CreateTripOperator(OperatorInterface):
 
             task_input = TaskInput(
                 data = {"trip_stop_uuid":trip_stop.uuid,
-                        "customer": CustomerRead.from_orm(trip_stop.customer).model_dump(mode='json')
+                        "customer": CustomerRead.from_orm(customer).model_dump(mode='json')
                         }
             )
 
