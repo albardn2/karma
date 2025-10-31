@@ -32,8 +32,17 @@ class NoSaleReason(str, Enum):
 class TripStopOperatorSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    skip_reason: Optional[SkipReason] = None
-    no_sale_reason: Optional[NoSaleReason] = None
+    outcome: str
+    mixed_large_extra: Optional[float] = None
+    mixed_large: Optional[float] = None
+    mixed_small: Optional[float] = None
+
+
+
+
+
+
+
 
     @model_validator(mode="after")
     def check_skip_and_no_sale(self):
@@ -59,14 +68,15 @@ class TripStopOperator(OperatorInterface):
         self.task_exe = task_exe
 
         trip_stop = self.get_trip_stop(uow=uow)
-        # if operator_schema.skip_reason:
-        #     trip_stop.status = TripStopStatus.SKIPPED.value
-        #     trip_stop.skip_reason = operator_schema.skip_reason.value
-        # elif operator_schema.no_sale_reason:
-        #     trip_stop.status = TripStopStatus.COMPLETED.value
-        #     trip_stop.no_sale_reason = operator_schema.no_sale_reason.value
-        #
-        # task_exe.result = operator_schema.model_dump(mode="json")
+        trip_stop.outcome = operator_schema.outcome
+        sales_outcome = {
+            "mixed_large_extra": operator_schema.mixed_large_extra,
+            "mixed_large": operator_schema.mixed_large,
+            "mixed_small": operator_schema.mixed_small
+        }
+        trip_stop.sales_outcome = sales_outcome
+        uow.trip_stop_repository.save(trip_stop, commit=False)
+        task_exe.result = operator_schema.model_dump(mode="json")
         task_exe.status = WorkflowStatus.COMPLETED.value
         task_exe.end_time = datetime.now()
         task_exe.completed_by_uuid = payload.completed_by_uuid

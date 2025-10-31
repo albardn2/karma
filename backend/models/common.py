@@ -1937,11 +1937,6 @@ class Trip(Base):
         return inventory_sale_mapper
 
 
-
-
-
-
-
 class TripStop(Base):
     __tablename__ = "trip_stop"
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -1952,10 +1947,9 @@ class TripStop(Base):
     notes = Column(Text, nullable=True)
     status = Column(String(120), nullable=False)  # e.g., planned, completed, skipped
     customer_uuid = Column(String(36), ForeignKey("customer.uuid"), nullable=True)  # Optional customer for the stop
-    skip_reason = Column(Text, nullable=True)  # Reason for skipping the stop, if applicable
-    no_sale_reason = Column(Text, nullable=True)  # Reason for skipping the stop, if applicable
-
-    # relations
+    index = Column(Integer, nullable=True)  # Order of the stop in the trip
+    outcome = Column(Text, nullable=True)  # e.g., delivered, failed, rescheduled
+    sales = Column(MutableDict.as_mutable(JSONB), default=dict, nullable=True)  # Summary of sales at this stop
     trip = relationship("Trip", back_populates="stops")
     customer = relationship("Customer", back_populates="trip_stops")
     customer_orders = relationship("CustomerOrder", back_populates="trip_stop")

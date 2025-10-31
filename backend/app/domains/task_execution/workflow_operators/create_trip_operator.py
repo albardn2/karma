@@ -1,6 +1,7 @@
 
 
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 
 from app.domains.task_execution.workflow_operators.operator_interface import OperatorInterface
@@ -23,6 +24,24 @@ from app.dto.trip import TripData, InventoryInput
 from app.dto.trip_stop import TripStopCreate, TripStopStatus
 from app.utils.geom_utils import wkt_or_wkb_to_lat_lon
 from app.dto.customer import CustomerRead
+
+from app.dto.task import FieldType
+
+class TripStopOutcome(str, Enum):
+    # with arabic translation
+    SALE = "sale - تم البيع"
+    INTERESTED_HAVE_INVENTORY = "interested:have_inventory - مهتم: لديه مخزون"
+    INTERESTED_NEEDS_BETTER_PRICE = "interested:needs_better_price - مهتم: يحتاج إلى سعر أفضل"
+    NOT_INTERESTED_COMPETITOR = "not_interested:competitors_product - غير مهتم: منتج المنافس"
+    NOT_INTERESTED_BAD_PRODUCT = "not_interested:bad_product - غير مهتم: منتج سيئ"
+    NOT_INTERSTED_PRICE_TOO_HIGH = "not_interested:price_too_high - غير مهتم: السعر مرتفع جدًا"
+    NOT_INTERESTED_OTHER = "not_interested:other - غير مهتم: أخرى"
+    SKIPPED_CUSTOMER_NOT_AVAILABLE = "skipped:customer_not_available - تم التخطي: العميل غير متاح"
+    SKIPPED_VEHICLE_BREAKDOWN = "skipped:vehicle_breakdown - تم التخطي: عطل في المركبة"
+    SKIPPED_NO_PARKING = "skipped:no_parking - تم التخطي: لا يوجد موقف"
+    SKIPPED_NO_TIME = "skipped:no_time - تم التخطي: لا يوجد وقت"
+    SKIPPED_OTHER = "skipped:other - تم التخطي: أخرى"
+
 
 
 class CreateTripOperatorSchema(BaseModel):
@@ -77,7 +96,7 @@ class CreateTripOperator(OperatorInterface):
 
         # create trip stops
         created_task_names = []
-        for customer_uuid in self.get_customer_uuids():
+        for i,customer_uuid in enumerate(self.get_customer_uuids()):
             customer = uow.customer_repository.find_one(
                 uuid=customer_uuid,
                 is_deleted=False
@@ -92,14 +111,43 @@ class CreateTripOperator(OperatorInterface):
                     trip_uuid=task_exe.workflow_execution.trips[0].uuid,
                     coordinates=wkt_or_wkb_to_lat_lon(customer.coordinates),
                     customer_uuid=customer_uuid,
-                    status=TripStopStatus.IN_PROGRESS.value
+                    status=TripStopStatus.IN_PROGRESS.value,
+                    index=i
                 )
             )
 
             task_input = TaskInput(
                 data = {"trip_stop_uuid":trip_stop.uuid,
                         "customer": CustomerRead.from_orm(customer).model_dump(mode='json')
-                        }
+                        },
+                fields = [
+                    TaskInput.Field(
+                        name = "outcome -  النتيجة",
+                        label="outcome",
+                        type=FieldType.SELECT,
+                        required=True,
+                        options=[outcome.value for outcome in TripStopOutcome]
+                    ),
+                    TaskInput.Field(
+                        name = "kg large extra bags -   كبيرة أكسترا كيلو",
+                        label="mixed_large_extra",
+                        type=FieldType.NUMBER,
+                        required=False,
+                    ),
+                    TaskInput.Field(
+                        name = "kg large bags -  كبيرة كيلو",
+                        label="mixed_large",
+                        type=FieldType.NUMBER,
+                        required=False,
+                    ),
+                    TaskInput.Field(
+                        name = "kg small -  صغيرة كيلو",
+                        label="mixed_small",
+                        type=FieldType.NUMBER,
+                        required=False,
+                    ),
+
+                ]
             )
 
             task_create = TaskDomain.create_task(
