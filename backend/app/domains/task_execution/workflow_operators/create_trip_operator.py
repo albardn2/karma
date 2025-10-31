@@ -27,6 +27,9 @@ from app.dto.customer import CustomerRead
 
 from app.dto.task import FieldType
 
+from app.dto.task import TaskInputField
+
+
 class TripStopOutcome(str, Enum):
     # with arabic translation
     SALE = "sale - تم البيع"
@@ -121,26 +124,26 @@ class CreateTripOperator(OperatorInterface):
                         "customer": CustomerRead.from_orm(customer).model_dump(mode='json')
                         },
                 fields = [
-                    TaskInput.Field(
+                    TaskInputField(
                         name = "outcome -  النتيجة",
                         label="outcome",
                         type=FieldType.SELECT,
                         required=True,
                         options=[outcome.value for outcome in TripStopOutcome]
                     ),
-                    TaskInput.Field(
+                    TaskInputField(
                         name = "kg large extra bags -   كبيرة أكسترا كيلو",
                         label="mixed_large_extra",
                         type=FieldType.NUMBER,
                         required=False,
                     ),
-                    TaskInput.Field(
+                    TaskInputField(
                         name = "kg large bags -  كبيرة كيلو",
                         label="mixed_large",
                         type=FieldType.NUMBER,
                         required=False,
                     ),
-                    TaskInput.Field(
+                    TaskInputField(
                         name = "kg small -  صغيرة كيلو",
                         label="mixed_small",
                         type=FieldType.NUMBER,
