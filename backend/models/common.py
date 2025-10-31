@@ -1953,7 +1953,7 @@ class TripStop(Base):
     trip = relationship("Trip", back_populates="stops")
     customer = relationship("Customer", back_populates="trip_stops")
     customer_orders = relationship("CustomerOrder", back_populates="trip_stop")
-
+    task_execution_uuid = Column(String(36), ForeignKey("task_execution.uuid"), nullable=True)
 
 
 

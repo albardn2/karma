@@ -186,9 +186,11 @@ class CreateTripOperator(OperatorInterface):
                     parent_task_execution_uuid= self.get_trip_operator_task_execution_uuid()
 
                 ))
+
+            trip_stop_model  = uow.trip_stop_repository.find_one(uuid=trip_stop.uuid)
+            trip_stop_model.task_execution_uuid = task_execution.uuid
+            uow.trip_stop_repository.save(trip_stop_model, commit=False)
             created_task_names.append(task_create.name)
-
-
 
 
         task_exe.result = operator_schema.model_dump(mode="json")
