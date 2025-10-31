@@ -121,6 +121,18 @@ class TaskExecutionDomain:
         TaskExecutionDomain.unblock_dependent_task_executions(
             uow=uow, task_execution=task_exe
         )
+
+        # if all tasks are completed, mark workflow execution as completed
+        all_tasks = uow.task_execution_repository.find_all(
+            workflow_execution_uuid=task_exe.workflow_execution_uuid,
+            status=WorkflowStatus.COMPLETED.value
+        )
+        if len(all_tasks) == len(task_exe.workflow_execution.task_executions):
+            workflow_execution = task_exe.workflow_execution
+            workflow_execution.status = WorkflowStatus.COMPLETED.value
+            workflow_execution.end_time = datetime.now()
+            uow.workflow_execution_repository.save(model=workflow_execution, commit=False)
+
         return TaskExecutionRead.from_orm(task_exe)
 
     @staticmethod
