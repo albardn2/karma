@@ -36,21 +36,7 @@ class TripStopOperatorSchema(BaseModel):
     mixed_large_extra: Optional[float] = None
     mixed_large: Optional[float] = None
     mixed_small: Optional[float] = None
-
-
-
-
-
-
-
-
-    @model_validator(mode="after")
-    def check_skip_and_no_sale(self):
-        if self.skip_reason and self.no_sale_reason:
-            raise BadRequestError("Cannot have both skip_reason and no_sale_reason set.")
-        return self
-
-
+    notes: Optional[str] = None
 
 class TripStopOperator(OperatorInterface):
 
@@ -75,6 +61,7 @@ class TripStopOperator(OperatorInterface):
             "mixed_small": operator_schema.mixed_small
         }
         trip_stop.sales_outcome = sales_outcome
+        trip_stop.notes = operator_schema.notes
         uow.trip_stop_repository.save(trip_stop, commit=False)
         task_exe.result = operator_schema.model_dump(mode="json")
         task_exe.status = WorkflowStatus.COMPLETED.value

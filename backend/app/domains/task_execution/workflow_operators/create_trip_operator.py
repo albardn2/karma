@@ -149,6 +149,12 @@ class CreateTripOperator(OperatorInterface):
                         type=FieldType.NUMBER,
                         required=False,
                     ),
+                    TaskInputField(
+                        name = "notes - ملاحظات",
+                        label="notes",
+                        type=FieldType.TEXT,
+                        required=False,
+                    ),
 
                 ]
             )
