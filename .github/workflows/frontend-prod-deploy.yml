@@ -53,16 +53,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Copy compose + Caddyfile to prod server
-        uses: appleboy/scp-action@v0.1.4
+      - name: Copy compose to prod server
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.FRONTEND_PROD_DROPLET_HOST }}
           username: root
           password: ${{ secrets.FRONTEND_PROD_DROPLET_PASSWORD }}
           port: 22
-          source: |
-            ./frontend/docker-compose.prod.yaml
-            ./frontend/Caddyfile
+          source: ./frontend/docker-compose.prod.yaml
+          target: /root/app
+
+      - name: Copy Caddyfile to prod server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.FRONTEND_PROD_DROPLET_HOST }}
+          username: root
+          password: ${{ secrets.FRONTEND_PROD_DROPLET_PASSWORD }}
+          port: 22
+          source: ./frontend/Caddyfile
           target: /root/app
 
       - name: Deploy via SSH
