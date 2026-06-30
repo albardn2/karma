@@ -1,0 +1,96 @@
+{
+  "materials": [
+    {
+      "created_at": "2025-06-18T01:53:38.175016",
+      "created_by_uuid": "ccc2c680-775a-44c0-86ae-3318bd8c27ab",
+      "description": null,
+      "is_deleted": false,
+      "measure_unit": "kg",
+      "name": "ads",
+      "sku": "sdcdscsdc",
+      "type": "product",
+      "uuid": "c60a5eec-ba3f-4744-9f2b-7a288f3ee1ee"
+    },
+    {
+      "created_at": "2025-06-18T01:53:58.432550",
+      "created_by_uuid": "ccc2c680-775a-44c0-86ae-3318bd8c27ab",
+      "description": null,
+      "is_deleted": false,
+      "measure_unit": null,
+      "name": "sdcsdc",
+      "sku": "sdcdscs",
+      "type": "product",
+      "uuid": "80d72b21-2397-4bfd-a523-251680ee7ba5"
+    },
+    {
+      "created_at": "2025-06-18T15:48:06.146678",
+      "created_by_uuid": "ccc2c680-775a-44c0-86ae-3318bd8c27ab",
+      "description": null,
+      "is_deleted": false,
+      "measure_unit": null,
+      "name": "aaa",
+      "sku": "aaa",
+      "type": "prepared",
+      "uuid": "885b8ecf-6fad-45ea-bef8-77373b774e98"
+    },
+    {
+      "created_at": "2025-06-18T15:48:16.007093",
+      "created_by_uuid": "ccc2c680-775a-44c0-86ae-3318bd8c27ab",
+      "description": "sdcds",
+      "is_deleted": false,
+      "measure_unit": "pcs",
+      "name": "sadcdsc",
+      "sku": "sdcdsc",
+      "type": "prepared",
+      "uuid": "ba7082be-d0ec-44d5-918b-4ebed78c5a71"
+    },
+    {
+      "created_at": "2025-06-18T15:51:34.069020",
+      "created_by_uuid": "ccc2c680-775a-44c0-86ae-3318bd8c27ab",
+      "description": "njn",
+      "is_deleted": false,
+      "measure_unit": "kg",
+      "name": "jhbhj",
+      "sku": "jhbjh",
+      "type": "prepared",
+      "uuid": "bcd7c4f9-377e-4635-b968-f97412a36af4"
+    },
+    {
+      "created_at": "2025-06-19T18:49:37.618610",
+      "created_by_uuid": "ccc2c680-775a-44c0-86ae-3318bd8c27ab",
+      "description": null,
+      "is_deleted": false,
+      "measure_unit": "kg",
+      "name": "asdsad",
+      "sku": "dsadscsd",
+      "type": "prepared",
+      "uuid": "af2441e0-783c-4e50-8bdb-b333dd269be2"
+    },
+    {
+      "created_at": "2025-06-20T22:23:20.400630",
+      "created_by_uuid": "ccc2c680-775a-44c0-86ae-3318bd8c27ab",
+      "description": null,
+      "is_deleted": false,
+      "measure_unit": "kg",
+      "name": "raw peanuts",
+      "sku": "aeesre",
+      "type": "raw_material",
+      "uuid": "99f52c39-4272-45f2-a6ef-848e336ca75d"
+    },
+    {
+      "created_at": "2025-06-18T01:51:59.887559",
+      "created_by_uuid": "ccc2c680-775a-44c0-86ae-3318bd8c27ab",
+      "description": "sdcdsdsc",
+      "is_deleted": false,
+      "measure_unit": "liters",
+      "name": "raw peanutsss",
+      "sku": "raw_peanutss",
+      "type": "raw_material",
+      "uuid": "b50b26fb-a8b3-4b0e-bee8-4f550f8adf4f"
+    }
+  ],
+  "page": 1,
+  "pages": 1,
+  "per_page": 100,
+  "total_count": 8
+}

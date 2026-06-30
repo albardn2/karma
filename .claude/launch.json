@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "karma-frontend",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "-f", "docker-compose.local.yml", "up", "frontend"],
+      "port": 3000
+    }
+  ]
+}

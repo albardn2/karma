@@ -1,0 +1,21 @@
+version: '3.8'
+
+# Development overrides for docker-compose.yml
+services:
+  app:
+    environment:
+      - NODE_ENV=development
+      - VITE_DEV_API_BASE_URL=${DEV_API_BASE_URL:-https://dev-api.your-domain.com}
+    ports:
+      - "3000:5000"  # Different port for dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev
+
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.dev.conf:/etc/nginx/nginx.conf

@@ -1,0 +1,40 @@
+name: CD – Deploy Frontend Dev
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Copy compose + Caddyfile to server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.FRONTEND_DEV_DROPLET_HOST }}
+          username: root
+          password: ${{ secrets.FRONTEND_DEV_DROPLET_PASSWORD }}
+          port: 22
+          source: |
+            ./frontend/docker-compose.dev.yaml
+            ./frontend/Caddyfile
+          target: /root/app
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.FRONTEND_DEV_DROPLET_HOST }}
+          username: root
+          password: ${{ secrets.FRONTEND_DEV_DROPLET_PASSWORD }}
+          port: 22
+          script: |
+            cd /root/app/frontend
+            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose -f docker-compose.dev.yaml pull
+            docker compose -f docker-compose.dev.yaml up -d --remove-orphans

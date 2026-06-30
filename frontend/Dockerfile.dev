@@ -1,0 +1,17 @@
+# Dev image for local preview: installs ALL deps (incl. Vite/esbuild) and runs the
+# Vite dev server via the Express middleware (`npm run dev`).
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install full dependency set (the prod Dockerfile uses --only=production, which
+# omits the build/dev toolchain and cannot run `npm run dev`).
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+EXPOSE 5000
+ENV NODE_ENV=development
+
+CMD ["npm", "run", "dev"]

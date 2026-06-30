@@ -1,0 +1,11 @@
+[deployment]
+deploymentTarget = "cloudrun"
+ignorePorts = false
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[env]
+NODE_ENV = "production"
+VITE_PROD_API_BASE_URL = "https://api-prod.karma-grp.com"
