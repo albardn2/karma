@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { VehicleStatus, type Vehicle, type VehicleUpdateData } from "@/lib/types";
 import { VehicleInventoryDialog } from "@/components/vehicles/VehicleInventoryDialog";
+import { VehicleInventoryChart } from "@/components/vehicles/VehicleInventoryChart";
 
 const vehicleUpdateSchema = z.object({
   plate_number: z.string().min(1, "Plate number is required").optional(),
@@ -599,6 +600,11 @@ export default function VehicleDetail() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Inventory time series chart */}
+        <div className="mt-6">
+          <VehicleInventoryChart vehicleUuid={uuid as string} />
         </div>
       </div>
     </AppLayout>
