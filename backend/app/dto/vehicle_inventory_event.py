@@ -11,6 +11,7 @@ class VehicleInventoryEventType(str, Enum):
     MANUAL = "manual"          # add stock to the vehicle (+)
     ADJUSTMENT = "adjustment"  # correct stock up or down (+/-)
     UNLOAD = "unload"          # remove stock from the vehicle (-)
+    SALE = "sale"              # sold off the vehicle during a trip (-), system-generated
 
 
 class VehicleInventoryEventCreate(BaseModel):
@@ -30,12 +31,19 @@ class VehicleInventoryEventCreate(BaseModel):
     cost_per_unit: Optional[float] = None
     currency: Optional[Currency] = None
     notes: Optional[str] = None
+    # set for system-generated 'sale' events tied to a fulfilled trip-stop order item
+    customer_order_item_uuid: Optional[str] = None
 
     @model_validator(mode="after")
     def check_quantity(self):
         if self.quantity == 0:
             raise BadRequestError("quantity must be non-zero")
-        if self.event_type in (VehicleInventoryEventType.MANUAL, VehicleInventoryEventType.UNLOAD) and self.quantity <= 0:
+        positive_types = (
+            VehicleInventoryEventType.MANUAL,
+            VehicleInventoryEventType.UNLOAD,
+            VehicleInventoryEventType.SALE,
+        )
+        if self.event_type in positive_types and self.quantity <= 0:
             raise BadRequestError(f"quantity must be positive for event_type '{self.event_type.value}'")
         return self
 
@@ -51,6 +59,7 @@ class VehicleInventoryEventRead(BaseModel):
     cost_per_unit: Optional[float] = None
     currency: Optional[str] = None
     notes: Optional[str] = None
+    customer_order_item_uuid: Optional[str] = None
     is_deleted: bool
     created_at: datetime
 

@@ -1,7 +1,10 @@
 # app/dto/customer_order.py
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
+
+from app.dto.payment import PaymentMethod
+from app.entrypoint.routes.common.errors import BadRequestError
 
 from app.dto.customer_order_item import CustomerOrderItemCreate
 from app.dto.invoice import InvoiceCreate
@@ -147,3 +150,39 @@ class CustomerOrderWithItemsAndInvoiceRead(BaseModel):
         )
 
 
+
+
+class CustomerOrderCheckoutCreate(BaseModel):
+    """Create an order with items + invoice and, in one submit, optionally
+    fulfill all items and record a full payment against the invoice."""
+    model_config = ConfigDict(extra="forbid")
+    created_by_uuid: Optional[str] = None
+    customer_uuid: str
+    currency: Currency
+    trip_stop_uuid: Optional[str] = None
+    notes: Optional[str] = None
+    due_date: Optional[datetime] = None
+    items: List[CustomerOrderAndInvoiceItemCreate]
+    fulfill: bool = True
+    pay: bool = True
+    financial_account_uuid: Optional[str] = None
+    payment_method: Optional[PaymentMethod] = None
+
+    @model_validator(mode="after")
+    def _check_pay(self):
+        if not self.items:
+            raise BadRequestError("At least one item is required")
+        if self.pay and not self.payment_method:
+            raise BadRequestError("payment_method is required when pay=true")
+        return self
+
+    def to_base_create(self) -> "CustomerOrderWithItemsAndInvoiceCreate":
+        return CustomerOrderWithItemsAndInvoiceCreate(
+            created_by_uuid=self.created_by_uuid,
+            customer_uuid=self.customer_uuid,
+            currency=self.currency,
+            trip_stop_uuid=self.trip_stop_uuid,
+            notes=self.notes,
+            due_date=self.due_date,
+            items=self.items,
+        )

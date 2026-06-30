@@ -97,6 +97,12 @@ class CreateTripOperator(OperatorInterface):
                                    workflow_execution_uuid=task_exe.workflow_execution.uuid,
                                ))
 
+        # snapshot the vehicle's per-material inventory at trip start
+        from app.domains.vehicle_inventory.domain import VehicleInventoryDomain
+        trip = task_exe.workflow_execution.trips[0]
+        trip.start_inventory = VehicleInventoryDomain.balances_for_vehicle(uow=uow, vehicle_uuid=vehicle.uuid)
+        uow.trip_repository.save(model=trip, commit=False)
+
         # create trip stops
         created_task_names = []
         for i,customer_uuid in enumerate(self.get_customer_uuids()):
@@ -130,24 +136,6 @@ class CreateTripOperator(OperatorInterface):
                         type=FieldType.SELECT,
                         required=True,
                         options=[outcome.value for outcome in TripStopOutcome]
-                    ),
-                    TaskInputField(
-                        name = "kg large extra bags -   كبيرة أكسترا كيلو",
-                        label="mixed_large_extra",
-                        type=FieldType.NUMBER,
-                        required=False,
-                    ),
-                    TaskInputField(
-                        name = "kg large bags -  كبيرة كيلو",
-                        label="mixed_large",
-                        type=FieldType.NUMBER,
-                        required=False,
-                    ),
-                    TaskInputField(
-                        name = "kg small -  صغيرة كيلو",
-                        label="mixed_small",
-                        type=FieldType.NUMBER,
-                        required=False,
                     ),
                     TaskInputField(
                         name = "notes - ملاحظات",

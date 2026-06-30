@@ -1884,6 +1884,9 @@ class Trip(Base):
     data = Column(MutableDict.as_mutable(JSONB), default=dict, nullable=True)
     workflow_execution_uuid = Column(String(36), ForeignKey("workflow_execution.uuid"), nullable=True)
     service_area_names = Column(ARRAY(String), nullable=True, default=list)
+    # snapshots of the vehicle's per-material inventory at trip start / end ({material_uuid: qty})
+    start_inventory = Column(MutableDict.as_mutable(JSONB), nullable=True)
+    end_inventory = Column(MutableDict.as_mutable(JSONB), nullable=True)
 
     # relations
     vehicle = relationship("Vehicle", back_populates="trips")
@@ -1898,44 +1901,52 @@ class Trip(Base):
             all_orders.extend(orders)
 
         # get amount paid
-        return sum(order.amount_paid for order in all_orders)
+        return sum(order.net_amount_paid for order in all_orders)
 
-    @hybrid_property
-    def expected_inventory_map(self):
-        trip_input_inventory = self.data.get("input_inventory")
-        if not trip_input_inventory:
-            return {}
+    @property
+    def sold_inventory_map(self):
+        """Quantity sold off the vehicle during the trip, per material.
 
-        # get customer order item fulfilled inventory and subtract quantity
-        all_orders = []
+        Derived from the vehicle 'sale' events created when trip-stop orders are
+        fulfilled (stored as negative deltas), returned here as positive amounts.
+        """
+        sold: dict[str, float] = {}
         for stop in self.stops:
-            orders = [order for order in stop.customer_orders if not order.is_deleted]
-            all_orders.extend(orders)
+            for order in stop.customer_orders:
+                if order.is_deleted:
+                    continue
+                for item in order.customer_order_items:
+                    if item.is_deleted or not item.is_fulfilled:
+                        continue
+                    for ev in item.vehicle_inventory_events:
+                        if ev.is_deleted or ev.event_type != "sale":
+                            continue
+                        sold[ev.material_uuid] = sold.get(ev.material_uuid, 0) - ev.quantity
+        return sold
 
-        all_fulfilled_order_items = []
-        for order in all_orders:
-            fulfilled_items = [item for item in order.customer_order_items if not item.is_deleted and item.is_fulfilled]
-            all_fulfilled_order_items.extend(fulfilled_items)
-
-        inventory_sale_mapper = {}
-        for item in all_fulfilled_order_items:
-            events = [event for event in item.inventory_events if not event.is_deleted and event.event_type == "sale"]
-            for event in events:
-                if event.inventory_uuid not in inventory_sale_mapper:
-                    inventory_sale_mapper[event.inventory_uuid] = {
-                        "quantity": 0
-                    }
-                inventory_sale_mapper[event.inventory_uuid]["quantity"] += event.quantity
-
-        # now add the quantity from the inventory_map
-        for inventory_uuid, inventory_data in trip_input_inventory.items():
-            if inventory_uuid not in inventory_sale_mapper:
-                inventory_sale_mapper[inventory_uuid] = {
-                    "quantity": 0
-                }
-            inventory_sale_mapper[inventory_uuid]["quantity"] += inventory_data["quantity"]
-
-        return inventory_sale_mapper
+    @property
+    def inventory_reconciliation(self):
+        """Per-material reconciliation of vehicle stock over the trip:
+        start snapshot, amount sold, expected end (= start - sold), actual end
+        snapshot, and the variance (actual - expected)."""
+        start = self.start_inventory or {}
+        end = self.end_inventory or {}
+        sold = self.sold_inventory_map
+        materials = set(start) | set(end) | set(sold)
+        result = {}
+        for m in materials:
+            s = start.get(m, 0) or 0
+            sld = sold.get(m, 0) or 0
+            expected_end = s - sld
+            actual_end = end.get(m)
+            result[m] = {
+                "start": s,
+                "sold": sld,
+                "expected_end": expected_end,
+                "actual_end": actual_end,
+                "variance": (actual_end - expected_end) if actual_end is not None else None,
+            }
+        return result
 
 
 class TripStop(Base):
@@ -2043,15 +2054,18 @@ class VehicleInventoryEvent(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     vehicle_inventory_uuid = Column(String(36), ForeignKey("vehicle_inventory.uuid"), nullable=False)
     material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
-    event_type = Column(String(120), nullable=False)  # manual, adjustment, unload
+    event_type = Column(String(120), nullable=False)  # manual, adjustment, unload, sale
     quantity = Column(Float, nullable=False)  # signed delta applied to the balance
     cost_per_unit = Column(Float, nullable=True)
     currency = Column(String(120), nullable=True)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
+    # set for trip-driven 'sale' events, linking the decrement to the fulfilled order item
+    customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=True)
 
     # relations
     vehicle_inventory = relationship("VehicleInventory", back_populates="events")
+    customer_order_item = relationship("CustomerOrderItem", backref="vehicle_inventory_events")
 
     def __repr__(self):
         return (

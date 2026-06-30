@@ -54,6 +54,10 @@ class TripFinishOperator(OperatorInterface):
             "inventory_left": [inv.model_dump(mode="json") for inv in operator_schema.inventory_left]
         }
 
+        # snapshot the vehicle's per-material inventory at trip end
+        from app.domains.vehicle_inventory.domain import VehicleInventoryDomain
+        trip.end_inventory = VehicleInventoryDomain.balances_for_vehicle(uow=uow, vehicle_uuid=trip.vehicle_uuid)
+
         trip.status = TripStatus.COMPLETED.value
         task_exe.result = operator_schema.model_dump(mode="json")
         task_exe.status = WorkflowStatus.COMPLETED.value

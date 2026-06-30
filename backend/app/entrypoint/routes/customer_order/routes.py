@@ -13,6 +13,7 @@ from models.common import CustomerOrder as CustomerOrderModel
 from app.entrypoint.routes.customer_order import customer_order_blueprint
 from app.domains.customer_order.domain import CustomerOrderDomain
 from app.dto.customer_order import CustomerOrderWithItemsAndInvoiceCreate
+from app.dto.customer_order import CustomerOrderCheckoutCreate
 from app.dto.customer_order import CustomerOrderWithItemsAndInvoiceRead
 
 from app.dto.customer_order_item import CustomerOrderItemBulkRead, CustomerOrderItemRead
@@ -35,6 +36,23 @@ def create_customer_order_with_items_and_invoice():
     with SqlAlchemyUnitOfWork() as uow:
         add_logged_user_to_payload(uow=uow, user_uuid=current_uuid, payload=payload)
         full_read = CustomerOrderDomain.create_customer_order_with_items_and_invoice(uow=uow, payload=payload)
+        result = full_read.model_dump(mode="json")
+        uow.commit()
+    return jsonify(result), 201
+
+
+@customer_order_blueprint.route("/with-items-and-invoice/checkout", methods=["POST"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value)
+def create_customer_order_checkout():
+    """Create order + items + invoice, optionally fulfill + pay, in one submit."""
+    current_uuid = get_jwt_identity()
+    payload = CustomerOrderCheckoutCreate(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        add_logged_user_to_payload(uow=uow, user_uuid=current_uuid, payload=payload)
+        full_read = CustomerOrderDomain.create_order_checkout(uow=uow, payload=payload)
         result = full_read.model_dump(mode="json")
         uow.commit()
     return jsonify(result), 201

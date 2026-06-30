@@ -19,6 +19,8 @@ from app.dto.customer_order_item import CustomerOrderItemBulkUnFulfill
 
 from app.domains.inventory.domain import InventoryDomain
 from app.dto.inventory import InventoryRead, InventoryFIFOOutput
+from app.domains.vehicle_inventory.domain import VehicleInventoryDomain
+from app.domains.vehicle_inventory_event.domain import VehicleInventoryEventDomain
 
 
 class CustomerOrderItemDomain:
@@ -81,6 +83,20 @@ class CustomerOrderItemDomain:
                         affect_original=False
                     )
                 )
+
+            # If this order is being delivered on a trip, also decrement the
+            # vehicle's inventory (independent ledger; may go negative).
+            order = customer_order_item.customer_order
+            trip_stop = order.trip_stop if order else None
+            if trip_stop is not None and trip_stop.trip is not None:
+                VehicleInventoryDomain.record_trip_sale(
+                    uow=uow,
+                    vehicle_uuid=trip_stop.trip.vehicle_uuid,
+                    material_uuid=customer_order_item.material_uuid,
+                    quantity=abs(customer_order_item.quantity),
+                    customer_order_item_uuid=customer_order_item.uuid,
+                    created_by_uuid=customer_order_item.created_by_uuid,
+                )
             items.append(customer_order_item)
         uow.customer_order_item_repository.batch_save(models=items, commit=False)
         bulk_read = CustomerOrderItemBulkRead(items=[CustomerOrderItemRead.from_orm(m) for m in items])
@@ -107,6 +123,15 @@ class CustomerOrderItemDomain:
                 uuid=inventory_events[0].uuid
 
             )
+
+            # reverse any vehicle 'sale' events created when this item was fulfilled on a trip
+            vehicle_sale_events = [
+                e for e in customer_order_item.vehicle_inventory_events
+                if not e.is_deleted and e.event_type == "sale"
+            ]
+            for e in vehicle_sale_events:
+                VehicleInventoryEventDomain.delete_event(uow=uow, uuid=e.uuid)
+
             items.append(customer_order_item)
         uow.customer_order_item_repository.batch_save(models=items, commit=False)
         bulk_read = CustomerOrderItemBulkRead(items=[CustomerOrderItemRead.from_orm(m) for m in items])

@@ -43,6 +43,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { TaskExecutionProgress } from "@/components/TaskExecutionProgress";
 import { TripOperatorMap } from "@/components/map/TripOperatorMap";
 import { CustomerLocationMap } from "@/components/map/CustomerLocationMap";
+import { CreateOrderDialog } from "@/components/customer-orders/CreateOrderDialog";
+import { CustomerRecentOrders } from "@/components/customer-orders/CustomerRecentOrders";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { WorkflowExecution } from "@/types/workflowExecution";
@@ -674,6 +676,28 @@ export default function WorkflowExecutionTaskDetail() {
 
   const customerLocationData = getCustomerLocationData();
 
+  // Context for creating an order at a trip stop (customer + trip_stop from the task inputs)
+  const getTripStopOrderContext = () => {
+    if (!task || (task.operator !== "trip_stop" && task.operator !== "trip_stop_operator")) {
+      return null;
+    }
+    try {
+      let ti: any = task.taskInputs;
+      if (typeof ti === "string") ti = JSON.parse(ti);
+      const data = ti?.data;
+      const customer = data?.customer;
+      if (!customer?.uuid) return null;
+      return {
+        customerUuid: customer.uuid as string,
+        customerName: (customer.company_name || customer.full_name || customer.name) as string | undefined,
+        tripStopUuid: data?.trip_stop_uuid as string | undefined,
+      };
+    } catch {
+      return null;
+    }
+  };
+  const orderContext = getTripStopOrderContext();
+
   const renderFormField = (field: TaskInputField) => {
     const key = field.name;
 
@@ -1115,6 +1139,18 @@ export default function WorkflowExecutionTaskDetail() {
                         <CustomerLocationMap
                           coordinates={customerLocationData.coordinates}
                           customerName={customerLocationData.customerName}
+                        />
+                      </div>
+                    )}
+
+                    {/* Recent order history + create an order for this trip stop's customer */}
+                    {orderContext && (
+                      <div className="mb-6">
+                        <CustomerRecentOrders customerUuid={orderContext.customerUuid} />
+                        <CreateOrderDialog
+                          customerUuid={orderContext.customerUuid}
+                          customerName={orderContext.customerName}
+                          tripStopUuid={orderContext.tripStopUuid}
                         />
                       </div>
                     )}
