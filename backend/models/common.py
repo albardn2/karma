@@ -25,6 +25,7 @@ from sqlalchemy import (
     Integer,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy import UniqueConstraint, Index, text
 from models.base import Base
 
 class User(Base):
@@ -1969,3 +1970,91 @@ class TripStop(Base):
 
 
 
+
+
+# ------------------------------
+# Vehicle Inventory (independent of warehouse inventory)
+# ------------------------------
+# These two tables track materials carried on a vehicle. They intentionally have
+# NO foreign keys to / from the warehouse Inventory or InventoryEvent tables and
+# are not referenced by any warehouse inventory logic, so vehicle stock is fully
+# isolated from warehouse stock.
+
+class VehicleInventory(Base):
+    __tablename__ = "vehicle_inventory"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    vehicle_uuid = Column(String(36), ForeignKey("vehicle.uuid"), nullable=False)
+    material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
+    unit = Column(String(120), nullable=True)  # mirrors material.measure_unit
+    notes = Column(Text, nullable=True)
+    currency = Column(String(120), nullable=True)
+    is_active = Column(Boolean, default=True)
+    is_deleted = Column(Boolean, default=False)
+
+    # one active stock row per (vehicle, material)
+    __table_args__ = (
+        Index(
+            "uq_vehicle_inventory_vehicle_material_active",
+            "vehicle_uuid", "material_uuid",
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+        ),
+    )
+
+    # relations (backref avoids editing Vehicle/Material)
+    vehicle = relationship("Vehicle", backref="vehicle_inventories")
+    material = relationship("Material", backref="vehicle_inventories")
+    events = relationship("VehicleInventoryEvent", back_populates="vehicle_inventory")
+
+    @hybrid_property
+    def current_quantity(self):
+        return sum(e.quantity for e in self.events if not e.is_deleted)
+
+    @current_quantity.expression
+    def current_quantity(cls):
+        return (
+            select(func.coalesce(func.sum(VehicleInventoryEvent.quantity), 0))
+            .where(
+                VehicleInventoryEvent.vehicle_inventory_uuid == cls.uuid,
+                VehicleInventoryEvent.is_deleted.is_(False),
+            )
+            .scalar_subquery()
+        )
+
+    @hybrid_property
+    def material_name(self):
+        return self.material.name if self.material else None
+
+    def __repr__(self):
+        return (
+            f"<VehicleInventory(uuid={self.uuid}, vehicle_uuid={self.vehicle_uuid}, "
+            f"material_uuid={self.material_uuid}, current_quantity={self.current_quantity})>"
+        )
+
+
+class VehicleInventoryEvent(Base):
+    __tablename__ = "vehicle_inventory_event"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    vehicle_inventory_uuid = Column(String(36), ForeignKey("vehicle_inventory.uuid"), nullable=False)
+    material_uuid = Column(String(36), ForeignKey("material.uuid"), nullable=False)
+    event_type = Column(String(120), nullable=False)  # manual, adjustment, unload
+    quantity = Column(Float, nullable=False)  # signed delta applied to the balance
+    cost_per_unit = Column(Float, nullable=True)
+    currency = Column(String(120), nullable=True)
+    notes = Column(Text, nullable=True)
+    is_deleted = Column(Boolean, default=False)
+
+    # relations
+    vehicle_inventory = relationship("VehicleInventory", back_populates="events")
+
+    def __repr__(self):
+        return (
+            f"<VehicleInventoryEvent(uuid={self.uuid}, type={self.event_type}, "
+            f"quantity={self.quantity})>"
+        )

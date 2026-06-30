@@ -40,6 +40,8 @@ from app.entrypoint.routes.vehicle import vehicle_blueprint
 from app.entrypoint.routes.service_area import service_area_blueprint
 from app.entrypoint.routes.trip import trip_blueprint
 from app.entrypoint.routes.trip_stop import trip_stop_blueprint
+from app.entrypoint.routes.vehicle_inventory import vehicle_inventory_blueprint
+from app.entrypoint.routes.vehicle_inventory_event import vehicle_inventory_event_blueprint
 
 
 jwt = JWTManager()
@@ -100,6 +102,8 @@ def create_app(config_object=Config):
     app.register_blueprint(service_area_blueprint, url_prefix='/service-area')
     app.register_blueprint(trip_blueprint, url_prefix='/trip')
     app.register_blueprint(trip_stop_blueprint, url_prefix='/trip-stop')
+    app.register_blueprint(vehicle_inventory_blueprint, url_prefix='/vehicle-inventory')
+    app.register_blueprint(vehicle_inventory_event_blueprint, url_prefix='/vehicle-inventory-event')
 
     register_error_handlers(app)
     return app
