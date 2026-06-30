@@ -6,6 +6,8 @@ from uuid import UUID
 from datetime import datetime
 from app.dto.task_execution import OperatorType
 
+from app.dto.customer import CustomerCategory
+
 
 class FieldType(str, Enum):
     TEXT = 'text'
@@ -41,7 +43,8 @@ class TaskInputField(BaseModel):
 class TaskInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    fields: List[TaskInputField] = []
+    # default emptylist
+    fields: List[TaskInputField] = Field(default_factory=list)
     data: Optional[dict] = None
 
 
@@ -61,7 +64,7 @@ class TaskCreate(TaskBase):
     model_config = ConfigDict(extra="forbid")
 
     created_by_uuid: Optional[str] = None
-    workflow_uuid: str  # Workflow this task belongs to
+    workflow_uuid: Optional[str] = None  # Workflow this task belongs to
     parent_task_uuid: Optional[str] = None  # Parent task if this is a child task
 
 # DTO for partial updates to a Task
@@ -82,9 +85,36 @@ class TaskRead(TaskBase):
     uuid: str
     created_by_uuid: Optional[str] = None
     created_at: datetime
-    workflow_uuid: str
+    workflow_uuid: Optional[str] = None  # Workflow this task belongs to
     is_deleted: bool = False  # Indicates if the task is deleted
     parent_task_uuid: Optional[str] = None  # Parent task UUID if this is a child task
+
+
+    @classmethod
+    def from_orm_with_enrichment(cls, task, uow):
+        # Custom from_orm to handle task_inputs deserialization
+        obj = cls.from_orm(task)
+        if obj.task_inputs:
+            for f in obj.task_inputs.fields:
+                if f.label == "service_areas":
+                    service_areas = uow.service_area_repository.find_all(is_deleted=False)
+                    f.options = [sa.name for sa in service_areas]
+                if f.label == "assigned_user_uuid":
+                    users = uow.user_repository.find_all(is_deleted=False)
+                    f.options = [user.first_name for user in users]
+                if f.label == "customer_categories":
+                    categories = [category.value for category in CustomerCategory]
+                    f.options = categories
+                if f.label == "vehicle_plate":
+                    vehicles = uow.vehicle_repository.find_all(is_deleted=False)
+                    f.options = [vehicle.plate_number for vehicle in vehicles]
+                if f.label == "start_warehouse_name":
+                    warehouses = uow.warehouse_repository.find_all(is_deleted=False)
+                    f.options = [wh.name for wh in warehouses]
+                if f.label == "end_warehouse_name":
+                    warehouses = uow.warehouse_repository.find_all(is_deleted=False)
+                    f.options = [wh.name for wh in warehouses]
+        return obj
 
 # DTO for pagination and filtering when listing Tasks
 class TaskListParams(BaseModel):

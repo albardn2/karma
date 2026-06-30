@@ -1,0 +1,24 @@
+{
+  email {$EMAIL}
+  # For first-time testing, you can use the staging CA to avoid rate-limits:
+  # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# Redirect bare www -> apex (optional)
+www.{$APP_HOST} {
+  redir https://{$APP_HOST}{uri}
+}
+
+# Primary site
+{$APP_HOST} {
+  encode gzip
+  reverse_proxy web:5000
+
+  # (Optional) Security headers:
+  # header {
+  #   Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+  #   X-Content-Type-Options "nosniff"
+  #   X-Frame-Options "DENY"
+  #   Referrer-Policy "strict-origin-when-cross-origin"
+  # }
+}

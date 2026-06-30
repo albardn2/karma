@@ -35,10 +35,6 @@ class TripOperator(OperatorInterface):
         if not task_exe:
             raise BadRequestError(f"TaskExecution not found with uuid: {payload.uuid}")
 
-        if not all(child.status in [WorkflowStatus.COMPLETED.value] for child in task_exe.child_task_executions):
-            raise BadRequestError(
-                f"TaskExecution with uuid: {payload.uuid} has children that are not all skipped or completed."
-            )
 
 
     # task_exe.result = operator_schema.model_dump(mode="json")

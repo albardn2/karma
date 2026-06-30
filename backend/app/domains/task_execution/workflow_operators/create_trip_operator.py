@@ -1,6 +1,7 @@
 
 
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 
 from app.domains.task_execution.workflow_operators.operator_interface import OperatorInterface
@@ -15,14 +16,35 @@ from app.domains.trip.domain import TripDomain
 from app.dto.task_execution import OperatorType
 from app.dto.trip import TripCreate, TripStatus
 
-from backend.app.domains.task.domain import TaskDomain
-from backend.app.domains.task_execution.domain import TaskExecutionDomain
-from backend.app.domains.trip_stop.domain import TripStopDomain
-from backend.app.dto.task import TaskCreate, TaskInput
-from backend.app.dto.task_execution import TaskExecutionCreate
-from backend.app.dto.trip import TripData, InventoryInput
-from backend.app.dto.trip_stop import TripStopCreate, TripStopStatus
-from backend.app.utils.geom_utils import wkt_or_wkb_to_lat_lon
+from app.domains.task.domain import TaskDomain
+from app.domains.trip_stop.domain import TripStopDomain
+from app.dto.task import TaskCreate, TaskInput
+from app.dto.task_execution import TaskExecutionCreate
+from app.dto.trip import TripData, InventoryInput
+from app.dto.trip_stop import TripStopCreate, TripStopStatus
+from app.utils.geom_utils import wkt_or_wkb_to_lat_lon
+from app.dto.customer import CustomerRead
+
+from app.dto.task import FieldType
+
+from app.dto.task import TaskInputField
+
+
+class TripStopOutcome(str, Enum):
+    # with arabic translation
+    SALE = "sale - تم البيع"
+    INTERESTED_HAVE_INVENTORY = "interested:have_inventory - مهتم: لديه مخزون"
+    INTERESTED_NEEDS_BETTER_PRICE = "interested:needs_better_price - مهتم: يحتاج إلى سعر أفضل"
+    NOT_INTERESTED_COMPETITOR = "not_interested:competitors_product - غير مهتم: منتج المنافس"
+    NOT_INTERESTED_BAD_PRODUCT = "not_interested:bad_product - غير مهتم: منتج سيئ"
+    NOT_INTERSTED_PRICE_TOO_HIGH = "not_interested:price_too_high - غير مهتم: السعر مرتفع جدًا"
+    NOT_INTERESTED_OTHER = "not_interested:other - غير مهتم: أخرى"
+    SKIPPED_CUSTOMER_NOT_AVAILABLE = "skipped:customer_not_available - تم التخطي: العميل غير متاح"
+    SKIPPED_VEHICLE_BREAKDOWN = "skipped:vehicle_breakdown - تم التخطي: عطل في المركبة"
+    SKIPPED_NO_PARKING = "skipped:no_parking - تم التخطي: لا يوجد موقف"
+    SKIPPED_NO_TIME = "skipped:no_time - تم التخطي: لا يوجد وقت"
+    SKIPPED_OTHER = "skipped:other - تم التخطي: أخرى"
+
 
 
 class CreateTripOperatorSchema(BaseModel):
@@ -36,31 +58,48 @@ class CreateTripOperator(OperatorInterface):
                 payload:TaskExecutionComplete,
                 parameter: Optional[dict] = None,
                 *args, **kwargs):
+        from app.domains.task_execution.domain import TaskExecutionDomain
 
         # load the operator schema
-        operator_schema = CreateTripOperatorSchema(**payload.result)
+        operator_schema = CreateTripOperatorSchema()
 
         task_exe = uow.task_execution_repository.find_one(uuid=payload.uuid)
         if not task_exe:
             raise BadRequestError(f"TaskExecution not found with uuid: {payload.uuid}")
         self.task_exe = task_exe
-        self.all_tasks_executions = task_exe.workflow_execution.tasks_executions
+        self.all_tasks_executions = task_exe.workflow_execution.task_executions
+
+        vehicle_plate = self.get_vehicle_plate()
+        vehicle = uow.vehicle_repository.find_one(plate_number=vehicle_plate, is_deleted=False)
+        if not vehicle:
+            raise BadRequestError(f"Vehicle not found with plate number: {vehicle_plate}")
+
+        start_warehouse_name = self.get_start_warehouse_name()
+        start_warehouse = uow.warehouse_repository.find_one(name=start_warehouse_name)
+        if not start_warehouse:
+            raise BadRequestError(f"Start Warehouse not found with name: {start_warehouse_name}")
+        end_warehouse_name = self.get_end_warehouse_name()
+        end_warehouse = uow.warehouse_repository.find_one(name=end_warehouse_name)
+        if not end_warehouse:
+            raise BadRequestError(f"End Warehouse not found with name: {end_warehouse_name}")
+
+        service_area_names = self.get_service_areas()
+        # create trip
         TripDomain.create_trip(uow=uow,
                                payload=TripCreate(
                                    created_by_uuid=payload.completed_by_uuid,
-                                   vehicle_uuid=self.get_vehicle_uuid(),
-                                   service_area_uuid=self.get_service_area_uuid(),
+                                   vehicle_uuid=vehicle.uuid,
                                    status=TripStatus.IN_PROGRESS.value,
-                                   start_warehouse_uuid=self.get_start_warehouse_uuid(),
-                                   end_warehouse_uuid= self.get_end_warehouse_uuid(),
+                                   start_warehouse_uuid=start_warehouse.uuid ,
+                                   end_warehouse_uuid= end_warehouse.uuid,
                                    start_time=datetime.now(),
-                                   data = self.get_trip_data().model_dump(mode="json"),
+                                   service_area_names = service_area_names,
                                    workflow_execution_uuid=task_exe.workflow_execution.uuid,
                                ))
 
         # create trip stops
         created_task_names = []
-        for customer_uuid in self.get_customer_uuids():
+        for i,customer_uuid in enumerate(self.get_customer_uuids()):
             customer = uow.customer_repository.find_one(
                 uuid=customer_uuid,
                 is_deleted=False
@@ -72,33 +111,69 @@ class CreateTripOperator(OperatorInterface):
                 uow=uow,
                 payload=TripStopCreate(
                     created_by_uuid=payload.completed_by_uuid,
-                    trip_uuid=task_exe.workflow_execution.trip.uuid,
+                    trip_uuid=task_exe.workflow_execution.trips[0].uuid,
                     coordinates=wkt_or_wkb_to_lat_lon(customer.coordinates),
                     customer_uuid=customer_uuid,
-                    status=TripStopStatus.IN_PROGRESS.value
+                    status=TripStopStatus.IN_PROGRESS.value,
+                    index=i
                 )
             )
 
             task_input = TaskInput(
-                data = {"trip_stop_uuid":trip_stop.uuid}
+                data = {"trip_stop_uuid":trip_stop.uuid,
+                        "customer": CustomerRead.from_orm(customer).model_dump(mode='json')
+                        },
+                fields = [
+                    TaskInputField(
+                        name = "outcome -  النتيجة",
+                        label="outcome",
+                        type=FieldType.SELECT,
+                        required=True,
+                        options=[outcome.value for outcome in TripStopOutcome]
+                    ),
+                    TaskInputField(
+                        name = "kg large extra bags -   كبيرة أكسترا كيلو",
+                        label="mixed_large_extra",
+                        type=FieldType.NUMBER,
+                        required=False,
+                    ),
+                    TaskInputField(
+                        name = "kg large bags -  كبيرة كيلو",
+                        label="mixed_large",
+                        type=FieldType.NUMBER,
+                        required=False,
+                    ),
+                    TaskInputField(
+                        name = "kg small -  صغيرة كيلو",
+                        label="mixed_small",
+                        type=FieldType.NUMBER,
+                        required=False,
+                    ),
+                    TaskInputField(
+                        name = "notes - ملاحظات",
+                        label="notes",
+                        type=FieldType.TEXT,
+                        required=False,
+                    ),
+
+                ]
             )
 
             task_create = TaskDomain.create_task(
                 uow=uow,
                 payload=TaskCreate(
-                    name=f"trip_stop_{customer.name}:{customer_uuid}",
+                    name=f"trip_stop_{customer.company_name}:{customer_uuid}",
                     created_by_uuid=payload.completed_by_uuid,
-                    workflow_uuid = task_exe.workflow_execution.workflow_uuid,
-                    parent_task_uuid=self.get_trip_operator_task_uuid(),
+                    workflow_uuid = None, #task_exe.workflow_execution.workflow_uuid,
+                    parent_task_uuid= None, #self.get_trip_operator_task_uuid(),
                     operator= OperatorType.TRIP_STOP_OPERATOR.value,
                     task_inputs =task_input,
-                    depends_on = [] if not created_task_names else [created_task_names[-1]],
+                    depends_on = [], #if not created_task_names else [created_task_names[-1]],
                     callback_fns = [],
                 )
             )
-            created_task_names.append(task_create.name)
 
-            depends_on = task_create.depends_on or []
+            depends_on = [self.get_trip_operator_task_execution_name()] if not created_task_names else [created_task_names[-1]]
             task_execution = TaskExecutionDomain.create_task_execution(
                 uow=uow,
                 payload=TaskExecutionCreate(
@@ -110,7 +185,12 @@ class CreateTripOperator(OperatorInterface):
                     created_by_uuid=payload.completed_by_uuid,
                     parent_task_execution_uuid= self.get_trip_operator_task_execution_uuid()
 
-            ))
+                ))
+
+            trip_stop_model  = uow.trip_stop_repository.find_one(uuid=trip_stop.uuid)
+            trip_stop_model.task_execution_uuid = task_execution.uuid
+            uow.trip_stop_repository.save(trip_stop_model, commit=False)
+            created_task_names.append(task_create.name)
 
 
         task_exe.result = operator_schema.model_dump(mode="json")
@@ -128,62 +208,61 @@ class CreateTripOperator(OperatorInterface):
         return self.__class__.__name__
 
 
-    def get_service_area_uuid(self) -> str:
+    def get_service_areas(self) -> list:
+        """
+        This method is a placeholder for retrieving the service area names.
+        It should be implemented to return the actual service area UUID.
+        """
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return task_exe.result.get("service_areas")
+    def get_vehicle_plate(self) -> str:
         """
         This method is a placeholder for retrieving the service area UUID.
         It should be implemented to return the actual service area UUID.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
-                return task_exe.result.get("service_area_uuid")
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return task_exe.result.get("vehicle_plate")
 
-    def get_vehicle_uuid(self) -> str:
+    def get_start_warehouse_name(self) -> str:
         """
         This method is a placeholder for retrieving the service area UUID.
         It should be implemented to return the actual service area UUID.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
-                return task_exe.result.get("vehicle_uuid")
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return task_exe.result.get("start_warehouse_name")
 
-    def get_start_warehouse_uuid(self) -> str:
+    def get_end_warehouse_name(self) -> str:
         """
         This method is a placeholder for retrieving the service area UUID.
         It should be implemented to return the actual service area UUID.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
-                return task_exe.result.get("start_warehouse_uuid")
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return task_exe.result.get("end_warehouse_name")
 
-    def get_end_warehouse_uuid(self) -> str:
-        """
-        This method is a placeholder for retrieving the service area UUID.
-        It should be implemented to return the actual service area UUID.
-        """
-        for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.START_TRIP_OPERATOR.value:
-                return task_exe.result.get("end_warehouse_uuid")
-
-    def get_trip_data(self) -> TripData:
-        """
-        This method is a placeholder for retrieving the trip data.
-        It should be implemented to return the actual trip data.
-        """
-        for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.TRIP_ADD_INVENTORY_OPERATOR.value:
-                inventory_input_list = task_exe.result.get("inventory")
-                trip_data = TripData(
-                    input_inventory=[
-                        InventoryInput(
-                            inventory_uuid=item.get("inventory_uuid"),
-                            quantity=item.get("quantity"),
-                            material_name=item.get("material_name"),
-                            lot_id=item.get("lot_id")
-                        ) for item in inventory_input_list
-                    ]
-
-                )
-                return trip_data
+    # def get_trip_data(self) -> TripData:
+    #     """
+    #     This method is a placeholder for retrieving the trip data.
+    #     It should be implemented to return the actual trip data.
+    #     """
+    #     for task_exe in self.all_tasks_executions:
+    #         if task_exe.operator_name == OperatorType.TRIP_ADD_INVENTORY_OPERATOR.value:
+    #             inventory_input_list = task_exe.result.get("inventory")
+    #             trip_data = TripData(
+    #                 input_inventory=[
+    #                     InventoryInput(
+    #                         inventory_uuid=item.get("inventory_uuid"),
+    #                         quantity=item.get("quantity"),
+    #                         material_name=item.get("material_name"),
+    #                         lot_id=item.get("lot_id")
+    #                     ) for item in inventory_input_list
+    #                 ]
+    #
+    #             )
+    #             return trip_data
 
 
     def get_customer_uuids(self) -> list[str]:
@@ -192,18 +271,23 @@ class CreateTripOperator(OperatorInterface):
         It should be implemented to return the actual customer UUIDs.
         """
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.TRIP_ROUTE_OPERATOR.value:
+            if task_exe.operator == OperatorType.TRIP_ROUTE_OPERATOR.value:
                 return task_exe.result.get("customer_uuids", [])
 
 
     def get_trip_operator_task_execution_uuid(self):
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.TRIP_OPERATOR.value:
                 return task_exe.uuid
+
+    def get_trip_operator_task_execution_name(self):
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.TRIP_OPERATOR.value:
+                return task_exe.name
 
     def get_trip_operator_task_uuid(self):
         for task_exe in self.all_tasks_executions:
-            if task_exe.operator_name == OperatorType.TRIP_OPERATOR.value:
+            if task_exe.operator == OperatorType.TRIP_OPERATOR.value:
                 return task_exe.task.uuid
 
 

@@ -26,6 +26,17 @@ jobs:
             ./backend/docker-compose.dev.yaml
           target: /root/app
 
+      - name: Copy caddy to server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.DEV_DROPLET_HOST }}
+          username: root
+          password: ${{ secrets.DEV_DROPLET_PASSWORD }}
+          port: 22
+          source: |
+            ./backend/Caddyfile
+          target: /root/app
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:

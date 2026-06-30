@@ -11,10 +11,8 @@ from app.entrypoint.routes.common.errors import BadRequestError
 from app.dto.workflow_execution import (
     WorkflowStatus
 )
-
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
-
-from backend.app.dto.trip_stop import TripStopStatus
+from app.dto.trip_stop import TripStopStatus
 
 
 class SkipReason(str, Enum):
@@ -34,16 +32,11 @@ class NoSaleReason(str, Enum):
 class TripStopOperatorSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    skip_reason: Optional[SkipReason] = None
-    no_sale_reason: Optional[NoSaleReason] = None
-
-    @model_validator(mode="after")
-    def check_skip_and_no_sale(self):
-        if self.skip_reason and self.no_sale_reason:
-            raise BadRequestError("Cannot have both skip_reason and no_sale_reason set.")
-        return self
-
-
+    outcome: str
+    mixed_large_extra: Optional[float] = None
+    mixed_large: Optional[float] = None
+    mixed_small: Optional[float] = None
+    notes: Optional[str] = None
 
 class TripStopOperator(OperatorInterface):
 
@@ -58,16 +51,19 @@ class TripStopOperator(OperatorInterface):
         task_exe = uow.task_execution_repository.find_one(uuid=payload.uuid)
         if not task_exe:
             raise BadRequestError(f"TaskExecution not found with uuid: {payload.uuid}")
+        self.task_exe = task_exe
 
         trip_stop = self.get_trip_stop(uow=uow)
-        if operator_schema.skip_reason:
-            trip_stop.status = TripStopStatus.SKIPPED.value
-            trip_stop.skip_reason = operator_schema.skip_reason.value
-        elif operator_schema.no_sale_reason:
-            trip_stop.status = TripStopStatus.COMPLETED.value
-            trip_stop.no_sale_reason = operator_schema.no_sale_reason.value
-
-        # task_exe.result = operator_schema.model_dump(mode="json")
+        trip_stop.outcome = operator_schema.outcome
+        sales_outcome = {
+            "mixed_large_extra": operator_schema.mixed_large_extra,
+            "mixed_large": operator_schema.mixed_large,
+            "mixed_small": operator_schema.mixed_small
+        }
+        trip_stop.sales_outcome = sales_outcome
+        trip_stop.notes = operator_schema.notes
+        uow.trip_stop_repository.save(trip_stop, commit=False)
+        task_exe.result = operator_schema.model_dump(mode="json")
         task_exe.status = WorkflowStatus.COMPLETED.value
         task_exe.end_time = datetime.now()
         task_exe.completed_by_uuid = payload.completed_by_uuid
@@ -86,11 +82,9 @@ class TripStopOperator(OperatorInterface):
 
     def get_trip_stop(self,uow:SqlAlchemyUnitOfWork):
 
-        trip_stop_uuid = self.task_exe.task_inputs.data.get("trip_stop_uuid")
-
+        trip_stop_uuid = self.task_exe.task_inputs.get("data", {}).get("trip_stop_uuid")
         trip_stop = uow.trip_stop_repository.find_one(
             uuid=trip_stop_uuid,
-            is_deleted=False
         )
         if not trip_stop:
             raise BadRequestError(f"TripStop not found with uuid: {trip_stop_uuid}")

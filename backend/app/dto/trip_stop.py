@@ -23,6 +23,7 @@ class TripStopStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     SKIPPED = "skipped"
+    CANCELLED = "cancelled"
 
 
 class TripStopCreate(BaseModel):
@@ -34,8 +35,9 @@ class TripStopCreate(BaseModel):
     notes: Optional[str] = None
     status: TripStopStatus
     customer_uuid: Optional[str] = None
-    skip_reason: Optional[str] = None
-    no_sale_reason: Optional[str] = None
+    index: Optional[int] = None
+    outcome: Optional[str] = None
+    sales: Optional[dict] = None
 
     # either pass coordinates or customer_uuid but not both
 
@@ -69,8 +71,6 @@ class TripStopUpdate(BaseModel):
     notes: Optional[str] = None
     status: Optional[TripStopStatus] = None
     customer_uuid: Optional[str] = None
-    skip_reason: Optional[str] = None
-    no_sale_reason: Optional[str] = None
 
     @field_validator("coordinates", mode="before")
     def parse_latlon_to_wkt(cls, v: str) -> str:
@@ -88,15 +88,17 @@ class TripStopRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     uuid: str
-    created_by_uuid: Optional[str]
+    created_by_uuid: Optional[str] = None
     created_at: datetime
     trip_uuid: str
     coordinates: str
-    notes: Optional[str]
+    notes: Optional[str] = None
     status: TripStopStatus
-    customer_uuid: Optional[str]
-    skip_reason: Optional[str]
-    no_sale_reason: Optional[str] = None
+    customer_uuid: Optional[str] = None
+    index: Optional[int] = None
+    outcome: Optional[str] = None
+    sales: Optional[dict] = None
+
 
     @field_validator("coordinates", mode="before")
     def _wkb_or_wkt_to_latlon(cls, v):

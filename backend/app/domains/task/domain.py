@@ -54,12 +54,11 @@ class TaskDomain:
         """
         existing_workflow = uow.workflow_repository.find_one(uuid=workflow_uuid,is_deleted=False)
         if not existing_workflow:
-            raise NotFoundError(f"Workflow with uuid '{workflow_uuid}' not found.")
+            return
 
         for task in existing_workflow.tasks:
             if task.name == name:
                 raise BadRequestError(f"Task with name '{name}' already exists in workflow '{workflow_uuid}'.")
-
 
     @staticmethod
     def validate_depends_on(uow: SqlAlchemyUnitOfWork, payload:TaskCreate):

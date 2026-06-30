@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Optional
-
+from app.dto.task_execution import OperatorType
 from app.domains.task_execution.workflow_operators.operator_interface import OperatorInterface
 from app.dto.task_execution import TaskExecutionComplete
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -10,22 +10,23 @@ from app.entrypoint.routes.common.errors import BadRequestError
 from app.dto.workflow_execution import (
     WorkflowStatus
 )
-from geoalchemy2.shape import to_shape
+from geoalchemy2.shape import to_shape, from_shape
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.domains.trip.distribution_algo import DistributionAlgorithm
+from models.common import ServiceArea as ServiceAreaModel
+from shapely import MultiPolygon
 
 
 class TripRouteOperatorSchema(BaseModel):
-    service_area_uuid: str
-    start_warehouse_uuid: str
-    end_warehouse_uuid: str
-
     # result
     customer_uuids: Optional[list[str]] = None
     waypoints: Optional[list[tuple[float, float]]] = None
     route_coordinates: Optional[list[tuple[float, float]]] = None
 
+
+def _parts(g):
+    return list(g.geoms) if g.geom_type == "MultiPolygon" else [g]
 
 class TripRouteOperator(OperatorInterface):
 
@@ -35,48 +36,54 @@ class TripRouteOperator(OperatorInterface):
                 *args, **kwargs):
 
         # load the operator schema
-        operator_schema = TripRouteOperatorSchema(**payload.result)
+        operator_schema = TripRouteOperatorSchema()
 
         task_exe = uow.task_execution_repository.find_one(uuid=payload.uuid)
         if not task_exe:
             raise BadRequestError(f"TaskExecution not found with uuid: {payload.uuid}")
+        self.task_exe = task_exe
+        self.all_tasks_executions = task_exe.workflow_execution.task_executions
 
+        service_area_names = self.get_service_areas()
+        # name is in service_area names
 
-        service_area = uow.service_area_repository.find_one(
-            uuid=operator_schema.service_area_uuid,
-            is_deleted=False
-        )
-        if not service_area:
-            raise BadRequestError(f"ServiceArea not found with uuid: {operator_schema.service_area_uuid}")
+        filters = []
+        # is in service area
+        filters.append(ServiceAreaModel.name.in_(service_area_names))
+        service_areas = uow.service_area_repository._find_all_by_filters(filters=filters)
 
-        start_warehouse = uow.warehouse_repository.find_one(
-            uuid=operator_schema.start_warehouse_uuid,
-            is_deleted=False
-        )
+        polys = [p for sa in service_areas for p in _parts(to_shape(sa.geometry))]
+        mp = MultiPolygon(polys)                    # MultiPolygon of all parts
+
+        start_warehouse_name = self.get_start_warehouse_name()
+        start_warehouse = uow.warehouse_repository.find_one(name=start_warehouse_name)
         if not start_warehouse:
-            raise BadRequestError(f"Start Warehouse not found with uuid: {operator_schema.start_warehouse_uuid}")
-        end_warehouse = uow.warehouse_repository.find_one(
-            uuid=operator_schema.end_warehouse_uuid,
-            is_deleted=False
-        )
+            raise BadRequestError(f"Start Warehouse not found with name: {start_warehouse_name}")
+        end_warehouse_name =  self.get_end_warehouse_name()
+        end_warehouse = uow.warehouse_repository.find_one(name=end_warehouse_name)
         if not end_warehouse:
-            raise BadRequestError(f"End Warehouse not found with uuid: {operator_schema.end_warehouse_uuid}")
+            raise BadRequestError(f"End Warehouse not found with name: {end_warehouse_name}")
 
         start_point = to_shape(start_warehouse.coordinates)
         end_point = to_shape(end_warehouse.coordinates)
 
+        customer_categories = self.get_customer_categories()
+        min_stops = self.min_stops()
+        max_stops = self.get_max_stops()
+        print("MAX STOPS =", max_stops)
+        print("MIN STOPS = ", min_stops)
 
-
+        last_visit_threshold_days = self.last_visit_threshold_days()
 
 
         ordered_customers, waypoints, route_coords = DistributionAlgorithm(uow=uow).run(
-            polygon=to_shape(service_area.polygon),
+            polygons=mp,
             start_point=start_point,
             end_point=end_point,
-            max_stops=parameter.get("max_stops"),  # You can set these parameters as needed
-            min_stops=parameter.get("min_stops"),
-            customer_categories=None,
-            materials_filter=None
+            max_stops=max_stops,  # You can set these parameters as needed
+            min_stops=min_stops,
+            customer_categories=customer_categories,
+            last_visit_threshold_days=last_visit_threshold_days
         )
 
         operator_schema.customer_uuids = [customer.uuid for customer in ordered_customers]
@@ -100,4 +107,65 @@ class TripRouteOperator(OperatorInterface):
         return self.__class__.__name__
 
 
+    def get_service_areas(self) -> str:
+        """
+        This method is a placeholder for retrieving the service area names.
+        It should be implemented to return the actual service area UUID.
+        """
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return task_exe.result.get("service_areas")
 
+    def get_start_warehouse_name(self) -> str:
+        """
+        This method is a placeholder for retrieving the service area UUID.
+        It should be implemented to return the actual service area UUID.
+        """
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return task_exe.result.get("start_warehouse_name")
+
+    def get_end_warehouse_name(self) -> str:
+        """
+        This method is a placeholder for retrieving the service area UUID.
+        It should be implemented to return the actual service area UUID.
+        """
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return task_exe.result.get("end_warehouse_name")
+
+    def get_customer_categories(self) -> list[str]:
+        """
+        This method is a placeholder for retrieving the customer categories.
+        It should be implemented to return the actual customer categories.
+        """
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return task_exe.result.get("customer_categories")
+
+    def get_max_stops(self) -> int:
+        """
+        This method is a placeholder for retrieving the customer categories.
+        It should be implemented to return the actual customer categories.
+        """
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return task_exe.result.get("max_stops")
+
+    def min_stops(self) -> int:
+        """
+        This method is a placeholder for retrieving the customer categories.
+        It should be implemented to return the actual customer categories.
+        """
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return task_exe.result.get("min_stops")
+
+    def last_visit_threshold_days(self) -> int:
+        """
+        This method is a placeholder for retrieving the customer categories.
+        It should be implemented to return the actual customer categories.
+        """
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return task_exe.result.get("last_visit_threshold_days")

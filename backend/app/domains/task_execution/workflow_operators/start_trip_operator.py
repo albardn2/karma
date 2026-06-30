@@ -1,5 +1,3 @@
-
-
 from datetime import datetime
 from typing import Optional
 
@@ -19,10 +17,18 @@ from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWo
 class StartTripOperatorSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vehicle_uuid: str
-    start_warehouse_uuid: str
-    end_warehouse_uuid: str
-    service_area_uuid:str
+    service_areas: list[str]
+    start_warehouse_name: str
+    end_warehouse_name: str
+    vehicle_plate: str
+    last_visit_threshold_days:int
+    start_point: Optional[str] = None
+    end_point: Optional[str] = None
+    assigned_user_uuid: Optional[str] = None
+    customer_categories: Optional[list[str]] = None
+    max_stops: Optional[int] = None
+    min_stops: Optional[int] = None
+
 
 class StartTripOperator(OperatorInterface):
 

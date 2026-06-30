@@ -83,7 +83,7 @@ class TaskExecutionDomain:
             if task_execution.status in [WorkflowStatus.COMPLETED.value, WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value]:
                 continue
 
-            for child in task_execution.children:
+            for child in task_execution.child_task_executions:
                 if child.status not in [WorkflowStatus.COMPLETED.value, WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value]:
                     child.status = WorkflowStatus.CANCELLED.value
                     child.end_time = datetime.now()
@@ -121,6 +121,18 @@ class TaskExecutionDomain:
         TaskExecutionDomain.unblock_dependent_task_executions(
             uow=uow, task_execution=task_exe
         )
+
+        # if all tasks are completed, mark workflow execution as completed
+        all_tasks = uow.task_execution_repository.find_all(
+            workflow_execution_uuid=task_exe.workflow_execution_uuid,
+            status=WorkflowStatus.COMPLETED.value
+        )
+        if len(all_tasks) == len(task_exe.workflow_execution.task_executions):
+            workflow_execution = task_exe.workflow_execution
+            workflow_execution.status = WorkflowStatus.COMPLETED.value
+            workflow_execution.end_time = datetime.now()
+            uow.workflow_execution_repository.save(model=workflow_execution, commit=False)
+
         return TaskExecutionRead.from_orm(task_exe)
 
     @staticmethod
@@ -139,7 +151,7 @@ class TaskExecutionDomain:
 
         # now loop through the tasks and mark in progress if dependent names are completed
         for task in workflow_exe_tasks:
-            if task.depends_on and all(name_status_mapper[dep] == WorkflowStatus.COMPLETED.value for dep in task.depends_on):
+            if task.status in [WorkflowStatus.NOT_STARTED.value]  and task.depends_on and all(name_status_mapper[dep] == WorkflowStatus.COMPLETED.value for dep in task.depends_on):
                 TaskExecutionDomain.mark_dependent_task_in_progress(uow=uow, dependent_task=task)
 
     @staticmethod

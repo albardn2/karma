@@ -42,7 +42,8 @@ from models.common import WorkflowExecution as WorkflowExecutionModel
 )
 def create_workflow_execution():
     current_user_uuid = get_jwt_identity()
-    payload = WorkflowExecutionCreate(**request.json)
+    data = request.get_json()
+    payload = WorkflowExecutionCreate(**data)
     with SqlAlchemyUnitOfWork() as uow:
         add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=payload)
         dto = WorkflowExecutionDomain.create_workflow_execution(uow=uow, payload=payload)

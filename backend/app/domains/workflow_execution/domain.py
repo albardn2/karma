@@ -60,10 +60,10 @@ class WorkflowExecutionDomain:
         workflow_execution.error_message = "Workflow execution was cancelled by user"
         uow.workflow_execution_repository.save(model=workflow_execution, commit=False)
 
-        if workflow_execution.trip_uuid:
+        for trip in workflow_execution.trips:
             # Cancel the trip if it exists
             from app.domains.trip.domain import TripDomain
-            TripDomain.cancel_trip(uow=uow, uuid=workflow_execution.trip_uuid)
+            TripDomain.cancel_trip(uow=uow, uuid=trip.uuid)
 
         TaskExecutionDomain.cancel_task_executions(workflow_execution_uuid=workflow_execution.uuid, uow=uow)
 
