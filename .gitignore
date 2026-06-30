@@ -110,3 +110,14 @@ alembic/versions/*.py
 # Visual Studio Code settings
 .vscode/
 
+
+# Local prod-db dump tooling
+scripts/.prod-db.env
+prod-dump-*.sql.gz
+
+# Replit agent state / leaked junk
+frontend/.local/
+frontend/.agents/
+
+# Frontend has a client/src/lib dir — exempt it from the Python `lib/` rule above
+!frontend/client/src/lib/

@@ -1,0 +1,41 @@
+version: "3.8"
+
+# Frontend DEV stack (deployed to the dev frontend droplet).
+# Caddy terminates TLS for crm-dev.karma-grp.com and proxies to the app.
+services:
+  app:
+    image: ghcr.io/albardn2/karma-frontend:latest-dev
+    restart: always
+    expose:
+      - "5000"
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+    networks:
+      - web
+
+  caddy:
+    image: caddy:latest
+    restart: always
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_HOST: crm-dev.karma-grp.com
+      EMAIL: zaid.bardan@gmail.com
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  web:
+    driver: bridge

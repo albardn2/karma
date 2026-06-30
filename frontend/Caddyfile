@@ -1,0 +1,11 @@
+{
+  email {$EMAIL}
+  # For first-time testing, use the staging CA to avoid rate limits:
+  # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# Primary site -> the frontend container
+{$APP_HOST} {
+  encode gzip
+  reverse_proxy app:5000
+}

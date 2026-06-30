@@ -1,0 +1,54 @@
+class CustomerOrderAndInvoiceItemCreate(BaseModel):
+    """Fields required to create a new customer order with items and invoice."""
+    model_config = ConfigDict(extra="forbid")
+    material_uuid: str
+    quantity: int
+    price_per_unit: float
+
+class CustomerOrderWithItemsAndInvoiceCreate(BaseModel):
+    """Fields required to create a new customer order with items and invoice."""
+    model_config = ConfigDict(extra="forbid")
+    created_by_uuid: Optional[str] = None
+    customer_uuid: str
+    currency: Currency
+    trip_stop_uuid: Optional[str] = None
+    notes: Optional[str] = None
+    due_date: Optional[datetime]
+    items: List[CustomerOrderAndInvoiceItemCreate]
+
+    def to_customer_order_create(self):
+        return CustomerOrderCreate(
+            trip_stop_uuid=self.trip_stop_uuid,
+            created_by_uuid=self.created_by_uuid,
+            customer_uuid=self.customer_uuid,
+            notes=self.notes,
+        )
+
+    def to_customer_order_item_bulk_create(self, customer_order_uuid: str):
+        return CustomerOrderItemBulkCreate(
+            items=[
+                CustomerOrderItemCreate(
+                    created_by_uuid=self.created_by_uuid,
+                    customer_order_uuid=customer_order_uuid,
+                    quantity=item.quantity,
+                    material_uuid=item.material_uuid,
+                )
+                for item in self.items
+            ]
+        )
+
+    def to_invoice_create(self, customer_order_uuid: str):
+        return InvoiceCreate(
+            created_by_uuid=self.created_by_uuid,
+            customer_uuid=self.customer_uuid,
+            customer_order_uuid=customer_order_uuid,
+            currency=self.currency,
+            notes=self.notes,
+            due_date=self.due_date,
+        )
+
+class CustomerOrderWithItemsAndInvoiceRead(BaseModel):
+    """Fields required to create a new customer order with items and invoice."""
+    model_config = ConfigDict(extra="forbid")
+    customer_order: CustomerOrderRead
+    invoices: list[InvoiceRead]

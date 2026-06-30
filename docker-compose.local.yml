@@ -1,0 +1,82 @@
+# Local full-stack preview: Postgres (PostGIS) + Flask backend + React/Vite frontend.
+#
+#   docker compose -f docker-compose.local.yml up --build
+#
+# Then open http://localhost:3000 and log in with admin / admin.
+# The browser loads the SPA from :3000 and calls the Flask API directly at :5000
+# (Flask CORS is open; JWT travels in the Authorization header).
+services:
+  db:
+    image: postgis/postgis:13-3.1-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: local
+      POSTGRES_PASSWORD: local
+      POSTGRES_DB: backend
+    command: postgres -c listen_addresses='*'
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "local", "-d", "backend"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - karma_pg_data:/var/lib/postgresql/data
+
+  # Builds the backend image (reused by seed + backend) and applies migrations, then exits.
+  backend-migrate:
+    build:
+      context: ./backend
+    image: karma-backend:local
+    command: ["sh", "-c", "python scripts/wait_for_db.py && alembic upgrade head"]
+    environment:
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Creates a local admin user (idempotent) so login works on a fresh DB.
+  backend-seed:
+    image: karma-backend:local
+    command: ["sh", "-c", "python scripts/wait_for_db.py && python scripts/seed_admin.py"]
+    environment:
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+      PYTHONPATH: /karma
+      SEED_ADMIN_USERNAME: admin
+      SEED_ADMIN_PASSWORD: admin
+    depends_on:
+      backend-migrate:
+        condition: service_completed_successfully
+
+  backend:
+    image: karma-backend:local
+    restart: unless-stopped
+    command: ["gunicorn", "--bind", "0.0.0.0:5000", "--reload", "run:app"]
+    environment:
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+    ports:
+      - "5000:5000"
+    depends_on:
+      backend-seed:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      # Read by the browser; must be reachable from the host, not the docker network.
+      VITE_API_BASE_URL: "http://localhost:5000"
+    ports:
+      - "3000:5000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  karma_pg_data:
