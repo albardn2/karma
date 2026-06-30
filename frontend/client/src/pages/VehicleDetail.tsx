@@ -35,6 +35,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { VehicleStatus, type Vehicle, type VehicleUpdateData } from "@/lib/types";
+import { VehicleInventoryDialog } from "@/components/vehicles/VehicleInventoryDialog";
 
 const vehicleUpdateSchema = z.object({
   plate_number: z.string().min(1, "Plate number is required").optional(),
@@ -273,6 +274,7 @@ export default function VehicleDetail() {
           <div className="flex items-center gap-2">
             {!isEditing && (
               <>
+                <VehicleInventoryDialog vehicleUuid={uuid as string} />
                 <Button
                   variant="outline"
                   onClick={() => setIsEditing(true)}
