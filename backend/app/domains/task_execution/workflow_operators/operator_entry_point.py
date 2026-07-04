@@ -13,6 +13,7 @@ from app.domains.task_execution.workflow_operators.trip_route_operator import Tr
 from app.domains.task_execution.workflow_operators.create_trip_operator import CreateTripOperator
 from app.domains.task_execution.workflow_operators.trip_operator import TripOperator
 from app.domains.task_execution.workflow_operators.trip_stop_operator import TripStopOperator
+from app.domains.task_execution.workflow_operators.trip_finish_operator import TripFinishOperator
 
 
 class OperatorEntryPoint:
@@ -33,7 +34,8 @@ class OperatorEntryPoint:
                 OperatorType.TRIP_ROUTE_OPERATOR: TripRouteOperator(),
                 OperatorType.TRIP_CREATE_OPERATOR: CreateTripOperator(),
                 OperatorType.TRIP_OPERATOR: TripOperator(),  # Assuming TripOperator is similar to CreateTripOperator
-                OperatorType.TRIP_STOP_OPERATOR: TripStopOperator()
+                OperatorType.TRIP_STOP_OPERATOR: TripStopOperator(),
+                OperatorType.TRIP_FINISH_OPERATOR: TripFinishOperator()
             }
 
 

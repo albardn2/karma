@@ -52,6 +52,138 @@ class CreateTripOperatorSchema(BaseModel):
 
     pass
 
+
+def create_trip_stop_with_task(
+    uow: SqlAlchemyUnitOfWork,
+    workflow_execution,
+    customer,
+    created_by_uuid: Optional[str],
+    index: int,
+    depends_on: list,
+    parent_task_execution_uuid: Optional[str],
+):
+    """Create a trip stop for a customer plus its trip_stop_operator task and
+    task execution, and link them together. Used both for routed stops
+    (pre-created by CreateTripOperator) and ad-hoc manual stops added mid-trip."""
+    from app.domains.task_execution.domain import TaskExecutionDomain
+
+    trip = workflow_execution.trips[0]
+    trip_stop = TripStopDomain.create_trip_stop(
+        uow=uow,
+        payload=TripStopCreate(
+            created_by_uuid=created_by_uuid,
+            trip_uuid=trip.uuid,
+            coordinates=wkt_or_wkb_to_lat_lon(customer.coordinates),
+            customer_uuid=customer.uuid,
+            status=TripStopStatus.IN_PROGRESS.value,
+            index=index,
+        )
+    )
+
+    task_input = TaskInput(
+        data={"trip_stop_uuid": trip_stop.uuid,
+              "customer": CustomerRead.from_orm(customer).model_dump(mode='json')
+              },
+        fields=[
+            TaskInputField(
+                name="outcome -  النتيجة",
+                label="outcome",
+                type=FieldType.SELECT,
+                required=True,
+                options=[outcome.value for outcome in TripStopOutcome]
+            ),
+            TaskInputField(
+                name="notes - ملاحظات",
+                label="notes",
+                type=FieldType.TEXT,
+                required=False,
+            ),
+        ]
+    )
+
+    task_create = TaskDomain.create_task(
+        uow=uow,
+        payload=TaskCreate(
+            # index suffix keeps names unique even when the same customer is
+            # visited twice in one trip (dependency chains reference names)
+            name=f"trip_stop_{customer.company_name}:{customer.uuid}:{index}",
+            created_by_uuid=created_by_uuid,
+            workflow_uuid=None,
+            parent_task_uuid=None,
+            operator=OperatorType.TRIP_STOP_OPERATOR.value,
+            task_inputs=task_input,
+            depends_on=[],
+            callback_fns=[],
+        )
+    )
+
+    task_execution = TaskExecutionDomain.create_task_execution(
+        uow=uow,
+        payload=TaskExecutionCreate(
+            status=WorkflowStatus.NOT_STARTED.value if depends_on else WorkflowStatus.IN_PROGRESS.value,
+            depends_on=depends_on,
+            start_time=datetime.now() if not depends_on else None,
+            task_uuid=task_create.uuid,
+            workflow_execution_uuid=workflow_execution.uuid,
+            created_by_uuid=created_by_uuid,
+            parent_task_execution_uuid=parent_task_execution_uuid,
+        ))
+
+    trip_stop_model = uow.trip_stop_repository.find_one(uuid=trip_stop.uuid)
+    trip_stop_model.task_execution_uuid = task_execution.uuid
+    uow.trip_stop_repository.save(trip_stop_model, commit=False)
+    return task_create, task_execution
+
+
+def create_finish_trip_task(
+    uow: SqlAlchemyUnitOfWork,
+    workflow_execution,
+    created_by_uuid: Optional[str],
+    depends_on: list,
+    parent_task_execution_uuid: Optional[str],
+):
+    """Create the explicit finish-trip task: snapshots end inventory and marks
+    the trip completed. Keeps the workflow open while ad-hoc stops are added."""
+    from app.domains.task_execution.domain import TaskExecutionDomain
+
+    task_input = TaskInput(
+        data={},
+        fields=[
+            TaskInputField(
+                name="notes - ملاحظات",
+                label="notes",
+                type=FieldType.TEXT,
+                required=False,
+            ),
+        ]
+    )
+    task_create = TaskDomain.create_task(
+        uow=uow,
+        payload=TaskCreate(
+            name="finish_trip",
+            created_by_uuid=created_by_uuid,
+            workflow_uuid=None,
+            parent_task_uuid=None,
+            operator=OperatorType.TRIP_FINISH_OPERATOR.value,
+            task_inputs=task_input,
+            depends_on=[],
+            callback_fns=[],
+        )
+    )
+    task_execution = TaskExecutionDomain.create_task_execution(
+        uow=uow,
+        payload=TaskExecutionCreate(
+            status=WorkflowStatus.NOT_STARTED.value if depends_on else WorkflowStatus.IN_PROGRESS.value,
+            depends_on=depends_on,
+            start_time=datetime.now() if not depends_on else None,
+            task_uuid=task_create.uuid,
+            workflow_execution_uuid=workflow_execution.uuid,
+            created_by_uuid=created_by_uuid,
+            parent_task_execution_uuid=parent_task_execution_uuid,
+        ))
+    return task_create, task_execution
+
+
 class CreateTripOperator(OperatorInterface):
 
     def execute(self,uow:SqlAlchemyUnitOfWork,
@@ -74,14 +206,20 @@ class CreateTripOperator(OperatorInterface):
         if not vehicle:
             raise BadRequestError(f"Vehicle not found with plate number: {vehicle_plate}")
 
-        start_warehouse_name = self.get_start_warehouse_name()
-        start_warehouse = uow.warehouse_repository.find_one(name=start_warehouse_name)
-        if not start_warehouse:
-            raise BadRequestError(f"Start Warehouse not found with name: {start_warehouse_name}")
-        end_warehouse_name = self.get_end_warehouse_name()
-        end_warehouse = uow.warehouse_repository.find_one(name=end_warehouse_name)
-        if not end_warehouse:
-            raise BadRequestError(f"End Warehouse not found with name: {end_warehouse_name}")
+        manual_stops = self.is_manual_stops()
+
+        # warehouses are only part of the routed flow; manual trips skip them
+        start_warehouse = None
+        end_warehouse = None
+        if not manual_stops:
+            start_warehouse_name = self.get_start_warehouse_name()
+            start_warehouse = uow.warehouse_repository.find_one(name=start_warehouse_name)
+            if not start_warehouse:
+                raise BadRequestError(f"Start Warehouse not found with name: {start_warehouse_name}")
+            end_warehouse_name = self.get_end_warehouse_name()
+            end_warehouse = uow.warehouse_repository.find_one(name=end_warehouse_name)
+            if not end_warehouse:
+                raise BadRequestError(f"End Warehouse not found with name: {end_warehouse_name}")
 
         service_area_names = self.get_service_areas()
         # create trip
@@ -90,10 +228,10 @@ class CreateTripOperator(OperatorInterface):
                                    created_by_uuid=payload.completed_by_uuid,
                                    vehicle_uuid=vehicle.uuid,
                                    status=TripStatus.IN_PROGRESS.value,
-                                   start_warehouse_uuid=start_warehouse.uuid ,
-                                   end_warehouse_uuid= end_warehouse.uuid,
+                                   start_warehouse_uuid=start_warehouse.uuid if start_warehouse else None,
+                                   end_warehouse_uuid=end_warehouse.uuid if end_warehouse else None,
                                    start_time=datetime.now(),
-                                   service_area_names = service_area_names,
+                                   service_area_names = service_area_names or [],
                                    workflow_execution_uuid=task_exe.workflow_execution.uuid,
                                ))
 
@@ -103,7 +241,7 @@ class CreateTripOperator(OperatorInterface):
         trip.start_inventory = VehicleInventoryDomain.balances_for_vehicle(uow=uow, vehicle_uuid=vehicle.uuid)
         uow.trip_repository.save(model=trip, commit=False)
 
-        # create trip stops
+        # create trip stops (routed mode; manual mode has no pre-computed customers)
         created_task_names = []
         for i,customer_uuid in enumerate(self.get_customer_uuids()):
             customer = uow.customer_repository.find_one(
@@ -113,73 +251,29 @@ class CreateTripOperator(OperatorInterface):
             if not customer:
                 raise BadRequestError(f"Customer not found with uuid: {customer_uuid}")
 
-            trip_stop = TripStopDomain.create_trip_stop(
-                uow=uow,
-                payload=TripStopCreate(
-                    created_by_uuid=payload.completed_by_uuid,
-                    trip_uuid=task_exe.workflow_execution.trips[0].uuid,
-                    coordinates=wkt_or_wkb_to_lat_lon(customer.coordinates),
-                    customer_uuid=customer_uuid,
-                    status=TripStopStatus.IN_PROGRESS.value,
-                    index=i
-                )
-            )
-
-            task_input = TaskInput(
-                data = {"trip_stop_uuid":trip_stop.uuid,
-                        "customer": CustomerRead.from_orm(customer).model_dump(mode='json')
-                        },
-                fields = [
-                    TaskInputField(
-                        name = "outcome -  النتيجة",
-                        label="outcome",
-                        type=FieldType.SELECT,
-                        required=True,
-                        options=[outcome.value for outcome in TripStopOutcome]
-                    ),
-                    TaskInputField(
-                        name = "notes - ملاحظات",
-                        label="notes",
-                        type=FieldType.TEXT,
-                        required=False,
-                    ),
-
-                ]
-            )
-
-            task_create = TaskDomain.create_task(
-                uow=uow,
-                payload=TaskCreate(
-                    name=f"trip_stop_{customer.company_name}:{customer_uuid}",
-                    created_by_uuid=payload.completed_by_uuid,
-                    workflow_uuid = None, #task_exe.workflow_execution.workflow_uuid,
-                    parent_task_uuid= None, #self.get_trip_operator_task_uuid(),
-                    operator= OperatorType.TRIP_STOP_OPERATOR.value,
-                    task_inputs =task_input,
-                    depends_on = [], #if not created_task_names else [created_task_names[-1]],
-                    callback_fns = [],
-                )
-            )
-
             depends_on = [self.get_trip_operator_task_execution_name()] if not created_task_names else [created_task_names[-1]]
-            task_execution = TaskExecutionDomain.create_task_execution(
+            task_create, _ = create_trip_stop_with_task(
                 uow=uow,
-                payload=TaskExecutionCreate(
-                    status = WorkflowStatus.NOT_STARTED.value if depends_on else WorkflowStatus.IN_PROGRESS.value,
-                    depends_on=depends_on,
-                    start_time=datetime.now() if not depends_on else None,
-                    task_uuid=task_create.uuid,
-                    workflow_execution_uuid=task_exe.workflow_execution.uuid,
-                    created_by_uuid=payload.completed_by_uuid,
-                    parent_task_execution_uuid= self.get_trip_operator_task_execution_uuid()
-
-                ))
-
-            trip_stop_model  = uow.trip_stop_repository.find_one(uuid=trip_stop.uuid)
-            trip_stop_model.task_execution_uuid = task_execution.uuid
-            uow.trip_stop_repository.save(trip_stop_model, commit=False)
+                workflow_execution=task_exe.workflow_execution,
+                customer=customer,
+                created_by_uuid=payload.completed_by_uuid,
+                index=i,
+                depends_on=depends_on,
+                parent_task_execution_uuid=self.get_trip_operator_task_execution_uuid(),
+            )
             created_task_names.append(task_create.name)
 
+        # explicit finish-trip step: snapshots end inventory + completes the trip.
+        # It unblocks after the last routed stop (or right after the trip task in
+        # manual mode) and keeps the workflow open while ad-hoc stops are added.
+        finish_depends_on = [created_task_names[-1]] if created_task_names else [self.get_trip_operator_task_execution_name()]
+        create_finish_trip_task(
+            uow=uow,
+            workflow_execution=task_exe.workflow_execution,
+            created_by_uuid=payload.completed_by_uuid,
+            depends_on=finish_depends_on,
+            parent_task_execution_uuid=self.get_trip_operator_task_execution_uuid(),
+        )
 
         task_exe.result = operator_schema.model_dump(mode="json")
         task_exe.status = WorkflowStatus.COMPLETED.value
@@ -195,6 +289,12 @@ class CreateTripOperator(OperatorInterface):
         # name of class
         return self.__class__.__name__
 
+
+    def is_manual_stops(self) -> bool:
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return bool(task_exe.result.get("manual_stops"))
+        return False
 
     def get_service_areas(self) -> list:
         """

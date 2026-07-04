@@ -69,7 +69,9 @@ def get_trip(uuid: str):
     PermissionScope.SALES.value,
 )
 def get_trip_activity(uuid: str):
-    """Orders, fulfillments (vehicle sales) and payments at this trip's stops."""
+    """Stops, orders, fulfillments (vehicle sales) and payments at this trip's stops."""
+    from app.utils.geom_utils import wkt_or_wkb_to_lat_lon
+
     with SqlAlchemyUnitOfWork() as uow:
         trip = uow.trip_repository.find_one(uuid=uuid)
         if not trip:
@@ -86,6 +88,29 @@ def get_trip_activity(uuid: str):
                 mat = uow.material_repository.find_one(uuid=material_uuid)
                 material_names[material_uuid] = mat.name if mat else material_uuid
             return material_names[material_uuid]
+
+        stops = []
+        for stop in trip.stops:
+            task_exe = (
+                uow.task_execution_repository.find_one(uuid=stop.task_execution_uuid)
+                if stop.task_execution_uuid else None
+            )
+            try:
+                latlon = wkt_or_wkb_to_lat_lon(stop.coordinates)
+            except Exception:
+                latlon = None
+            stops.append({
+                "uuid": stop.uuid,
+                "index": stop.index,
+                "customer_uuid": stop.customer_uuid,
+                "customer_name": customer_name(stop.customer),
+                "status": task_exe.status if task_exe else stop.status,
+                "outcome": stop.outcome,
+                "coordinates": latlon,  # "lat,lon"
+                "created_at": stop.created_at.isoformat() if stop.created_at else None,
+                "completed_at": task_exe.end_time.isoformat() if task_exe and task_exe.end_time else None,
+            })
+        stops.sort(key=lambda s: (s["index"] is None, s["index"], s["created_at"] or ""))
 
         orders, fulfillments, payments = [], [], []
         for stop in trip.stops:
@@ -128,6 +153,7 @@ def get_trip_activity(uuid: str):
 
         newest_first = lambda rows: sorted(rows, key=lambda r: r["created_at"] or "", reverse=True)
         result = {
+            "stops": stops,
             "orders": newest_first(orders),
             "fulfillments": newest_first(fulfillments),
             "payments": newest_first(payments),

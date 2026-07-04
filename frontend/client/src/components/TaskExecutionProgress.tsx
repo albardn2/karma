@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Check, X, Clock, Circle } from "lucide-react";
 import type { TaskExecution } from "@/types/taskExecution";
 
@@ -15,6 +16,16 @@ export function TaskExecutionProgress({
   // Topological sort to order tasks based on depends_on
   const orderedTasks = topologicalSort(taskExecutions);
 
+  // keep the selected circle visible (e.g. a freshly added ad-hoc stop)
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!selectedTaskExecutionUuid || !containerRef.current) return;
+    const el = containerRef.current.querySelector(
+      `[data-testid="progress-task-${selectedTaskExecutionUuid}"]`
+    );
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [selectedTaskExecutionUuid, orderedTasks.length]);
+
   if (orderedTasks.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-gray-500">
@@ -24,7 +35,7 @@ export function TaskExecutionProgress({
   }
 
   return (
-    <div className="w-full overflow-x-auto py-8">
+    <div className="w-full overflow-x-auto py-8" ref={containerRef}>
       <div className="flex items-center justify-center min-w-max px-8">
         {orderedTasks.map((task, index) => (
           <div key={task.uuid} className="flex items-center">
@@ -74,66 +85,42 @@ export function TaskExecutionProgress({
 function topologicalSort(tasks: TaskExecution[]): TaskExecution[] {
   if (tasks.length === 0) return [];
 
-  // Build maps: name -> task and name -> dependents
-  const taskByName = new Map<string, TaskExecution>();
-  const dependents = new Map<string, Set<string>>();
-  const inDegree = new Map<string, number>();
-
-  // Initialize maps
-  tasks.forEach((task) => {
-    const name = task.name || task.uuid;
-    taskByName.set(name, task);
-    inDegree.set(name, 0);
-    dependents.set(name, new Set());
+  // Graph keyed by uuid (names can collide, e.g. two ad-hoc stops for the
+  // same customer). depends_on refers to task NAMES, so resolve names to uuids.
+  const byUuid = new Map<string, TaskExecution>(tasks.map((t) => [t.uuid, t]));
+  const uuidsByName = new Map<string, string[]>();
+  tasks.forEach((t) => {
+    const name = t.name || t.uuid;
+    if (!uuidsByName.has(name)) uuidsByName.set(name, []);
+    uuidsByName.get(name)!.push(t.uuid);
   });
 
-  // Build dependency graph based on task names in depends_on
-  tasks.forEach((task) => {
-    const name = task.name || task.uuid;
-    const deps = task.depends_on || [];
-    
-    // Count how many valid dependencies this task has
-    let validDepsCount = 0;
-    deps.forEach((depName) => {
-      if (taskByName.has(depName)) {
-        validDepsCount++;
-        // Add this task as a dependent of the dependency
-        dependents.get(depName)!.add(name);
-      }
-    });
-    
-    inDegree.set(name, validDepsCount);
-  });
-
-  // Kahn's algorithm for topological sort
-  const queue: string[] = [];
-  const result: TaskExecution[] = [];
-
-  // Start with tasks that have no dependencies
-  inDegree.forEach((degree, name) => {
-    if (degree === 0) {
-      queue.push(name);
-    }
-  });
-
-  while (queue.length > 0) {
-    const currentName = queue.shift()!;
-    const currentTask = taskByName.get(currentName);
-    if (currentTask) {
-      result.push(currentTask);
-    }
-
-    // Reduce in-degree for dependents
-    const deps = dependents.get(currentName);
-    if (deps) {
-      deps.forEach((depName) => {
-        const newDegree = inDegree.get(depName)! - 1;
-        inDegree.set(depName, newDegree);
-        if (newDegree === 0) {
-          queue.push(depName);
-        }
+  const inDegree = new Map<string, number>(tasks.map((t) => [t.uuid, 0]));
+  const dependents = new Map<string, Set<string>>(tasks.map((t) => [t.uuid, new Set<string>()]));
+  tasks.forEach((t) => {
+    (t.depends_on || []).forEach((depName) => {
+      (uuidsByName.get(depName) || []).forEach((depUuid) => {
+        dependents.get(depUuid)!.add(t.uuid);
+        inDegree.set(t.uuid, (inDegree.get(t.uuid) || 0) + 1);
       });
-    }
+    });
+  });
+
+  // Kahn's algorithm; among available tasks always pick the earliest-created,
+  // so dynamically added tasks (ad-hoc stops) land in chronological position
+  // instead of being pushed to the front of the bar.
+  const createdAt = (u: string) => new Date((byUuid.get(u) as any)?.created_at || 0).getTime();
+  const available: string[] = tasks.filter((t) => inDegree.get(t.uuid) === 0).map((t) => t.uuid);
+  const result: TaskExecution[] = [];
+  while (available.length > 0) {
+    available.sort((a, b) => createdAt(a) - createdAt(b));
+    const current = available.shift()!;
+    result.push(byUuid.get(current)!);
+    dependents.get(current)!.forEach((next) => {
+      const degree = (inDegree.get(next) || 0) - 1;
+      inDegree.set(next, degree);
+      if (degree === 0) available.push(next);
+    });
   }
 
   // If we couldn't process all tasks, there might be a cycle or missing dependencies
@@ -145,7 +132,13 @@ function topologicalSort(tasks: TaskExecution[]): TaskExecution[] {
       }
     });
   }
-  
+
+  // keep the explicit finish step visually last
+  const finishIdx = result.findIndex((t) => t.name === "finish_trip");
+  if (finishIdx >= 0 && finishIdx !== result.length - 1) {
+    result.push(...result.splice(finishIdx, 1));
+  }
+
   return result;
 }
 

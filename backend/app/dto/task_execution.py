@@ -17,6 +17,7 @@ class OperatorType(str, Enum):
     TRIP_ADD_INVENTORY_OPERATOR = "trip_add_inventory_operator"
     TRIP_ROUTE_OPERATOR = "trip_route_operator"
     TRIP_CREATE_OPERATOR = "trip_create_operator"
+    TRIP_FINISH_OPERATOR = "trip_finish_operator"
 
 
 # Base DTO for TaskExecution
@@ -61,6 +62,7 @@ class TaskExecutionRead(TaskExecutionBase):
     created_at: datetime  # Time when the task execution was created
     parent_task_execution_uuid: Optional[str] = None  # Parent task execution str if this is a child task
     name: Optional[str] = None  # Name of the task execution, if applicable
+    operator: Optional[str] = None  # Operator of the underlying task
     result : Optional[Dict[str, Any]] = Field(default_factory=dict)  # Ensure result is always a dict
 
 

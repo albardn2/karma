@@ -15,6 +15,8 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Trip } from "@/lib/types";
 import { VehicleInventoryChart } from "@/components/vehicles/VehicleInventoryChart";
+import { TripStopsMap } from "@/components/map/TripStopsMap";
+import { Table as TableIcon, Map as MapIcon } from "lucide-react";
 
 export default function TripDetail() {
   const params = useParams();
@@ -48,6 +50,13 @@ export default function TripDetail() {
   const [activityTab, setActivityTab] = useState("orders");
   const [activityPage, setActivityPage] = useState(0);
   const PAGE_SIZE = 5;
+
+  // trip stop customers: table (paginated) / animated map toggle
+  const [stopsView, setStopsView] = useState<"table" | "map">("table");
+  const [stopsPage, setStopsPage] = useState(0);
+  const stops: any[] = activity?.stops || [];
+  const stopsPageRows = stops.slice(stopsPage * PAGE_SIZE, (stopsPage + 1) * PAGE_SIZE);
+  const stopsPageCount = Math.max(1, Math.ceil(stops.length / PAGE_SIZE));
   const activityRows: any[] =
     activityTab === "orders" ? activity?.orders || []
     : activityTab === "fulfillments" ? activity?.fulfillments || []
@@ -392,6 +401,94 @@ export default function TripDetail() {
             title="Vehicle Inventory During Trip"
           />
         </div>
+
+        {/* Trip stop customers: sorted table / animated map */}
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Trip Stops</CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant={stopsView === "table" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStopsView("table")}
+                  data-testid="button-stops-table"
+                >
+                  <TableIcon className="h-4 w-4 mr-2" /> Table
+                </Button>
+                <Button
+                  variant={stopsView === "map" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStopsView("map")}
+                  data-testid="button-stops-map"
+                >
+                  <MapIcon className="h-4 w-4 mr-2" /> Map
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {stops.length === 0 ? (
+              <p className="text-sm text-gray-500" data-testid="trip-stops-empty">No stops on this trip yet.</p>
+            ) : stopsView === "map" ? (
+              <TripStopsMap stops={stops} />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="table-trip-stops">
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b">
+                      <th className="py-2 pr-4 font-medium">#</th>
+                      <th className="py-2 pr-4 font-medium">Customer</th>
+                      <th className="py-2 pr-4 font-medium">Status</th>
+                      <th className="py-2 pr-4 font-medium">Outcome</th>
+                      <th className="py-2 font-medium">Completed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stopsPageRows.map((s: any, i: number) => (
+                      <tr key={s.uuid} className="border-b last:border-0">
+                        <td className="py-2 pr-4 text-gray-500">{stopsPage * PAGE_SIZE + i + 1}</td>
+                        <td className="py-2 pr-4">{s.customer_name || "—"}</td>
+                        <td className="py-2 pr-4">
+                          <Badge variant={s.status === "completed" ? "secondary" : "outline"}>
+                            {s.status || "—"}
+                          </Badge>
+                        </td>
+                        <td className="py-2 pr-4 max-w-[240px] truncate">{s.outcome || "—"}</td>
+                        <td className="py-2 whitespace-nowrap">{s.completed_at ? formatDateTime(s.completed_at) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {stops.length > PAGE_SIZE && (
+                  <div className="flex items-center justify-end gap-3 mt-3">
+                    <span className="text-xs text-gray-500" data-testid="trip-stops-page-info">
+                      {stopsPage * PAGE_SIZE + 1}–{Math.min((stopsPage + 1) * PAGE_SIZE, stops.length)} of {stops.length}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setStopsPage((p) => Math.max(0, p - 1))}
+                      disabled={stopsPage === 0}
+                      data-testid="button-stops-prev"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setStopsPage((p) => Math.min(stopsPageCount - 1, p + 1))}
+                      disabled={stopsPage >= stopsPageCount - 1}
+                      data-testid="button-stops-next"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Orders / fulfillments / payments at this trip's stops */}
         <Card className="mt-6">

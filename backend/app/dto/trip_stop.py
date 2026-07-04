@@ -61,6 +61,24 @@ class TripStopCreate(BaseModel):
         return lat_lon_to_wkt(coords=v)  # This will raise BadRequestError if invalid
 
 
+class ManualStopCreate(BaseModel):
+    """Ad-hoc stop added by the driver mid-trip: either an existing customer
+    or a brand-new one created on the spot."""
+    model_config = ConfigDict(extra="forbid")
+
+    customer_uuid: Optional[str] = None
+    customer: Optional[dict] = None  # CustomerCreate fields for a new customer
+    # "lat,lon" fallback used when the customer has no stored coordinates
+    # (e.g. device geolocation at the shop)
+    coordinates: Optional[str] = None
+
+    @model_validator(mode="after")
+    def check_exclusive(self):
+        if bool(self.customer_uuid) == bool(self.customer):
+            raise BadRequestError("Set exactly one of `customer_uuid` or `customer`.")
+        return self
+
+
 class TripStopUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

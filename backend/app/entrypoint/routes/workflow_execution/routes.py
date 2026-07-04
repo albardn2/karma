@@ -69,6 +69,126 @@ def get_workflow_execution(uuid: str):
         dto = WorkflowExecutionRead.from_orm(workflow_exe).model_dump(mode="json")
     return jsonify(dto), 200
 
+
+@workflow_execution_blueprint.route("/<string:uuid>/manual-stop", methods=["POST"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.OPERATOR.value,
+    PermissionScope.DRIVER.value,
+    PermissionScope.SALES.value)
+def add_manual_stop(uuid: str):
+    """Add an ad-hoc trip stop mid-trip: picks an existing customer or creates
+    a new one on the spot, then creates the stop + its trip_stop task."""
+    from datetime import datetime
+    from app.dto.trip_stop import ManualStopCreate
+    from app.dto.trip import TripStatus
+    from app.dto.task_execution import OperatorType
+    from app.dto.customer import CustomerCreate, CustomerRead
+    from models.common import Customer as CustomerModel
+    from app.utils.geom_utils import lat_lon_to_wkt
+    from app.domains.task_execution.workflow_operators.create_trip_operator import create_trip_stop_with_task
+
+    current_uuid = get_jwt_identity()
+    payload = ManualStopCreate(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid)
+        if not workflow_exe:
+            raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
+        trips = workflow_exe.trips
+        if not trips:
+            raise BadRequestError("This workflow execution has no trip yet")
+        trip = trips[0]
+        if trip.status != TripStatus.IN_PROGRESS.value:
+            raise BadRequestError(f"Trip is not in progress (status: {trip.status})")
+
+        # resolve or create the customer
+        if payload.customer_uuid:
+            customer = uow.customer_repository.find_one(uuid=payload.customer_uuid, is_deleted=False)
+            if not customer:
+                raise NotFoundError("Customer not found")
+        else:
+            customer_create = CustomerCreate(**payload.customer)
+            customer_create.created_by_uuid = current_uuid
+            if customer_create.email_address and uow.customer_repository.find_one(email_address=customer_create.email_address):
+                raise BadRequestError(f"Customer with email {customer_create.email_address} already exists")
+            customer = CustomerModel(**customer_create.model_dump())
+            uow.customer_repository.save(model=customer, commit=False)
+
+        # the stop needs coordinates; backfill from the request (device location)
+        if customer.coordinates is None:
+            if not payload.coordinates:
+                raise BadRequestError("Customer has no coordinates; provide `coordinates` (lat,lon)")
+            customer.coordinates = lat_lon_to_wkt(coords=payload.coordinates)
+            uow.customer_repository.save(model=customer, commit=False)
+
+        # flush + refresh so coordinates round-trips to a geometry element
+        # (downstream code calls to_shape() on it)
+        uow.session.flush()
+        uow.session.refresh(customer)
+
+        existing_indexes = [s.index for s in trip.stops if s.index is not None]
+        next_index = (max(existing_indexes) + 1) if existing_indexes else 0
+
+        trip_op_exe = next(
+            (te for te in workflow_exe.task_executions if te.operator == OperatorType.TRIP_OPERATOR.value),
+            None,
+        )
+
+        # splice the new stop into the execution chain: it follows the latest
+        # finished chain task, and whatever previously followed that task is
+        # rewired to depend on the new stop — so the flow continues through it.
+        chain_ops = (OperatorType.TRIP_OPERATOR.value, OperatorType.TRIP_STOP_OPERATOR.value)
+        completed_chain = [
+            te for te in workflow_exe.task_executions
+            if te.operator in chain_ops and te.status == WorkflowStatus.COMPLETED.value
+        ]
+        anchor = (
+            max(completed_chain, key=lambda te: te.end_time or te.created_at)
+            if completed_chain else trip_op_exe
+        )
+        successors = [
+            te for te in workflow_exe.task_executions
+            if anchor is not None
+            and te.uuid != anchor.uuid
+            and te.depends_on and anchor.name in te.depends_on
+            and te.status in (WorkflowStatus.NOT_STARTED.value, WorkflowStatus.IN_PROGRESS.value)
+        ]
+
+        task_create, task_execution = create_trip_stop_with_task(
+            uow=uow,
+            workflow_execution=workflow_exe,
+            customer=customer,
+            created_by_uuid=current_uuid,
+            index=next_index,
+            depends_on=[anchor.name] if anchor is not None else [],
+            parent_task_execution_uuid=trip_op_exe.uuid if trip_op_exe else None,
+        )
+
+        # the new stop is current when its anchor is already done
+        new_exe_model = uow.task_execution_repository.find_one(uuid=task_execution.uuid)
+        if anchor is not None and anchor.status == WorkflowStatus.COMPLETED.value:
+            new_exe_model.status = WorkflowStatus.IN_PROGRESS.value
+            new_exe_model.start_time = datetime.now()
+            uow.task_execution_repository.save(model=new_exe_model, commit=False)
+
+        # re-point the old successors (next stop / finish_trip) at the new stop
+        for succ in successors:
+            succ.depends_on = [task_create.name]
+            if succ.status == WorkflowStatus.IN_PROGRESS.value:
+                succ.status = WorkflowStatus.NOT_STARTED.value
+                succ.start_time = None
+            uow.task_execution_repository.save(model=succ, commit=False)
+
+        uow.commit()
+        result = {
+            "task_execution_uuid": task_execution.uuid,
+            "customer": CustomerRead.from_orm(customer).model_dump(mode="json"),
+        }
+    return jsonify(result), 201
+
 # # Route to update a Workflow
 # @workflow_execution_blueprint.route("/<string:uuid>", methods=["PUT"])
 # @jwt_required()

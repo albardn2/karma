@@ -44,6 +44,7 @@ import { TaskExecutionProgress } from "@/components/TaskExecutionProgress";
 import { TripOperatorMap } from "@/components/map/TripOperatorMap";
 import { CustomerLocationMap } from "@/components/map/CustomerLocationMap";
 import { CreateOrderDialog } from "@/components/customer-orders/CreateOrderDialog";
+import { AddStopDialog } from "@/components/trips/AddStopDialog";
 import { CustomerRecentOrders } from "@/components/customer-orders/CustomerRecentOrders";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -145,15 +146,21 @@ export default function WorkflowExecutionTaskDetail() {
       let fieldSchema: z.ZodTypeAny;
       
       switch (field.type) {
-        case 'number':
-          fieldSchema = z.coerce.number();
+        case 'number': {
+          let numberSchema: z.ZodTypeAny = z.coerce.number();
           if (field.min !== undefined && field.min !== null) {
-            fieldSchema = (fieldSchema as z.ZodNumber).min(field.min);
+            numberSchema = (numberSchema as z.ZodNumber).min(field.min);
           }
           if (field.max !== undefined && field.max !== null) {
-            fieldSchema = (fieldSchema as z.ZodNumber).max(field.max);
+            numberSchema = (numberSchema as z.ZodNumber).max(field.max);
           }
+          // treat empty inputs as "not provided" instead of coercing "" to 0
+          fieldSchema = z.preprocess(
+            (v) => (v === "" || v === null || v === undefined ? undefined : v),
+            field.required ? numberSchema : numberSchema.optional()
+          );
           break;
+        }
         case 'email':
           fieldSchema = z.string().email();
           break;
@@ -698,6 +705,28 @@ export default function WorkflowExecutionTaskDetail() {
   };
   const orderContext = getTripStopOrderContext();
 
+  // manual-stops mode: when checked on the start_trip form, hide the routing inputs
+  const ROUTING_FIELD_NAMES = new Set([
+    "service_areas", "start_warehouse_name", "end_warehouse_name", "start_point", "end_point",
+    "customer_categories", "last_visit_threshold_days", "max_stops", "min_stops",
+  ]);
+  const manualStopsValue = form.watch("manual_stops" as any);
+  const manualStopsChecked =
+    task?.operator === "start_trip_operator" &&
+    Array.isArray(manualStopsValue) && manualStopsValue.length > 0;
+  const visibleTaskInputFields = manualStopsChecked
+    ? taskInputFields.filter((f) => !ROUTING_FIELD_NAMES.has(f.name))
+    : taskInputFields;
+
+  // ad-hoc stops can be added while the trip is underway (trip created, not yet finished)
+  const tripCreated = taskExecutions.some(
+    (te: any) => (te.operator || te.task?.operator) === "trip_create_operator" && te.status === "completed"
+  );
+  const tripFinished = taskExecutions.some(
+    (te: any) => (te.operator || te.task?.operator) === "trip_finish_operator" && te.status === "completed"
+  );
+  const canAddStop = tripCreated && !tripFinished;
+
   const renderFormField = (field: TaskInputField) => {
     const key = field.name;
 
@@ -1083,9 +1112,17 @@ export default function WorkflowExecutionTaskDetail() {
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <CardTitle>Task Execution Progress</CardTitle>
-                    <span className="text-sm text-gray-500">
-                      {Math.round(calculateProgress())}% Complete
-                    </span>
+                    <div className="flex items-center gap-3">
+                      {canAddStop && (
+                        <AddStopDialog
+                          workflowExecutionUuid={executionUuid}
+                          onCreated={(teUuid) => setSelectedTaskExecutionUuid(teUuid)}
+                        />
+                      )}
+                      <span className="text-sm text-gray-500">
+                        {Math.round(calculateProgress())}% Complete
+                      </span>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -1157,8 +1194,8 @@ export default function WorkflowExecutionTaskDetail() {
 
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(handleTaskComplete)} className="space-y-6">
-                        {taskInputFields.length > 0 ? (
-                          taskInputFields.map((field) => renderFormField(field))
+                        {visibleTaskInputFields.length > 0 ? (
+                          visibleTaskInputFields.map((field) => renderFormField(field))
                         ) : (
                           <div className="text-center text-gray-500 py-4">
                             No input fields defined for this task.

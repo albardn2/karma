@@ -44,6 +44,18 @@ class TripRouteOperator(OperatorInterface):
         self.task_exe = task_exe
         self.all_tasks_executions = task_exe.workflow_execution.task_executions
 
+        # manual-stops mode: the driver adds stops ad hoc, no routing to compute
+        if self.is_manual_stops():
+            operator_schema.customer_uuids = []
+            operator_schema.waypoints = []
+            operator_schema.route_coordinates = []
+            task_exe.result = operator_schema.model_dump(mode="json")
+            task_exe.status = WorkflowStatus.COMPLETED.value
+            task_exe.end_time = datetime.now()
+            task_exe.completed_by_uuid = payload.completed_by_uuid
+            uow.task_execution_repository.save(task_exe, commit=False)
+            return
+
         service_area_names = self.get_service_areas()
         # name is in service_area names
 
@@ -106,6 +118,12 @@ class TripRouteOperator(OperatorInterface):
         # name of class
         return self.__class__.__name__
 
+
+    def is_manual_stops(self) -> bool:
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                return bool(task_exe.result.get("manual_stops"))
+        return False
 
     def get_service_areas(self) -> str:
         """
