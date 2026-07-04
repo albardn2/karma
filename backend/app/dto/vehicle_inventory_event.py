@@ -33,6 +33,8 @@ class VehicleInventoryEventCreate(BaseModel):
     notes: Optional[str] = None
     # set for system-generated 'sale' events tied to a fulfilled trip-stop order item
     customer_order_item_uuid: Optional[str] = None
+    # trip stop where the stock left the truck (attributes the sale to a trip)
+    trip_stop_uuid: Optional[str] = None
 
     @model_validator(mode="after")
     def check_quantity(self):
@@ -60,6 +62,7 @@ class VehicleInventoryEventRead(BaseModel):
     currency: Optional[str] = None
     notes: Optional[str] = None
     customer_order_item_uuid: Optional[str] = None
+    trip_stop_uuid: Optional[str] = None
     is_deleted: bool
     created_at: datetime
 

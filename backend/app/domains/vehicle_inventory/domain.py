@@ -70,6 +70,7 @@ class VehicleInventoryDomain:
         quantity: float,
         customer_order_item_uuid: str,
         created_by_uuid: str = None,
+        trip_stop_uuid: str = None,
     ):
         """Decrement the vehicle's stock of a material for a fulfilled trip-stop order item.
         Auto-creates the inventory row if missing and may push the balance negative."""
@@ -87,6 +88,7 @@ class VehicleInventoryDomain:
                 quantity=abs(quantity),
                 customer_order_item_uuid=customer_order_item_uuid,
                 created_by_uuid=created_by_uuid,
+                trip_stop_uuid=trip_stop_uuid,
             ),
             allow_negative=True,
         )

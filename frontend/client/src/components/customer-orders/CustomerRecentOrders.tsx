@@ -15,7 +15,7 @@ interface OrderRow {
   currency?: string;
 }
 
-export function CustomerRecentOrders({ customerUuid }: { customerUuid: string }) {
+export function CustomerRecentOrders({ customerUuid, tripStopUuid }: { customerUuid: string; tripStopUuid?: string }) {
   const [selectedOrderUuid, setSelectedOrderUuid] = useState<string | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ["/customer-order/", "recent", customerUuid],
@@ -104,6 +104,7 @@ export function CustomerRecentOrders({ customerUuid }: { customerUuid: string })
 
       <OrderDetailDialog
         orderUuid={selectedOrderUuid}
+        tripStopUuid={tripStopUuid}
         open={!!selectedOrderUuid}
         onOpenChange={(o) => { if (!o) setSelectedOrderUuid(null); }}
       />

@@ -98,6 +98,7 @@ export function CreateOrderDialog({
     onSuccess: () => {
       toast({ title: "Order created", description: "The order was created successfully." });
       queryClient.invalidateQueries({ queryKey: ["/customer-order/"] });
+      queryClient.invalidateQueries({ queryKey: ["/customer/"] }); // refresh customer balance
       queryClient.invalidateQueries({ queryKey: ["/trip-stop/"] });
       reset();
       setIsOpen(false);

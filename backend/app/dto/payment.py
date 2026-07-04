@@ -22,6 +22,7 @@ class PaymentBase(BaseModel):
     payment_method: PaymentMethod
     notes: Optional[str] = None
     debit_note_item_uuid: Optional[str] = None
+    trip_stop_uuid: Optional[str] = None  # set when cash is collected during a trip
 
     # validate invoice uuid or debit note item uuid must exist but not both
     @model_validator(mode="after")

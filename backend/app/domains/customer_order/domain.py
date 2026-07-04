@@ -39,7 +39,8 @@ class CustomerOrderDomain:
                 uow=uow,
                 payload=CustomerOrderItemBulkFulfill(
                     items=[FulfillItem(customer_order_item_uuid=item.uuid)
-                           for item in full.customer_order.customer_order_items]
+                           for item in full.customer_order.customer_order_items],
+                    trip_stop_uuid=payload.trip_stop_uuid,
                 ),
             )
 
@@ -56,6 +57,7 @@ class CustomerOrderDomain:
                         amount=amount,
                         currency=payload.currency,
                         payment_method=payload.payment_method,
+                        trip_stop_uuid=payload.trip_stop_uuid,
                     ),
                 )
 

@@ -645,11 +645,14 @@ class Payment(Base):
     notes = Column(Text, nullable=True)
     debit_note_item_uuid = Column(String(36), ForeignKey("debit_note_item.uuid"), nullable=True)
     is_deleted  = Column(Boolean, default=False)
+    # trip stop where this cash was collected (set for payments taken during a trip)
+    trip_stop_uuid = Column(String(36), ForeignKey("trip_stop.uuid"), nullable=True)
 
     # relations
     invoice = relationship("Invoice", back_populates="payments")
     financial_account = relationship("FinancialAccount", back_populates="payments")
     debit_note_item = relationship("DebitNoteItem", back_populates="payments")
+    trip_stop = relationship("TripStop", backref="payments")
 
     def __repr__(self):
         return (
@@ -1895,33 +1898,30 @@ class Trip(Base):
 
     @hybrid_property
     def expected_cash(self):
-        all_orders = []
+        # cash actually collected at this trip's stops (payments tagged to the stop),
+        # including payments taken for previously-created orders during the trip
+        total = 0
         for stop in self.stops:
-            orders = [order for order in stop.customer_orders if not order.is_deleted]
-            all_orders.extend(orders)
-
-        # get amount paid
-        return sum(order.net_amount_paid for order in all_orders)
+            for payment in stop.payments:
+                if not payment.is_deleted:
+                    total += payment.amount
+        return total
 
     @property
     def sold_inventory_map(self):
         """Quantity sold off the vehicle during the trip, per material.
 
-        Derived from the vehicle 'sale' events created when trip-stop orders are
-        fulfilled (stored as negative deltas), returned here as positive amounts.
+        Derived from the vehicle 'sale' events tagged to this trip's stops (stored
+        as negative deltas), returned here as positive amounts. Tagging by stop
+        (rather than walking the stops' orders) captures stock handed off for
+        previously-created orders that are fulfilled during the trip.
         """
         sold: dict[str, float] = {}
         for stop in self.stops:
-            for order in stop.customer_orders:
-                if order.is_deleted:
+            for ev in stop.vehicle_inventory_events:
+                if ev.is_deleted or ev.event_type != "sale":
                     continue
-                for item in order.customer_order_items:
-                    if item.is_deleted or not item.is_fulfilled:
-                        continue
-                    for ev in item.vehicle_inventory_events:
-                        if ev.is_deleted or ev.event_type != "sale":
-                            continue
-                        sold[ev.material_uuid] = sold.get(ev.material_uuid, 0) - ev.quantity
+                sold[ev.material_uuid] = sold.get(ev.material_uuid, 0) - ev.quantity
         return sold
 
     @property
@@ -2062,10 +2062,13 @@ class VehicleInventoryEvent(Base):
     is_deleted = Column(Boolean, default=False)
     # set for trip-driven 'sale' events, linking the decrement to the fulfilled order item
     customer_order_item_uuid = Column(String(36), ForeignKey("customer_order_item.uuid"), nullable=True)
+    # trip stop where the stock left the truck (set for sales collected during a trip)
+    trip_stop_uuid = Column(String(36), ForeignKey("trip_stop.uuid"), nullable=True)
 
     # relations
     vehicle_inventory = relationship("VehicleInventory", back_populates="events")
     customer_order_item = relationship("CustomerOrderItem", backref="vehicle_inventory_events")
+    trip_stop = relationship("TripStop", backref="vehicle_inventory_events")
 
     def __repr__(self):
         return (

@@ -1146,7 +1146,7 @@ export default function WorkflowExecutionTaskDetail() {
                     {/* Recent order history + create an order for this trip stop's customer */}
                     {orderContext && (
                       <div className="mb-6">
-                        <CustomerRecentOrders customerUuid={orderContext.customerUuid} />
+                        <CustomerRecentOrders customerUuid={orderContext.customerUuid} tripStopUuid={orderContext.tripStopUuid} />
                         <CreateOrderDialog
                           customerUuid={orderContext.customerUuid}
                           customerName={orderContext.customerName}

@@ -9,10 +9,12 @@ import { apiRequest } from "@/lib/queryClient";
 
 export function OrderDetailDialog({
   orderUuid,
+  tripStopUuid,
   open,
   onOpenChange,
 }: {
   orderUuid: string | null;
+  tripStopUuid?: string;
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
@@ -39,6 +41,7 @@ export function OrderDetailDialog({
     queryClient.invalidateQueries({ queryKey: detailKey });
     queryClient.refetchQueries({ queryKey: detailKey });
     queryClient.invalidateQueries({ queryKey: ["/customer-order/"] });
+    queryClient.invalidateQueries({ queryKey: ["/customer/"] }); // refresh customer balance
   };
 
   const canFulfill = unfulfilled.length > 0;
@@ -49,7 +52,10 @@ export function OrderDetailDialog({
       if (doFulfill && canFulfill) {
         await apiRequest("/customer-order-item/fulfill-items", {
           method: "POST",
-          body: { items: unfulfilled.map((i: any) => ({ customer_order_item_uuid: i.uuid })) },
+          body: {
+            items: unfulfilled.map((i: any) => ({ customer_order_item_uuid: i.uuid })),
+            trip_stop_uuid: tripStopUuid || null, // attribute the vehicle sale to the current stop
+          },
         });
       }
       if (doPay && canPay) {
@@ -61,6 +67,7 @@ export function OrderDetailDialog({
             amount: amountDue,
             currency,
             payment_method: "cash", // default method
+            trip_stop_uuid: tripStopUuid || null, // attribute cash to the current trip stop
           },
         });
       }
