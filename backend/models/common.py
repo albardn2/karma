@@ -1899,13 +1899,14 @@ class Trip(Base):
     @hybrid_property
     def expected_cash(self):
         # cash actually collected at this trip's stops (payments tagged to the stop),
-        # including payments taken for previously-created orders during the trip
-        total = 0
+        # including payments taken for previously-created orders during the trip.
+        # Keyed by currency, since a trip may collect in more than one (USD/SYP).
+        totals: dict[str, float] = {}
         for stop in self.stops:
             for payment in stop.payments:
                 if not payment.is_deleted:
-                    total += payment.amount
-        return total
+                    totals[payment.currency] = totals.get(payment.currency, 0) + payment.amount
+        return totals
 
     @property
     def sold_inventory_map(self):

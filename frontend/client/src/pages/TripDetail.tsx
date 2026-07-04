@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit3, Save, X, Copy, Check, Truck } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Edit3, Save, X, Copy, Check, Truck, Banknote, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Trip } from "@/lib/types";
+import { VehicleInventoryChart } from "@/components/vehicles/VehicleInventoryChart";
 
 export default function TripDetail() {
   const params = useParams();
@@ -26,6 +28,32 @@ export default function TripDetail() {
     queryFn: () => apiRequest(`/trip/${params?.uuid}`),
     enabled: !!params?.uuid,
   });
+
+  // material names for the inventory tables (keys are material uuids)
+  const { data: materialsData } = useQuery({
+    queryKey: ["/material/", "trip-detail"],
+    queryFn: () => apiRequest("/material/?page=1&per_page=100"),
+  });
+  const materialName = (uuid: string) => {
+    const m = (materialsData?.materials || []).find((m: any) => m.uuid === uuid);
+    return m ? `${m.name}${m.measure_unit ? ` (${m.measure_unit})` : ""}` : uuid;
+  };
+
+  // orders / fulfillments / payments at this trip's stops
+  const { data: activity } = useQuery({
+    queryKey: ["/trip/", params?.uuid, "activity"],
+    queryFn: () => apiRequest(`/trip/${params?.uuid}/activity`),
+    enabled: !!params?.uuid,
+  });
+  const [activityTab, setActivityTab] = useState("orders");
+  const [activityPage, setActivityPage] = useState(0);
+  const PAGE_SIZE = 5;
+  const activityRows: any[] =
+    activityTab === "orders" ? activity?.orders || []
+    : activityTab === "fulfillments" ? activity?.fulfillments || []
+    : activity?.payments || [];
+  const pageRows = activityRows.slice(activityPage * PAGE_SIZE, (activityPage + 1) * PAGE_SIZE);
+  const pageCount = Math.max(1, Math.ceil(activityRows.length / PAGE_SIZE));
 
   const updateTripMutation = useMutation({
     mutationFn: async (data: { notes?: string }) => {
@@ -278,6 +306,220 @@ export default function TripDetail() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Expected cash collected at this trip's stops */}
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-gray-600" />
+              <CardTitle>Expected Cash</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {trip.expected_cash && Object.keys(trip.expected_cash).length > 0 ? (
+              <div className="flex flex-wrap gap-3">
+                {Object.entries(trip.expected_cash).map(([cur, amt]) => (
+                  <div key={cur} className="border rounded-md px-4 py-2" data-testid={`expected-cash-${cur}`}>
+                    <div className="text-xs text-gray-500">{cur}</div>
+                    <div className="text-lg font-semibold">{Number(amt).toFixed(2)}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500" data-testid="expected-cash-empty">No cash collected on this trip yet.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Start/end inventory + reconciliation */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Trip Inventory</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {trip.inventory_reconciliation && Object.keys(trip.inventory_reconciliation).length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="table-trip-inventory">
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b">
+                      <th className="py-2 pr-4 font-medium">Material</th>
+                      <th className="py-2 pr-4 font-medium text-right">Start</th>
+                      <th className="py-2 pr-4 font-medium text-right">Sold</th>
+                      <th className="py-2 pr-4 font-medium text-right">Expected End</th>
+                      <th className="py-2 pr-4 font-medium text-right">End</th>
+                      <th className="py-2 font-medium text-right">Variance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(trip.inventory_reconciliation).map(([mu, r]) => (
+                      <tr key={mu} className="border-b last:border-0">
+                        <td className="py-2 pr-4">{materialName(mu)}</td>
+                        <td className="py-2 pr-4 text-right">{r.start}</td>
+                        <td className="py-2 pr-4 text-right">{r.sold}</td>
+                        <td className="py-2 pr-4 text-right">{r.expected_end}</td>
+                        <td className="py-2 pr-4 text-right">{r.actual_end ?? "—"}</td>
+                        <td className="py-2 text-right">
+                          {r.variance === null || r.variance === undefined ? (
+                            <span className="text-gray-400">—</span>
+                          ) : (
+                            <Badge variant={r.variance === 0 ? "secondary" : "destructive"}>
+                              {r.variance > 0 ? `+${r.variance}` : r.variance}
+                            </Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!trip.end_inventory || Object.keys(trip.end_inventory).length === 0 ? (
+                  <p className="text-xs text-gray-500 mt-2">
+                    End inventory not snapshotted yet — End and Variance fill in when the trip completes.
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500" data-testid="trip-inventory-empty">No inventory snapshot for this trip.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Vehicle inventory over the trip window */}
+        <div className="mt-6">
+          <VehicleInventoryChart
+            vehicleUuid={trip.vehicle_uuid}
+            windowStart={trip.start_time || trip.created_at}
+            windowEnd={trip.end_time}
+            title="Vehicle Inventory During Trip"
+          />
+        </div>
+
+        {/* Orders / fulfillments / payments at this trip's stops */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Trip Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs
+              value={activityTab}
+              onValueChange={(v) => { setActivityTab(v); setActivityPage(0); }}
+            >
+              <TabsList data-testid="tabs-trip-activity">
+                <TabsTrigger value="orders" data-testid="tab-orders">
+                  Orders ({activity?.orders?.length ?? 0})
+                </TabsTrigger>
+                <TabsTrigger value="fulfillments" data-testid="tab-fulfillments">
+                  Fulfilled ({activity?.fulfillments?.length ?? 0})
+                </TabsTrigger>
+                <TabsTrigger value="payments" data-testid="tab-payments">
+                  Paid ({activity?.payments?.length ?? 0})
+                </TabsTrigger>
+              </TabsList>
+
+              <div className="mt-4">
+                {pageRows.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-6 text-center" data-testid="trip-activity-empty">
+                    Nothing here for this trip yet.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm" data-testid="table-trip-activity">
+                      <thead>
+                        <tr className="text-left text-gray-500 border-b">
+                          <th className="py-2 pr-4 font-medium">Date</th>
+                          <th className="py-2 pr-4 font-medium">Customer</th>
+                          {activityTab === "orders" && (
+                            <>
+                              <th className="py-2 pr-4 font-medium text-right">Total</th>
+                              <th className="py-2 font-medium">Status</th>
+                            </>
+                          )}
+                          {activityTab === "fulfillments" && (
+                            <>
+                              <th className="py-2 pr-4 font-medium">Material</th>
+                              <th className="py-2 font-medium text-right">Qty</th>
+                            </>
+                          )}
+                          {activityTab === "payments" && (
+                            <th className="py-2 font-medium text-right">Amount</th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pageRows.map((r: any, i: number) => (
+                          <tr
+                            key={i}
+                            className={cn(
+                              "border-b last:border-0",
+                              (r.uuid || r.customer_order_uuid) && "cursor-pointer hover:bg-gray-50"
+                            )}
+                            onClick={() => {
+                              const target = r.uuid || r.customer_order_uuid;
+                              if (target) setLocation(`/customer-orders/${target}`);
+                            }}
+                          >
+                            <td className="py-2 pr-4 whitespace-nowrap">{formatDateTime(r.created_at)}</td>
+                            <td className="py-2 pr-4">{r.customer_name || "—"}</td>
+                            {activityTab === "orders" && (
+                              <>
+                                <td className="py-2 pr-4 text-right">{r.total} {r.currency}</td>
+                                <td className="py-2">
+                                  <div className="flex gap-2">
+                                    <Badge variant={r.is_paid ? "secondary" : "destructive"}>
+                                      {r.is_paid ? "Paid" : "Unpaid"}
+                                    </Badge>
+                                    <Badge variant={r.is_fulfilled ? "secondary" : "outline"}>
+                                      {r.is_fulfilled ? "Fulfilled" : "Unfulfilled"}
+                                    </Badge>
+                                  </div>
+                                </td>
+                              </>
+                            )}
+                            {activityTab === "fulfillments" && (
+                              <>
+                                <td className="py-2 pr-4">{r.material_name}</td>
+                                <td className="py-2 text-right">{r.quantity}</td>
+                              </>
+                            )}
+                            {activityTab === "payments" && (
+                              <td className="py-2 text-right">{r.amount} {r.currency}</td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* pagination */}
+                {activityRows.length > PAGE_SIZE && (
+                  <div className="flex items-center justify-end gap-3 mt-3">
+                    <span className="text-xs text-gray-500" data-testid="trip-activity-page-info">
+                      {activityPage * PAGE_SIZE + 1}–{Math.min((activityPage + 1) * PAGE_SIZE, activityRows.length)} of {activityRows.length}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActivityPage((p) => Math.max(0, p - 1))}
+                      disabled={activityPage === 0}
+                      data-testid="button-activity-prev"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActivityPage((p) => Math.min(pageCount - 1, p + 1))}
+                      disabled={activityPage >= pageCount - 1}
+                      data-testid="button-activity-next"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </Tabs>
+          </CardContent>
+        </Card>
 
         {/* Notes Section */}
         <Card className="mt-6">

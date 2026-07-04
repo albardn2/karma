@@ -504,6 +504,13 @@ export interface Trip {
   end_point?: string;
   data?: TripData;
   workflow_execution_uuid?: string;
+  start_inventory?: Record<string, number> | null;
+  end_inventory?: Record<string, number> | null;
+  inventory_reconciliation?: Record<
+    string,
+    { start: number; sold: number; expected_end: number; actual_end: number | null; variance: number | null }
+  > | null;
+  expected_cash?: Record<string, number> | null;
 }
 
 export interface TripFormData {

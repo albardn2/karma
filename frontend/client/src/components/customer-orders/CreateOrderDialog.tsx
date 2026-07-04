@@ -30,8 +30,6 @@ export function CreateOrderDialog({
   const [currency, setCurrency] = useState("USD");
   const [markFulfilled, setMarkFulfilled] = useState(true);
   const [markPaid, setMarkPaid] = useState(true);
-  const [financialAccountUuid, setFinancialAccountUuid] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -40,21 +38,32 @@ export function CreateOrderDialog({
     queryFn: async () => apiRequest("/material/?page=1&per_page=100"),
     enabled: isOpen,
   });
-  const materials = materialsData?.materials || [];
+  const allMaterials = materialsData?.materials || [];
 
-  const { data: accountsData } = useQuery({
-    queryKey: ["/financial-account/", "create-order"],
-    queryFn: async () => apiRequest("/financial-account/?page=1&per_page=100"),
-    enabled: isOpen && markPaid,
+  // when creating an order at a trip stop, only offer materials that were on
+  // the truck at trip start (per the trip's start_inventory snapshot)
+  const { data: tripStopData } = useQuery({
+    queryKey: ["/trip-stop/", tripStopUuid],
+    queryFn: async () => apiRequest(`/trip-stop/${tripStopUuid}`),
+    enabled: isOpen && !!tripStopUuid,
   });
-  const accounts = accountsData?.accounts || [];
-
-  const { data: methodsData } = useQuery({
-    queryKey: ["/payment/payment-methods"],
-    queryFn: async () => apiRequest("/payment/payment-methods"),
-    enabled: isOpen && markPaid,
+  const tripUuid = tripStopData?.trip_uuid;
+  const { data: tripData } = useQuery({
+    queryKey: ["/trip/", tripUuid],
+    queryFn: async () => apiRequest(`/trip/${tripUuid}`),
+    enabled: isOpen && !!tripUuid,
   });
-  const methods: string[] = methodsData || ["cash"];
+  const startInventory: Record<string, number> = tripData?.start_inventory || {};
+  const loadedMaterialUuids = Object.entries(startInventory)
+    .filter(([, qty]) => Number(qty) > 0)
+    .map(([uuid]) => uuid);
+  // fall back to all materials when the trip has no snapshot (e.g. older trips)
+  const materials =
+    tripStopUuid && loadedMaterialUuids.length > 0
+      ? allMaterials.filter((m: any) => loadedMaterialUuids.includes(m.uuid))
+      : allMaterials;
+  const unitOf = (materialUuid: string) =>
+    allMaterials.find((m: any) => m.uuid === materialUuid)?.measure_unit || "";
 
   const total = items.reduce(
     (sum, it) => sum + (parseFloat(it.quantity) || 0) * (parseFloat(it.price_per_unit) || 0),
@@ -71,8 +80,6 @@ export function CreateOrderDialog({
     setCurrency("USD");
     setMarkFulfilled(true);
     setMarkPaid(true);
-    setFinancialAccountUuid("");
-    setPaymentMethod("cash");
   };
 
   const createOrder = useMutation({
@@ -90,8 +97,8 @@ export function CreateOrderDialog({
         pay: markPaid,
       };
       if (markPaid) {
-        body.financial_account_uuid = financialAccountUuid || null;
-        body.payment_method = paymentMethod;
+        body.financial_account_uuid = null; // default account (by currency) on the backend
+        body.payment_method = "cash"; // default method
       }
       return apiRequest("/customer-order/with-items-and-invoice/checkout", { method: "POST", body });
     },
@@ -158,8 +165,17 @@ export function CreateOrderDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <Input type="number" min="1" step="1" placeholder="Qty" className="w-20"
-                  value={it.quantity} onChange={(e) => setItem(i, { quantity: e.target.value })} />
+                <div className="relative w-24">
+                  <Input type="number" min="1" step="1" placeholder="Qty"
+                    className={unitOf(it.material_uuid) ? "pr-10" : ""}
+                    value={it.quantity} onChange={(e) => setItem(i, { quantity: e.target.value })} />
+                  {unitOf(it.material_uuid) && (
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none"
+                      data-testid={`unit-${i}`}>
+                      {unitOf(it.material_uuid)}
+                    </span>
+                  )}
+                </div>
                 <Input type="number" min="0" step="any" placeholder="Price" className="w-24"
                   value={it.price_per_unit} onChange={(e) => setItem(i, { price_per_unit: e.target.value })} />
                 <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(i)} disabled={items.length === 1}>
@@ -183,32 +199,6 @@ export function CreateOrderDialog({
               Mark paid
             </label>
           </div>
-
-          {/* payment fields */}
-          {markPaid && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Financial account</label>
-                <Select value={financialAccountUuid} onValueChange={setFinancialAccountUuid}>
-                  <SelectTrigger data-testid="select-account"><SelectValue placeholder="Default (by currency)" /></SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((a: any) => (
-                      <SelectItem key={a.uuid} value={a.uuid}>{a.account_name} ({a.currency})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Payment method</label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger data-testid="select-method"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {methods.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>

@@ -184,6 +184,7 @@ class TripRead(BaseModel):
     start_inventory: Optional[dict] = None
     end_inventory: Optional[dict] = None
     inventory_reconciliation: Optional[dict] = None
+    expected_cash: Optional[dict] = None  # {currency: amount} collected at this trip's stops
 
     @field_validator("distribution_area", "start_point", "end_point", mode="before")
     def _ensure_wkt(cls, v):

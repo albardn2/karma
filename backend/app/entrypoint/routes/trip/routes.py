@@ -58,6 +58,83 @@ def get_trip(uuid: str):
     return jsonify(dto), 200
 #
 #
+@trip_blueprint.route("/<string:uuid>/activity", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATOR.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.DRIVER.value,
+    PermissionScope.SALES.value,
+)
+def get_trip_activity(uuid: str):
+    """Orders, fulfillments (vehicle sales) and payments at this trip's stops."""
+    with SqlAlchemyUnitOfWork() as uow:
+        trip = uow.trip_repository.find_one(uuid=uuid)
+        if not trip:
+            raise NotFoundError("Trip not found")
+
+        def customer_name(customer):
+            if not customer:
+                return None
+            return customer.company_name or customer.full_name
+
+        material_names: dict = {}
+        def material_name(material_uuid):
+            if material_uuid not in material_names:
+                mat = uow.material_repository.find_one(uuid=material_uuid)
+                material_names[material_uuid] = mat.name if mat else material_uuid
+            return material_names[material_uuid]
+
+        orders, fulfillments, payments = [], [], []
+        for stop in trip.stops:
+            for o in stop.customer_orders:
+                if o.is_deleted:
+                    continue
+                orders.append({
+                    "uuid": o.uuid,
+                    "created_at": o.created_at.isoformat() if o.created_at else None,
+                    "customer_name": customer_name(o.customer),
+                    "total": o.total_adjusted_amount,
+                    "currency": o.currency,
+                    "is_paid": o.is_paid,
+                    "is_fulfilled": o.is_fulfilled,
+                })
+            for ev in stop.vehicle_inventory_events:
+                if ev.is_deleted or ev.event_type != "sale":
+                    continue
+                item = ev.customer_order_item
+                order = item.customer_order if item else None
+                fulfillments.append({
+                    "created_at": ev.created_at.isoformat() if ev.created_at else None,
+                    "material_name": material_name(ev.material_uuid),
+                    "quantity": -ev.quantity,  # stored as negative delta; report as positive
+                    "customer_name": customer_name(order.customer) if order else None,
+                    "customer_order_uuid": order.uuid if order else None,
+                })
+            for p in stop.payments:
+                if p.is_deleted:
+                    continue
+                inv = p.invoice
+                order = inv.customer_order if inv else None
+                payments.append({
+                    "created_at": p.created_at.isoformat() if p.created_at else None,
+                    "amount": p.amount,
+                    "currency": p.currency,
+                    "customer_name": customer_name(order.customer) if order else None,
+                    "customer_order_uuid": order.uuid if order else None,
+                })
+
+        newest_first = lambda rows: sorted(rows, key=lambda r: r["created_at"] or "", reverse=True)
+        result = {
+            "orders": newest_first(orders),
+            "fulfillments": newest_first(fulfillments),
+            "payments": newest_first(payments),
+        }
+    return jsonify(result), 200
+#
+#
 @trip_blueprint.route("/<string:uuid>", methods=["PUT"])
 @jwt_required()
 @scopes_required(
