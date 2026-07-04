@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_BASE_URL = 'https://api-prod.karma-grp.com';
+import { API_BASE_URL } from '@/utils/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;

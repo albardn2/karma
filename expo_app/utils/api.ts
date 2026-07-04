@@ -1,6 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-const API_BASE_URL = 'https://api-prod.karma-grp.com';
+// Set per build profile in eas.json (dev/preview -> api-dev, production ->
+// api-prod) and overridable via .env for local `expo start`; resolved by
+// app.config.ts into expo config extra.
+const API_BASE_URL: string =
+  Constants.expoConfig?.extra?.apiBaseUrl ?? 'https://api-prod.karma-grp.com';
 
 interface ApiResponse<T = any> {
   data?: T;

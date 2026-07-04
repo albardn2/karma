@@ -5,16 +5,19 @@
       "developmentClient": true,
       "distribution": "internal",
       "android": { "buildType": "apk" },
-      "ios": { "simulator": true }
+      "ios": { "simulator": true },
+      "env": { "API_BASE_URL": "https://api-dev.karma-grp.com" }
     },
     "preview": {
       "distribution": "internal",
       "android": { "buildType": "apk" },
-      "ios": { "simulator": false }
+      "ios": { "simulator": false },
+      "env": { "API_BASE_URL": "https://api-dev.karma-grp.com" }
     },
     "production": {
       "android": { "gradleCommand": ":app:bundleRelease" }, // outputs AAB
-      "ios": { "simulator": false }
+      "ios": { "simulator": false },
+      "env": { "API_BASE_URL": "https://api-prod.karma-grp.com" }
     }
   },
   "submit": {

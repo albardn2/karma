@@ -143,53 +143,8 @@ export default function CustomersScreen() {
   };
 
   useEffect(() => {
-    // Test backend connectivity first
-    testBackendConnection();
-    fetchCustomers();
-  }, []);
-
-  useEffect(() => {
     fetchCustomers();
   }, [page, searchTerm, categoryFilter, appliedFilters]);
-
-  const testBackendConnection = async () => {
-    try {
-      console.log('Testing backend connection...');
-      // Test 1: Simple GET request to root
-      try {
-        const simpleResponse = await fetch('https://api-prod.karma-grp.com/', {
-          method: 'GET',
-          headers: {
-            'ngrok-skip-browser-warning': 'true',
-          },
-          mode: 'cors',
-        });
-        console.log('Simple GET response:', simpleResponse.status);
-      } catch (simpleError) {
-        console.log('Simple GET failed:', simpleError);
-      }
-
-      // Test 2: Health check
-      const response = await fetch('https://api-prod.karma-grp.com/health', {
-        method: 'GET',
-        headers: {
-          'ngrok-skip-browser-warning': 'true',
-        },
-      });
-      console.log('Backend health check response:', response.status);
-      if (response.ok) {
-        console.log('✅ Backend is accessible');
-      } else {
-        console.log('❌ Backend returned error:', response.status);
-      }
-    } catch (error) {
-      console.log('❌ Backend connection failed:', error);
-      Alert.alert(
-        'Backend Connection Error', 
-        'Cannot connect to the backend server. Please check if:\n\n1. Your backend is running\n2. The production API is accessible\n3. Your network connection is stable'
-      );
-    }
-  };
 
   const fetchCustomers = async () => {
     try {
