@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '@/utils/api';
+import { API_BASE_URL, apiCall, setOnAuthFailure } from '@/utils/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -18,7 +18,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
+    // when a token refresh fails mid-session, drop straight to the login screen
+    setOnAuthFailure(() => {
+      setIsAuthenticated(false);
+      setUser(null);
+    });
     checkAuthStatus();
+    return () => setOnAuthFailure(null);
   }, []);
 
   const clearAuthData = async () => {
@@ -42,21 +48,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      const response = await fetch(`${API_BASE_URL}/auth/me`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // apiCall handles 401 -> refresh -> retry transparently
+      const response = await apiCall('/auth/me');
 
-      if (response.ok) {
-        const userData = await response.json();
+      if (response.status === 200 && response.data) {
+        const userData = response.data;
         await AsyncStorage.setItem('user_data', JSON.stringify(userData));
         setUser(userData);
         return true;
       }
-      
+
       await clearAuthData();
       setIsAuthenticated(false);
       setUser(null);

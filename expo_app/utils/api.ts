@@ -13,34 +13,99 @@ interface ApiResponse<T = any> {
   status: number;
 }
 
+// Registered by AuthContext so a failed refresh routes the user to login.
+let onAuthFailure: (() => void) | null = null;
+export const setOnAuthFailure = (handler: (() => void) | null) => {
+  onAuthFailure = handler;
+};
+
+const clearStoredAuth = async () => {
+  await AsyncStorage.multiRemove(['access_token', 'refresh_token', 'user_email', 'user_data']);
+};
+
+// 'ok' = new access token stored; 'rejected' = refresh token invalid/expired
+// (log the user out); 'network' = transient failure (keep the session).
+type RefreshResult = 'ok' | 'rejected' | 'network';
+
+// Single-flight: many parallel 401s trigger exactly one refresh request.
+let refreshPromise: Promise<RefreshResult> | null = null;
+
+const refreshAccessToken = (): Promise<RefreshResult> => {
+  if (!refreshPromise) {
+    refreshPromise = (async (): Promise<RefreshResult> => {
+      const refreshToken = await AsyncStorage.getItem('refresh_token');
+      if (!refreshToken) return 'rejected';
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${refreshToken}`,
+          },
+        });
+        if (!response.ok) return 'rejected';
+
+        const data = await response.json();
+        if (!data?.access_token) return 'rejected';
+
+        await AsyncStorage.setItem('access_token', data.access_token);
+        return 'ok';
+      } catch (error) {
+        // offline / flaky connection: don't kill the session over it
+        console.error('Token refresh network error:', error);
+        return 'network';
+      }
+    })();
+    refreshPromise.finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+};
+
+const doFetch = async (endpoint: string, options: RequestInit): Promise<Response> => {
+  const token = await AsyncStorage.getItem('access_token');
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+};
+
 export const apiCall = async <T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> => {
   try {
-    const token = await AsyncStorage.getItem('access_token');
+    let response = await doFetch(endpoint, options);
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string>),
-    };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const fullUrl = `${API_BASE_URL}${endpoint}`;
-
-    const response = await fetch(fullUrl, {
-      ...options,
-      headers,
-    });
-
+    // access token expired: refresh once and retry the original request
     if (response.status === 401) {
-      return {
-        status: 401,
-        error: 'Token expired',
-      };
+      const refreshed = await refreshAccessToken();
+      if (refreshed === 'ok') {
+        response = await doFetch(endpoint, options);
+      } else if (refreshed === 'rejected') {
+        await clearStoredAuth();
+        onAuthFailure?.();
+        return {
+          status: 401,
+          error: 'Session expired',
+        };
+      } else {
+        // transient network problem during refresh: surface the error but
+        // keep the tokens so the next attempt can succeed
+        return {
+          status: 401,
+          error: 'Network error during session refresh',
+        };
+      }
     }
 
     if (response.ok) {
