@@ -50,6 +50,10 @@ class CustomerOrderItemBulkFulfill(BaseModel):
     """Schema for bulk fulfilling customer order items by UUID."""
     model_config = ConfigDict(extra="forbid")
     items: List[FulfillItem]
+    # current trip stop where fulfillment happens; attributes the vehicle sale to
+    # this stop's trip (overriding the order's own stop, e.g. previously-created
+    # orders handed off during a trip). Falls back to the order's stop if unset.
+    trip_stop_uuid: Optional[str] = None
 
 class CustomerOrderItemBulkUnFulfill(BaseModel):
     """Schema for bulk unfulfilling customer order items by UUID."""

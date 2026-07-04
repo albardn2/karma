@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useRoute, useLocation, Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,7 @@ import { WorkflowExecutionStatusLabels } from "@/types/workflowExecution";
 export default function WorkflowExecutionDetail() {
   const [, params] = useRoute("/workflow-execution/:uuid");
   const workflowUuid = params?.uuid || "";
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const [filters, setFilters] = useState({
@@ -115,13 +116,17 @@ export default function WorkflowExecutionDetail() {
         body: payload,
       });
     },
-    onSuccess: () => {
+    onSuccess: (created: any) => {
       queryClient.invalidateQueries({ queryKey: ["/workflow-execution/"] });
       setShowExecuteDialog(false);
       toast({
         title: "Execution started",
         description: "Workflow execution has been initiated successfully.",
       });
+      // route straight to the new execution's detail page
+      if (created?.uuid) {
+        setLocation(`/workflow-execution/${workflowUuid}/${created.uuid}`);
+      }
     },
     onError: (error: any) => {
       toast({

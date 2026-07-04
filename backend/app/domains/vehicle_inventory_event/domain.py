@@ -15,13 +15,17 @@ class VehicleInventoryEventDomain:
         """Convert the user-entered magnitude into the signed delta to store."""
         if event_type == VehicleInventoryEventType.MANUAL:
             return abs(quantity)
-        if event_type == VehicleInventoryEventType.UNLOAD:
+        if event_type in (VehicleInventoryEventType.UNLOAD, VehicleInventoryEventType.SALE):
             return -abs(quantity)
         # adjustment: signed as given
         return quantity
 
     @staticmethod
-    def create_event(uow: SqlAlchemyUnitOfWork, payload: VehicleInventoryEventCreate) -> VehicleInventoryEventRead:
+    def create_event(
+        uow: SqlAlchemyUnitOfWork,
+        payload: VehicleInventoryEventCreate,
+        allow_negative: bool = False,
+    ) -> VehicleInventoryEventRead:
         inventory = uow.vehicle_inventory_repository.find_one(
             uuid=payload.vehicle_inventory_uuid, is_deleted=False
         )
@@ -30,8 +34,8 @@ class VehicleInventoryEventDomain:
 
         delta = VehicleInventoryEventDomain._signed_delta(payload.event_type, payload.quantity)
 
-        # never allow a vehicle's stock to go negative
-        if inventory.current_quantity + delta < 0:
+        # by default a vehicle's stock cannot go negative; trip sales may override
+        if not allow_negative and inventory.current_quantity + delta < 0:
             raise BadRequestError(
                 f"Insufficient vehicle stock: balance {inventory.current_quantity}, "
                 f"requested change {delta}"

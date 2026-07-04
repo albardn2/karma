@@ -33,6 +33,67 @@ class VehicleInventoryDomain:
         return VehicleInventoryRead.from_orm(inventory)
 
     @staticmethod
+    def get_or_create_inventory(
+        uow: SqlAlchemyUnitOfWork,
+        vehicle_uuid: str,
+        material_uuid: str,
+        created_by_uuid: str = None,
+    ) -> VehicleInventoryModel:
+        """Return the active (vehicle, material) inventory row, creating it if absent."""
+        inv = uow.vehicle_inventory_repository.find_first(
+            vehicle_uuid=vehicle_uuid, material_uuid=material_uuid, is_deleted=False
+        )
+        if inv:
+            return inv
+        material = uow.material_repository.find_one(uuid=material_uuid, is_deleted=False)
+        inv = VehicleInventoryModel(
+            vehicle_uuid=vehicle_uuid,
+            material_uuid=material_uuid,
+            created_by_uuid=created_by_uuid,
+            unit=material.measure_unit if material else None,
+            is_active=True,
+        )
+        uow.vehicle_inventory_repository.save(model=inv, commit=False)
+        return inv
+
+    @staticmethod
+    def balances_for_vehicle(uow: SqlAlchemyUnitOfWork, vehicle_uuid: str) -> dict:
+        """Snapshot of the vehicle's current per-material balances ({material_uuid: qty})."""
+        rows = uow.vehicle_inventory_repository.find_all(vehicle_uuid=vehicle_uuid, is_deleted=False)
+        return {r.material_uuid: r.current_quantity for r in rows}
+
+    @staticmethod
+    def record_trip_sale(
+        uow: SqlAlchemyUnitOfWork,
+        vehicle_uuid: str,
+        material_uuid: str,
+        quantity: float,
+        customer_order_item_uuid: str,
+        created_by_uuid: str = None,
+        trip_stop_uuid: str = None,
+    ):
+        """Decrement the vehicle's stock of a material for a fulfilled trip-stop order item.
+        Auto-creates the inventory row if missing and may push the balance negative."""
+        from app.domains.vehicle_inventory_event.domain import VehicleInventoryEventDomain
+        from app.dto.vehicle_inventory_event import VehicleInventoryEventCreate, VehicleInventoryEventType
+
+        inv = VehicleInventoryDomain.get_or_create_inventory(
+            uow=uow, vehicle_uuid=vehicle_uuid, material_uuid=material_uuid, created_by_uuid=created_by_uuid
+        )
+        return VehicleInventoryEventDomain.create_event(
+            uow=uow,
+            payload=VehicleInventoryEventCreate(
+                vehicle_inventory_uuid=inv.uuid,
+                event_type=VehicleInventoryEventType.SALE,
+                quantity=abs(quantity),
+                customer_order_item_uuid=customer_order_item_uuid,
+                created_by_uuid=created_by_uuid,
+                trip_stop_uuid=trip_stop_uuid,
+            ),
+            allow_negative=True,
+        )
+
+    @staticmethod
     def delete_vehicle_inventory(uow: SqlAlchemyUnitOfWork, uuid: str) -> VehicleInventoryRead:
         inventory = uow.vehicle_inventory_repository.find_one(uuid=uuid, is_deleted=False)
         if not inventory:

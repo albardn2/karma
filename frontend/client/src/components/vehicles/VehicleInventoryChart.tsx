@@ -60,7 +60,19 @@ const toMs = (s: string) => {
   return new Date(hasTz ? s : s + "Z").getTime();
 };
 
-export function VehicleInventoryChart({ vehicleUuid }: { vehicleUuid: string }) {
+export function VehicleInventoryChart({
+  vehicleUuid,
+  windowStart,
+  windowEnd,
+  title = "Inventory Over Time",
+}: {
+  vehicleUuid: string;
+  // fixed time window (e.g. a trip): hides the range picker; windowEnd omitted/null
+  // means "up until now" (trip still in progress)
+  windowStart?: string | null;
+  windowEnd?: string | null;
+  title?: string;
+}) {
   const [preset, setPreset] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -106,7 +118,11 @@ export function VehicleInventoryChart({ vehicleUuid }: { vehicleUuid: string }) 
     const now = Date.now();
     let startMs: number;
     let endMs: number;
-    if (preset === "custom") {
+    if (windowStart) {
+      // fixed window mode (e.g. trip start → trip end / now)
+      startMs = toMs(windowStart);
+      endMs = windowEnd ? toMs(windowEnd) : now;
+    } else if (preset === "custom") {
       startMs = startDate ? new Date(startDate + "T00:00:00Z").getTime() : -Infinity;
       endMs = endDate ? new Date(endDate + "T23:59:59Z").getTime() : now;
     } else if (preset === "all") {
@@ -166,7 +182,7 @@ export function VehicleInventoryChart({ vehicleUuid }: { vehicleUuid: string }) 
     }));
 
     return { rows, lines };
-  }, [inventories, eventsByInv, selected, preset, startDate, endDate]);
+  }, [inventories, eventsByInv, selected, preset, startDate, endDate, windowStart, windowEnd]);
 
   const toggle = (uuid: string) => {
     setSelected((prev) => {
@@ -176,13 +192,19 @@ export function VehicleInventoryChart({ vehicleUuid }: { vehicleUuid: string }) 
     });
   };
 
+  // fixed windows are usually hours long — show times on the axis, not dates
+  const spanMs = rows.length ? rows[rows.length - 1].t - rows[0].t : 0;
+  const tickFmt = (t: number) =>
+    spanMs <= 2 * DAY ? new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : new Date(t).toLocaleDateString();
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Inventory Over Time</CardTitle>
+        <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        {/* Filters */}
+        {/* Filters (hidden in fixed-window mode) */}
+        {!windowStart && (
         <div className="flex flex-wrap items-end gap-4 mb-4">
           <div>
             <label className="text-sm font-medium text-gray-500 mb-1 block">Range</label>
@@ -224,6 +246,7 @@ export function VehicleInventoryChart({ vehicleUuid }: { vehicleUuid: string }) 
             </>
           )}
         </div>
+        )}
 
         {/* Material toggles */}
         {inventories.length > 0 && (
@@ -263,7 +286,7 @@ export function VehicleInventoryChart({ vehicleUuid }: { vehicleUuid: string }) 
                 type="number"
                 scale="time"
                 domain={["dataMin", "dataMax"]}
-                tickFormatter={(t) => new Date(t).toLocaleDateString()}
+                tickFormatter={tickFmt}
                 fontSize={12}
               />
               <YAxis allowDecimals fontSize={12} />

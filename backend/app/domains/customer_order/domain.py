@@ -16,9 +16,53 @@ from app.dto.invoice_item import InvoiceItemRead
 from app.dto.customer_order_item import CustomerOrderItemBulkDelete
 from app.dto.invoice_item import InvoiceItemBulkDelete
 from app.entrypoint.routes.common.errors import BadRequestError
+from app.dto.customer_order import CustomerOrderCheckoutCreate
 
 
 class CustomerOrderDomain:
+
+    @staticmethod
+    def create_order_checkout(uow: SqlAlchemyUnitOfWork, payload: CustomerOrderCheckoutCreate) -> CustomerOrderWithItemsAndInvoiceRead:
+        """Create order + items + invoice, then optionally fulfill all items and
+        record a full payment against the invoice — all in one transaction."""
+        from app.dto.customer_order_item import CustomerOrderItemBulkFulfill, FulfillItem
+        from app.domains.payment.domain import PaymentDomain
+        from app.dto.payment import PaymentCreate
+
+        full = CustomerOrderDomain.create_customer_order_with_items_and_invoice(
+            uow=uow, payload=payload.to_base_create()
+        )
+        invoice = full.invoices[0]
+
+        if payload.fulfill:
+            CustomerOrderItemDomain.fulfill_items(
+                uow=uow,
+                payload=CustomerOrderItemBulkFulfill(
+                    items=[FulfillItem(customer_order_item_uuid=item.uuid)
+                           for item in full.customer_order.customer_order_items],
+                    trip_stop_uuid=payload.trip_stop_uuid,
+                ),
+            )
+
+        if payload.pay:
+            inv = uow.invoice_repository.find_one(uuid=invoice.uuid, is_deleted=False)
+            amount = inv.net_amount_due if inv else 0
+            if amount and amount > 0:
+                PaymentDomain.create_payment(
+                    uow=uow,
+                    payload=PaymentCreate(
+                        created_by_uuid=payload.created_by_uuid,
+                        invoice_uuid=invoice.uuid,
+                        financial_account_uuid=payload.financial_account_uuid,
+                        amount=amount,
+                        currency=payload.currency,
+                        payment_method=payload.payment_method,
+                        trip_stop_uuid=payload.trip_stop_uuid,
+                    ),
+                )
+
+        order = uow.customer_order_repository.find_one(uuid=full.customer_order.uuid, is_deleted=False)
+        return CustomerOrderWithItemsAndInvoiceRead.from_customer_order_model(order)
 
     @staticmethod
     def create_customer_order_with_items_and_invoice(uow: SqlAlchemyUnitOfWork,payload:CustomerOrderWithItemsAndInvoiceCreate) -> CustomerOrderRead:
