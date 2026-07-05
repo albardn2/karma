@@ -152,8 +152,8 @@ export default function DistributionScreen() {
     router.push('/distribution/start');
   };
 
-  const handleExecutionPress = (_execution: WorkflowExecution) => {
-    Alert.alert('Coming Soon', 'The execution detail page is next.');
+  const handleExecutionPress = (execution: WorkflowExecution) => {
+    router.push(`/distribution/${execution.uuid}`);
   };
 
   const taskProgress = (execution: WorkflowExecution) => {

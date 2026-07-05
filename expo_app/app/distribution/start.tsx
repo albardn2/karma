@@ -191,7 +191,8 @@ export default function StartTripScreen() {
         throw new Error(completed.error || 'Failed to start the trip');
       }
 
-      router.replace('/distribution');
+      // drop into the running trip so the driver can continue the flow
+      router.replace(`/distribution/${createdUuid}`);
     } catch (e: any) {
       // roll back the dangling execution so the list stays clean
       if (createdUuid) {
