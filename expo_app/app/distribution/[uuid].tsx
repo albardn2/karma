@@ -102,6 +102,47 @@ const parseLatLng = (s?: string | null): { lat: number | null; lng: number | nul
   return { lat: isNaN(lat) ? null : lat, lng: isNaN(lng) ? null : lng };
 };
 
+// Topologically order task executions by their depends_on chain (names → uuids),
+// ties broken by created_at. Returns a { taskExecutionUuid: position } map so
+// trip stops render in true visit order (done → current → upcoming), including
+// ad-hoc stops spliced into the chain.
+const chainRank = (tasks: TaskExecution[]): Record<string, number> => {
+  const byUuid = new Map(tasks.map((t) => [t.uuid, t]));
+  const uuidsByName = new Map<string, string[]>();
+  tasks.forEach((t) => {
+    const n = t.name || t.uuid;
+    if (!uuidsByName.has(n)) uuidsByName.set(n, []);
+    uuidsByName.get(n)!.push(t.uuid);
+  });
+  const indeg = new Map(tasks.map((t) => [t.uuid, 0]));
+  const deps = new Map(tasks.map((t) => [t.uuid, new Set<string>()]));
+  tasks.forEach((t) => {
+    (t.depends_on || []).forEach((dn) => {
+      (uuidsByName.get(dn) || []).forEach((du) => {
+        deps.get(du)!.add(t.uuid);
+        indeg.set(t.uuid, (indeg.get(t.uuid) || 0) + 1);
+      });
+    });
+  });
+  const createdAt = (u: string) => new Date(byUuid.get(u)?.created_at || 0).getTime();
+  const avail = tasks.filter((t) => indeg.get(t.uuid) === 0).map((t) => t.uuid);
+  const order: string[] = [];
+  while (avail.length) {
+    avail.sort((a, b) => createdAt(a) - createdAt(b));
+    const c = avail.shift() as string;
+    order.push(c);
+    deps.get(c)!.forEach((n) => {
+      const d = (indeg.get(n) || 0) - 1;
+      indeg.set(n, d);
+      if (d === 0) avail.push(n);
+    });
+  }
+  tasks.forEach((t) => { if (!order.includes(t.uuid)) order.push(t.uuid); });
+  const rank: Record<string, number> = {};
+  order.forEach((u, i) => (rank[u] = i));
+  return rank;
+};
+
 export default function ExecutionDetailScreen() {
   const router = useRouter();
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
@@ -212,11 +253,16 @@ export default function ExecutionDetailScreen() {
           })
         )
       ).filter(Boolean) as (TripStop & { _createdAt: string })[];
-      // surface the actionable stop first: current → upcoming → done, then by
-      // creation time within each group (so a newly-added stop shows at the top)
-      const rank = (s: TripStop) =>
-        s.status === 'in_progress' ? 0 : s.status === 'not_started' ? 1 : s.status === 'completed' ? 2 : 3;
-      built.sort((a, b) => rank(a) - rank(b) || new Date(a._createdAt).getTime() - new Date(b._createdAt).getTime());
+      // order by the actual visit sequence (dependency chain), so done stops
+      // stay in place at the top, the current stop follows, then upcoming — and
+      // an ad-hoc stop lands where it was spliced in (as current), not last.
+      const rank = chainRank(execution?.task_executions || []);
+      built.sort((a, b) => {
+        const ra = rank[a.taskExecutionUuid] ?? 0;
+        const rb = rank[b.taskExecutionUuid] ?? 0;
+        if (ra !== rb) return ra - rb;
+        return new Date(a._createdAt).getTime() - new Date(b._createdAt).getTime();
+      });
       built.forEach((s, i) => (s.index = i));
       setTripStops(built);
       setStopsLoading(false);
