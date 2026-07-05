@@ -55,6 +55,7 @@ services:
     command: ["gunicorn", "--bind", "0.0.0.0:5000", "--reload", "run:app"]
     environment:
       SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+      JWT_SECRET_KEY: "local-dev-only-not-a-secret"
     ports:
       - "5000:5000"
     depends_on:

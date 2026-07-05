@@ -51,6 +51,7 @@ jobs:
             APP_HOST=api-dev.karma-grp.com
             REGISTRY_URL=ghcr.io/albardn2/karma-backend
             EMAIL=zaid.bardan@gmail.com
+            JWT_SECRET_KEY=${{ secrets.DEV_JWT_SECRET_KEY }}
             EOF
             docker compose -f docker-compose.dev.yaml down
             docker compose -f docker-compose.dev.yaml pull

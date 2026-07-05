@@ -42,6 +42,9 @@ services:
       - "5000"
     environment:
       SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+      # JWT signing secret; comes from the droplet-side .env written by the
+      # deploy workflow (sourced from GitHub secrets)
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     networks:
       - proxy
 

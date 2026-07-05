@@ -59,7 +59,13 @@ def create_app(config_object=Config):
     env_config = dotenv_values(os.path.join(BASE_DIR,"..", ".env"))
     app.config.from_mapping(env_config)
 
-    app.config['JWT_SECRET_KEY'] = "super-secret-change-me"
+    # the JWT signing secret must come from the environment (or the .env file
+    # loaded above) — never from source. Refuse to boot without it so a
+    # misconfigured deploy fails loudly instead of signing forgeable tokens.
+    jwt_secret = os.environ.get("JWT_SECRET_KEY") or app.config.get("JWT_SECRET_KEY")
+    if not jwt_secret:
+        raise RuntimeError("JWT_SECRET_KEY environment variable must be set")
+    app.config['JWT_SECRET_KEY'] = jwt_secret
     # accept tokens from both headers and cookies
     app.config['JWT_TOKEN_LOCATION'] = ["headers", "cookies"]
     app.config['JWT_COOKIE_SECURE']   = False     # only over HTTPS in prod
