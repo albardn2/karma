@@ -240,6 +240,8 @@ def list_workflow_executions():
         filters.append(WorkflowExecutionModel.uuid == params.uuid)
     if params.workflow_uuid:
         filters.append(WorkflowExecutionModel.workflow_uuid == params.workflow_uuid)
+    if params.status:
+        filters.append(WorkflowExecutionModel.status == params.status.value)
     if params.name:
         filters.append(WorkflowExecutionModel.name.ilike(f"%{params.name}%"))
     if params.tags:
@@ -252,6 +254,33 @@ def list_workflow_executions():
     if params.end_time:
         filters.append(WorkflowExecutionModel.start_time <= params.end_time)
     with SqlAlchemyUnitOfWork() as uow:
+        if params.mine:
+            # executions the caller created, or trips assigned to them via the
+            # start_trip setup (result.assigned_user_uuid holds a username)
+            from sqlalchemy import or_, select
+            from models.common import TaskExecution as TaskExecutionModel
+            from models.common import Task as TaskModel
+
+            current_uuid = get_jwt_identity()
+            current_user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
+            assigned_values = [current_uuid]
+            if current_user:
+                assigned_values.append(current_user.username)
+            assigned_exists = (
+                select(TaskExecutionModel.uuid)
+                .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
+                .where(
+                    TaskExecutionModel.workflow_execution_uuid == WorkflowExecutionModel.uuid,
+                    TaskModel.operator == "start_trip_operator",
+                    TaskExecutionModel.result["assigned_user_uuid"].astext.in_(assigned_values),
+                )
+                .exists()
+            )
+            filters.append(or_(
+                WorkflowExecutionModel.created_by_uuid == current_uuid,
+                assigned_exists,
+            ))
+
         page = uow.workflow_execution_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,

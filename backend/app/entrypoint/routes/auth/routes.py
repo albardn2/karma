@@ -77,6 +77,26 @@ def login():
         set_refresh_cookies(resp, refresh_token)
         return resp, 200
 
+@auth_blueprint.route("/refresh", methods=["POST"])
+@jwt_required(refresh=True)
+def refresh():
+    """Exchange a valid refresh token (header or cookie) for a new access
+    token, re-reading the user's scopes so permission changes take effect."""
+    current_uuid = get_jwt_identity()
+    with SqlAlchemyUnitOfWork() as uow:
+        user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
+        if not user:
+            raise Unauthorized("User not found")
+        scopes = user.permission_scope.split(",")
+        access_token = create_access_token(
+            identity=user.uuid,
+            additional_claims={"scopes": scopes},
+            expires_delta=timedelta(days=1)
+        )
+    resp = jsonify({"access_token": access_token})
+    set_access_cookies(resp, access_token)
+    return resp, 200
+
 @auth_blueprint.route("/logout", methods=["POST"])
 def logout():
     resp = jsonify({"msg": "Logged out"})
