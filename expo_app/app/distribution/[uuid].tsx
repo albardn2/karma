@@ -108,6 +108,9 @@ export default function ExecutionDetailScreen() {
   const [activeFields, setActiveFields] = useState<Field[]>([]);
   const [fieldValues, setFieldValues] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
+  // trip-stop customer context (for the Create Order flow)
+  const [stopContext, setStopContext] = useState<{ customerUuid: string; customerName: string; tripStopUuid: string } | null>(null);
+  const [balance, setBalance] = useState<Record<string, number> | null>(null);
 
   const fetchExecution = async (spinner = true) => {
     if (spinner) setLoading(true);
@@ -145,10 +148,13 @@ export default function ExecutionDetailScreen() {
   );
 
   // load the active task's form fields (outcome/notes for stops, none for route/create/trip)
+  // and, for a trip stop, its customer context + balance for the order flow
   useEffect(() => {
     (async () => {
       setActiveFields([]);
       setFieldValues({});
+      setStopContext(null);
+      setBalance(null);
       if (!activeTask?.task_uuid) return;
       const res = await apiCall<any>(`/task/${activeTask.task_uuid}`);
       const fields: Field[] = res.data?.task_inputs?.fields || [];
@@ -156,6 +162,20 @@ export default function ExecutionDetailScreen() {
       const initial: Record<string, any> = {};
       for (const f of fields) initial[f.name] = f.type === 'checklist' ? [] : '';
       setFieldValues(initial);
+
+      if (activeTask.operator === 'trip_stop_operator') {
+        const data = res.data?.task_inputs?.data || {};
+        const customer = data.customer;
+        if (customer?.uuid) {
+          setStopContext({
+            customerUuid: customer.uuid,
+            customerName: customer.company_name || customer.full_name || 'Customer',
+            tripStopUuid: data.trip_stop_uuid,
+          });
+          const cust = await apiCall<any>(`/customer/${customer.uuid}`);
+          setBalance(cust.data?.balance_per_currency || {});
+        }
+      }
     })();
   }, [activeTask?.uuid]);
 
@@ -300,6 +320,46 @@ export default function ExecutionDetailScreen() {
             <View style={styles.actionCard}>
               <ThemedText style={styles.actionHeading}>Current step</ThemedText>
               <ThemedText style={styles.actionTaskName}>{taskLabel(activeTask)}</ThemedText>
+
+              {/* trip-stop customer: balance + create order */}
+              {stopContext && (
+                <View style={styles.stopPanel}>
+                  {balance && (
+                    <View style={styles.balanceRow}>
+                      <ThemedText style={styles.balanceLabel}>Balance</ThemedText>
+                      {Object.keys(balance).length === 0 ? (
+                        <ThemedText style={styles.balanceNone}>—</ThemedText>
+                      ) : (
+                        Object.entries(balance).map(([cur, amt]) => (
+                          <View
+                            key={cur}
+                            style={[styles.balanceBadge, Number(amt) > 0 ? styles.balanceOwed : styles.balanceClear]}
+                          >
+                            <ThemedText style={styles.balanceBadgeText}>{Number(amt).toFixed(2)} {cur}</ThemedText>
+                          </View>
+                        ))
+                      )}
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={styles.createOrderBtn}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/distribution/create-order',
+                        params: {
+                          tripStopUuid: stopContext.tripStopUuid,
+                          customerUuid: stopContext.customerUuid,
+                          customerName: stopContext.customerName,
+                        },
+                      })
+                    }
+                    testID="button-create-order"
+                  >
+                    <ThemedText style={styles.createOrderText}>+ Create Order</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {activeFields.map(renderField)}
               <TouchableOpacity
                 style={[styles.actionButton, submitting && styles.actionButtonDisabled]}
@@ -363,6 +423,22 @@ const styles = StyleSheet.create({
   actionHeading: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', opacity: 0.6, letterSpacing: 0.5 },
   actionTaskName: { fontSize: 18, fontWeight: '700', marginTop: 4, marginBottom: 12 },
   doneText: { fontSize: 15, fontWeight: '600', textAlign: 'center', paddingVertical: 8 },
+  stopPanel: {
+    marginBottom: 16, paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.12)',
+  },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  balanceLabel: { fontSize: 13, opacity: 0.6 },
+  balanceNone: { fontSize: 14, opacity: 0.4 },
+  balanceBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  balanceOwed: { backgroundColor: '#FEE2E2' },
+  balanceClear: { backgroundColor: '#D1FAE5' },
+  balanceBadgeText: { fontSize: 12, fontWeight: '600', color: '#374151' },
+  createOrderBtn: {
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#5469D4', borderRadius: 10,
+    paddingVertical: 12, alignItems: 'center',
+  },
+  createOrderText: { color: '#5469D4', fontWeight: '700', fontSize: 15 },
   fieldBlock: { marginBottom: 16 },
   fieldLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
