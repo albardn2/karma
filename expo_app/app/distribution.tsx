@@ -10,9 +10,12 @@ import {
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Stack, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NativeHeader } from '@/components/layout/NativeHeader';
+import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { apiCall } from '@/utils/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 const TRIP_WORKFLOW_NAME = 'simple_trip_workflow';
 
@@ -78,6 +81,11 @@ const formatDateTime = (s?: string | null) => {
 
 export default function DistributionScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  // admins see every trip; everyone else only their own (created or assigned)
+  const scopes: string[] = (user?.permission_scope || '').split(',').map((s: string) => s.trim());
+  const isAdmin = scopes.includes('admin') || scopes.includes('superuser');
   const [workflowUuid, setWorkflowUuid] = useState<string | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
@@ -114,6 +122,7 @@ export default function DistributionScreen() {
         per_page: '20',
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (!isAdmin) params.append('mine', 'true');
 
       const response = await apiCall<WorkflowExecutionPage>(`/workflow-execution/?${params.toString()}`);
       if (response.data) {
@@ -132,7 +141,7 @@ export default function DistributionScreen() {
   useEffect(() => {
     fetchExecutions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflowUuid, page, statusFilter]);
+  }, [workflowUuid, page, statusFilter, isAdmin]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -165,18 +174,15 @@ export default function DistributionScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <ThemedText style={styles.title}>Distribution</ThemedText>
-          <ThemedText style={styles.subtitle}>Trip executions</ThemedText>
-        </View>
-        <TouchableOpacity onPress={handleStartTrip} testID="button-start-trip">
-          <LinearGradient colors={['#5469D4', '#4F46E5']} style={styles.createButton}>
-            <ThemedText style={styles.createButtonText}>+ Start Trip</ThemedText>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+      {/* Hide the auto-generated route header; we render our own */}
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Header with back button + Start Trip */}
+      <NativeHeader
+        title="Distribution"
+        onBack={() => router.back()}
+        rightButton={{ label: '+ Start Trip', onPress: handleStartTrip }}
+      />
 
       {/* Status filter chips */}
       <View style={styles.filterRow}>
@@ -212,7 +218,7 @@ export default function DistributionScreen() {
       ) : (
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[styles.listContainer, { paddingBottom: 72 + Math.max(insets.bottom, 6) }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {executions.length === 0 ? (
@@ -283,6 +289,12 @@ export default function DistributionScreen() {
           )}
         </ScrollView>
       )}
+
+      {/* Fixed bottom navigation */}
+      <BottomNavigation
+        activeTab="menu"
+        onTabPress={(t) => router.replace(t === 'home' ? '/' : '/?tab=menu')}
+      />
     </ThemedView>
   );
 }
@@ -291,38 +303,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 13,
-    opacity: 0.6,
-    marginTop: 2,
-  },
-  createButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  createButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 12,
   },
   filterChip: {

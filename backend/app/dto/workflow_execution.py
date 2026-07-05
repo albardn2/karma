@@ -70,6 +70,8 @@ class WorkflowExecutionListParams(BaseModel):
     name: Optional[str] = None  # Filter by workflow execution name
     status: Optional[WorkflowStatus] = None  # Filter by execution status (e.g., in_progress, completed)
     created_by_uuid: Optional[str] = None
+    # restrict to executions the caller created or is assigned to (start_trip assigned user)
+    mine: Optional[bool] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     tags : Optional[List[WorkflowTags]] = None  # Filter by tags associated with the workflow execution

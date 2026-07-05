@@ -7,7 +7,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { WelcomeContent } from '@/components/WelcomeContent';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 interface MenuItem {
   id: number;
@@ -21,7 +21,9 @@ interface MenuItem {
 export default function HomeScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'home' | 'menu'>('home');
+  // modules navigate back here with ?tab=menu so the menu view is restored
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const [activeTab, setActiveTab] = useState<'home' | 'menu'>(tab === 'menu' ? 'menu' : 'home');
   const insets = useSafeAreaInsets();
 
   const menuItems: MenuItem[] = [
