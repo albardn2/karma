@@ -212,7 +212,11 @@ export default function ExecutionDetailScreen() {
           })
         )
       ).filter(Boolean) as (TripStop & { _createdAt: string })[];
-      built.sort((a, b) => new Date(a._createdAt).getTime() - new Date(b._createdAt).getTime());
+      // surface the actionable stop first: current → upcoming → done, then by
+      // creation time within each group (so a newly-added stop shows at the top)
+      const rank = (s: TripStop) =>
+        s.status === 'in_progress' ? 0 : s.status === 'not_started' ? 1 : s.status === 'completed' ? 2 : 3;
+      built.sort((a, b) => rank(a) - rank(b) || new Date(a._createdAt).getTime() - new Date(b._createdAt).getTime());
       built.forEach((s, i) => (s.index = i));
       setTripStops(built);
       setStopsLoading(false);
