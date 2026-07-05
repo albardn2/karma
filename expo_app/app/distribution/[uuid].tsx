@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -11,7 +12,7 @@ import {
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
 
@@ -111,6 +112,12 @@ export default function ExecutionDetailScreen() {
   // trip-stop customer context (for the Create Order flow)
   const [stopContext, setStopContext] = useState<{ customerUuid: string; customerName: string; tripStopUuid: string } | null>(null);
   const [balance, setBalance] = useState<Record<string, number> | null>(null);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [pickerField, setPickerField] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // refresh when returning from create-order / order / add-stop screens
+  useFocusEffect(React.useCallback(() => { setRefreshKey((k) => k + 1); }, []));
 
   const fetchExecution = async (spinner = true) => {
     if (spinner) setLoading(true);
@@ -126,9 +133,9 @@ export default function ExecutionDetailScreen() {
   };
 
   useEffect(() => {
-    fetchExecution();
+    fetchExecution(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uuid]);
+  }, [uuid, refreshKey]);
 
   const orderedTasks = useMemo(() => {
     const tasks = [...(execution?.task_executions || [])];
@@ -174,10 +181,22 @@ export default function ExecutionDetailScreen() {
           });
           const cust = await apiCall<any>(`/customer/${customer.uuid}`);
           setBalance(cust.data?.balance_per_currency || {});
+
+          // recent orders: unpaid/unfulfilled first, then most recent; top 5
+          const ordersRes = await apiCall<any>(`/customer-order/?customer_uuid=${customer.uuid}&per_page=50`);
+          const all: any[] = ordersRes.data?.orders || ordersRes.data?.customer_orders || [];
+          const needsAttention = (o: any) => o.is_paid === false || o.is_fulfilled === false;
+          const sorted = [...all].sort((a, b) => {
+            const ap = needsAttention(a) ? 0 : 1;
+            const bp = needsAttention(b) ? 0 : 1;
+            if (ap !== bp) return ap - bp;
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          });
+          setRecentOrders(sorted.slice(0, 5));
         }
       }
     })();
-  }, [activeTask?.uuid]);
+  }, [activeTask?.uuid, refreshKey]);
 
   const progress = useMemo(() => {
     const total = orderedTasks.length;
@@ -238,9 +257,26 @@ export default function ExecutionDetailScreen() {
   };
 
   const renderField = (f: Field) => {
-    if (f.type === 'select' || f.type === 'checklist') {
-      const isMulti = f.type === 'checklist';
-      const selected: string[] = isMulti ? fieldValues[f.name] || [] : [fieldValues[f.name]].filter(Boolean);
+    if (f.type === 'select') {
+      const value = fieldValues[f.name];
+      return (
+        <View key={f.name} style={styles.fieldBlock}>
+          <ThemedText style={styles.fieldLabel}>{f.label}{f.required ? ' *' : ''}</ThemedText>
+          <TouchableOpacity
+            style={styles.dropdown}
+            onPress={() => setPickerField(f.name)}
+            testID={`select-${f.name}`}
+          >
+            <ThemedText style={[styles.dropdownText, !value && styles.dropdownPlaceholder]} numberOfLines={1}>
+              {value || f.placeholder || 'Select…'}
+            </ThemedText>
+            <ThemedText style={styles.dropdownCaret}>▾</ThemedText>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (f.type === 'checklist') {
+      const selected: string[] = fieldValues[f.name] || [];
       return (
         <View key={f.name} style={styles.fieldBlock}>
           <ThemedText style={styles.fieldLabel}>{f.label}{f.required ? ' *' : ''}</ThemedText>
@@ -251,11 +287,11 @@ export default function ExecutionDetailScreen() {
                 <TouchableOpacity
                   key={opt}
                   style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => (isMulti ? toggleChecklist(f.name, opt) : setValue(f.name, active ? '' : opt))}
+                  onPress={() => toggleChecklist(f.name, opt)}
                   testID={`opt-${f.name}-${opt}`}
                 >
                   <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
-                    {active && isMulti ? '✓ ' : ''}{opt}
+                    {active ? '✓ ' : ''}{opt}
                   </ThemedText>
                 </TouchableOpacity>
               );
@@ -315,6 +351,17 @@ export default function ExecutionDetailScreen() {
             <ThemedText style={styles.summaryMeta}>{progress.done}/{progress.total} tasks done</ThemedText>
           </View>
 
+          {/* Add an ad-hoc stop while the trip is underway */}
+          {execution.status === 'in_progress' && (
+            <TouchableOpacity
+              style={styles.addStopBtn}
+              onPress={() => router.push({ pathname: '/distribution/add-stop', params: { executionUuid: execution.uuid } })}
+              testID="button-add-stop"
+            >
+              <ThemedText style={styles.addStopText}>＋ Add Stop</ThemedText>
+            </TouchableOpacity>
+          )}
+
           {/* Active task action */}
           {activeTask ? (
             <View style={styles.actionCard}>
@@ -357,6 +404,41 @@ export default function ExecutionDetailScreen() {
                   >
                     <ThemedText style={styles.createOrderText}>+ Create Order</ThemedText>
                   </TouchableOpacity>
+
+                  {/* recent orders (tap to pay / fulfill) */}
+                  {recentOrders.length > 0 && (
+                    <View style={styles.recentBox}>
+                      <ThemedText style={styles.recentTitle}>Recent orders</ThemedText>
+                      {recentOrders.map((o) => (
+                        <TouchableOpacity
+                          key={o.uuid}
+                          style={styles.recentRow}
+                          onPress={() =>
+                            router.push({
+                              pathname: '/distribution/order',
+                              params: { orderUuid: o.uuid, tripStopUuid: stopContext.tripStopUuid },
+                            })
+                          }
+                          testID={`recent-order-${o.uuid}`}
+                        >
+                          <View style={styles.recentLeft}>
+                            <ThemedText style={styles.recentDate}>{fmt(o.created_at)}</ThemedText>
+                            <ThemedText style={styles.recentDue}>
+                              {(o.net_amount_due ?? o.total_adjusted_amount ?? 0)} {o.currency || ''} due
+                            </ThemedText>
+                          </View>
+                          <View style={styles.recentBadges}>
+                            <View style={[styles.miniBadge, o.is_paid ? styles.balanceClear : styles.balanceOwed]}>
+                              <ThemedText style={styles.miniBadgeText}>{o.is_paid ? 'Paid' : 'Unpaid'}</ThemedText>
+                            </View>
+                            <View style={[styles.miniBadge, o.is_fulfilled ? styles.balanceClear : styles.miniGray]}>
+                              <ThemedText style={styles.miniBadgeText}>{o.is_fulfilled ? 'Fulfilled' : 'Unfulfilled'}</ThemedText>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -397,6 +479,37 @@ export default function ExecutionDetailScreen() {
           </View>
         </ScrollView>
       ) : null}
+
+      {/* dropdown picker for select fields (e.g. outcome) */}
+      <Modal visible={pickerField !== null} transparent animationType="slide" onRequestClose={() => setPickerField(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>
+                {activeFields.find((f) => f.name === pickerField)?.label || 'Select'}
+              </ThemedText>
+              <TouchableOpacity onPress={() => setPickerField(null)}><ThemedText style={styles.modalClose}>✕</ThemedText></TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              {(activeFields.find((f) => f.name === pickerField)?.options || []).map((opt) => {
+                const active = pickerField ? fieldValues[pickerField] === opt : false;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    style={styles.modalOption}
+                    onPress={() => { if (pickerField) setValue(pickerField, opt); setPickerField(null); }}
+                    testID={`picker-opt-${opt}`}
+                  >
+                    <ThemedText style={[styles.modalOptionText, active && styles.modalOptionActive]}>
+                      {active ? '✓ ' : ''}{opt}
+                    </ThemedText>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -439,6 +552,24 @@ const styles = StyleSheet.create({
     paddingVertical: 12, alignItems: 'center',
   },
   createOrderText: { color: '#5469D4', fontWeight: '700', fontSize: 15 },
+  recentBox: { marginTop: 14 },
+  recentTitle: { fontSize: 12, fontWeight: '600', opacity: 0.6, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+  recentRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(0,0,0,0.08)',
+  },
+  recentLeft: { flex: 1, marginRight: 8 },
+  recentDate: { fontSize: 13, fontWeight: '600' },
+  recentDue: { fontSize: 12, opacity: 0.6, marginTop: 1 },
+  recentBadges: { flexDirection: 'row', gap: 6 },
+  miniBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  miniGray: { backgroundColor: '#E5E7EB' },
+  miniBadgeText: { fontSize: 11, fontWeight: '600', color: '#374151' },
+  addStopBtn: {
+    borderWidth: 1, borderColor: '#5469D4', borderRadius: 10, paddingVertical: 11,
+    alignItems: 'center', marginBottom: 16, backgroundColor: '#fff',
+  },
+  addStopText: { color: '#5469D4', fontWeight: '700', fontSize: 15 },
   fieldBlock: { marginBottom: 16 },
   fieldLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -453,6 +584,23 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 10,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, backgroundColor: '#fff', color: '#111827',
   },
+  dropdown: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#fff',
+  },
+  dropdownText: { fontSize: 15, color: '#111827', flex: 1, marginRight: 8 },
+  dropdownPlaceholder: { color: '#9ca3af' },
+  dropdownCaret: { fontSize: 12, color: '#6b7280' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
+  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '70%', paddingBottom: 24 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.1)' },
+  modalTitle: { fontSize: 16, fontWeight: '700' },
+  modalClose: { fontSize: 18, color: '#6b7280' },
+  modalList: { paddingHorizontal: 8 },
+  modalOption: { paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.06)' },
+  modalOptionText: { fontSize: 15, color: '#111827' },
+  modalOptionActive: { fontWeight: '700', color: '#5469D4' },
   actionButton: { marginTop: 4, backgroundColor: '#5469D4', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   actionButtonDisabled: { opacity: 0.6 },
   actionButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
