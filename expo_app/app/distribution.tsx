@@ -149,7 +149,7 @@ export default function DistributionScreen() {
   };
 
   const handleStartTrip = () => {
-    Alert.alert('Coming Soon', 'Starting a new trip execution will be available in the next step.');
+    router.push('/distribution/start');
   };
 
   const handleExecutionPress = (_execution: WorkflowExecution) => {
