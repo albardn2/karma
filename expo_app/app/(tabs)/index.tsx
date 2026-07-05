@@ -41,6 +41,14 @@ export default function HomeScreen() {
       section: 'customer_orders',
       color: '#e74c3c',
     },
+    {
+      id: 3,
+      title: 'Distribution',
+      description: 'Trip executions and deliveries',
+      icon: '🚚',
+      section: 'distribution',
+      color: '#16a34a',
+    },
   ];
 
   const handleLogout = () => {
@@ -61,6 +69,8 @@ export default function HomeScreen() {
   const handleMenuPress = (item: MenuItem) => {
     if (item.section === 'customers') {
       router.push('/customers');
+    } else if (item.section === 'distribution') {
+      router.push('/distribution');
     } else if (item.section === 'customer_orders') {
       Alert.alert('Coming Soon', 'Customer Orders module will be available soon');
     } else {

@@ -240,6 +240,8 @@ def list_workflow_executions():
         filters.append(WorkflowExecutionModel.uuid == params.uuid)
     if params.workflow_uuid:
         filters.append(WorkflowExecutionModel.workflow_uuid == params.workflow_uuid)
+    if params.status:
+        filters.append(WorkflowExecutionModel.status == params.status.value)
     if params.name:
         filters.append(WorkflowExecutionModel.name.ilike(f"%{params.name}%"))
     if params.tags:
