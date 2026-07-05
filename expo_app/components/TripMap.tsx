@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 
@@ -37,16 +37,38 @@ export function TripMap({
   onStopPress: (stop: TripMapStop) => void;
 }) {
   const mapRef = useRef<MapView>(null);
-  const pinned = stops.filter((s) => s.lat != null && s.lng != null);
+  const [ready, setReady] = useState(false);
+
+  const pinned = useMemo(() => stops.filter((s) => s.lat != null && s.lng != null), [stops]);
+  const current = useMemo(
+    () => pinned.find((s) => s.tripStopUuid === currentStopUuid) || pinned[0] || null,
+    [pinned, currentStopUuid]
+  );
 
   const initialRegion = useMemo<Region>(() => {
-    const current = pinned.find((s) => s.tripStopUuid === currentStopUuid) || pinned[0];
     if (current && current.lat != null && current.lng != null) {
       return { latitude: current.lat, longitude: current.lng, latitudeDelta: 0.05, longitudeDelta: 0.05 };
     }
     return DEFAULT_REGION;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinned.length, currentStopUuid]);
+  }, []); // only for the very first frame; recentering happens imperatively below
+
+  // react-native-maps ignores initialRegion after mount, so recenter imperatively
+  // once the map is ready and the stops/current stop resolve.
+  useEffect(() => {
+    if (!ready || !mapRef.current) return;
+    if (current && current.lat != null && current.lng != null) {
+      mapRef.current.animateToRegion(
+        { latitude: current.lat, longitude: current.lng, latitudeDelta: 0.05, longitudeDelta: 0.05 },
+        500
+      );
+    } else if (pinned.length > 0) {
+      mapRef.current.fitToCoordinates(
+        pinned.map((s) => ({ latitude: s.lat as number, longitude: s.lng as number })),
+        { edgePadding: { top: 90, right: 80, bottom: 280, left: 80 }, animated: true }
+      );
+    }
+  }, [ready, current?.tripStopUuid, current?.lat, current?.lng, pinned.length]);
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -55,6 +77,7 @@ export function TripMap({
         style={StyleSheet.absoluteFill}
         provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
         initialRegion={initialRegion}
+        onMapReady={() => setReady(true)}
         showsUserLocation
         showsMyLocationButton
         loadingEnabled

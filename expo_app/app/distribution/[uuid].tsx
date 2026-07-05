@@ -162,6 +162,17 @@ export default function ExecutionDetailScreen() {
     [execution]
   );
 
+  // stop tasks + a stable signature so the per-stop fetch only re-runs when the
+  // set of stops or their statuses actually change (not on every focus refresh)
+  const stopTasks = useMemo(
+    () => (execution?.task_executions || []).filter((t) => t.operator === 'trip_stop_operator'),
+    [execution]
+  );
+  const stopSignature = useMemo(
+    () => stopTasks.map((t) => `${t.uuid}:${t.status}`).join('|'),
+    [stopTasks]
+  );
+
   // load fields for the current non-stop task (list mode only)
   useEffect(() => {
     (async () => {
@@ -175,40 +186,39 @@ export default function ExecutionDetailScreen() {
   // load all trip stops with coordinates (map mode)
   useEffect(() => {
     (async () => {
-      if (!tripPhase || !execution) { setTripStops([]); return; }
-      const stopTasks = (execution.task_executions || []).filter((t) => t.operator === 'trip_stop_operator');
-      if (stopTasks.length === 0) { setTripStops([]); return; }
+      if (!tripPhase || stopTasks.length === 0) { setTripStops([]); return; }
       setStopsLoading(true);
-      const built = await Promise.all(
-        stopTasks.map(async (te) => {
-          const res = await apiCall<any>(`/task/${te.task_uuid}`);
-          const data = res.data?.task_inputs?.data || {};
-          const customer = data.customer || {};
-          const { lat, lng } = parseLatLng(customer.coordinates);
-          return {
-            taskExecutionUuid: te.uuid,
-            taskUuid: te.task_uuid,
-            tripStopUuid: data.trip_stop_uuid,
-            customerUuid: customer.uuid,
-            customerName: customer.company_name || customer.full_name || 'Customer',
-            status: te.status,
-            lat,
-            lng,
-            index: 0,
-          } as TripStop;
-        })
-      );
-      built.sort((a, b) => {
-        const ta = stopTasks.find((t) => t.uuid === a.taskExecutionUuid)?.created_at || '';
-        const tb = stopTasks.find((t) => t.uuid === b.taskExecutionUuid)?.created_at || '';
-        return new Date(ta).getTime() - new Date(tb).getTime();
-      });
+      const built = (
+        await Promise.all(
+          stopTasks.map(async (te) => {
+            const res = await apiCall<any>(`/task/${te.task_uuid}`);
+            const data = res.data?.task_inputs?.data;
+            // drop stops whose task fetch failed rather than emitting undefined ids
+            if (!res.data || !data || !data.trip_stop_uuid) return null;
+            const customer = data.customer || {};
+            const { lat, lng } = parseLatLng(customer.coordinates);
+            return {
+              taskExecutionUuid: te.uuid,
+              taskUuid: te.task_uuid,
+              tripStopUuid: data.trip_stop_uuid,
+              customerUuid: customer.uuid,
+              customerName: customer.company_name || customer.full_name || 'Customer',
+              status: te.status,
+              lat,
+              lng,
+              index: 0,
+              _createdAt: te.created_at,
+            } as TripStop & { _createdAt: string };
+          })
+        )
+      ).filter(Boolean) as (TripStop & { _createdAt: string })[];
+      built.sort((a, b) => new Date(a._createdAt).getTime() - new Date(b._createdAt).getTime());
       built.forEach((s, i) => (s.index = i));
       setTripStops(built);
       setStopsLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [execution, tripPhase]);
+  }, [stopSignature, tripPhase]);
 
   const currentStopUuid = useMemo(
     () => tripStops.find((s) => s.status === 'in_progress')?.tripStopUuid || null,
@@ -223,7 +233,7 @@ export default function ExecutionDetailScreen() {
 
   const goToStop = (s: { taskExecutionUuid: string; tripStopUuid: string }) => {
     const stop = tripStops.find((t) => t.taskExecutionUuid === s.taskExecutionUuid);
-    if (!stop) return;
+    if (!stop || !stop.tripStopUuid || !stop.customerUuid) return;
     router.push({
       pathname: '/distribution/stop/[taskExecutionUuid]',
       params: {
@@ -353,9 +363,9 @@ export default function ExecutionDetailScreen() {
               <ThemedText style={styles.actionHint}>This step has inputs — complete it in the full app.</ThemedText>
             )}
             <TouchableOpacity
-              style={[styles.actionButton, submitting && styles.actionButtonDisabled]}
+              style={[styles.actionButton, (submitting || activeFields.length > 0) && styles.actionButtonDisabled]}
               onPress={completeActive}
-              disabled={submitting}
+              disabled={submitting || activeFields.length > 0}
               testID="button-complete-active"
             >
               {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.actionButtonText}>Complete {taskLabel(activeTask)}</ThemedText>}

@@ -1,11 +1,12 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
+  Pressable,
   PanResponder,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
@@ -47,101 +48,123 @@ export function StopsSheet({
   finishAction?: { label: string; onPress: () => void } | null;
 }) {
   const insets = useSafeAreaInsets();
-  const screenH = Dimensions.get('window').height;
+  const { height: screenH } = useWindowDimensions();
   const SHEET_H = Math.min(screenH * 0.62, 560);
   const PEEK = 190; // visible height when collapsed
-  const COLLAPSED = SHEET_H - PEEK; // translateY when collapsed
+  const COLLAPSED = Math.max(0, SHEET_H - PEEK); // translateY when collapsed
+
   const translateY = useRef(new Animated.Value(COLLAPSED)).current;
   const lastY = useRef(COLLAPSED);
+  const [expanded, setExpanded] = useState(false);
 
   const snapTo = (to: number) => {
-    Animated.spring(translateY, { toValue: to, useNativeDriver: true, bounciness: 4 }).start();
+    Animated.spring(translateY, { toValue: to, useNativeDriver: true, bounciness: 4 }).start(({ finished }) => {
+      if (finished) lastY.current = to;
+    });
     lastY.current = to;
+    setExpanded(to <= COLLAPSED / 2);
   };
+
+  // keep the offset valid if the window size changes (web / split-screen)
+  useEffect(() => {
+    snapTo(expanded ? 0 : COLLAPSED);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [COLLAPSED]);
 
   const pan = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 4,
+        onPanResponderGrant: () => {
+          // capture the live position (mid-spring) so the drag continues smoothly
+          translateY.stopAnimation((v: number) => { lastY.current = v; });
+        },
         onPanResponderMove: (_e, g) => {
           const next = Math.min(COLLAPSED, Math.max(0, lastY.current + g.dy));
           translateY.setValue(next);
         },
         onPanResponderRelease: (_e, g) => {
           const current = Math.min(COLLAPSED, Math.max(0, lastY.current + g.dy));
-          // snap to whichever end is closer, biased by fling velocity
           const goExpand = g.vy < -0.5 || (g.vy <= 0.5 && current < COLLAPSED / 2);
           snapTo(goExpand ? 0 : COLLAPSED);
+        },
+        onPanResponderTerminate: (_e, g) => {
+          const current = Math.min(COLLAPSED, Math.max(0, lastY.current + g.dy));
+          snapTo(current < COLLAPSED / 2 ? 0 : COLLAPSED);
         },
       }),
     [COLLAPSED]
   );
 
-  const toggle = () => snapTo(lastY.current > COLLAPSED / 2 ? 0 : COLLAPSED);
+  const toggle = () => snapTo(expanded ? COLLAPSED : 0);
 
   return (
-    <Animated.View
-      style={[
-        styles.sheet,
-        { height: SHEET_H, bottom: 0, transform: [{ translateY }], paddingBottom: insets.bottom },
-      ]}
-    >
-      {/* drag handle + header */}
-      <View {...pan.panHandlers}>
-        <TouchableOpacity activeOpacity={0.9} onPress={toggle} style={styles.handleArea}>
-          <View style={styles.handle} />
-        </TouchableOpacity>
-        <View style={styles.header}>
-          <ThemedText style={styles.title}>Stops ({stops.length})</ThemedText>
-          <TouchableOpacity style={styles.addBtn} onPress={onAddStop} testID="sheet-add-stop">
-            <ThemedText style={styles.addBtnText}>＋ Add Stop</ThemedText>
+    <>
+      {/* tap-outside-to-collapse backdrop; only intercepts touches when expanded */}
+      {expanded && (
+        <Pressable style={styles.backdrop} onPress={() => snapTo(COLLAPSED)} testID="sheet-backdrop" />
+      )}
+
+      <Animated.View
+        style={[
+          styles.sheet,
+          { height: SHEET_H + insets.bottom, bottom: 0, transform: [{ translateY }] },
+        ]}
+      >
+        <View {...pan.panHandlers}>
+          <TouchableOpacity activeOpacity={0.9} onPress={toggle} style={styles.handleArea}>
+            <View style={styles.handle} />
           </TouchableOpacity>
+          <View style={styles.header}>
+            <ThemedText style={styles.title}>Stops ({stops.length})</ThemedText>
+            <TouchableOpacity style={styles.addBtn} onPress={onAddStop} testID="sheet-add-stop">
+              <ThemedText style={styles.addBtnText}>＋ Add Stop</ThemedText>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
 
-      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-        {stops.length === 0 ? (
-          <ThemedText style={styles.empty}>No stops yet. Tap “Add Stop” to begin.</ThemedText>
-        ) : (
-          stops.map((s, i) => {
-            const isCurrent = s.tripStopUuid === currentStopUuid;
-            const color = statusColor(s.status, isCurrent);
-            const last = i === stops.length - 1;
-            return (
-              <TouchableOpacity
-                key={s.taskExecutionUuid}
-                style={[styles.row, isCurrent && styles.rowCurrent]}
-                onPress={() => onStopPress(s)}
-                testID={`sheet-stop-${s.tripStopUuid}`}
-              >
-                {/* progress rail */}
-                <View style={styles.rail}>
-                  <View style={[styles.dot, { backgroundColor: color }]} />
-                  {!last && <View style={styles.line} />}
-                </View>
-                <View style={styles.rowBody}>
-                  <ThemedText style={styles.rowName} numberOfLines={1}>{i + 1}. {s.customerName}</ThemedText>
-                  <ThemedText style={[styles.rowStatus, { color }]}>
-                    {STATUS_LABEL[s.status] || s.status}
-                  </ThemedText>
-                </View>
-                {isCurrent && <ThemedText style={styles.chevron}>›</ThemedText>}
-              </TouchableOpacity>
-            );
-          })
-        )}
+        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
+          {stops.length === 0 ? (
+            <ThemedText style={styles.empty}>No stops yet. Tap “Add Stop” to begin.</ThemedText>
+          ) : (
+            stops.map((s, i) => {
+              const isCurrent = s.tripStopUuid === currentStopUuid;
+              const color = statusColor(s.status, isCurrent);
+              const last = i === stops.length - 1;
+              return (
+                <TouchableOpacity
+                  key={s.taskExecutionUuid}
+                  style={[styles.row, isCurrent && styles.rowCurrent]}
+                  onPress={() => onStopPress(s)}
+                  testID={`sheet-stop-${s.tripStopUuid}`}
+                >
+                  <View style={styles.rail}>
+                    <View style={[styles.dot, { backgroundColor: color }]} />
+                    {!last && <View style={styles.line} />}
+                  </View>
+                  <View style={styles.rowBody}>
+                    <ThemedText style={styles.rowName} numberOfLines={1}>{i + 1}. {s.customerName}</ThemedText>
+                    <ThemedText style={[styles.rowStatus, { color }]}>{STATUS_LABEL[s.status] || s.status}</ThemedText>
+                  </View>
+                  {isCurrent && <ThemedText style={styles.chevron}>›</ThemedText>}
+                </TouchableOpacity>
+              );
+            })
+          )}
 
-        {finishAction && (
-          <TouchableOpacity style={styles.finishBtn} onPress={finishAction.onPress} testID="sheet-finish-trip">
-            <ThemedText style={styles.finishText}>{finishAction.label}</ThemedText>
-          </TouchableOpacity>
-        )}
-      </ScrollView>
-    </Animated.View>
+          {finishAction && (
+            <TouchableOpacity style={styles.finishBtn} onPress={finishAction.onPress} testID="sheet-finish-trip">
+              <ThemedText style={styles.finishText}>{finishAction.label}</ThemedText>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+      </Animated.View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.15)' },
   sheet: {
     position: 'absolute',
     left: 0,
@@ -165,7 +188,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 17, fontWeight: '700' },
   addBtn: { backgroundColor: '#5469D4', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  list: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
+  list: { paddingHorizontal: 16, paddingTop: 8 },
   empty: { textAlign: 'center', opacity: 0.6, paddingVertical: 24 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   rowCurrent: { backgroundColor: 'rgba(84,105,212,0.08)', borderRadius: 10, marginHorizontal: -8, paddingHorizontal: 8 },
