@@ -82,6 +82,7 @@ jobs:
             APP_HOST=${APP_HOST}
             REGISTRY_URL=${REGISTRY_URL}
             EMAIL=${EMAIL}
+            JWT_SECRET_KEY=${{ secrets.PROD_JWT_SECRET_KEY }}
             EOF
             docker compose -f docker-compose.prod.yaml down
             docker compose -f docker-compose.prod.yaml pull
@@ -105,6 +106,7 @@ jobs:
             APP_HOST=api-prod.karma-grp.com
             REGISTRY_URL=ghcr.io/albardn2/karma-backend
             EMAIL=zaid.bardan@gmail.com
+            JWT_SECRET_KEY=${{ secrets.PROD_JWT_SECRET_KEY }}
             EOF
             docker compose -f docker-compose.prod.yaml down
             docker compose -f docker-compose.prod.yaml pull
