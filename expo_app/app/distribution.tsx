@@ -180,7 +180,7 @@ export default function DistributionScreen() {
       {/* Header with back button + Start Trip */}
       <NativeHeader
         title="Distribution"
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
         rightButton={{ label: '+ Start Trip', onPress: handleStartTrip }}
       />
 

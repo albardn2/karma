@@ -279,7 +279,10 @@ export default function StartTripScreen() {
   return (
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <NativeHeader title="Start Trip" onBack={() => router.back()} />
+      <NativeHeader
+        title="Start Trip"
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))}
+      />
 
       {loading ? (
         <View style={styles.centered}>

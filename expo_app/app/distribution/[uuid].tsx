@@ -269,7 +269,10 @@ export default function ExecutionDetailScreen() {
   return (
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <NativeHeader title="Trip" onBack={() => router.back()} />
+      <NativeHeader
+        title="Trip"
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))}
+      />
 
       {loading ? (
         <View style={styles.centered}><ActivityIndicator size="large" color="#5469D4" /></View>
