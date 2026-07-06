@@ -53,6 +53,10 @@ jobs:
             EMAIL=zaid.bardan@gmail.com
             JWT_SECRET_KEY=${{ secrets.DEV_JWT_SECRET_KEY }}
             EOF
+            # Authenticate to GHCR so the private :latest-dev image can be pulled.
+            # Without this, the droplet's cached credentials expire and
+            # `compose pull` silently no-ops, leaving stale code running.
+            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u albardn2 --password-stdin
             docker compose -f docker-compose.dev.yaml down
             docker compose -f docker-compose.dev.yaml pull
             docker compose -f docker-compose.dev.yaml up -d --scale migrate=0 --remove-orphans
