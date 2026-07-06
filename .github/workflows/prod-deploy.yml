@@ -84,6 +84,12 @@ jobs:
             EMAIL=${EMAIL}
             JWT_SECRET_KEY=${{ secrets.PROD_JWT_SECRET_KEY }}
             EOF
+            # Auth to GHCR + reclaim disk before pulling the private image.
+            # Without this, expired creds or a full disk make `pull` silently
+            # no-op and stale code keeps running despite a "successful" deploy.
+            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u albardn2 --password-stdin
+            docker image prune -af
+            docker builder prune -af
             docker compose -f docker-compose.prod.yaml down
             docker compose -f docker-compose.prod.yaml pull
             docker compose -f docker-compose.prod.yaml run --rm migrate
@@ -108,6 +114,12 @@ jobs:
             EMAIL=zaid.bardan@gmail.com
             JWT_SECRET_KEY=${{ secrets.PROD_JWT_SECRET_KEY }}
             EOF
+            # Auth to GHCR + reclaim disk before pulling the private image.
+            # Without this, expired creds or a full disk make `pull` silently
+            # no-op and stale code keeps running despite a "successful" deploy.
+            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u albardn2 --password-stdin
+            docker image prune -af
+            docker builder prune -af
             docker compose -f docker-compose.prod.yaml down
             docker compose -f docker-compose.prod.yaml pull
             docker compose -f docker-compose.prod.yaml up -d --scale migrate=0 --remove-orphans
