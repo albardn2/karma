@@ -53,6 +53,17 @@ jobs:
             EMAIL=zaid.bardan@gmail.com
             JWT_SECRET_KEY=${{ secrets.DEV_JWT_SECRET_KEY }}
             EOF
+            # Authenticate to GHCR so the private :latest-dev image can be pulled.
+            # Without this, the droplet's cached credentials expire and
+            # `compose pull` silently no-ops, leaving stale code running.
+            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u albardn2 --password-stdin
+            # Reclaim disk before pulling. Old image layers + build cache pile up
+            # across deploys and fill the droplet, so `pull` fails with "no space
+            # left on device" and `up` silently re-runs the stale cached image.
+            # Prune while the current containers are still up so their in-use
+            # images are protected; named volumes (the DB) are never touched.
+            docker image prune -af
+            docker builder prune -af
             docker compose -f docker-compose.dev.yaml down
             docker compose -f docker-compose.dev.yaml pull
             docker compose -f docker-compose.dev.yaml up -d --scale migrate=0 --remove-orphans
