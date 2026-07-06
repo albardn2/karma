@@ -253,33 +253,54 @@ def list_workflow_executions():
         filters.append(WorkflowExecutionModel.start_time >= params.start_time)
     if params.end_time:
         filters.append(WorkflowExecutionModel.start_time <= params.end_time)
-    with SqlAlchemyUnitOfWork() as uow:
-        if params.mine:
-            # executions the caller created, or trips assigned to them via the
-            # start_trip setup (result.assigned_user_uuid holds a username)
-            from sqlalchemy import or_, select
-            from models.common import TaskExecution as TaskExecutionModel
-            from models.common import Task as TaskModel
+    from sqlalchemy import or_, select
+    from models.common import TaskExecution as TaskExecutionModel
+    from models.common import Task as TaskModel
 
-            current_uuid = get_jwt_identity()
-            current_user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
-            assigned_values = [current_uuid]
-            if current_user:
-                assigned_values.append(current_user.username)
-            assigned_exists = (
-                select(TaskExecutionModel.uuid)
-                .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
-                .where(
-                    TaskExecutionModel.workflow_execution_uuid == WorkflowExecutionModel.uuid,
-                    TaskModel.operator == "start_trip_operator",
-                    TaskExecutionModel.result["assigned_user_uuid"].astext.in_(assigned_values),
-                )
-                .exists()
+    def owned_or_assigned_filter(user):
+        """Executions created by `user` OR whose start_trip setup assigns them
+        (result.assigned_user_uuid stores a username; also match uuid)."""
+        values = [user.uuid, user.username]
+        assigned_exists = (
+            select(TaskExecutionModel.uuid)
+            .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
+            .where(
+                TaskExecutionModel.workflow_execution_uuid == WorkflowExecutionModel.uuid,
+                TaskModel.operator == "start_trip_operator",
+                TaskExecutionModel.result["assigned_user_uuid"].astext.in_(values),
             )
-            filters.append(or_(
-                WorkflowExecutionModel.created_by_uuid == current_uuid,
-                assigned_exists,
-            ))
+            .exists()
+        )
+        return or_(WorkflowExecutionModel.created_by_uuid == user.uuid, assigned_exists)
+
+    with SqlAlchemyUnitOfWork() as uow:
+        current_uuid = get_jwt_identity()
+        current_user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
+        is_admin = bool(current_user and current_user.is_admin)
+
+        if not is_admin:
+            # non-admins can ONLY ever see their own trips — enforced server-side
+            # regardless of the `mine`/`assigned_user_uuid` params they send.
+            if current_user:
+                filters.append(owned_or_assigned_filter(current_user))
+            else:
+                filters.append(WorkflowExecutionModel.created_by_uuid == current_uuid)
+        else:
+            # admins see everything, but may narrow to a specific user (by the
+            # assigned_user_uuid filter) or to just their own (mine=true).
+            target = None
+            if params.assigned_user_uuid:
+                target = (
+                    uow.user_repository.find_one(uuid=params.assigned_user_uuid, is_deleted=False)
+                    or uow.user_repository.find_one(username=params.assigned_user_uuid, is_deleted=False)
+                )
+                if not target:
+                    # requested a specific user that doesn't exist → return nothing
+                    filters.append(WorkflowExecutionModel.uuid == "__no_such_user__")
+            elif params.mine:
+                target = current_user
+            if target:
+                filters.append(owned_or_assigned_filter(target))
 
         page = uow.workflow_execution_repository.find_all_by_filters_paginated(
             filters=filters,
