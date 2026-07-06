@@ -72,6 +72,9 @@ class WorkflowExecutionListParams(BaseModel):
     created_by_uuid: Optional[str] = None
     # restrict to executions the caller created or is assigned to (start_trip assigned user)
     mine: Optional[bool] = None
+    # admin-only: restrict to trips assigned to (or created by) a specific user
+    # (accepts a username or a user uuid). Ignored for non-admins.
+    assigned_user_uuid: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     tags : Optional[List[WorkflowTags]] = None  # Filter by tags associated with the workflow execution
