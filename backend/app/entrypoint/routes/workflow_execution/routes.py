@@ -51,6 +51,67 @@ def _assert_execution_access(uow, workflow_exe):
     raise NotFoundError(f"workflow_exe not found with uuid: {workflow_exe.uuid}")
 
 
+def _promote_stop_to_current(uow, workflow_exe, target):
+    """Splice a not_started trip_stop task execution to the front of the pending
+    chain (it becomes the current stop) and demote the previously-current stop
+    to next in line. The gap the target leaves is closed by re-pointing whatever
+    followed it at the target's old predecessor, so the linear depends_on chain
+    the frontend renders from stays intact. No-op if `target` is already current.
+    """
+    from datetime import datetime
+    from app.dto.task_execution import OperatorType
+
+    tasks = list(workflow_exe.task_executions)
+    current = next(
+        (te for te in tasks
+         if te.operator == OperatorType.TRIP_STOP_OPERATOR.value
+         and te.status == WorkflowStatus.IN_PROGRESS.value),
+        None,
+    )
+    if current is not None and current.uuid == target.uuid:
+        return  # already the current stop
+
+    target_name = target.name
+    target_pred_names = list(target.depends_on or [])  # what the target follows today
+
+    def _dedupe(names):
+        seen, out = set(), []
+        for n in names:
+            if n not in seen:
+                seen.add(n)
+                out.append(n)
+        return out
+
+    # 1) close the gap the target leaves: whatever depended on the target now
+    #    depends on the target's predecessor instead.
+    for te in tasks:
+        if te.uuid == target.uuid or (current is not None and te.uuid == current.uuid):
+            continue
+        if te.depends_on and target_name in te.depends_on:
+            te.depends_on = _dedupe(
+                [d for d in te.depends_on if d != target_name] + target_pred_names
+            )
+            if te.status == WorkflowStatus.IN_PROGRESS.value:
+                te.status = WorkflowStatus.NOT_STARTED.value
+                te.start_time = None
+            uow.task_execution_repository.save(model=te, commit=False)
+
+    # 2) splice the target to the front (right after the current stop's anchor)
+    #    and activate it.
+    if current is not None:
+        target.depends_on = list(current.depends_on or [])
+    target.status = WorkflowStatus.IN_PROGRESS.value
+    target.start_time = datetime.now()
+    uow.task_execution_repository.save(model=target, commit=False)
+
+    # 3) put the previously-current stop right behind the target.
+    if current is not None:
+        current.depends_on = [target_name]
+        current.status = WorkflowStatus.NOT_STARTED.value
+        current.start_time = None
+        uow.task_execution_repository.save(model=current, commit=False)
+
+
 @workflow_execution_blueprint.route("/", methods=["POST"])
 @jwt_required()
 @scopes_required(
@@ -132,6 +193,34 @@ def add_manual_stop(uuid: str):
             customer = uow.customer_repository.find_one(uuid=payload.customer_uuid, is_deleted=False)
             if not customer:
                 raise NotFoundError("Customer not found")
+            # if this customer is already an active stop on the trip, don't add a
+            # duplicate — promote it to current (or no-op if it's already current).
+            existing_tes = []
+            for s in trip.stops:
+                if s.customer_uuid == customer.uuid and s.task_execution_uuid:
+                    te = uow.task_execution_repository.find_one(uuid=s.task_execution_uuid)
+                    if te is not None:
+                        existing_tes.append(te)
+            already_current = next(
+                (te for te in existing_tes if te.status == WorkflowStatus.IN_PROGRESS.value), None
+            )
+            if already_current is not None:
+                return jsonify({
+                    "status": "already_current",
+                    "task_execution_uuid": already_current.uuid,
+                    "customer": CustomerRead.from_orm(customer).model_dump(mode="json"),
+                }), 200
+            pending = next(
+                (te for te in existing_tes if te.status == WorkflowStatus.NOT_STARTED.value), None
+            )
+            if pending is not None:
+                _promote_stop_to_current(uow, workflow_exe, pending)
+                uow.commit()
+                return jsonify({
+                    "status": "promoted",
+                    "task_execution_uuid": pending.uuid,
+                    "customer": CustomerRead.from_orm(customer).model_dump(mode="json"),
+                }), 200
         else:
             customer_create = CustomerCreate(**payload.customer)
             customer_create.created_by_uuid = current_uuid
@@ -207,6 +296,7 @@ def add_manual_stop(uuid: str):
 
         uow.commit()
         result = {
+            "status": "added",
             "task_execution_uuid": task_execution.uuid,
             "customer": CustomerRead.from_orm(customer).model_dump(mode="json"),
         }
@@ -232,7 +322,6 @@ def set_current_stop(uuid: str):
     predecessor. Everything is expressed through `depends_on` (task names), so
     the linear chain the frontend renders from stays intact.
     """
-    from datetime import datetime
     from app.dto.task_execution import OperatorType
     from app.dto.workflow_execution import SetCurrentStopParams
 
@@ -266,43 +355,7 @@ def set_current_stop(uuid: str):
         if current is None:
             raise BadRequestError("No current stop to reorder against")
 
-        target_name = target.name
-        anchor_names = list(current.depends_on or [])      # completed task the trip is at
-        target_pred_names = list(target.depends_on or [])  # what the target follows today
-
-        def _dedupe(names):
-            seen, out = set(), []
-            for n in names:
-                if n not in seen:
-                    seen.add(n)
-                    out.append(n)
-            return out
-
-        # 1) close the gap the target leaves: whatever depended on the target now
-        #    depends on the target's predecessor instead.
-        for te in tasks:
-            if te.uuid in (target.uuid, current.uuid):
-                continue
-            if te.depends_on and target_name in te.depends_on:
-                te.depends_on = _dedupe(
-                    [d for d in te.depends_on if d != target_name] + target_pred_names
-                )
-                if te.status == WorkflowStatus.IN_PROGRESS.value:
-                    te.status = WorkflowStatus.NOT_STARTED.value
-                    te.start_time = None
-                uow.task_execution_repository.save(model=te, commit=False)
-
-        # 2) splice the target to the front (it becomes current) and put the old
-        #    current right behind it.
-        target.depends_on = anchor_names
-        target.status = WorkflowStatus.IN_PROGRESS.value
-        target.start_time = datetime.now()
-        uow.task_execution_repository.save(model=target, commit=False)
-
-        current.depends_on = [target_name]
-        current.status = WorkflowStatus.NOT_STARTED.value
-        current.start_time = None
-        uow.task_execution_repository.save(model=current, commit=False)
+        _promote_stop_to_current(uow, workflow_exe, target)
 
         uow.commit()
         result = {
