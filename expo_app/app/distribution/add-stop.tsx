@@ -148,12 +148,25 @@ export default function AddStopScreen() {
           coordinates: coords || null,
         };
       }
-      const res = await apiCall(`/workflow-execution/${executionUuid}/manual-stop`, {
+      const res = await apiCall<{ status?: string }>(`/workflow-execution/${executionUuid}/manual-stop`, {
         method: 'POST',
         body: JSON.stringify(body),
       });
       if (res.status !== 201 && res.status !== 200) throw new Error(res.error || 'Failed to add the stop');
-      router.back();
+      // when the customer was already on the route the backend promotes the
+      // existing stop instead of adding a duplicate — let the driver know.
+      const outcome = res.data?.status;
+      if (outcome === 'promoted' || outcome === 'already_current') {
+        Alert.alert(
+          'Already on the route',
+          outcome === 'already_current'
+            ? 'This customer is already the current stop.'
+            : 'This customer is already on the route — set as the current stop.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      } else {
+        router.back();
+      }
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not add the stop');
     } finally {
