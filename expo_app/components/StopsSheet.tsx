@@ -40,6 +40,8 @@ export function StopsSheet({
   onStopPress,
   onAddStop,
   onSetCurrent,
+  armedStopUuid,
+  onArm,
   finishAction,
 }: {
   stops: SheetStop[];
@@ -47,15 +49,13 @@ export function StopsSheet({
   onStopPress: (stop: SheetStop) => void;
   onAddStop: () => void;
   onSetCurrent?: (stop: SheetStop) => void;
+  // The armed "Set current" selection is lifted to the parent so a tap
+  // anywhere else — on the map or in this list — dismisses it.
+  armedStopUuid?: string | null;
+  onArm?: (uuid: string | null) => void;
   finishAction?: { label: string; onPress: () => void } | null;
 }) {
   const insets = useSafeAreaInsets();
-  // taskExecutionUuid of the upcoming stop the user long-pressed → reveals its
-  // "Set current" action. Cleared on tap-away or when the stop set changes.
-  const [armedUuid, setArmedUuid] = useState<string | null>(null);
-  useEffect(() => {
-    if (armedUuid && !stops.some((s) => s.taskExecutionUuid === armedUuid)) setArmedUuid(null);
-  }, [stops, armedUuid]);
   const { height: screenH } = useWindowDimensions();
   const SHEET_H = Math.min(screenH * 0.62, 560);
   const PEEK = 190; // visible height when collapsed
@@ -110,7 +110,7 @@ export function StopsSheet({
     <>
       {/* tap-outside-to-collapse backdrop; only intercepts touches when expanded */}
       {expanded && (
-        <Pressable style={styles.backdrop} onPress={() => { setArmedUuid(null); snapTo(COLLAPSED); }} testID="sheet-backdrop" />
+        <Pressable style={styles.backdrop} onPress={() => { onArm?.(null); snapTo(COLLAPSED); }} testID="sheet-backdrop" />
       )}
 
       <Animated.View
@@ -141,13 +141,13 @@ export function StopsSheet({
               const last = i === stops.length - 1;
               // Only a future, not-yet-started stop can be promoted to current.
               const canSetCurrent = !!onSetCurrent && !isCurrent && s.status === 'not_started';
-              const armed = armedUuid === s.taskExecutionUuid;
+              const armed = armedStopUuid === s.taskExecutionUuid;
               return (
                 <TouchableOpacity
                   key={s.taskExecutionUuid}
                   style={[styles.row, isCurrent && styles.rowCurrent, armed && styles.rowArmed]}
-                  onPress={() => (armed ? setArmedUuid(null) : onStopPress(s))}
-                  onLongPress={() => canSetCurrent && setArmedUuid(s.taskExecutionUuid)}
+                  onPress={() => (armedStopUuid ? onArm?.(null) : onStopPress(s))}
+                  onLongPress={() => canSetCurrent && onArm?.(s.taskExecutionUuid)}
                   delayLongPress={300}
                   testID={`sheet-stop-${s.tripStopUuid}`}
                 >
@@ -162,7 +162,7 @@ export function StopsSheet({
                   {armed ? (
                     <TouchableOpacity
                       style={styles.setCurrentBtn}
-                      onPress={() => { setArmedUuid(null); onSetCurrent?.(s); }}
+                      onPress={() => { onArm?.(null); onSetCurrent?.(s); }}
                       testID={`sheet-set-current-${s.tripStopUuid}`}
                     >
                       <ThemedText style={styles.setCurrentText}>Set current</ThemedText>

@@ -19,6 +19,9 @@ export function TripMap({ stops, currentStopUuid }: {
   stops: TripMapStop[];
   currentStopUuid: string | null;
   onStopPress: (stop: TripMapStop) => void;
+  armedStopUuid?: string | null;
+  onArm?: (uuid: string | null) => void;
+  onSetCurrent?: (stop: TripMapStop) => void;
 }) {
   const current = stops.find((s) => s.tripStopUuid === currentStopUuid);
   const pinned = stops.filter((s) => s.lat != null && s.lng != null);

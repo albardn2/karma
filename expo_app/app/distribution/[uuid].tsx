@@ -160,6 +160,9 @@ export default function ExecutionDetailScreen() {
   // map-mode (trip phase) stops
   const [tripStops, setTripStops] = useState<TripStop[]>([]);
   const [stopsLoading, setStopsLoading] = useState(false);
+  // shared "Set current" armed selection (map pin tap or list long-press);
+  // lifted here so a tap elsewhere on either surface dismisses it.
+  const [armedStopUuid, setArmedStopUuid] = useState<string | null>(null);
 
   useFocusEffect(React.useCallback(() => { setRefreshKey((k) => k + 1); }, []));
 
@@ -275,6 +278,13 @@ export default function ExecutionDetailScreen() {
     [tripStops]
   );
 
+  // drop the armed "Set current" selection once it's no longer an upcoming stop
+  useEffect(() => {
+    if (!armedStopUuid) return;
+    const s = tripStops.find((t) => t.taskExecutionUuid === armedStopUuid);
+    if (!s || s.status !== 'not_started' || s.tripStopUuid === currentStopUuid) setArmedStopUuid(null);
+  }, [tripStops, armedStopUuid, currentStopUuid]);
+
   const progress = useMemo(() => {
     const total = orderedTasks.length;
     const done = orderedTasks.filter((t) => t.status === 'completed').length;
@@ -298,6 +308,7 @@ export default function ExecutionDetailScreen() {
 
   const setCurrentStop = async (s: { taskExecutionUuid: string }) => {
     if (!execution) return;
+    setArmedStopUuid(null);
     const res = await apiCall(`/workflow-execution/${execution.uuid}/set-current-stop`, {
       method: 'POST',
       body: JSON.stringify({ task_execution_uuid: s.taskExecutionUuid }),
@@ -385,7 +396,14 @@ export default function ExecutionDetailScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <NativeHeader title="Trip" onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
         <View style={styles.mapArea}>
-          <TripMap stops={tripStops} currentStopUuid={currentStopUuid} onStopPress={goToStop} />
+          <TripMap
+            stops={tripStops}
+            currentStopUuid={currentStopUuid}
+            onStopPress={goToStop}
+            armedStopUuid={armedStopUuid}
+            onArm={setArmedStopUuid}
+            onSetCurrent={setCurrentStop}
+          />
           {stopsLoading && (
             <View style={styles.stopsLoading}><ActivityIndicator color="#5469D4" /></View>
           )}
@@ -395,6 +413,8 @@ export default function ExecutionDetailScreen() {
             onStopPress={goToStop}
             onAddStop={() => router.push({ pathname: '/distribution/add-stop', params: { executionUuid: execution.uuid } })}
             onSetCurrent={setCurrentStop}
+            armedStopUuid={armedStopUuid}
+            onArm={setArmedStopUuid}
             finishAction={finishActive ? { label: 'Finish Trip', onPress: finishTrip } : null}
           />
         </View>
