@@ -41,12 +41,12 @@ class TripDomain:
         if trip.status in [TripStatus.COMPLETED.value, TripStatus.CANCELLED.value]:
             raise BadRequestError("Cannot cancel a completed or already cancelled trip")
 
-        trip.status = TripModel.CANCELLED.value
+        trip.status = TripStatus.CANCELLED.value
         trip.end_time = datetime.now()
 
         trip_stops = trip.stops
         for stop in trip_stops:
-            if stop.status not in [TripStopStatus.COMPLETED, TripStopStatus.CANCELLED]:
+            if stop.status not in [TripStopStatus.COMPLETED.value, TripStopStatus.CANCELLED.value]:
                 stop.status = TripStopStatus.CANCELLED.value
         uow.trip_repository.save(model=trip, commit=False)
         return TripRead.from_orm(trip)
