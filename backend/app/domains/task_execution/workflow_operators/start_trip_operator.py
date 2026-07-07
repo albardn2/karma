@@ -71,6 +71,46 @@ class StartTripOperator(OperatorInterface):
         if not task_exe:
             raise BadRequestError(f"TaskExecution not found with uuid: {payload.uuid}")
 
+        # A user may be assigned to at most one in-progress trip at a time. Block
+        # starting this trip if the assignee already has another in-progress trip
+        # assigned to them (their start_trip result.assigned_user_uuid matches).
+        if operator_schema.assigned_user_uuid:
+            from models.common import (
+                WorkflowExecution as WFEModel,
+                TaskExecution as TEModel,
+                Task as TaskModel,
+            )
+            # the assignee is chosen by username (or uuid); resolve to a real
+            # user so we key the check off a UNIQUE identity — never fall back to
+            # matching a non-unique raw string (e.g. a first name).
+            assignee = (
+                uow.user_repository.find_one(uuid=operator_schema.assigned_user_uuid, is_deleted=False)
+                or uow.user_repository.find_one(username=operator_schema.assigned_user_uuid, is_deleted=False)
+            )
+            if not assignee:
+                raise BadRequestError(
+                    f"Assigned user '{operator_schema.assigned_user_uuid}' was not found"
+                )
+            # assignment is stored as either the username or the uuid — match both
+            values = [assignee.uuid, assignee.username]
+            existing = (
+                uow.session.query(WFEModel.uuid)
+                .join(TEModel, TEModel.workflow_execution_uuid == WFEModel.uuid)
+                .join(TaskModel, TaskModel.uuid == TEModel.task_uuid)
+                .filter(
+                    WFEModel.status == WorkflowStatus.IN_PROGRESS.value,
+                    WFEModel.uuid != task_exe.workflow_execution_uuid,
+                    TaskModel.operator == "start_trip_operator",
+                    TEModel.result["assigned_user_uuid"].astext.in_(values),
+                )
+                .first()
+            )
+            if existing:
+                raise BadRequestError(
+                    "This user already has a trip in progress; finish or cancel it "
+                    "before assigning another."
+                )
+
         task_exe.result = operator_schema.model_dump(mode="json")
         task_exe.status = WorkflowStatus.COMPLETED.value
         task_exe.end_time = datetime.now()

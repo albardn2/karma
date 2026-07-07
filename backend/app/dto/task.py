@@ -101,7 +101,10 @@ class TaskRead(TaskBase):
                     f.options = [sa.name for sa in service_areas]
                 if f.label == "assigned_user_uuid":
                     users = uow.user_repository.find_all(is_deleted=False)
-                    f.options = [user.first_name for user in users]
+                    # username is unique; first_name is not, and the assignment
+                    # must key off a unique identifier (see the start_trip guard
+                    # and owned_or_assigned_filter, which match on uuid/username).
+                    f.options = [user.username for user in users]
                 if f.label == "customer_categories":
                     categories = [category.value for category in CustomerCategory]
                     f.options = categories
