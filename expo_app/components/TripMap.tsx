@@ -114,10 +114,19 @@ export function TripMap({
           const isCurrent = s.tripStopUuid === currentStopUuid;
           return (
             <Marker
-              key={s.taskExecutionUuid}
+              // Key every marker on the current stop id so ALL markers remount
+              // whenever the current stop changes. react-native-maps on the iOS
+              // (Apple) provider does NOT reliably redraw a custom marker view
+              // when its props change in place (the promoted pin stays gray /
+              // vanishes), so we force a fresh render — which works on mount.
+              key={`${s.taskExecutionUuid}:${currentStopUuid ?? 'none'}`}
               coordinate={{ latitude: s.lat as number, longitude: s.lng as number }}
               title={s.customerName}
               description={isCurrent ? 'Current stop' : s.status}
+              // keep the current (blue) pin on top; stops render in chain order,
+              // so an early-drawn current pin would otherwise be hidden under the
+              // later upcoming pins in a dense cluster.
+              zIndex={isCurrent ? 999 : 1}
               onPress={() => {
                 lastMarkerTapRef.current = Date.now();
                 const upcoming = s.status === 'not_started' && !isCurrent;
