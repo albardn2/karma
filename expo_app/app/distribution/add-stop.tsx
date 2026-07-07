@@ -124,10 +124,6 @@ export default function AddStopScreen() {
     })();
   }, [mode, categories.length]);
 
-  const captureLocation = () => {
-    fetchDeviceLocation({ prompt: true });
-  };
-
   const canSubmit = useMemo(() => {
     if (submitting) return false;
     return mode === 'existing'
@@ -266,22 +262,6 @@ export default function AddStopScreen() {
           </View>
         )}
 
-        {/* location */}
-        <ThemedText style={styles.fieldLabel}>Location (lat,lon) — used if the customer has no saved location</ThemedText>
-        <View style={styles.coordRow}>
-          <TextInput
-            style={[styles.input, styles.coordInput]}
-            placeholder="e.g. 33.5138,36.2765"
-            placeholderTextColor="#9ca3af"
-            value={coords}
-            onChangeText={setCoords}
-            testID="input-coords"
-          />
-          <TouchableOpacity style={styles.locBtn} onPress={captureLocation} testID="button-locate">
-            <ThemedText style={styles.locBtnText}>📍</ThemedText>
-          </TouchableOpacity>
-        </View>
-
         <TouchableOpacity
           style={[styles.submit, !canSubmit && styles.submitDisabled]}
           onPress={submit}
@@ -320,10 +300,6 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
   chipText: { fontSize: 13, color: '#374151' },
   chipTextActive: { color: '#fff', fontWeight: '600' },
-  coordRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  coordInput: { flex: 1 },
-  locBtn: { borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#fff' },
-  locBtnText: { fontSize: 18 },
   submit: { marginTop: 16, backgroundColor: '#5469D4', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   submitDisabled: { opacity: 0.5 },
   submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
