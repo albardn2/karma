@@ -39,15 +39,23 @@ export function StopsSheet({
   currentStopUuid,
   onStopPress,
   onAddStop,
+  onSetCurrent,
   finishAction,
 }: {
   stops: SheetStop[];
   currentStopUuid: string | null;
   onStopPress: (stop: SheetStop) => void;
   onAddStop: () => void;
+  onSetCurrent?: (stop: SheetStop) => void;
   finishAction?: { label: string; onPress: () => void } | null;
 }) {
   const insets = useSafeAreaInsets();
+  // taskExecutionUuid of the upcoming stop the user long-pressed → reveals its
+  // "Set current" action. Cleared on tap-away or when the stop set changes.
+  const [armedUuid, setArmedUuid] = useState<string | null>(null);
+  useEffect(() => {
+    if (armedUuid && !stops.some((s) => s.taskExecutionUuid === armedUuid)) setArmedUuid(null);
+  }, [stops, armedUuid]);
   const { height: screenH } = useWindowDimensions();
   const SHEET_H = Math.min(screenH * 0.62, 560);
   const PEEK = 190; // visible height when collapsed
@@ -102,7 +110,7 @@ export function StopsSheet({
     <>
       {/* tap-outside-to-collapse backdrop; only intercepts touches when expanded */}
       {expanded && (
-        <Pressable style={styles.backdrop} onPress={() => snapTo(COLLAPSED)} testID="sheet-backdrop" />
+        <Pressable style={styles.backdrop} onPress={() => { setArmedUuid(null); snapTo(COLLAPSED); }} testID="sheet-backdrop" />
       )}
 
       <Animated.View
@@ -131,11 +139,16 @@ export function StopsSheet({
               const isCurrent = s.tripStopUuid === currentStopUuid;
               const color = statusColor(s.status, isCurrent);
               const last = i === stops.length - 1;
+              // Only a future, not-yet-started stop can be promoted to current.
+              const canSetCurrent = !!onSetCurrent && !isCurrent && s.status === 'not_started';
+              const armed = armedUuid === s.taskExecutionUuid;
               return (
                 <TouchableOpacity
                   key={s.taskExecutionUuid}
-                  style={[styles.row, isCurrent && styles.rowCurrent]}
-                  onPress={() => onStopPress(s)}
+                  style={[styles.row, isCurrent && styles.rowCurrent, armed && styles.rowArmed]}
+                  onPress={() => (armed ? setArmedUuid(null) : onStopPress(s))}
+                  onLongPress={() => canSetCurrent && setArmedUuid(s.taskExecutionUuid)}
+                  delayLongPress={300}
                   testID={`sheet-stop-${s.tripStopUuid}`}
                 >
                   <View style={styles.rail}>
@@ -146,7 +159,17 @@ export function StopsSheet({
                     <ThemedText style={styles.rowName} numberOfLines={1}>{i + 1}. {s.customerName}</ThemedText>
                     <ThemedText style={[styles.rowStatus, { color }]}>{STATUS_LABEL[s.status] || s.status}</ThemedText>
                   </View>
-                  {isCurrent && <ThemedText style={styles.chevron}>›</ThemedText>}
+                  {armed ? (
+                    <TouchableOpacity
+                      style={styles.setCurrentBtn}
+                      onPress={() => { setArmedUuid(null); onSetCurrent?.(s); }}
+                      testID={`sheet-set-current-${s.tripStopUuid}`}
+                    >
+                      <ThemedText style={styles.setCurrentText}>Set current</ThemedText>
+                    </TouchableOpacity>
+                  ) : (
+                    isCurrent && <ThemedText style={styles.chevron}>›</ThemedText>
+                  )}
                 </TouchableOpacity>
               );
             })
@@ -192,6 +215,9 @@ const styles = StyleSheet.create({
   empty: { textAlign: 'center', opacity: 0.6, paddingVertical: 24 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   rowCurrent: { backgroundColor: 'rgba(84,105,212,0.08)', borderRadius: 10, marginHorizontal: -8, paddingHorizontal: 8 },
+  rowArmed: { backgroundColor: 'rgba(84,105,212,0.06)', borderRadius: 10, marginHorizontal: -8, paddingHorizontal: 8 },
+  setCurrentBtn: { backgroundColor: '#5469D4', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  setCurrentText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   rail: { width: 24, alignItems: 'center', alignSelf: 'stretch' },
   dot: { width: 14, height: 14, borderRadius: 7, marginTop: 14, borderWidth: 2, borderColor: '#fff' },
   line: { flex: 1, width: 2, backgroundColor: 'rgba(0,0,0,0.12)', marginTop: 2 },

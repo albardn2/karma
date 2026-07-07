@@ -296,6 +296,19 @@ export default function ExecutionDetailScreen() {
     });
   };
 
+  const setCurrentStop = async (s: { taskExecutionUuid: string }) => {
+    if (!execution) return;
+    const res = await apiCall(`/workflow-execution/${execution.uuid}/set-current-stop`, {
+      method: 'POST',
+      body: JSON.stringify({ task_execution_uuid: s.taskExecutionUuid }),
+    });
+    if (res.status !== 200) {
+      Alert.alert('Error', res.error || 'Could not set the current stop');
+      return;
+    }
+    await fetchExecution(false);
+  };
+
   const finishTrip = () => {
     if (!finishTask) return;
     Alert.alert('Finish trip', 'Complete the trip? All stops must be resolved.', [
@@ -381,6 +394,7 @@ export default function ExecutionDetailScreen() {
             currentStopUuid={currentStopUuid}
             onStopPress={goToStop}
             onAddStop={() => router.push({ pathname: '/distribution/add-stop', params: { executionUuid: execution.uuid } })}
+            onSetCurrent={setCurrentStop}
             finishAction={finishActive ? { label: 'Finish Trip', onPress: finishTrip } : null}
           />
         </View>

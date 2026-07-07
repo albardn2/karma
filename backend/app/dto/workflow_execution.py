@@ -82,6 +82,13 @@ class WorkflowExecutionListParams(BaseModel):
     page: int = Field(1, gt=0, description="Page number (>=1)")
     per_page: int = Field(20, gt=0, le=100, description="Items per page (<=100)")
 
+class SetCurrentStopParams(BaseModel):
+    """Promote an upcoming trip stop to be the current one."""
+    model_config = ConfigDict(extra="forbid")
+
+    task_execution_uuid: str  # the trip_stop task execution to make current
+
+
 class WorkflowExecutionPage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
