@@ -117,6 +117,10 @@ class CustomerListParams(BaseModel):
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
     within_polygon: Optional[str] = None  # WKT Polygon string
+    # "lat,lon" of a reference point (e.g. the driver's current location).
+    # When set, results are ordered nearest-first and customers without a
+    # saved location are excluded.
+    near: Optional[str] = None
 
     page: int = Field(1, gt=0, description="Page number, starting from 1")
     per_page: int = Field(20, gt=0, le=1000, description="Items per page, max 100")
