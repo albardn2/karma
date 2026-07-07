@@ -2,11 +2,13 @@ from flask import  request, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from geoalchemy2 import WKTElement
 from pydantic import  ValidationError
+from sqlalchemy import func
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.customer import customer_blueprint
 
 from app.dto.customer import CustomerCreate, CustomerRead
+from app.utils.geom_utils import lat_lon_to_wkt
 from models.common import Customer as CustomerModel
 
 from app.dto.customer import CustomerUpdate, CustomerReadList,CustomerListParams, CustomerPage
@@ -158,12 +160,29 @@ def list_customers():
     if params.within_polygon:
         # make per page a very high number to avoid pagination
         params.per_page = 10000
+
+    # default ordering: most recently added first
+    ordering = [CustomerModel.created_at.desc()]
+    if params.near:
+        # Order nearest-first relative to the reference point. Customers with
+        # no saved location can't have a distance, so exclude them.
+        point = WKTElement(
+            lat_lon_to_wkt(params.near),  # raises BadRequestError if malformed
+            srid=CustomerModel.coordinates.type.srid,  # e.g. 4326
+        )
+        filters.append(CustomerModel.coordinates.is_not(None))
+        # ST_DistanceSphere returns true great-circle metres. Plain ST_Distance
+        # on a SRID-4326 *geometry* measures planar degrees, which over-weights
+        # east-west offsets (1 deg lon << 1 deg lat away from the equator) and
+        # can mis-rank the nearest customers.
+        ordering = [func.ST_DistanceSphere(CustomerModel.coordinates, point).asc()]
+
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.customer_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
             per_page=params.per_page,
-            ordering=[CustomerModel.created_at.desc()]
+            ordering=ordering
         )
         items = [
             CustomerRead.from_orm(c).model_dump(mode='json')
