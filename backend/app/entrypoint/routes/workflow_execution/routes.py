@@ -29,6 +29,28 @@ from app.dto.workflow_execution import (
 from models.common import WorkflowExecution as WorkflowExecutionModel
 
 
+def _assert_execution_access(uow, workflow_exe):
+    """Guard object-level access to a workflow execution. Admins may touch any
+    trip; non-admins may only act on trips they created or are assigned to
+    (the start_trip setup stores the assignee in result.assigned_user_uuid).
+    Mirrors the list endpoint's owned_or_assigned_filter. Raises NotFoundError
+    (rather than 403) so a caller can't enumerate other users' trips by UUID.
+    """
+    current_user = uow.user_repository.find_one(uuid=get_jwt_identity(), is_deleted=False)
+    if not current_user:
+        raise NotFoundError("User not found")
+    if current_user.is_admin:
+        return
+    if workflow_exe.created_by_uuid == current_user.uuid:
+        return
+    values = {current_user.uuid, current_user.username}
+    for te in workflow_exe.task_executions:
+        if te.operator == "start_trip_operator":
+            if (te.result or {}).get("assigned_user_uuid") in values:
+                return
+    raise NotFoundError(f"workflow_exe not found with uuid: {workflow_exe.uuid}")
+
+
 @workflow_execution_blueprint.route("/", methods=["POST"])
 @jwt_required()
 @scopes_required(
@@ -97,6 +119,7 @@ def add_manual_stop(uuid: str):
         workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid)
         if not workflow_exe:
             raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
+        _assert_execution_access(uow, workflow_exe)
         trips = workflow_exe.trips
         if not trips:
             raise BadRequestError("This workflow execution has no trip yet")
@@ -188,6 +211,105 @@ def add_manual_stop(uuid: str):
             "customer": CustomerRead.from_orm(customer).model_dump(mode="json"),
         }
     return jsonify(result), 201
+
+
+@workflow_execution_blueprint.route("/<string:uuid>/set-current-stop", methods=["POST"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.OPERATOR.value,
+    PermissionScope.DRIVER.value,
+    PermissionScope.SALES.value)
+def set_current_stop(uuid: str):
+    """Promote an upcoming trip stop to be the current one.
+
+    The target stop is spliced to the front of the pending chain (right after
+    the last completed task the trip is currently at), and the previously
+    "current" stop becomes the next one in line. The gap the target leaves
+    behind is closed by re-pointing whatever followed it at the target's old
+    predecessor. Everything is expressed through `depends_on` (task names), so
+    the linear chain the frontend renders from stays intact.
+    """
+    from datetime import datetime
+    from app.dto.task_execution import OperatorType
+    from app.dto.workflow_execution import SetCurrentStopParams
+
+    params = SetCurrentStopParams(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid)
+        if not workflow_exe:
+            raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
+        _assert_execution_access(uow, workflow_exe)
+
+        tasks = list(workflow_exe.task_executions)
+        target = next((te for te in tasks if te.uuid == params.task_execution_uuid), None)
+        if target is None:
+            raise NotFoundError("Target stop not found on this trip")
+        if target.operator != OperatorType.TRIP_STOP_OPERATOR.value:
+            raise BadRequestError("Target task is not a trip stop")
+        if target.status == WorkflowStatus.IN_PROGRESS.value:
+            raise BadRequestError("Stop is already the current stop")
+        if target.status != WorkflowStatus.NOT_STARTED.value:
+            raise BadRequestError(
+                f"Only an upcoming stop can be made current (status: {target.status})"
+            )
+
+        # the stop currently being worked — there is exactly one during a trip
+        current = next(
+            (te for te in tasks
+             if te.operator == OperatorType.TRIP_STOP_OPERATOR.value
+             and te.status == WorkflowStatus.IN_PROGRESS.value),
+            None,
+        )
+        if current is None:
+            raise BadRequestError("No current stop to reorder against")
+
+        target_name = target.name
+        anchor_names = list(current.depends_on or [])      # completed task the trip is at
+        target_pred_names = list(target.depends_on or [])  # what the target follows today
+
+        def _dedupe(names):
+            seen, out = set(), []
+            for n in names:
+                if n not in seen:
+                    seen.add(n)
+                    out.append(n)
+            return out
+
+        # 1) close the gap the target leaves: whatever depended on the target now
+        #    depends on the target's predecessor instead.
+        for te in tasks:
+            if te.uuid in (target.uuid, current.uuid):
+                continue
+            if te.depends_on and target_name in te.depends_on:
+                te.depends_on = _dedupe(
+                    [d for d in te.depends_on if d != target_name] + target_pred_names
+                )
+                if te.status == WorkflowStatus.IN_PROGRESS.value:
+                    te.status = WorkflowStatus.NOT_STARTED.value
+                    te.start_time = None
+                uow.task_execution_repository.save(model=te, commit=False)
+
+        # 2) splice the target to the front (it becomes current) and put the old
+        #    current right behind it.
+        target.depends_on = anchor_names
+        target.status = WorkflowStatus.IN_PROGRESS.value
+        target.start_time = datetime.now()
+        uow.task_execution_repository.save(model=target, commit=False)
+
+        current.depends_on = [target_name]
+        current.status = WorkflowStatus.NOT_STARTED.value
+        current.start_time = None
+        uow.task_execution_repository.save(model=current, commit=False)
+
+        uow.commit()
+        result = {
+            "current_task_execution_uuid": target.uuid,
+            "previous_task_execution_uuid": current.uuid,
+        }
+    return jsonify(result), 200
 
 # # Route to update a Workflow
 # @workflow_execution_blueprint.route("/<string:uuid>", methods=["PUT"])
