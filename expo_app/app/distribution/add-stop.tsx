@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,12 +13,24 @@ import { ThemedView } from '@/components/ThemedView';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
+import * as Location from 'expo-location';
+
+function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
+  const R = 6371; // km
+  const dLat = ((bLat - aLat) * Math.PI) / 180;
+  const dLon = ((bLon - aLon) * Math.PI) / 180;
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
 
 interface CustomerRow {
   uuid: string;
   company_name?: string;
   full_name?: string;
   phone_number?: string;
+  coordinates?: string | null; // "lat,lon"
 }
 
 export default function AddStopScreen() {
@@ -31,20 +43,50 @@ export default function AddStopScreen() {
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [customerUuid, setCustomerUuid] = useState('');
   const [coords, setCoords] = useState('');
+  const [userLoc, setUserLoc] = useState<{ lat: number; lon: number } | null>(null);
+  const [locDenied, setLocDenied] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [newCustomer, setNewCustomer] = useState({ company_name: '', full_name: '', phone_number: '', category: '', full_address: '' });
   const [submitting, setSubmitting] = useState(false);
 
-  // capture device location once (web + native)
-  useEffect(() => {
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setCoords(`${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`),
-        () => {},
-        { enableHighAccuracy: true, timeout: 6000 }
-      );
+  // Capture device location via expo-location (navigator.geolocation is not
+  // available on native). Seeds the stop coordinates AND drives the
+  // nearest-first customer sort.
+  const fetchDeviceLocation = useCallback(async (opts?: { prompt?: boolean }) => {
+    try {
+      let granted = (await Location.getForegroundPermissionsAsync()).status === 'granted';
+      if (!granted && opts?.prompt) {
+        granted = (await Location.requestForegroundPermissionsAsync()).status === 'granted';
+      }
+      if (!granted) {
+        setLocDenied(true);
+        return;
+      }
+      setLocDenied(false);
+      // Bound the GPS fix: a cold fix can hang for a long time (notably on the
+      // simulator). Race against a timeout and fall back to the last known
+      // position so the nearest-customers list still populates.
+      const pos =
+        (await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+        ])) || (await Location.getLastKnownPositionAsync());
+      if (!pos) {
+        // Permission granted but no fix available → fall back to recent list.
+        setLocDenied(true);
+        return;
+      }
+      const { latitude, longitude } = pos.coords;
+      setUserLoc({ lat: latitude, lon: longitude });
+      setCoords(`${latitude.toFixed(6)},${longitude.toFixed(6)}`);
+    } catch {
+      setLocDenied(true);
     }
   }, []);
+
+  useEffect(() => {
+    fetchDeviceLocation({ prompt: true });
+  }, [fetchDeviceLocation]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 300);
@@ -53,12 +95,26 @@ export default function AddStopScreen() {
 
   useEffect(() => {
     if (mode !== 'existing') return;
+    let cancelled = false;
     (async () => {
-      const q = debounced ? `&company_name=${encodeURIComponent(debounced)}` : '';
-      const res = await apiCall<{ customers: CustomerRow[] }>(`/customer/?page=1&per_page=50${q}`);
-      setCustomers(res.data?.customers || []);
+      let url: string;
+      if (debounced) {
+        // Search takes precedence: match any customer by name.
+        url = `/customer/?page=1&per_page=50&company_name=${encodeURIComponent(debounced)}`;
+      } else if (userLoc) {
+        // No search → the 5 customers nearest the driver's current location.
+        url = `/customer/?page=1&per_page=5&near=${encodeURIComponent(`${userLoc.lat},${userLoc.lon}`)}`;
+      } else {
+        // No search and no location yet → fall back to the 5 most recent.
+        url = `/customer/?page=1&per_page=5`;
+      }
+      const res = await apiCall<{ customers: CustomerRow[] }>(url);
+      if (!cancelled) setCustomers(res.data?.customers || []);
     })();
-  }, [mode, debounced]);
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, debounced, userLoc]);
 
   useEffect(() => {
     if (mode !== 'new' || categories.length) return;
@@ -67,18 +123,6 @@ export default function AddStopScreen() {
       setCategories(res.data || []);
     })();
   }, [mode, categories.length]);
-
-  const captureLocation = () => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      Alert.alert('Location unavailable', 'Geolocation is not supported here.');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setCoords(`${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`),
-      (e) => Alert.alert('Location error', e.message),
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
-  };
 
   const canSubmit = useMemo(() => {
     if (submitting) return false;
@@ -104,12 +148,25 @@ export default function AddStopScreen() {
           coordinates: coords || null,
         };
       }
-      const res = await apiCall(`/workflow-execution/${executionUuid}/manual-stop`, {
+      const res = await apiCall<{ status?: string }>(`/workflow-execution/${executionUuid}/manual-stop`, {
         method: 'POST',
         body: JSON.stringify(body),
       });
       if (res.status !== 201 && res.status !== 200) throw new Error(res.error || 'Failed to add the stop');
-      router.back();
+      // when the customer was already on the route the backend promotes the
+      // existing stop instead of adding a duplicate — let the driver know.
+      const outcome = res.data?.status;
+      if (outcome === 'promoted' || outcome === 'already_current') {
+        Alert.alert(
+          'Already on the route',
+          outcome === 'already_current'
+            ? 'This customer is already the current stop.'
+            : 'This customer is already on the route — set as the current stop.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      } else {
+        router.back();
+      }
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not add the stop');
     } finally {
@@ -153,21 +210,42 @@ export default function AddStopScreen() {
               onChangeText={setSearch}
               testID="input-search"
             />
+            <ThemedText style={styles.listLabel} testID="list-label">
+              {debounced
+                ? 'Search results'
+                : userLoc
+                ? 'Nearest customers'
+                : locDenied
+                ? 'Recent customers · enable location for nearest'
+                : 'Recent customers'}
+            </ThemedText>
             <View style={styles.list}>
               {customers.length === 0 ? (
-                <ThemedText style={styles.empty}>No customers match.</ThemedText>
+                <ThemedText style={styles.empty}>
+                  {debounced ? 'No customers match.' : 'No customers to show.'}
+                </ThemedText>
               ) : (
-                customers.map((c) => (
-                  <TouchableOpacity
-                    key={c.uuid}
-                    style={[styles.listItem, customerUuid === c.uuid && styles.listItemActive]}
-                    onPress={() => setCustomerUuid(c.uuid)}
-                    testID={`customer-${c.uuid}`}
-                  >
-                    <ThemedText style={styles.listName}>{c.company_name || c.full_name}</ThemedText>
-                    <ThemedText style={styles.listSub}>{c.full_name}{c.phone_number ? ` · ${c.phone_number}` : ''}</ThemedText>
-                  </TouchableOpacity>
-                ))
+                customers.map((c) => {
+                  let distLabel = '';
+                  if (userLoc && c.coordinates) {
+                    const [la, lo] = c.coordinates.split(',').map((x) => parseFloat(x));
+                    if (Number.isFinite(la) && Number.isFinite(lo)) {
+                      const km = haversineKm(userLoc.lat, userLoc.lon, la, lo);
+                      distLabel = km < 1 ? ` · ${Math.round(km * 1000)} m` : ` · ${km.toFixed(1)} km`;
+                    }
+                  }
+                  return (
+                    <TouchableOpacity
+                      key={c.uuid}
+                      style={[styles.listItem, customerUuid === c.uuid && styles.listItemActive]}
+                      onPress={() => setCustomerUuid(c.uuid)}
+                      testID={`customer-${c.uuid}`}
+                    >
+                      <ThemedText style={styles.listName}>{c.company_name || c.full_name}</ThemedText>
+                      <ThemedText style={styles.listSub}>{c.full_name}{c.phone_number ? ` · ${c.phone_number}` : ''}{distLabel}</ThemedText>
+                    </TouchableOpacity>
+                  );
+                })
               )}
             </View>
           </View>
@@ -197,22 +275,6 @@ export default function AddStopScreen() {
           </View>
         )}
 
-        {/* location */}
-        <ThemedText style={styles.fieldLabel}>Location (lat,lon) — used if the customer has no saved location</ThemedText>
-        <View style={styles.coordRow}>
-          <TextInput
-            style={[styles.input, styles.coordInput]}
-            placeholder="e.g. 33.5138,36.2765"
-            placeholderTextColor="#9ca3af"
-            value={coords}
-            onChangeText={setCoords}
-            testID="input-coords"
-          />
-          <TouchableOpacity style={styles.locBtn} onPress={captureLocation} testID="button-locate">
-            <ThemedText style={styles.locBtnText}>📍</ThemedText>
-          </TouchableOpacity>
-        </View>
-
         <TouchableOpacity
           style={[styles.submit, !canSubmit && styles.submitDisabled]}
           onPress={submit}
@@ -238,6 +300,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 10,
     paddingHorizontal: 12, paddingVertical: 11, fontSize: 15, backgroundColor: '#fff', color: '#111827', marginBottom: 10,
   },
+  listLabel: { fontSize: 12, fontWeight: '600', opacity: 0.55, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
   list: { borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)', borderRadius: 10, overflow: 'hidden' },
   empty: { padding: 14, opacity: 0.6 },
   listItem: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.06)' },
@@ -250,10 +313,6 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
   chipText: { fontSize: 13, color: '#374151' },
   chipTextActive: { color: '#fff', fontWeight: '600' },
-  coordRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  coordInput: { flex: 1 },
-  locBtn: { borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#fff' },
-  locBtnText: { fontSize: 18 },
   submit: { marginTop: 16, backgroundColor: '#5469D4', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   submitDisabled: { opacity: 0.5 },
   submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },

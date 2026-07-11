@@ -43,7 +43,13 @@
         }
       ],
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Karma uses your location to show your position on the trip map and list the nearest customers when adding a stop."
+        }
+      ]
     ],
     "experiments": { "typedRoutes": true }
   }

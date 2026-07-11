@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 
 export interface TripMapStop {
@@ -31,18 +31,40 @@ export function TripMap({
   stops,
   currentStopUuid,
   onStopPress,
+  armedStopUuid = null,
+  onArm,
+  onSetCurrent,
 }: {
   stops: TripMapStop[];
   currentStopUuid: string | null;
   onStopPress: (stop: TripMapStop) => void;
+  armedStopUuid?: string | null;
+  onArm?: (uuid: string | null) => void;
+  onSetCurrent?: (stop: TripMapStop) => void;
 }) {
   const mapRef = useRef<MapView>(null);
   const [ready, setReady] = useState(false);
+  // On iOS (Apple provider) a marker tap ALSO fires MapView.onPress, which would
+  // instantly clear the arm we just set. Record when a marker was tapped so the
+  // map's onPress can ignore that paired event and only dismiss on a real
+  // background tap.
+  const lastMarkerTapRef = useRef(0);
 
   const pinned = useMemo(() => stops.filter((s) => s.lat != null && s.lng != null), [stops]);
   const current = useMemo(
     () => pinned.find((s) => s.tripStopUuid === currentStopUuid) || pinned[0] || null,
     [pinned, currentStopUuid]
+  );
+  // the upcoming stop the user tapped → shows a floating "Set current" button
+  const armedStop = useMemo(
+    () =>
+      pinned.find(
+        (s) =>
+          s.taskExecutionUuid === armedStopUuid &&
+          s.status === 'not_started' &&
+          s.tripStopUuid !== currentStopUuid
+      ) || null,
+    [pinned, armedStopUuid, currentStopUuid]
   );
 
   const initialRegion = useMemo<Region>(() => {
@@ -78,6 +100,12 @@ export function TripMap({
         provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
         initialRegion={initialRegion}
         onMapReady={() => setReady(true)}
+        onPress={() => {
+          // ignore the map press that iOS pairs with a marker tap; only a
+          // genuine background tap (no recent marker tap) dismisses.
+          if (Date.now() - lastMarkerTapRef.current < 350) return;
+          onArm?.(null);
+        }}
         showsUserLocation
         showsMyLocationButton
         loadingEnabled
@@ -86,11 +114,25 @@ export function TripMap({
           const isCurrent = s.tripStopUuid === currentStopUuid;
           return (
             <Marker
-              key={s.taskExecutionUuid}
+              // Key every marker on the current stop id so ALL markers remount
+              // whenever the current stop changes. react-native-maps on the iOS
+              // (Apple) provider does NOT reliably redraw a custom marker view
+              // when its props change in place (the promoted pin stays gray /
+              // vanishes), so we force a fresh render — which works on mount.
+              key={`${s.taskExecutionUuid}:${currentStopUuid ?? 'none'}`}
               coordinate={{ latitude: s.lat as number, longitude: s.lng as number }}
               title={s.customerName}
               description={isCurrent ? 'Current stop' : s.status}
-              onPress={() => onStopPress(s)}
+              // keep the current (blue) pin on top; stops render in chain order,
+              // so an early-drawn current pin would otherwise be hidden under the
+              // later upcoming pins in a dense cluster.
+              zIndex={isCurrent ? 999 : 1}
+              onPress={() => {
+                lastMarkerTapRef.current = Date.now();
+                const upcoming = s.status === 'not_started' && !isCurrent;
+                if (upcoming) onArm?.(s.taskExecutionUuid);
+                else { onArm?.(null); onStopPress(s); }
+              }}
             >
               <View style={[styles.pin, { backgroundColor: statusColor(s.status, isCurrent) }, isCurrent && styles.pinCurrent]}>
                 <View style={styles.pinInner} />
@@ -99,6 +141,23 @@ export function TripMap({
           );
         })}
       </MapView>
+
+      {/* floating "Set current" for a tapped upcoming pin; taps elsewhere on the
+          map dismiss it via the MapView onPress above */}
+      {armedStop && (
+        <View style={styles.armedWrap} pointerEvents="box-none">
+          <View style={styles.armedCard}>
+            <Text style={styles.armedName} numberOfLines={1}>{armedStop.customerName}</Text>
+            <TouchableOpacity
+              style={styles.armedBtn}
+              onPress={() => { onSetCurrent?.(armedStop); onArm?.(null); }}
+              testID={`map-set-current-${armedStop.tripStopUuid}`}
+            >
+              <Text style={styles.armedBtnText}>Set current</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -111,4 +170,13 @@ const styles = StyleSheet.create({
   },
   pinCurrent: { width: 32, height: 32, borderRadius: 16 },
   pinInner: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  armedWrap: { position: 'absolute', top: 12, left: 0, right: 0, alignItems: 'center' },
+  armedCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12,
+    paddingLeft: 14, paddingRight: 6, paddingVertical: 6, maxWidth: '90%',
+    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 6,
+  },
+  armedName: { fontSize: 14, fontWeight: '600', color: '#111827', marginRight: 10, flexShrink: 1 },
+  armedBtn: { backgroundColor: '#5469D4', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  armedBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });
