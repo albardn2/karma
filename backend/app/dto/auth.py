@@ -58,7 +58,8 @@ class MeUpdate(BaseModel):
     @pydantic.field_validator("language")
     def supported_language(cls, v):
         if v is not None and v not in ("en", "ar"):
-            raise ValueError("language must be one of: en, ar")
+            from app.entrypoint.routes.common.errors import BadRequestError
+            raise BadRequestError("language must be one of: en, ar")
         return v
 
 
