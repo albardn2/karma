@@ -13,8 +13,9 @@ import { ThemedView } from '@/components/ThemedView';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
-import { TripMap, TripMapStop } from '@/components/TripMap';
+import { TripMap, TripMapArea, TripMapStop } from '@/components/TripMap';
 import { StopsSheet } from '@/components/StopsSheet';
+import { parseWktPolygons } from '@/utils/wkt';
 
 interface TaskExecution {
   uuid: string;
@@ -163,6 +164,8 @@ export default function ExecutionDetailScreen() {
   // shared "Set current" armed selection (map pin tap or list long-press);
   // lifted here so a tap elsewhere on either surface dismisses it.
   const [armedStopUuid, setArmedStopUuid] = useState<string | null>(null);
+  // service areas picked in the trip setup, drawn on the map as boundaries
+  const [serviceAreas, setServiceAreas] = useState<TripMapArea[]>([]);
 
   useFocusEffect(React.useCallback(() => { setRefreshKey((k) => k + 1); }, []));
 
@@ -205,6 +208,34 @@ export default function ExecutionDetailScreen() {
     () => (execution?.task_executions || []).find((t) => t.operator === 'trip_finish_operator') || null,
     [execution]
   );
+
+  // service areas picked in the start_trip setup (names from its result)
+  const pickedAreaNames = useMemo(() => {
+    const setup = (execution?.task_executions || []).find((t) => t.operator === 'start_trip_operator');
+    const names = setup?.result?.service_areas;
+    return Array.isArray(names) ? (names as string[]).filter(Boolean) : [];
+  }, [execution]);
+  const pickedAreaSignature = pickedAreaNames.join('|');
+
+  // load the picked areas' geometries once the map view is active
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!tripPhase || pickedAreaNames.length === 0) { setServiceAreas([]); return; }
+      const res = await apiCall<{ items: { uuid: string; name: string; geometry?: string | null }[] }>(
+        '/service-area/?per_page=100'
+      );
+      if (cancelled) return;
+      const wanted = new Set(pickedAreaNames);
+      const areas = (res.data?.items || [])
+        .filter((sa) => wanted.has(sa.name))
+        .map((sa) => ({ uuid: sa.uuid, name: sa.name, polygons: parseWktPolygons(sa.geometry || '') }))
+        .filter((a) => a.polygons.length > 0);
+      setServiceAreas(areas);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripPhase, pickedAreaSignature]);
 
   // stop tasks + a stable signature so the per-stop fetch only re-runs when the
   // set of stops or their statuses actually change (not on every focus refresh)
@@ -403,6 +434,7 @@ export default function ExecutionDetailScreen() {
             armedStopUuid={armedStopUuid}
             onArm={setArmedStopUuid}
             onSetCurrent={setCurrentStop}
+            areas={serviceAreas}
           />
           {stopsLoading && (
             <View style={styles.stopsLoading}><ActivityIndicator color="#5469D4" /></View>

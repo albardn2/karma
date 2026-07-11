@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import MapView, { Marker, Polygon, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import type { PolygonRings } from '@/utils/wkt';
 
 export interface TripMapStop {
   taskExecutionUuid: string;
@@ -10,6 +11,13 @@ export interface TripMapStop {
   lat: number | null;
   lng: number | null;
   index: number;
+}
+
+// a service area drawn as translucent polygon(s) under the stop pins
+export interface TripMapArea {
+  uuid: string;
+  name: string;
+  polygons: PolygonRings[];
 }
 
 const statusColor = (status: string, isCurrent: boolean) => {
@@ -34,6 +42,7 @@ export function TripMap({
   armedStopUuid = null,
   onArm,
   onSetCurrent,
+  areas = [],
 }: {
   stops: TripMapStop[];
   currentStopUuid: string | null;
@@ -41,6 +50,7 @@ export function TripMap({
   armedStopUuid?: string | null;
   onArm?: (uuid: string | null) => void;
   onSetCurrent?: (stop: TripMapStop) => void;
+  areas?: TripMapArea[];
 }) {
   const mapRef = useRef<MapView>(null);
   const [ready, setReady] = useState(false);
@@ -89,8 +99,14 @@ export function TripMap({
         pinned.map((s) => ({ latitude: s.lat as number, longitude: s.lng as number })),
         { edgePadding: { top: 90, right: 80, bottom: 280, left: 80 }, animated: true }
       );
+    } else if (areas.length > 0) {
+      // no stops yet (fresh manual trip) — frame the picked service areas
+      mapRef.current.fitToCoordinates(
+        areas.flatMap((a) => a.polygons.flatMap((p) => p.coordinates)),
+        { edgePadding: { top: 90, right: 80, bottom: 280, left: 80 }, animated: true }
+      );
     }
-  }, [ready, current?.tripStopUuid, current?.lat, current?.lng, pinned.length]);
+  }, [ready, current?.tripStopUuid, current?.lat, current?.lng, pinned.length, areas.length]);
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -110,6 +126,21 @@ export function TripMap({
         showsMyLocationButton
         loadingEnabled
       >
+        {/* picked service-area boundaries, under the stop pins */}
+        {areas.map((a) =>
+          a.polygons.map((p, i) => (
+            <Polygon
+              key={`${a.uuid}:${i}`}
+              coordinates={p.coordinates}
+              holes={p.holes.length ? p.holes : undefined}
+              fillColor="rgba(84,105,212,0.16)"
+              strokeColor="rgba(84,105,212,0.85)"
+              strokeWidth={2}
+              tappable={false}
+            />
+          ))
+        )}
+
         {pinned.map((s) => {
           const isCurrent = s.tripStopUuid === currentStopUuid;
           return (

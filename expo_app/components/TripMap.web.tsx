@@ -22,6 +22,7 @@ export function TripMap({ stops, currentStopUuid }: {
   armedStopUuid?: string | null;
   onArm?: (uuid: string | null) => void;
   onSetCurrent?: (stop: TripMapStop) => void;
+  areas?: { uuid: string; name: string; polygons: unknown[] }[];
 }) {
   const current = stops.find((s) => s.tripStopUuid === currentStopUuid);
   const pinned = stops.filter((s) => s.lat != null && s.lng != null);
