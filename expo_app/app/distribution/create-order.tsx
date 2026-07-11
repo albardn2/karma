@@ -15,6 +15,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const CURRENCIES = ['USD', 'SYP'];
 
@@ -33,6 +34,7 @@ interface LineItem {
 
 export default function CreateOrderScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { tripStopUuid, customerUuid, customerName } = useLocalSearchParams<{
     tripStopUuid?: string;
     customerUuid?: string;
@@ -117,11 +119,11 @@ export default function CreateOrderScreen() {
         body: JSON.stringify(body),
       });
       if (res.status !== 201 && res.status !== 200) {
-        throw new Error(res.error || 'Failed to create the order');
+        throw new Error(res.error || t('createorder.createFailed'));
       }
       router.back();
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Could not create the order');
+      Alert.alert(t('createorder.errorTitle'), e?.message || t('createorder.createError'));
     } finally {
       setSubmitting(false);
     }
@@ -131,7 +133,7 @@ export default function CreateOrderScreen() {
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <NativeHeader
-        title="Create Order"
+        title={t('createorder.title')}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))}
       />
 
@@ -156,13 +158,13 @@ export default function CreateOrderScreen() {
               ))}
             </View>
             <View style={styles.totalWrap}>
-              <ThemedText style={styles.totalLabel}>Total</ThemedText>
+              <ThemedText style={styles.totalLabel}>{t('createorder.total')}</ThemedText>
               <ThemedText style={styles.totalValue}>{total.toFixed(2)} {currency}</ThemedText>
             </View>
           </View>
 
           {/* line items */}
-          <ThemedText style={styles.sectionLabel}>Items</ThemedText>
+          <ThemedText style={styles.sectionLabel}>{t('createorder.items')}</ThemedText>
           {items.map((it, i) => (
             <View key={i} style={styles.itemRow}>
               <TouchableOpacity
@@ -171,14 +173,14 @@ export default function CreateOrderScreen() {
                 testID={`select-material-${i}`}
               >
                 <ThemedText style={[styles.materialSelectText, !it.material_uuid && styles.placeholder]} numberOfLines={1}>
-                  {it.material_uuid ? materialOf(it.material_uuid)?.name || 'Material' : 'Select material…'}
+                  {it.material_uuid ? materialOf(it.material_uuid)?.name || t('createorder.material') : t('createorder.selectMaterialPlaceholder')}
                 </ThemedText>
               </TouchableOpacity>
               <View style={styles.qtyWrap}>
                 <TextInput
                   style={styles.smallInput}
                   keyboardType="numeric"
-                  placeholder="Qty"
+                  placeholder={t('createorder.qtyPlaceholder')}
                   placeholderTextColor="#9ca3af"
                   value={it.quantity}
                   onChangeText={(t) => setItem(i, { quantity: t })}
@@ -189,7 +191,7 @@ export default function CreateOrderScreen() {
               <TextInput
                 style={[styles.smallInput, styles.priceInput]}
                 keyboardType="numeric"
-                placeholder="Price"
+                placeholder={t('createorder.pricePlaceholder')}
                 placeholderTextColor="#9ca3af"
                 value={it.price_per_unit}
                 onChangeText={(t) => setItem(i, { price_per_unit: t })}
@@ -201,16 +203,16 @@ export default function CreateOrderScreen() {
             </View>
           ))}
           <TouchableOpacity style={styles.addItem} onPress={addItem} testID="add-item">
-            <ThemedText style={styles.addItemText}>+ Add item</ThemedText>
+            <ThemedText style={styles.addItemText}>{t('createorder.addItem')}</ThemedText>
           </TouchableOpacity>
 
           {/* toggles */}
           <View style={styles.toggleRow}>
-            <ThemedText style={styles.toggleLabel}>Mark fulfilled</ThemedText>
+            <ThemedText style={styles.toggleLabel}>{t('createorder.markFulfilled')}</ThemedText>
             <Switch value={markFulfilled} onValueChange={setMarkFulfilled} trackColor={{ true: '#5469D4' }} testID="toggle-fulfilled" />
           </View>
           <View style={styles.toggleRow}>
-            <ThemedText style={styles.toggleLabel}>Mark paid</ThemedText>
+            <ThemedText style={styles.toggleLabel}>{t('createorder.markPaid')}</ThemedText>
             <Switch value={markPaid} onValueChange={setMarkPaid} trackColor={{ true: '#5469D4' }} testID="toggle-paid" />
           </View>
 
@@ -220,7 +222,7 @@ export default function CreateOrderScreen() {
             disabled={!canSubmit}
             testID="button-submit-order"
           >
-            {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.submitText}>Submit Order</ThemedText>}
+            {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.submitText}>{t('createorder.submitOrder')}</ThemedText>}
           </TouchableOpacity>
         </ScrollView>
       )}
@@ -230,12 +232,12 @@ export default function CreateOrderScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>Select material</ThemedText>
+              <ThemedText style={styles.modalTitle}>{t('createorder.selectMaterial')}</ThemedText>
               <TouchableOpacity onPress={() => setPickerRow(null)}><ThemedText style={styles.modalClose}>✕</ThemedText></TouchableOpacity>
             </View>
             <ScrollView style={styles.modalList}>
               {materials.length === 0 ? (
-                <ThemedText style={styles.modalEmpty}>No materials available on the truck.</ThemedText>
+                <ThemedText style={styles.modalEmpty}>{t('createorder.noMaterials')}</ThemedText>
               ) : (
                 materials.map((m) => (
                   <TouchableOpacity

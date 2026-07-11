@@ -15,6 +15,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Field {
   name: string;
@@ -37,6 +38,7 @@ const fmt = (s?: string | null) => {
 
 export default function StopDetailScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { taskExecutionUuid, taskUuid, tripStopUuid, customerUuid, customerName } =
     useLocalSearchParams<{
       taskExecutionUuid?: string;
@@ -105,7 +107,7 @@ export default function StopDetailScreen() {
       if (!f.required) continue;
       const v = values[f.name];
       const empty = f.type === 'checklist' ? !(v || []).length : !v;
-      if (empty) { Alert.alert('Missing info', `${f.label} is required.`); return; }
+      if (empty) { Alert.alert(t('stopdetail.missingInfo'), t('stopdetail.fieldRequired', { field: f.label })); return; }
     }
     const result: Record<string, any> = {};
     for (const f of fields) {
@@ -120,10 +122,10 @@ export default function StopDetailScreen() {
         method: 'POST',
         body: JSON.stringify({ uuid: taskExecutionUuid, result }),
       });
-      if (res.status !== 200) throw new Error(res.error || 'Failed to complete the stop');
+      if (res.status !== 200) throw new Error(res.error || t('stopdetail.failedToCompleteStop'));
       router.back();
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Could not complete the stop');
+      Alert.alert(t('stopdetail.error'), e?.message || t('stopdetail.couldNotCompleteStop'));
     } finally {
       setSubmitting(false);
     }
@@ -137,7 +139,7 @@ export default function StopDetailScreen() {
           <ThemedText style={styles.fieldLabel}>{f.label}{f.required ? ' *' : ''}</ThemedText>
           <TouchableOpacity style={styles.dropdown} onPress={() => setPickerField(f.name)} testID={`select-${f.name}`}>
             <ThemedText style={[styles.dropdownText, !value && styles.dropdownPlaceholder]} numberOfLines={1}>
-              {value || f.placeholder || 'Select…'}
+              {value || f.placeholder || t('stopdetail.selectPlaceholder')}
             </ThemedText>
             <ThemedText style={styles.caret}>▾</ThemedText>
           </TouchableOpacity>
@@ -184,7 +186,7 @@ export default function StopDetailScreen() {
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <NativeHeader
-        title={(customerName as string) || 'Stop'}
+        title={(customerName as string) || t('stopdetail.stop')}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))}
       />
 
@@ -199,7 +201,7 @@ export default function StopDetailScreen() {
           {/* balance */}
           {balance && (
             <View style={styles.balanceRow}>
-              <ThemedText style={styles.balanceLabel}>Balance</ThemedText>
+              <ThemedText style={styles.balanceLabel}>{t('stopdetail.balance')}</ThemedText>
               {Object.keys(balance).length === 0 ? (
                 <ThemedText style={styles.balanceNone}>—</ThemedText>
               ) : (
@@ -218,13 +220,13 @@ export default function StopDetailScreen() {
             onPress={() => router.push({ pathname: '/distribution/create-order', params: { tripStopUuid, customerUuid, customerName } })}
             testID="button-create-order"
           >
-            <ThemedText style={styles.createOrderText}>+ Create Order</ThemedText>
+            <ThemedText style={styles.createOrderText}>{t('stopdetail.createOrder')}</ThemedText>
           </TouchableOpacity>
 
           {/* recent orders */}
           {recentOrders.length > 0 && (
             <View style={styles.recentBox}>
-              <ThemedText style={styles.recentTitle}>Recent orders</ThemedText>
+              <ThemedText style={styles.recentTitle}>{t('stopdetail.recentOrders')}</ThemedText>
               {recentOrders.map((o) => (
                 <TouchableOpacity
                   key={o.uuid}
@@ -234,11 +236,11 @@ export default function StopDetailScreen() {
                 >
                   <View style={styles.recentLeft}>
                     <ThemedText style={styles.recentDate}>{fmt(o.created_at)}</ThemedText>
-                    <ThemedText style={styles.recentDue}>{(o.net_amount_due ?? o.total_adjusted_amount ?? 0)} {o.currency || ''} due</ThemedText>
+                    <ThemedText style={styles.recentDue}>{t('stopdetail.amountDue', { amount: o.net_amount_due ?? o.total_adjusted_amount ?? 0, currency: o.currency || '' })}</ThemedText>
                   </View>
                   <View style={styles.recentBadges}>
-                    <View style={[styles.miniBadge, o.is_paid ? styles.clear : styles.owed]}><ThemedText style={styles.miniBadgeText}>{o.is_paid ? 'Paid' : 'Unpaid'}</ThemedText></View>
-                    <View style={[styles.miniBadge, o.is_fulfilled ? styles.clear : styles.gray]}><ThemedText style={styles.miniBadgeText}>{o.is_fulfilled ? 'Fulfilled' : 'Unfulfilled'}</ThemedText></View>
+                    <View style={[styles.miniBadge, o.is_paid ? styles.clear : styles.owed]}><ThemedText style={styles.miniBadgeText}>{o.is_paid ? t('stopdetail.paid') : t('stopdetail.unpaid')}</ThemedText></View>
+                    <View style={[styles.miniBadge, o.is_fulfilled ? styles.clear : styles.gray]}><ThemedText style={styles.miniBadgeText}>{o.is_fulfilled ? t('stopdetail.fulfilled') : t('stopdetail.unfulfilled')}</ThemedText></View>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -255,7 +257,7 @@ export default function StopDetailScreen() {
             disabled={submitting}
             testID="button-complete-stop"
           >
-            {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.completeText}>Complete Stop</ThemedText>}
+            {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.completeText}>{t('stopdetail.completeStop')}</ThemedText>}
           </TouchableOpacity>
         </ScrollView>
       )}
@@ -264,7 +266,7 @@ export default function StopDetailScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>{fields.find((f) => f.name === pickerField)?.label || 'Select'}</ThemedText>
+              <ThemedText style={styles.modalTitle}>{fields.find((f) => f.name === pickerField)?.label || t('stopdetail.select')}</ThemedText>
               <TouchableOpacity onPress={() => setPickerField(null)}><ThemedText style={styles.modalClose}>✕</ThemedText></TouchableOpacity>
             </View>
             <ScrollView style={styles.modalList}>

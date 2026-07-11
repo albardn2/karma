@@ -17,6 +17,7 @@ import { NativeHeader } from '@/components/layout/NativeHeader';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { apiCall } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const TRIP_WORKFLOW_NAME = 'simple_trip_workflow';
 
@@ -47,19 +48,19 @@ interface WorkflowExecutionPage {
 
 type StatusFilter = 'all' | 'in_progress' | 'completed' | 'cancelled';
 
-const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
+const STATUS_FILTERS: { value: StatusFilter; labelKey: string }[] = [
+  { value: 'all', labelKey: 'dist.statusAll' },
+  { value: 'in_progress', labelKey: 'dist.statusInProgress' },
+  { value: 'completed', labelKey: 'dist.statusCompleted' },
+  { value: 'cancelled', labelKey: 'dist.statusCancelled' },
 ];
 
-const STATUS_STYLES: Record<string, { bg: string; fg: string; label: string }> = {
-  in_progress: { bg: '#FEF3C7', fg: '#B45309', label: 'In Progress' },
-  completed: { bg: '#D1FAE5', fg: '#047857', label: 'Completed' },
-  cancelled: { bg: '#FEE2E2', fg: '#B91C1C', label: 'Cancelled' },
-  failed: { bg: '#FEE2E2', fg: '#B91C1C', label: 'Failed' },
-  not_started: { bg: '#E5E7EB', fg: '#4B5563', label: 'Not Started' },
+const STATUS_STYLES: Record<string, { bg: string; fg: string; labelKey: string }> = {
+  in_progress: { bg: '#FEF3C7', fg: '#B45309', labelKey: 'dist.statusInProgress' },
+  completed: { bg: '#D1FAE5', fg: '#047857', labelKey: 'dist.statusCompleted' },
+  cancelled: { bg: '#FEE2E2', fg: '#B91C1C', labelKey: 'dist.statusCancelled' },
+  failed: { bg: '#FEE2E2', fg: '#B91C1C', labelKey: 'dist.statusFailed' },
+  not_started: { bg: '#E5E7EB', fg: '#4B5563', labelKey: 'dist.statusNotStarted' },
 };
 
 // backend timestamps are naive UTC; parse them as UTC
@@ -84,6 +85,7 @@ export default function DistributionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { t } = useLanguage();
   // admins see every trip; everyone else only their own (created or assigned)
   const scopes: string[] = (user?.permission_scope || '').split(',').map((s: string) => s.trim());
   const isAdmin = scopes.includes('admin') || scopes.includes('superuser');
@@ -111,7 +113,7 @@ export default function DistributionScreen() {
       if (found) {
         setWorkflowUuid(found.uuid);
       } else {
-        setWorkflowError(response.error || `Workflow "${TRIP_WORKFLOW_NAME}" not found`);
+        setWorkflowError(response.error || t('dist.workflowNotFound', { name: TRIP_WORKFLOW_NAME }));
         setLoading(false);
       }
     })();
@@ -147,7 +149,7 @@ export default function DistributionScreen() {
         setTotalPages(response.data.pages);
         setTotalCount(response.data.total_count);
       } else if (response.error) {
-        Alert.alert('Error', `Failed to load trip executions: ${response.error}`);
+        Alert.alert(t('dist.errorTitle'), t('dist.loadExecutionsFailed', { error: response.error }));
       }
     } finally {
       setLoading(false);
@@ -166,7 +168,7 @@ export default function DistributionScreen() {
   };
   const assignedLabel = assignedUsername
     ? userLabel(users.find((u) => u.username === assignedUsername) || { username: assignedUsername })
-    : 'All users';
+    : t('dist.allUsers');
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -189,10 +191,10 @@ export default function DistributionScreen() {
   };
 
   const statusBadge = (status: string) => {
-    const s = STATUS_STYLES[status] || { bg: '#E5E7EB', fg: '#4B5563', label: status };
+    const s = STATUS_STYLES[status] || { bg: '#E5E7EB', fg: '#4B5563', labelKey: null };
     return (
       <View style={[styles.statusBadge, { backgroundColor: s.bg }]}>
-        <ThemedText style={[styles.statusBadgeText, { color: s.fg }]}>{s.label}</ThemedText>
+        <ThemedText style={[styles.statusBadgeText, { color: s.fg }]}>{s.labelKey ? t(s.labelKey) : status}</ThemedText>
       </View>
     );
   };
@@ -204,9 +206,9 @@ export default function DistributionScreen() {
 
       {/* Header with back button + Start Trip */}
       <NativeHeader
-        title="Distribution"
+        title={t('dist.title')}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-        rightButton={{ label: '+ Start Trip', onPress: handleStartTrip }}
+        rightButton={{ label: t('dist.startTripButton'), onPress: handleStartTrip }}
       />
 
       {/* Status filter chips */}
@@ -224,7 +226,7 @@ export default function DistributionScreen() {
             <ThemedText
               style={[styles.filterChipText, statusFilter === f.value && styles.filterChipTextActive]}
             >
-              {f.label}
+              {t(f.labelKey)}
             </ThemedText>
           </TouchableOpacity>
         ))}
@@ -233,7 +235,7 @@ export default function DistributionScreen() {
       {/* Admin-only: filter by assigned user */}
       {isAdmin && (
         <View style={styles.assignedRow}>
-          <ThemedText style={styles.assignedLabel}>Assigned</ThemedText>
+          <ThemedText style={styles.assignedLabel}>{t('dist.assigned')}</ThemedText>
           <TouchableOpacity
             style={styles.assignedDropdown}
             onPress={() => setUserPickerOpen(true)}
@@ -252,7 +254,7 @@ export default function DistributionScreen() {
         </View>
       ) : workflowError ? (
         <View style={styles.centered}>
-          <ThemedText style={styles.emptyTitle}>Could not load the trip workflow</ThemedText>
+          <ThemedText style={styles.emptyTitle}>{t('dist.workflowLoadErrorTitle')}</ThemedText>
           <ThemedText style={styles.emptyText}>{workflowError}</ThemedText>
         </View>
       ) : (
@@ -264,11 +266,11 @@ export default function DistributionScreen() {
           {executions.length === 0 ? (
             <View style={styles.centered}>
               <ThemedText style={styles.emptyIcon}>🚚</ThemedText>
-              <ThemedText style={styles.emptyTitle}>No trip executions</ThemedText>
+              <ThemedText style={styles.emptyTitle}>{t('dist.emptyTitle')}</ThemedText>
               <ThemedText style={styles.emptyText}>
                 {statusFilter === 'all'
-                  ? 'Start a trip to see it here.'
-                  : 'No executions with this status.'}
+                  ? t('dist.emptyAllHint')
+                  : t('dist.emptyStatusHint')}
               </ThemedText>
             </View>
           ) : (
@@ -284,17 +286,17 @@ export default function DistributionScreen() {
                 >
                   <View style={styles.cardHeader}>
                     <ThemedText style={styles.cardTitle}>
-                      Trip · {formatDateTime(execution.start_time || execution.created_at)}
+                      {t('dist.tripCardTitle', { date: formatDateTime(execution.start_time || execution.created_at) })}
                     </ThemedText>
                     {statusBadge(execution.status)}
                   </View>
                   <View style={styles.cardMeta}>
                     <ThemedText style={styles.cardMetaText}>
-                      {progress ? `${progress.done}/${progress.total} tasks done` : 'No tasks yet'}
+                      {progress ? t('dist.tasksDone', { done: progress.done, total: progress.total }) : t('dist.noTasksYet')}
                     </ThemedText>
                     {execution.end_time && (
                       <ThemedText style={styles.cardMetaText}>
-                        Ended {formatDateTime(execution.end_time)}
+                        {t('dist.ended', { time: formatDateTime(execution.end_time) })}
                       </ThemedText>
                     )}
                   </View>
@@ -312,10 +314,10 @@ export default function DistributionScreen() {
                 onPress={() => setPage((p) => Math.max(1, p - 1))}
                 testID="button-prev-page"
               >
-                <ThemedText style={styles.pageButtonText}>‹ Prev</ThemedText>
+                <ThemedText style={styles.pageButtonText}>{t('dist.prevPage')}</ThemedText>
               </TouchableOpacity>
               <ThemedText style={styles.pageInfo}>
-                Page {page} of {totalPages} · {totalCount} total
+                {t('dist.pageInfo', { page, pages: totalPages, count: totalCount })}
               </ThemedText>
               <TouchableOpacity
                 style={[styles.pageButton, page >= totalPages && styles.pageButtonDisabled]}
@@ -323,7 +325,7 @@ export default function DistributionScreen() {
                 onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
                 testID="button-next-page"
               >
-                <ThemedText style={styles.pageButtonText}>Next ›</ThemedText>
+                <ThemedText style={styles.pageButtonText}>{t('dist.nextPage')}</ThemedText>
               </TouchableOpacity>
             </View>
           )}
@@ -341,7 +343,7 @@ export default function DistributionScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>Filter by assigned user</ThemedText>
+              <ThemedText style={styles.modalTitle}>{t('dist.filterByAssignedUser')}</ThemedText>
               <TouchableOpacity onPress={() => setUserPickerOpen(false)}><ThemedText style={styles.modalClose}>✕</ThemedText></TouchableOpacity>
             </View>
             <ScrollView style={styles.modalList}>
@@ -351,7 +353,7 @@ export default function DistributionScreen() {
                 testID="assigned-opt-all"
               >
                 <ThemedText style={[styles.modalOptionText, !assignedUsername && styles.modalOptionActive]}>
-                  {!assignedUsername ? '✓ ' : ''}All users
+                  {!assignedUsername ? '✓ ' : ''}{t('dist.allUsers')}
                 </ThemedText>
               </TouchableOpacity>
               {users.map((u) => (

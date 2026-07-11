@@ -23,6 +23,7 @@ import * as Clipboard from 'expo-clipboard';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Customer {
   uuid: string;
@@ -78,15 +79,16 @@ const InfoRow: React.FC<InfoRowProps> = ({
     locationLoading = false,
     onGetLocation
   }) => {
+  const { t } = useLanguage();
   const isCoordinatesField = fieldName === 'coordinates';
   const copyToClipboard = async (text: string) => {
-    if (!text || text === "Not provided") return;
+    if (!text || text === t('custdetail.notProvided')) return;
 
     try {
       await Clipboard.setStringAsync(text);
-      Alert.alert("Copied", `${label} copied to clipboard`);
+      Alert.alert(t('custdetail.copied'), t('custdetail.copiedToClipboard', { label }));
     } catch (error) {
-      Alert.alert("Error", "Failed to copy to clipboard");
+      Alert.alert(t('custdetail.error'), t('custdetail.copyFailed'));
     }
   };
 
@@ -110,7 +112,7 @@ const InfoRow: React.FC<InfoRowProps> = ({
                     );
                     clearFieldError(fieldName);
                   }}
-                  placeholder="Latitude,Longitude (e.g., 29.7604,-95.3698)"
+                  placeholder={t('custdetail.coordinatesPlaceholder')}
                   placeholderTextColor="#9ca3af"
                 />
                 <TouchableOpacity
@@ -119,7 +121,7 @@ const InfoRow: React.FC<InfoRowProps> = ({
                   disabled={locationLoading}
                 >
                   <ThemedText style={styles.locateButtonText}>
-                    {locationLoading ? '📍...' : '📍 Locate Me'}
+                    {locationLoading ? '📍...' : t('custdetail.locateMe')}
                   </ThemedText>
                 </TouchableOpacity>
               </View>
@@ -149,8 +151,8 @@ const InfoRow: React.FC<InfoRowProps> = ({
       ) : (
         <View style={styles.infoValueContainer}>
           <ThemedText style={styles.infoValue}>
-            {value || "Not provided"}
-            {value && value !== "Not provided" && (
+            {value || t('custdetail.notProvided')}
+            {value && value !== t('custdetail.notProvided') && (
               <TouchableOpacity
                 style={styles.copyButton}
                 onPress={() => copyToClipboard(value)}
@@ -174,6 +176,7 @@ export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [screenData, setScreenData] = useState(Dimensions.get("window"));
@@ -233,25 +236,25 @@ export default function CustomerDetailScreen() {
     const newErrors: Record<string, string> = {};
 
     if (!editedCustomer.full_name?.trim()) {
-      newErrors.full_name = "Customer name is required";
+      newErrors.full_name = t('custdetail.customerNameRequired');
     }
     if (!editedCustomer.company_name?.trim()) {
-      newErrors.company_name = "Company name is required";
+      newErrors.company_name = t('custdetail.companyNameRequired');
     }
 
     const hasPhone = editedCustomer.phone_number?.trim().length > 0;
     const hasEmail = editedCustomer.email_address?.trim().length > 0;
 
     if (!hasPhone && !hasEmail) {
-      newErrors.phone_number = "Either phone number or email is required";
-      newErrors.email_address = "Either phone number or email is required";
+      newErrors.phone_number = t('custdetail.phoneOrEmailRequired');
+      newErrors.email_address = t('custdetail.phoneOrEmailRequired');
     }
 
     if (
       editedCustomer.email_address?.trim() &&
       !/\S+@\S+\.\S+/.test(editedCustomer.email_address)
     ) {
-      newErrors.email_address = "Please enter a valid email address";
+      newErrors.email_address = t('custdetail.invalidEmail');
     }
 
     setErrors(newErrors);
@@ -272,9 +275,9 @@ export default function CustomerDetailScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Permission Denied',
-          'Location permission is required to get your current location.',
-          [{ text: 'OK' }]
+          t('custdetail.permissionDenied'),
+          t('custdetail.locationPermissionRequired'),
+          [{ text: t('custdetail.ok') }]
         );
         return;
       }
@@ -290,15 +293,15 @@ export default function CustomerDetailScreen() {
       if (editedCustomer) {
         setEditedCustomer(prev => prev ? { ...prev, coordinates } : null);
         clearFieldError('coordinates');
-        showBanner('success', 'Location retrieved successfully!');
+        showBanner('success', t('custdetail.locationRetrieved'));
       }
 
     } catch (error) {
       console.error('Error getting location:', error);
       Alert.alert(
-        'Location Error',
-        'Failed to get your current location. Please try again or enter coordinates manually.',
-        [{ text: 'OK' }]
+        t('custdetail.locationError'),
+        t('custdetail.locationFailed'),
+        [{ text: t('custdetail.ok') }]
       );
     } finally {
       setLocationLoading(false);
@@ -314,12 +317,12 @@ export default function CustomerDetailScreen() {
         setCustomer(response.data);
         setEditedCustomer(response.data);
       } else {
-        Alert.alert("Error", "Failed to load customer details");
+        Alert.alert(t('custdetail.error'), t('custdetail.loadCustomerFailed'));
         router.back();
       }
     } catch (error) {
       console.error("Error fetching customer:", error);
-      Alert.alert("Error", "Failed to load customer details");
+      Alert.alert(t('custdetail.error'), t('custdetail.loadCustomerFailed'));
       router.back();
     } finally {
       setLoading(false);
@@ -339,7 +342,7 @@ export default function CustomerDetailScreen() {
     if (!editedCustomer || !customer) return;
 
     if (!validateForm()) {
-      showBanner("error", "Please fix the validation errors before saving");
+      showBanner("error", t('custdetail.fixValidationErrors'));
       return;
     }
 
@@ -379,7 +382,7 @@ export default function CustomerDetailScreen() {
       // If no changes, just exit edit mode
       if (Object.keys(updateData).length === 0) {
         setIsEditing(false);
-        showBanner("success", "No changes were made");
+        showBanner("success", t('custdetail.noChanges'));
         return;
       }
 
@@ -393,9 +396,9 @@ export default function CustomerDetailScreen() {
         setEditedCustomer(response.data);
         setIsEditing(false);
         setErrors({});
-        showBanner("success", "Customer updated successfully!");
+        showBanner("success", t('custdetail.updateSuccess'));
       } else {
-        let errorMsg = "Failed to update customer";
+        let errorMsg = t('custdetail.updateFailed');
         if (response.error) {
           try {
             const err =
@@ -409,7 +412,7 @@ export default function CustomerDetailScreen() {
       }
     } catch (error) {
       console.error("Error updating customer:", error);
-      showBanner("error", "Network error - please try again");
+      showBanner("error", t('custdetail.networkError'));
     } finally {
       setUpdating(false);
     }
@@ -462,7 +465,7 @@ export default function CustomerDetailScreen() {
         }
       } else {
         // Handle specific error messages from backend
-        let errorMessage = "Failed to delete customer";
+        let errorMessage = t('custdetail.deleteFailed');
         if (response.error) {
           try {
             const errorData = JSON.parse(response.error);
@@ -473,11 +476,11 @@ export default function CustomerDetailScreen() {
             errorMessage = response.error;
           }
         }
-        Alert.alert("Cannot Delete Customer", errorMessage);
+        Alert.alert(t('custdetail.cannotDeleteCustomer'), errorMessage);
       }
     } catch (error) {
       console.error("Error deleting customer:", error);
-      Alert.alert("Error", "Failed to delete customer");
+      Alert.alert(t('custdetail.error'), t('custdetail.deleteFailed'));
     } finally {
       setLoading(false);
     }
@@ -519,7 +522,7 @@ export default function CustomerDetailScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#5469D4" />
           <ThemedText style={styles.loadingText}>
-            Loading customer details...
+            {t('custdetail.loadingCustomerDetails')}
           </ThemedText>
         </View>
       </ThemedView>
@@ -530,13 +533,13 @@ export default function CustomerDetailScreen() {
     return (
       <ThemedView style={styles.container}>
         <View style={styles.errorContainer}>
-          <ThemedText style={styles.errorText}>Customer not found</ThemedText>
+          <ThemedText style={styles.errorText}>{t('custdetail.customerNotFound')}</ThemedText>
           <TouchableOpacity onPress={() => router.back()}>
             <LinearGradient
               colors={["#5469D4", "#4F46E5"]}
               style={styles.backButton}
             >
-              <ThemedText style={styles.backButtonText}>Go Back</ThemedText>
+              <ThemedText style={styles.backButtonText}>{t('custdetail.goBack')}</ThemedText>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -627,7 +630,7 @@ export default function CustomerDetailScreen() {
                       disabled={updating}
                     >
                       <ThemedText style={styles.cancelButtonText}>
-                        Cancel
+                        {t('custdetail.cancel')}
                       </ThemedText>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -643,7 +646,7 @@ export default function CustomerDetailScreen() {
                         style={styles.saveButton}
                       >
                         <ThemedText style={styles.saveButtonText}>
-                          {updating ? "Saving..." : "Save"}
+                          {updating ? t('custdetail.saving') : t('custdetail.save')}
                         </ThemedText>
                       </LinearGradient>
                     </TouchableOpacity>
@@ -725,7 +728,7 @@ export default function CustomerDetailScreen() {
                   onPress={() => router.back()}
                   style={styles.backButton}
                 >
-                  <ThemedText style={styles.backButtonText}>← Back</ThemedText>
+                  <ThemedText style={styles.backButtonText}>{t('custdetail.back')}</ThemedText>
                 </TouchableOpacity>
 
                 <View style={styles.headerActions}>
@@ -737,7 +740,7 @@ export default function CustomerDetailScreen() {
                         disabled={updating}
                       >
                         <ThemedText style={styles.cancelButtonText}>
-                          Cancel
+                          {t('custdetail.cancel')}
                         </ThemedText>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -753,7 +756,7 @@ export default function CustomerDetailScreen() {
                           style={styles.saveButton}
                         >
                           <ThemedText style={styles.saveButtonText}>
-                            {updating ? "Saving..." : "Save Changes"}
+                            {updating ? t('custdetail.saving') : t('custdetail.saveChanges')}
                           </ThemedText>
                         </LinearGradient>
                       </TouchableOpacity>
@@ -765,7 +768,7 @@ export default function CustomerDetailScreen() {
                         style={styles.editButton}
                       >
                         <ThemedText style={styles.editButtonText}>
-                          ✏️ Edit
+                          {t('custdetail.edit')}
                         </ThemedText>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -773,7 +776,7 @@ export default function CustomerDetailScreen() {
                         style={styles.deleteButton}
                       >
                         <ThemedText style={styles.deleteButtonText}>
-                          🗑️ Delete
+                          {t('custdetail.delete')}
                         </ThemedText>
                       </TouchableOpacity>
                     </>
@@ -804,11 +807,11 @@ export default function CustomerDetailScreen() {
           {/* Contact Information */}
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>
-              Contact Information
+              {t('custdetail.contactInformation')}
             </ThemedText>
             <View style={styles.sectionContent}>
               <InfoRow
-                label="Full Name"
+                label={t('custdetail.fullName')}
                 value={
                   isEditing && editedCustomer
                     ? editedCustomer.full_name
@@ -823,7 +826,7 @@ export default function CustomerDetailScreen() {
                 clearFieldError={clearFieldError}
               />
               <InfoRow
-                label="Company Name"
+                label={t('custdetail.companyName')}
                 value={
                   isEditing && editedCustomer
                     ? editedCustomer.company_name
@@ -838,7 +841,7 @@ export default function CustomerDetailScreen() {
                 clearFieldError={clearFieldError}
               />
               <InfoRow
-                label="Email Address"
+                label={t('custdetail.emailAddress')}
                 value={
                   isEditing && editedCustomer
                     ? editedCustomer.email_address || ""
@@ -854,7 +857,7 @@ export default function CustomerDetailScreen() {
                 clearFieldError={clearFieldError}
               />
               <InfoRow
-                label="Phone Number"
+                label={t('custdetail.phoneNumber')}
                 value={
                   isEditing && editedCustomer
                     ? editedCustomer.phone_number
@@ -870,7 +873,7 @@ export default function CustomerDetailScreen() {
                 clearFieldError={clearFieldError}
               />
               <InfoRow
-                label="Full Address"
+                label={t('custdetail.fullAddress')}
                 value={
                   isEditing && editedCustomer
                     ? editedCustomer.full_address
@@ -891,11 +894,11 @@ export default function CustomerDetailScreen() {
           {/* Business Details */}
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>
-              Business Details
+              {t('custdetail.businessDetails')}
             </ThemedText>
             <View style={styles.sectionContent}>
               <InfoRow
-                label="Business Cards"
+                label={t('custdetail.businessCards')}
                 value={
                   isEditing && editedCustomer
                     ? editedCustomer.business_cards || ""
@@ -911,7 +914,7 @@ export default function CustomerDetailScreen() {
                 clearFieldError={clearFieldError}
               />
               <InfoRow
-                label="Notes"
+                label={t('custdetail.notes')}
                 value={
                   isEditing && editedCustomer
                     ? editedCustomer.notes || ""
@@ -927,7 +930,7 @@ export default function CustomerDetailScreen() {
                 clearFieldError={clearFieldError}
               />
               <InfoRow
-                label="Coordinates"
+                label={t('custdetail.coordinates')}
                 value={
                   isEditing && editedCustomer
                     ? editedCustomer.coordinates || ""
@@ -944,7 +947,7 @@ export default function CustomerDetailScreen() {
                 onGetLocation={getLocation}
               />
               <InfoRow
-                label="UUID"
+                label={t('custdetail.uuid')}
                 value={customer.uuid}
                 isEditing={isEditing}
                 editedCustomer={editedCustomer}
@@ -953,7 +956,7 @@ export default function CustomerDetailScreen() {
                 clearFieldError={clearFieldError}
               />
               <InfoRow
-                label="Created"
+                label={t('custdetail.created')}
                 value={formatDate(customer.created_at)}
                 isEditing={isEditing}
                 editedCustomer={editedCustomer}
@@ -966,7 +969,7 @@ export default function CustomerDetailScreen() {
 
           {/* Balance Details */}
           <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Balance Details</ThemedText>
+            <ThemedText style={styles.sectionTitle}>{t('custdetail.balanceDetails')}</ThemedText>
             <View style={styles.sectionContent}>
               {Object.entries(customer.balance_per_currency).length > 0 ? (
                 Object.entries(customer.balance_per_currency).map(
@@ -988,7 +991,7 @@ export default function CustomerDetailScreen() {
                 )
               ) : (
                 <ThemedText style={styles.noBalanceText}>
-                  No balance information available
+                  {t('custdetail.noBalanceInfo')}
                 </ThemedText>
               )}
             </View>
@@ -997,7 +1000,7 @@ export default function CustomerDetailScreen() {
           {/* Location Map */}
           {customer.coordinates && (
             <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle}>Location</ThemedText>
+              <ThemedText style={styles.sectionTitle}>{t('custdetail.location')}</ThemedText>
               <View style={styles.sectionContent}>
                 <CustomerLocationMap customer={customer} />
               </View>
@@ -1032,17 +1035,16 @@ export default function CustomerDetailScreen() {
               <View style={styles.deleteModalHeader}>
                 <ThemedText style={styles.deleteModalIcon}>⚠️</ThemedText>
                 <ThemedText style={styles.deleteModalTitle}>
-                  Delete Customer
+                  {t('custdetail.deleteCustomer')}
                 </ThemedText>
               </View>
 
               <ThemedText style={styles.deleteModalMessage}>
-                Are you sure you want to delete{" "}
+                {t('custdetail.deleteConfirmPrefix')}{" "}
                 <ThemedText style={styles.deleteModalCustomerName}>
                   {customer?.full_name}
                 </ThemedText>
-                ? This action cannot be undone and will permanently remove all
-                customer data.
+                {t('custdetail.deleteConfirmSuffix')}
               </ThemedText>
 
               <View style={styles.deleteModalActions}>
@@ -1052,7 +1054,7 @@ export default function CustomerDetailScreen() {
                   activeOpacity={0.7}
                 >
                   <ThemedText style={styles.deleteModalCancelText}>
-                    Cancel
+                    {t('custdetail.cancel')}
                   </ThemedText>
                 </TouchableOpacity>
 
@@ -1065,7 +1067,7 @@ export default function CustomerDetailScreen() {
                     style={styles.deleteModalConfirmButton}
                   >
                     <ThemedText style={styles.deleteModalConfirmText}>
-                      {loading ? "Deleting..." : "Delete Customer"}
+                      {loading ? t('custdetail.deleting') : t('custdetail.deleteCustomer')}
                     </ThemedText>
                   </LinearGradient>
 ```python

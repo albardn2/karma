@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface SheetStop {
@@ -20,12 +21,13 @@ export interface SheetStop {
   index: number;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  in_progress: 'Current',
-  completed: 'Done',
-  not_started: 'Upcoming',
-  cancelled: 'Cancelled',
-  failed: 'Failed',
+// Translation keys per backend status; wrapped with t(...) at render time.
+const STATUS_LABEL_KEY: Record<string, string> = {
+  in_progress: 'sheet.statusCurrent',
+  completed: 'sheet.statusDone',
+  not_started: 'sheet.statusUpcoming',
+  cancelled: 'sheet.statusCancelled',
+  failed: 'sheet.statusFailed',
 };
 const statusColor = (status: string, isCurrent: boolean) => {
   if (isCurrent) return '#5469D4';
@@ -55,6 +57,7 @@ export function StopsSheet({
   onArm?: (uuid: string | null) => void;
   finishAction?: { label: string; onPress: () => void } | null;
 }) {
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
   const SHEET_H = Math.min(screenH * 0.62, 560);
@@ -124,16 +127,16 @@ export function StopsSheet({
             <View style={styles.handle} />
           </TouchableOpacity>
           <View style={styles.header}>
-            <ThemedText style={styles.title}>Stops ({stops.length})</ThemedText>
+            <ThemedText style={styles.title}>{t('sheet.stopsTitle', { count: stops.length })}</ThemedText>
             <TouchableOpacity style={styles.addBtn} onPress={onAddStop} testID="sheet-add-stop">
-              <ThemedText style={styles.addBtnText}>＋ Add Stop</ThemedText>
+              <ThemedText style={styles.addBtnText}>{t('sheet.addStop')}</ThemedText>
             </TouchableOpacity>
           </View>
         </View>
 
         <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
           {stops.length === 0 ? (
-            <ThemedText style={styles.empty}>No stops yet. Tap “Add Stop” to begin.</ThemedText>
+            <ThemedText style={styles.empty}>{t('sheet.noStopsYet')}</ThemedText>
           ) : (
             stops.map((s, i) => {
               const isCurrent = s.tripStopUuid === currentStopUuid;
@@ -157,7 +160,7 @@ export function StopsSheet({
                   </View>
                   <View style={styles.rowBody}>
                     <ThemedText style={styles.rowName} numberOfLines={1}>{i + 1}. {s.customerName}</ThemedText>
-                    <ThemedText style={[styles.rowStatus, { color }]}>{STATUS_LABEL[s.status] || s.status}</ThemedText>
+                    <ThemedText style={[styles.rowStatus, { color }]}>{STATUS_LABEL_KEY[s.status] ? t(STATUS_LABEL_KEY[s.status]) : s.status}</ThemedText>
                   </View>
                   {armed ? (
                     <TouchableOpacity
@@ -165,7 +168,7 @@ export function StopsSheet({
                       onPress={() => { onArm?.(null); onSetCurrent?.(s); }}
                       testID={`sheet-set-current-${s.tripStopUuid}`}
                     >
-                      <ThemedText style={styles.setCurrentText}>Set current</ThemedText>
+                      <ThemedText style={styles.setCurrentText}>{t('sheet.setCurrent')}</ThemedText>
                     </TouchableOpacity>
                   ) : (
                     isCurrent && <ThemedText style={styles.chevron}>›</ThemedText>

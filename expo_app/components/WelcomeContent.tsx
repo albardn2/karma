@@ -2,8 +2,10 @@ import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet, Animated, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText } from '@/components/ThemedText';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export const WelcomeContent: React.FC = () => {
+  const { t } = useLanguage();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -79,7 +81,7 @@ export const WelcomeContent: React.FC = () => {
       </Animated.View>
 
       <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-        <ThemedText style={styles.title}>Welcome to Your Dashboard</ThemedText>
+        <ThemedText style={styles.title}>{t('welcome.title')}</ThemedText>
       </Animated.View>
 
       <Animated.View style={{ 
@@ -87,7 +89,7 @@ export const WelcomeContent: React.FC = () => {
         transform: [{ translateY: slideAnim }, { scale: scaleAnim }] 
       }}>
         <ThemedText style={styles.message}>
-          Select a module from the navigation to get started
+          {t('welcome.selectModule')}
         </ThemedText>
       </Animated.View>
     </View>

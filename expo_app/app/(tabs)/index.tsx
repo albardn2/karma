@@ -8,42 +8,24 @@ import { WelcomeContent } from '@/components/WelcomeContent';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Lang, LANGUAGE_LABELS } from '@/i18n/translations';
 
 interface MenuItem {
   id: number;
-  title: string;
-  description: string;
+  titleKey: string;
   icon: string;
   section: string;
   color: string;
 }
 
 const ALL_MENU_ITEMS: MenuItem[] = [
-  {
-    id: 1,
-    title: 'Customers',
-    description: 'Manage customer information and relationships',
-    icon: '👥',
-    section: 'customers',
-    color: '#5469D4',
-  },
-  {
-    id: 2,
-    title: 'Customer Orders',
-    description: 'Track and manage customer orders',
-    icon: '📋',
-    section: 'customer_orders',
-    color: '#e74c3c',
-  },
-  {
-    id: 3,
-    title: 'Distribution',
-    description: 'Trip executions and deliveries',
-    icon: '🚚',
-    section: 'distribution',
-    color: '#16a34a',
-  },
+  { id: 1, titleKey: 'menu.customers', icon: '👥', section: 'customers', color: '#5469D4' },
+  { id: 2, titleKey: 'menu.customerOrders', icon: '📋', section: 'customer_orders', color: '#e74c3c' },
+  { id: 3, titleKey: 'menu.distribution', icon: '🚚', section: 'distribution', color: '#16a34a' },
 ];
+
+const LANGS: Lang[] = ['en', 'ar'];
 
 // field crews (sales/drivers with no other role) only work the trip flow —
 // their menu shows Distribution alone
@@ -51,6 +33,7 @@ const FIELD_ROLES = new Set(['sales', 'driver']);
 
 export default function HomeScreen() {
   const { user, logout } = useAuth();
+  const { t, lang, setLang } = useLanguage();
   const router = useRouter();
   // modules navigate back here with ?tab=menu so the menu view is restored
   const { tab } = useLocalSearchParams<{ tab?: string }>();
@@ -70,12 +53,12 @@ export default function HomeScreen() {
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      t('menu.logout'),
+      t('menu.logoutConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('menu.logout'),
           style: 'destructive',
           onPress: () => logout()
         },
@@ -89,9 +72,7 @@ export default function HomeScreen() {
     } else if (item.section === 'distribution') {
       router.push('/distribution');
     } else if (item.section === 'customer_orders') {
-      Alert.alert('Coming Soon', 'Customer Orders module will be available soon');
-    } else {
-      Alert.alert(item.title, `You tapped on ${item.title}`);
+      Alert.alert(t('menu.comingSoon'), t('menu.comingSoonMsg'));
     }
   };
 
@@ -115,7 +96,7 @@ export default function HomeScreen() {
           <View style={styles.menuContainer}>
             <View style={styles.menuSection}>
               <View style={styles.menuHeader}>
-                <ThemedText style={styles.menuTitle}>Modules</ThemedText>
+                <ThemedText style={styles.menuTitle}>{t('menu.modules')}</ThemedText>
               </View>
 
               <View style={styles.menuGrid}>
@@ -129,7 +110,7 @@ export default function HomeScreen() {
                     <View style={styles.moduleIcon}>
                       <ThemedText style={styles.moduleIconText}>{item.icon}</ThemedText>
                     </View>
-                    <ThemedText style={styles.moduleTitle}>{item.title}</ThemedText>
+                    <ThemedText style={styles.moduleTitle}>{t(item.titleKey)}</ThemedText>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -137,17 +118,38 @@ export default function HomeScreen() {
 
             <View style={styles.menuSection}>
               <View style={styles.menuHeader}>
-                <ThemedText style={styles.menuTitle}>Account</ThemedText>
+                <ThemedText style={styles.menuTitle}>{t('menu.account')}</ThemedText>
               </View>
 
               <View style={styles.accountItems}>
+                {/* preferred language — persisted to the user profile */}
+                <View style={styles.accountItem}>
+                  <View style={styles.accountContent}>
+                    <ThemedText style={styles.languageLabel}>{t('menu.language')}</ThemedText>
+                    <View style={styles.langRow}>
+                      {LANGS.map((l) => (
+                        <TouchableOpacity
+                          key={l}
+                          style={[styles.langChip, lang === l && styles.langChipActive]}
+                          onPress={() => setLang(l)}
+                          testID={`lang-${l}`}
+                        >
+                          <ThemedText style={[styles.langChipText, lang === l && styles.langChipTextActive]}>
+                            {LANGUAGE_LABELS[l]}
+                          </ThemedText>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
                 <TouchableOpacity
                   style={styles.accountItem}
                   onPress={handleLogout}
                   activeOpacity={0.7}
                 >
                   <View style={styles.accountContent}>
-                    <ThemedText style={styles.logoutTitle}>Logout</ThemedText>
+                    <ThemedText style={styles.logoutTitle}>{t('menu.logout')}</ThemedText>
                   </View>
                 </TouchableOpacity>
               </View>
@@ -250,5 +252,35 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ef4444',
     textAlign: 'center',
+  },
+  languageLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 10,
+  },
+  langRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  langChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.12)',
+    alignItems: 'center',
+  },
+  langChipActive: {
+    backgroundColor: '#5469D4',
+    borderColor: '#5469D4',
+  },
+  langChipText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  langChipTextActive: {
+    color: '#fff',
   },
 });

@@ -15,6 +15,7 @@ import { Stack, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const TRIP_WORKFLOW_NAME = 'simple_trip_workflow';
 
@@ -53,6 +54,7 @@ const prettyLabel = (name: string) =>
 export default function StartTripScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   const [workflowUuid, setWorkflowUuid] = useState<string | null>(null);
   const [fields, setFields] = useState<Field[]>([]);
@@ -69,7 +71,7 @@ export default function StartTripScreen() {
       );
       const found = wf.data?.workflows?.[0];
       if (!found) {
-        setLoadError(wf.error || `Workflow "${TRIP_WORKFLOW_NAME}" not found`);
+        setLoadError(wf.error || t('start.workflowNotFound', { name: TRIP_WORKFLOW_NAME }));
         setLoading(false);
         return;
       }
@@ -129,14 +131,14 @@ export default function StartTripScreen() {
 
   // client-side gate mirroring the backend's per-mode requirements
   const validate = (): string | null => {
-    if (!values['vehicle_plate']) return 'Please select a vehicle.';
+    if (!values['vehicle_plate']) return t('start.selectVehicle');
     if (manualStops) {
-      if (!values['assigned_user_uuid']) return 'Please select the assigned user.';
+      if (!values['assigned_user_uuid']) return t('start.selectAssignedUser');
     } else {
-      if (!(values['service_areas'] || []).length) return 'Select at least one service area.';
-      if (!values['start_warehouse_name']) return 'Select a start warehouse.';
-      if (!values['end_warehouse_name']) return 'Select an end warehouse.';
-      if (!values['last_visit_threshold_days']) return 'Set the last-visit threshold (days).';
+      if (!(values['service_areas'] || []).length) return t('start.selectServiceArea');
+      if (!values['start_warehouse_name']) return t('start.selectStartWarehouse');
+      if (!values['end_warehouse_name']) return t('start.selectEndWarehouse');
+      if (!values['last_visit_threshold_days']) return t('start.setLastVisitThreshold');
     }
     return null;
   };
@@ -161,7 +163,7 @@ export default function StartTripScreen() {
   const handleStart = async () => {
     const err = validate();
     if (err) {
-      Alert.alert('Missing info', err);
+      Alert.alert(t('start.missingInfo'), err);
       return;
     }
     if (!workflowUuid) return;
@@ -175,13 +177,13 @@ export default function StartTripScreen() {
         body: JSON.stringify({ workflow_uuid: workflowUuid }),
       });
       if (created.status !== 201 || !created.data) {
-        throw new Error(created.error || 'Failed to create the trip execution');
+        throw new Error(created.error || t('start.failedCreateExecution'));
       }
       createdUuid = created.data.uuid;
       const setupExe = (created.data.task_executions || []).find(
         (te: any) => te.operator === 'start_trip_operator'
       );
-      if (!setupExe) throw new Error('Setup task not found on the new execution');
+      if (!setupExe) throw new Error(t('start.setupTaskNotFound'));
 
       // 2. complete the setup task with the form values
       const completed = await apiCall('/task-execution/complete', {
@@ -189,7 +191,7 @@ export default function StartTripScreen() {
         body: JSON.stringify({ uuid: setupExe.uuid, result: buildResult() }),
       });
       if (completed.status !== 200) {
-        throw new Error(completed.error || 'Failed to start the trip');
+        throw new Error(completed.error || t('start.failedStartTrip'));
       }
 
       // drop into the running trip so the driver can continue the flow
@@ -199,7 +201,7 @@ export default function StartTripScreen() {
       if (createdUuid) {
         await apiCall(`/workflow-execution/cancel/${createdUuid}`, { method: 'POST' }).catch(() => {});
       }
-      Alert.alert('Error', e?.message || 'Could not start the trip');
+      Alert.alert(t('start.error'), e?.message || t('start.couldNotStartTrip'));
     } finally {
       setSubmitting(false);
     }
@@ -229,7 +231,7 @@ export default function StartTripScreen() {
               );
             })}
             {(f.options || []).length === 0 && (
-              <ThemedText style={styles.emptyOpts}>No options available</ThemedText>
+              <ThemedText style={styles.emptyOpts}>{t('start.noOptionsAvailable')}</ThemedText>
             )}
           </View>
         </View>
@@ -281,7 +283,7 @@ export default function StartTripScreen() {
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <NativeHeader
-        title="Start Trip"
+        title={t('start.startTrip')}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))}
       />
 
@@ -291,7 +293,7 @@ export default function StartTripScreen() {
         </View>
       ) : loadError ? (
         <View style={styles.centered}>
-          <ThemedText style={styles.errorTitle}>Could not load the trip form</ThemedText>
+          <ThemedText style={styles.errorTitle}>{t('start.couldNotLoadForm')}</ThemedText>
           <ThemedText style={styles.errorText}>{loadError}</ThemedText>
         </View>
       ) : (
@@ -299,9 +301,9 @@ export default function StartTripScreen() {
           {/* manual stops toggle */}
           <View style={styles.toggleRow}>
             <View style={styles.toggleTextWrap}>
-              <ThemedText style={styles.toggleTitle}>Manual stops</ThemedText>
+              <ThemedText style={styles.toggleTitle}>{t('start.manualStops')}</ThemedText>
               <ThemedText style={styles.toggleHint}>
-                Driver adds stops during the trip. No route planning needed.
+                {t('start.manualStopsHint')}
               </ThemedText>
             </View>
             <Switch
@@ -323,7 +325,7 @@ export default function StartTripScreen() {
             {submitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <ThemedText style={styles.startButtonText}>Start Trip</ThemedText>
+              <ThemedText style={styles.startButtonText}>{t('start.startTrip')}</ThemedText>
             )}
           </TouchableOpacity>
         </ScrollView>

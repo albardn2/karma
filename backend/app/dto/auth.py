@@ -50,6 +50,18 @@ class UserUpdate(BaseModel):
     # only admins may change this:
     permission_scope: Optional[str] = None
 
+class MeUpdate(BaseModel):
+    """Self-service profile update — only safe, user-owned preferences."""
+    model_config = ConfigDict(extra="forbid")
+    language: Optional[str] = None
+
+    @pydantic.field_validator("language")
+    def supported_language(cls, v):
+        if v is not None and v not in ("en", "ar"):
+            raise ValueError("language must be one of: en, ar")
+        return v
+
+
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     username_or_email: Optional[str] = None

@@ -13,6 +13,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { TripMap, TripMapArea, TripMapStop } from '@/components/TripMap';
 import { StopsSheet } from '@/components/StopsSheet';
 import { parseWktPolygons } from '@/utils/wkt';
@@ -59,19 +60,21 @@ const OPERATOR_ORDER: Record<string, number> = {
   trip_stop_operator: 4,
   trip_finish_operator: 5,
 };
+// values are translation keys; wrap with t(...) at render time
 const OPERATOR_LABEL: Record<string, string> = {
-  start_trip_operator: 'Setup',
-  trip_route_operator: 'Route calculation',
-  trip_create_operator: 'Create trip',
-  trip_operator: 'Trip',
-  trip_finish_operator: 'Finish trip',
+  start_trip_operator: 'trip.setup',
+  trip_route_operator: 'trip.routeCalculation',
+  trip_create_operator: 'trip.createTrip',
+  trip_operator: 'trip.trip',
+  trip_finish_operator: 'trip.finishTrip',
 };
+// label holds a translation key; wrap with t(...) at render time
 const STATUS_STYLES: Record<string, { bg: string; fg: string; label: string }> = {
-  in_progress: { bg: '#FEF3C7', fg: '#B45309', label: 'In Progress' },
-  completed: { bg: '#D1FAE5', fg: '#047857', label: 'Completed' },
-  cancelled: { bg: '#FEE2E2', fg: '#B91C1C', label: 'Cancelled' },
-  failed: { bg: '#FEE2E2', fg: '#B91C1C', label: 'Failed' },
-  not_started: { bg: '#E5E7EB', fg: '#4B5563', label: 'Not Started' },
+  in_progress: { bg: '#FEF3C7', fg: '#B45309', label: 'trip.statusInProgress' },
+  completed: { bg: '#D1FAE5', fg: '#047857', label: 'trip.statusCompleted' },
+  cancelled: { bg: '#FEE2E2', fg: '#B91C1C', label: 'trip.statusCancelled' },
+  failed: { bg: '#FEE2E2', fg: '#B91C1C', label: 'trip.statusFailed' },
+  not_started: { bg: '#E5E7EB', fg: '#4B5563', label: 'trip.statusNotStarted' },
 };
 
 const toDate = (s?: string | null) => {
@@ -83,13 +86,14 @@ const fmt = (s?: string | null) => {
   const d = toDate(s);
   return d ? d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 };
-const taskLabel = (te: TaskExecution) => {
+const taskLabel = (te: TaskExecution, t: (key: string, vars?: Record<string, string | number>) => string) => {
   if (te.operator === 'trip_stop_operator') {
     const raw = (te.name || '').replace(/^trip_stop_/, '');
     const customer = raw.split(':')[0];
-    return customer ? `Stop: ${customer}` : 'Trip stop';
+    return customer ? t('trip.stopWithCustomer', { customer }) : t('trip.tripStop');
   }
-  return OPERATOR_LABEL[te.operator || ''] || te.name || 'Task';
+  const key = OPERATOR_LABEL[te.operator || ''];
+  return key ? t(key) : te.name || t('trip.task');
 };
 const statusDot = (status: string) => {
   if (status === 'completed') return { icon: '✓', color: '#16a34a' };
@@ -146,6 +150,7 @@ const chainRank = (tasks: TaskExecution[]): Record<string, number> => {
 
 export default function ExecutionDetailScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
 
   const [execution, setExecution] = useState<WorkflowExecution | null>(null);
@@ -173,7 +178,7 @@ export default function ExecutionDetailScreen() {
     if (spinner) setLoading(true);
     const res = await apiCall<WorkflowExecution>(`/workflow-execution/${uuid}`);
     if (res.data) { setExecution(res.data); setError(null); }
-    else setError(res.error || 'Failed to load the trip');
+    else setError(res.error || t('trip.failedToLoadTrip'));
     setLoading(false);
     setRefreshing(false);
   };
@@ -277,7 +282,7 @@ export default function ExecutionDetailScreen() {
               taskUuid: te.task_uuid,
               tripStopUuid: data.trip_stop_uuid,
               customerUuid: customer.uuid,
-              customerName: customer.company_name || customer.full_name || 'Customer',
+              customerName: customer.company_name || customer.full_name || t('trip.customer'),
               status: te.status,
               lat,
               lng,
@@ -345,7 +350,7 @@ export default function ExecutionDetailScreen() {
       body: JSON.stringify({ task_execution_uuid: s.taskExecutionUuid }),
     });
     if (res.status !== 200) {
-      Alert.alert('Error', res.error || 'Could not set the current stop');
+      Alert.alert(t('trip.error'), res.error || t('trip.couldNotSetCurrentStop'));
       return;
     }
     await fetchExecution(false);
@@ -353,17 +358,17 @@ export default function ExecutionDetailScreen() {
 
   const finishTrip = () => {
     if (!finishTask) return;
-    Alert.alert('Finish trip', 'Complete the trip? All stops must be resolved.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('trip.finishTrip'), t('trip.finishTripConfirm'), [
+      { text: t('trip.cancel'), style: 'cancel' },
       {
-        text: 'Finish',
+        text: t('trip.finish'),
         style: 'destructive',
         onPress: async () => {
           const res = await apiCall('/task-execution/complete', {
             method: 'POST',
             body: JSON.stringify({ uuid: finishTask.uuid, result: {} }),
           });
-          if (res.status !== 200) Alert.alert('Error', res.error || 'Could not finish the trip');
+          if (res.status !== 200) Alert.alert(t('trip.error'), res.error || t('trip.couldNotFinishTrip'));
           else fetchExecution(false);
         },
       },
@@ -378,20 +383,20 @@ export default function ExecutionDetailScreen() {
         method: 'POST',
         body: JSON.stringify({ uuid: activeTask.uuid, result: {} }),
       });
-      if (res.status !== 200) throw new Error(res.error || 'Failed to complete the task');
+      if (res.status !== 200) throw new Error(res.error || t('trip.failedToCompleteTask'));
       await fetchExecution(false);
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Could not complete the task');
+      Alert.alert(t('trip.error'), e?.message || t('trip.couldNotCompleteTask'));
     } finally {
       setSubmitting(false);
     }
   };
 
   const statusBadge = (status: string) => {
-    const s = STATUS_STYLES[status] || { bg: '#E5E7EB', fg: '#4B5563', label: status };
+    const s = STATUS_STYLES[status];
     return (
-      <View style={[styles.badge, { backgroundColor: s.bg }]}>
-        <ThemedText style={[styles.badgeText, { color: s.fg }]}>{s.label}</ThemedText>
+      <View style={[styles.badge, { backgroundColor: s?.bg || '#E5E7EB' }]}>
+        <ThemedText style={[styles.badgeText, { color: s?.fg || '#4B5563' }]}>{s ? t(s.label) : status}</ThemedText>
       </View>
     );
   };
@@ -401,7 +406,7 @@ export default function ExecutionDetailScreen() {
     return (
       <ThemedView style={styles.container}>
         <Stack.Screen options={{ headerShown: false }} />
-        <NativeHeader title="Trip" onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
+        <NativeHeader title={t('trip.trip')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
         <View style={styles.centered}><ActivityIndicator size="large" color="#5469D4" /></View>
       </ThemedView>
     );
@@ -410,9 +415,9 @@ export default function ExecutionDetailScreen() {
     return (
       <ThemedView style={styles.container}>
         <Stack.Screen options={{ headerShown: false }} />
-        <NativeHeader title="Trip" onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
+        <NativeHeader title={t('trip.trip')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
         <View style={styles.centered}>
-          <ThemedText style={styles.errorTitle}>Could not load the trip</ThemedText>
+          <ThemedText style={styles.errorTitle}>{t('trip.couldNotLoadTrip')}</ThemedText>
           <ThemedText style={styles.errorText}>{error}</ThemedText>
         </View>
       </ThemedView>
@@ -425,7 +430,7 @@ export default function ExecutionDetailScreen() {
     return (
       <ThemedView style={styles.container}>
         <Stack.Screen options={{ headerShown: false }} />
-        <NativeHeader title="Trip" onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
+        <NativeHeader title={t('trip.trip')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
         <View style={styles.mapArea}>
           <TripMap
             stops={tripStops}
@@ -447,7 +452,7 @@ export default function ExecutionDetailScreen() {
             onSetCurrent={setCurrentStop}
             armedStopUuid={armedStopUuid}
             onArm={setArmedStopUuid}
-            finishAction={finishActive ? { label: 'Finish Trip', onPress: finishTrip } : null}
+            finishAction={finishActive ? { label: t('trip.finishTripButton'), onPress: finishTrip } : null}
           />
         </View>
       </ThemedView>
@@ -458,25 +463,25 @@ export default function ExecutionDetailScreen() {
   return (
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <NativeHeader title="Trip" onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
+      <NativeHeader title={t('trip.trip')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchExecution(false); }} />}
       >
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
-            <ThemedText style={styles.summaryTitle}>Trip · {fmt(execution.start_time || execution.created_at)}</ThemedText>
+            <ThemedText style={styles.summaryTitle}>{t('trip.summaryTitle', { date: fmt(execution.start_time || execution.created_at) })}</ThemedText>
             {statusBadge(execution.status)}
           </View>
-          <ThemedText style={styles.summaryMeta}>{progress.done}/{progress.total} tasks done</ThemedText>
+          <ThemedText style={styles.summaryMeta}>{t('trip.tasksDone', { done: progress.done, total: progress.total })}</ThemedText>
         </View>
 
         {activeTask ? (
           <View style={styles.actionCard}>
-            <ThemedText style={styles.actionHeading}>Current step</ThemedText>
-            <ThemedText style={styles.actionTaskName}>{taskLabel(activeTask)}</ThemedText>
+            <ThemedText style={styles.actionHeading}>{t('trip.currentStep')}</ThemedText>
+            <ThemedText style={styles.actionTaskName}>{taskLabel(activeTask, t)}</ThemedText>
             {activeFields.length > 0 && (
-              <ThemedText style={styles.actionHint}>This step has inputs — complete it in the full app.</ThemedText>
+              <ThemedText style={styles.actionHint}>{t('trip.stepHasInputs')}</ThemedText>
             )}
             <TouchableOpacity
               style={[styles.actionButton, (submitting || activeFields.length > 0) && styles.actionButtonDisabled]}
@@ -484,27 +489,27 @@ export default function ExecutionDetailScreen() {
               disabled={submitting || activeFields.length > 0}
               testID="button-complete-active"
             >
-              {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.actionButtonText}>Complete {taskLabel(activeTask)}</ThemedText>}
+              {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.actionButtonText}>{t('trip.completeTask', { task: taskLabel(activeTask, t) })}</ThemedText>}
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.actionCard}>
             <ThemedText style={styles.doneText}>
-              {execution.status === 'completed' ? '✓ Trip completed' : 'No step to act on right now.'}
+              {execution.status === 'completed' ? t('trip.tripCompleted') : t('trip.noStepToActOn')}
             </ThemedText>
           </View>
         )}
 
-        <ThemedText style={styles.sectionTitle}>Progress</ThemedText>
+        <ThemedText style={styles.sectionTitle}>{t('trip.progress')}</ThemedText>
         <View style={styles.taskList}>
-          {orderedTasks.map((t) => {
-            const dot = statusDot(t.status);
-            const isActive = activeTask?.uuid === t.uuid;
+          {orderedTasks.map((task) => {
+            const dot = statusDot(task.status);
+            const isActive = activeTask?.uuid === task.uuid;
             return (
-              <View key={t.uuid} style={[styles.taskRow, isActive && styles.taskRowActive]}>
+              <View key={task.uuid} style={[styles.taskRow, isActive && styles.taskRowActive]}>
                 <ThemedText style={[styles.taskDot, { color: dot.color }]}>{dot.icon}</ThemedText>
-                <ThemedText style={styles.taskName}>{taskLabel(t)}</ThemedText>
-                <ThemedText style={[styles.taskStatus, { color: dot.color }]}>{STATUS_STYLES[t.status]?.label || t.status}</ThemedText>
+                <ThemedText style={styles.taskName}>{taskLabel(task, t)}</ThemedText>
+                <ThemedText style={[styles.taskStatus, { color: dot.color }]}>{STATUS_STYLES[task.status] ? t(STATUS_STYLES[task.status].label) : task.status}</ThemedText>
               </View>
             );
           })}

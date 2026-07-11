@@ -12,6 +12,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall } from '@/utils/api';
 import * as Location from 'expo-location';
 
@@ -35,6 +36,7 @@ interface CustomerRow {
 
 export default function AddStopScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { executionUuid } = useLocalSearchParams<{ executionUuid?: string }>();
 
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
@@ -89,8 +91,8 @@ export default function AddStopScreen() {
   }, [fetchDeviceLocation]);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(search.trim()), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(timer);
   }, [search]);
 
   useEffect(() => {
@@ -152,23 +154,23 @@ export default function AddStopScreen() {
         method: 'POST',
         body: JSON.stringify(body),
       });
-      if (res.status !== 201 && res.status !== 200) throw new Error(res.error || 'Failed to add the stop');
+      if (res.status !== 201 && res.status !== 200) throw new Error(res.error || t('addstop.failedToAddStop'));
       // when the customer was already on the route the backend promotes the
       // existing stop instead of adding a duplicate — let the driver know.
       const outcome = res.data?.status;
       if (outcome === 'promoted' || outcome === 'already_current') {
         Alert.alert(
-          'Already on the route',
+          t('addstop.alreadyOnRouteTitle'),
           outcome === 'already_current'
-            ? 'This customer is already the current stop.'
-            : 'This customer is already on the route — set as the current stop.',
-          [{ text: 'OK', onPress: () => router.back() }]
+            ? t('addstop.alreadyCurrentStop')
+            : t('addstop.promotedToCurrentStop'),
+          [{ text: t('addstop.ok'), onPress: () => router.back() }]
         );
       } else {
         router.back();
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Could not add the stop');
+      Alert.alert(t('addstop.errorTitle'), e?.message || t('addstop.couldNotAddStop'));
     } finally {
       setSubmitting(false);
     }
@@ -178,7 +180,7 @@ export default function AddStopScreen() {
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <NativeHeader
-        title="Add Stop"
+        title={t('addstop.title')}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))}
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -189,14 +191,14 @@ export default function AddStopScreen() {
             onPress={() => setMode('existing')}
             testID="mode-existing"
           >
-            <ThemedText style={[styles.modeText, mode === 'existing' && styles.modeTextActive]}>Existing customer</ThemedText>
+            <ThemedText style={[styles.modeText, mode === 'existing' && styles.modeTextActive]}>{t('addstop.existingCustomer')}</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.modeBtn, mode === 'new' && styles.modeBtnActive]}
             onPress={() => setMode('new')}
             testID="mode-new"
           >
-            <ThemedText style={[styles.modeText, mode === 'new' && styles.modeTextActive]}>New customer</ThemedText>
+            <ThemedText style={[styles.modeText, mode === 'new' && styles.modeTextActive]}>{t('addstop.newCustomer')}</ThemedText>
           </TouchableOpacity>
         </View>
 
@@ -204,7 +206,7 @@ export default function AddStopScreen() {
           <View>
             <TextInput
               style={styles.input}
-              placeholder="Search customers…"
+              placeholder={t('addstop.searchCustomersPlaceholder')}
               placeholderTextColor="#9ca3af"
               value={search}
               onChangeText={setSearch}
@@ -212,17 +214,17 @@ export default function AddStopScreen() {
             />
             <ThemedText style={styles.listLabel} testID="list-label">
               {debounced
-                ? 'Search results'
+                ? t('addstop.searchResults')
                 : userLoc
-                ? 'Nearest customers'
+                ? t('addstop.nearestCustomers')
                 : locDenied
-                ? 'Recent customers · enable location for nearest'
-                : 'Recent customers'}
+                ? t('addstop.recentCustomersEnableLocation')
+                : t('addstop.recentCustomers')}
             </ThemedText>
             <View style={styles.list}>
               {customers.length === 0 ? (
                 <ThemedText style={styles.empty}>
-                  {debounced ? 'No customers match.' : 'No customers to show.'}
+                  {debounced ? t('addstop.noCustomersMatch') : t('addstop.noCustomersToShow')}
                 </ThemedText>
               ) : (
                 customers.map((c) => {
@@ -231,7 +233,9 @@ export default function AddStopScreen() {
                     const [la, lo] = c.coordinates.split(',').map((x) => parseFloat(x));
                     if (Number.isFinite(la) && Number.isFinite(lo)) {
                       const km = haversineKm(userLoc.lat, userLoc.lon, la, lo);
-                      distLabel = km < 1 ? ` · ${Math.round(km * 1000)} m` : ` · ${km.toFixed(1)} km`;
+                      distLabel = km < 1
+                        ? ` · ${t('addstop.distanceMeters', { value: Math.round(km * 1000) })}`
+                        : ` · ${t('addstop.distanceKilometers', { value: km.toFixed(1) })}`;
                     }
                   }
                   return (
@@ -251,13 +255,13 @@ export default function AddStopScreen() {
           </View>
         ) : (
           <View>
-            <TextInput style={styles.input} placeholder="Company / shop name *" placeholderTextColor="#9ca3af"
-              value={newCustomer.company_name} onChangeText={(t) => setNewCustomer((p) => ({ ...p, company_name: t }))} testID="input-company" />
-            <TextInput style={styles.input} placeholder="Contact full name *" placeholderTextColor="#9ca3af"
-              value={newCustomer.full_name} onChangeText={(t) => setNewCustomer((p) => ({ ...p, full_name: t }))} testID="input-fullname" />
-            <TextInput style={styles.input} placeholder="Phone number *" placeholderTextColor="#9ca3af" keyboardType="phone-pad"
-              value={newCustomer.phone_number} onChangeText={(t) => setNewCustomer((p) => ({ ...p, phone_number: t }))} testID="input-phone" />
-            <ThemedText style={styles.fieldLabel}>Category *</ThemedText>
+            <TextInput style={styles.input} placeholder={t('addstop.companyNamePlaceholder')} placeholderTextColor="#9ca3af"
+              value={newCustomer.company_name} onChangeText={(text) => setNewCustomer((p) => ({ ...p, company_name: text }))} testID="input-company" />
+            <TextInput style={styles.input} placeholder={t('addstop.contactFullNamePlaceholder')} placeholderTextColor="#9ca3af"
+              value={newCustomer.full_name} onChangeText={(text) => setNewCustomer((p) => ({ ...p, full_name: text }))} testID="input-fullname" />
+            <TextInput style={styles.input} placeholder={t('addstop.phoneNumberPlaceholder')} placeholderTextColor="#9ca3af" keyboardType="phone-pad"
+              value={newCustomer.phone_number} onChangeText={(text) => setNewCustomer((p) => ({ ...p, phone_number: text }))} testID="input-phone" />
+            <ThemedText style={styles.fieldLabel}>{t('addstop.categoryLabel')}</ThemedText>
             <View style={styles.chipWrap}>
               {categories.map((c) => (
                 <TouchableOpacity
@@ -270,8 +274,8 @@ export default function AddStopScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TextInput style={styles.input} placeholder="Address (optional)" placeholderTextColor="#9ca3af"
-              value={newCustomer.full_address} onChangeText={(t) => setNewCustomer((p) => ({ ...p, full_address: t }))} testID="input-address" />
+            <TextInput style={styles.input} placeholder={t('addstop.addressPlaceholder')} placeholderTextColor="#9ca3af"
+              value={newCustomer.full_address} onChangeText={(text) => setNewCustomer((p) => ({ ...p, full_address: text }))} testID="input-address" />
           </View>
         )}
 
@@ -281,7 +285,7 @@ export default function AddStopScreen() {
           disabled={!canSubmit}
           testID="button-submit-add-stop"
         >
-          {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.submitText}>Add Stop</ThemedText>}
+          {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.submitText}>{t('addstop.addStop')}</ThemedText>}
         </TouchableOpacity>
       </ScrollView>
     </ThemedView>
