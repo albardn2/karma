@@ -18,6 +18,37 @@ interface MenuItem {
   color: string;
 }
 
+const ALL_MENU_ITEMS: MenuItem[] = [
+  {
+    id: 1,
+    title: 'Customers',
+    description: 'Manage customer information and relationships',
+    icon: '👥',
+    section: 'customers',
+    color: '#5469D4',
+  },
+  {
+    id: 2,
+    title: 'Customer Orders',
+    description: 'Track and manage customer orders',
+    icon: '📋',
+    section: 'customer_orders',
+    color: '#e74c3c',
+  },
+  {
+    id: 3,
+    title: 'Distribution',
+    description: 'Trip executions and deliveries',
+    icon: '🚚',
+    section: 'distribution',
+    color: '#16a34a',
+  },
+];
+
+// field crews (sales/drivers with no other role) only work the trip flow —
+// their menu shows Distribution alone
+const FIELD_ROLES = new Set(['sales', 'driver']);
+
 export default function HomeScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -26,32 +57,16 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<'home' | 'menu'>(tab === 'menu' ? 'menu' : 'home');
   const insets = useSafeAreaInsets();
 
-  const menuItems: MenuItem[] = [
-    {
-      id: 1,
-      title: 'Customers',
-      description: 'Manage customer information and relationships',
-      icon: '👥',
-      section: 'customers',
-      color: '#5469D4',
-    },
-    {
-      id: 2,
-      title: 'Customer Orders',
-      description: 'Track and manage customer orders',
-      icon: '📋',
-      section: 'customer_orders',
-      color: '#e74c3c',
-    },
-    {
-      id: 3,
-      title: 'Distribution',
-      description: 'Trip executions and deliveries',
-      icon: '🚚',
-      section: 'distribution',
-      color: '#16a34a',
-    },
-  ];
+  const menuItems: MenuItem[] = useMemo(() => {
+    const scopes: string[] = (user?.permission_scope || '')
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter(Boolean);
+    const fieldOnly = scopes.length > 0 && scopes.every((s) => FIELD_ROLES.has(s));
+    return fieldOnly
+      ? ALL_MENU_ITEMS.filter((i) => i.section === 'distribution')
+      : ALL_MENU_ITEMS;
+  }, [user?.permission_scope]);
 
   const handleLogout = () => {
     Alert.alert(
