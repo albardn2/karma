@@ -18,9 +18,10 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const TRIP_WORKFLOW_NAME = 'simple_trip_workflow';
 
-// routing-only fields; hidden when manual_stops is on (backend validates per mode)
+// routing-only fields; hidden when manual_stops is on (backend validates per
+// mode). service_areas intentionally NOT here: it also shows in manual mode
+// (optional) so the trip map can draw the picked areas' boundaries.
 const ROUTING_FIELDS = new Set([
-  'service_areas',
   'start_warehouse_name',
   'end_warehouse_name',
   'start_point',
