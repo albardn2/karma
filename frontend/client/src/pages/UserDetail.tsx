@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -15,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -33,7 +35,9 @@ import {
   Key,
   Globe,
   Copy,
-  Trash2
+  Trash2,
+  MapPin,
+  Timer
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -49,6 +53,16 @@ const userUpdateSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters").optional().or(z.literal("")),
   permission_scope: z.string().optional(),
   rfid_token: z.string().optional(),
+  track_location: z.boolean().optional(),
+  location_ping_seconds: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
+    z
+      .number({ invalid_type_error: "Must be a number" })
+      .int("Must be a whole number")
+      .min(1, "Must be at least 1 second")
+      .max(3600, "Must be at most 3600 seconds")
+      .optional()
+  ),
 });
 
 type UserUpdateFormValues = z.infer<typeof userUpdateSchema>;
@@ -89,6 +103,8 @@ export default function UserDetail() {
       password: "",
       permission_scope: "",
       rfid_token: "",
+      track_location: undefined,
+      location_ping_seconds: undefined,
     },
   });
 
@@ -105,6 +121,8 @@ export default function UserDetail() {
         password: "",
         permission_scope: user.permission_scope || "",
         rfid_token: "",
+        track_location: user.track_location,
+        location_ping_seconds: user.location_ping_seconds,
       });
     }
   }, [user, form]);
@@ -487,6 +505,51 @@ export default function UserDetail() {
                             </FormItem>
                           )}
                         />
+
+                        <FormField
+                          control={form.control}
+                          name="track_location"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 md:col-span-2">
+                              <div className="space-y-0.5">
+                                <FormLabel>Track location</FormLabel>
+                                <FormDescription>
+                                  Publish this user's live location from the mobile app
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value ?? false}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="location_ping_seconds"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Live ping cadence (seconds)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={3600}
+                                  placeholder="Enter ping cadence in seconds"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                How often the app publishes while tracking
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
                     </div>
                   </Form>
@@ -612,6 +675,28 @@ export default function UserDetail() {
                           )}
                         </div>
                         <p className="font-medium">{user.language || "Not provided"}</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <MapPin className="h-4 w-4" />
+                          <span>Track Location</span>
+                        </div>
+                        <Badge variant={user.track_location ? "default" : "secondary"}>
+                          {user.track_location ? "Enabled" : "Disabled"}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Timer className="h-4 w-4" />
+                          <span>Live Ping Cadence</span>
+                        </div>
+                        <p className="font-medium">
+                          {user.location_ping_seconds != null
+                            ? `${user.location_ping_seconds} seconds`
+                            : "Not set"}
+                        </p>
                       </div>
                     </div>
                   </div>

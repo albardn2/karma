@@ -2,9 +2,24 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "webdev5001",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd frontend && PORT=5001 npm run dev"
+      ],
+      "port": 5001
+    },
+    {
       "name": "karma-frontend",
       "runtimeExecutable": "docker",
-      "runtimeArgs": ["compose", "-f", "docker-compose.local.yml", "up", "frontend"],
+      "runtimeArgs": [
+        "compose",
+        "-f",
+        "docker-compose.local.yml",
+        "up",
+        "frontend"
+      ],
       "port": 3000
     }
   ]
