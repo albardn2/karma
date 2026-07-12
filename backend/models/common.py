@@ -2090,7 +2090,9 @@ class LocationPing(Base):
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_uuid = Column(String(36), ForeignKey("user.uuid"), nullable=False)
     trip_uuid = Column(String(36), ForeignKey("trip.uuid"), nullable=True)
-    coordinates = Column(Geometry("POINT", srid=4326), nullable=False)
+    # spatial_index=False matches the migration: we query by user/trip + time,
+    # not by area, so no GiST index is created
+    coordinates = Column(Geometry("POINT", srid=4326, spatial_index=False), nullable=False)
     recorded_at = Column(DateTime, nullable=False)
     speed = Column(Float, nullable=True)      # m/s, as reported by the device
     heading = Column(Float, nullable=True)    # degrees
