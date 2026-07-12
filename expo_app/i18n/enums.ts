@@ -13,6 +13,11 @@ const ENUM_AR: Record<string, string> = {
   // currencies (Currency)
   USD: 'دولار',
   SYP: 'ل.س',
+  // units of measure (UnitOfMeasure)
+  kg: 'كغ',
+  liters: 'لتر',
+  meters: 'متر',
+  pcs: 'قطعة',
   // task-form field identifiers (task_inputs field names/labels)
   manual_stops: 'محطات يدوية',
   service_areas: 'مناطق الخدمة',

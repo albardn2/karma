@@ -186,7 +186,7 @@ export default function CreateOrderScreen() {
                   onChangeText={(t) => setItem(i, { quantity: t })}
                   testID={`qty-${i}`}
                 />
-                {!!unitOf(it.material_uuid) && <ThemedText style={styles.unit}>{unitOf(it.material_uuid)}</ThemedText>}
+                {!!unitOf(it.material_uuid) && <ThemedText style={styles.unit}>{te(unitOf(it.material_uuid))}</ThemedText>}
               </View>
               <TextInput
                 style={[styles.smallInput, styles.priceInput]}
