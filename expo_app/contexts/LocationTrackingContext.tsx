@@ -4,6 +4,7 @@ import * as Location from 'expo-location';
 import { apiCall } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { MqttPublisher } from '@/utils/mqttPublisher';
+import { startBackgroundTracking, stopBackgroundTracking } from '@/services/backgroundLocation';
 
 interface ClientConfig {
   track_location: boolean;
@@ -18,11 +19,11 @@ const RECONNECT_BASE_MS = 5000;
 const RECONNECT_MAX_MS = 120000;
 
 /**
- * Foreground location tracker. When the logged-in user has track_location
- * enabled (per /location/client-config), publishes a retained position
- * message to the MQTT topic every ping_seconds while the app is active.
- * Background tracking is a separate phase (needs Always permission and a
- * new dev-client build).
+ * Location tracker. When the logged-in user has track_location enabled
+ * (per /location/client-config), publishes a retained position message to
+ * the MQTT topic every ping_seconds — via the foreground watcher while the
+ * app is active, and via the background task (services/backgroundLocation)
+ * when backgrounded, if the Always permission is granted.
  */
 export function LocationTrackingProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -49,6 +50,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
       watcherRef.current = null;
       publisherRef.current?.close();
       publisherRef.current = null;
+      stopBackgroundTracking().catch(() => {});
     };
 
     const connectPublisher = async (config: ClientConfig) => {
@@ -128,6 +130,17 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
         onPosition(config)
       );
       if (stoppedRef.current) watcherRef.current?.remove();
+
+      // keep publishing when the app is backgrounded / screen off; falls back
+      // to foreground-only when the Always permission is denied
+      const bgStarted = await startBackgroundTracking({
+        broker_ws_url: config.broker_ws_url,
+        topic: config.topic,
+        user_uuid: config.user_uuid,
+        username: config.username,
+        ping_seconds: config.ping_seconds,
+      }).catch(() => false);
+      if (stoppedRef.current && bgStarted) stopBackgroundTracking().catch(() => {});
     };
 
     // pause while backgrounded (foreground-only phase), resume when active
