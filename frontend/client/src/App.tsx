@@ -32,6 +32,7 @@ import Orders from "@/pages/Orders";
 import Invoices from "@/pages/Invoices";
 import Reports from "@/pages/Reports";
 import LiveMap from "@/pages/LiveMap";
+import UserLocationHistory from "@/pages/UserLocationHistory";
 import LocationTrackingSettings from "@/pages/LocationTrackingSettings";
 import Pricing from "@/pages/Pricing";
 import PricingDetail from "@/pages/PricingDetail";
@@ -143,6 +144,7 @@ function Router() {
       <Route path="/workflow-execution/:uuid" component={() => <ProtectedRoute><WorkflowExecutionDetail /></ProtectedRoute>} />
       <Route path="/users" component={() => <ProtectedRoute><Users /></ProtectedRoute>} />
       <Route path="/users/:uuid" component={() => <ProtectedRoute><UserDetail /></ProtectedRoute>} />
+      <Route path="/users/:uuid/location-history" component={() => <ProtectedRoute><UserLocationHistory /></ProtectedRoute>} />
       <Route path="/vehicles" component={() => <ProtectedRoute><Vehicles /></ProtectedRoute>} />
       <Route path="/vehicles/:uuid" component={() => <ProtectedRoute><VehicleDetail /></ProtectedRoute>} />
       <Route path="/trips" component={() => <ProtectedRoute><Trips /></ProtectedRoute>} />

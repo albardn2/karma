@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -37,7 +37,8 @@ import {
   Copy,
   Trash2,
   MapPin,
-  Timer
+  Timer,
+  History
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -70,6 +71,7 @@ type UserUpdateFormValues = z.infer<typeof userUpdateSchema>;
 export default function UserDetail() {
   const [, params] = useRoute("/users/:uuid");
   const uuid = params?.uuid;
+  const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
   const { toast } = useToast();
 
@@ -348,6 +350,13 @@ export default function UserDetail() {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                  <Button
+                    variant="outline"
+                    onClick={() => setLocation(`/users/${uuid}/location-history`)}
+                  >
+                    <History className="h-4 w-4 mr-2" />
+                    Location History
+                  </Button>
                   <Button onClick={() => setIsEditing(true)}>
                     <Edit className="h-4 w-4 mr-2" />
                     Edit User

@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { Trip } from "@/lib/types";
 import { VehicleInventoryChart } from "@/components/vehicles/VehicleInventoryChart";
 import { TripStopsMap } from "@/components/map/TripStopsMap";
+import { LocationPlayback, type PlaybackPoint } from "@/components/location/LocationPlayback";
 import { Table as TableIcon, Map as MapIcon } from "lucide-react";
 
 export default function TripDetail() {
@@ -50,6 +51,14 @@ export default function TripDetail() {
   const [activityTab, setActivityTab] = useState("orders");
   const [activityPage, setActivityPage] = useState(0);
   const PAGE_SIZE = 5;
+
+  // recorded GPS series for this trip (admin-only endpoint; hide the section on error)
+  const { data: locationData } = useQuery<{ points: PlaybackPoint[]; total_count: number }>({
+    queryKey: ["/location/trip/", params?.uuid],
+    queryFn: () => apiRequest(`/location/trip/${params?.uuid}`),
+    enabled: !!params?.uuid,
+    retry: false,
+  });
 
   // trip stop customers: table (paginated) / animated map toggle
   const [stopsView, setStopsView] = useState<"table" | "map">("table");
@@ -489,6 +498,24 @@ export default function TripDetail() {
             )}
           </CardContent>
         </Card>
+
+        {/* Recorded GPS trace playback (admin-only endpoint; section hidden when it errors) */}
+        {locationData && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Location Playback</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {locationData.total_count > 0 ? (
+                <LocationPlayback points={locationData.points} />
+              ) : (
+                <p className="text-sm text-gray-500" data-testid="trip-location-empty">
+                  No location points recorded for this trip.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Orders / fulfillments / payments at this trip's stops */}
         <Card className="mt-6">
