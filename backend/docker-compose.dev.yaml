@@ -48,6 +48,20 @@ services:
     networks:
       - proxy
 
+  location-ingest:
+    image: ghcr.io/albardn2/karma-backend:latest-dev
+    restart: always
+    depends_on:
+      - db
+    entrypoint: ["python", "-m", "location_ingest"]
+    environment:
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+      KARMA_ENV: dev
+      MQTT_BROKER_HOST: broker.emqx.io
+      MQTT_BROKER_TCP_PORT: "1883"
+    networks:
+      - proxy
+
   caddy:
     image: caddy:latest
     restart: always
