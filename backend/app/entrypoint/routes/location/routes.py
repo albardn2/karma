@@ -82,6 +82,8 @@ def client_config():
             "ping_seconds": int(user.location_ping_seconds or 15),
             "broker_ws_url": broker["ws_url"],
             "topic": f"{broker['topic_prefix']}/{user.uuid}",
+            # the live-map view subscribes to `{topic_prefix}/+`
+            "topic_prefix": broker["topic_prefix"],
             "user_uuid": user.uuid,
             "username": user.username,
         }
