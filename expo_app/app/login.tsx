@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function LoginScreen() {
@@ -11,24 +12,25 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t('login.errorTitle'), t('login.fillAllFields'));
       return;
     }
-    
+
     setIsLoading(true);
     try {
       const success = await login(email, password);
       if (success) {
         router.replace('/(tabs)');
       } else {
-        Alert.alert('Login Failed', 'Invalid email or password. Please check your credentials and try again.');
+        Alert.alert(t('login.loginFailedTitle'), t('login.invalidCredentials'));
       }
     } catch (error) {
-      Alert.alert('Network Error', 'Unable to connect to the server. Please check your internet connection and try again.');
+      Alert.alert(t('login.networkErrorTitle'), t('login.networkErrorMessage'));
     } finally {
       setIsLoading(false);
     }
@@ -52,18 +54,18 @@ export default function LoginScreen() {
             </View>
             
             <ThemedText type="title" style={styles.title}>
-              Welcome Back
+              {t('login.welcomeBack')}
             </ThemedText>
             <ThemedText style={styles.subtitle}>
-              Sign in to continue to your account
+              {t('login.subtitle')}
             </ThemedText>
 
             <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Email or Username</ThemedText>
+              <ThemedText style={styles.label}>{t('login.emailOrUsername')}</ThemedText>
               <View style={styles.inputWrapper}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter your email or username"
+                  placeholder={t('login.emailPlaceholder')}
                   placeholderTextColor="#9CA3AF"
                   value={email}
                   onChangeText={setEmail}
@@ -75,11 +77,11 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Password</ThemedText>
+              <ThemedText style={styles.label}>{t('login.password')}</ThemedText>
               <View style={styles.inputWrapper}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter your password"
+                  placeholder={t('login.passwordPlaceholder')}
                   placeholderTextColor="#9CA3AF"
                   value={password}
                   onChangeText={setPassword}
@@ -101,7 +103,7 @@ export default function LoginScreen() {
                 style={styles.loginButtonGradient}
               >
                 <ThemedText style={styles.loginButtonText}>
-                  {isLoading ? 'Signing In...' : 'Sign In'}
+                  {isLoading ? t('login.signingIn') : t('login.signIn')}
                 </ThemedText>
               </LinearGradient>
             </TouchableOpacity>

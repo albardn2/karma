@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface BottomNavigationProps {
   activeTab: 'home' | 'menu';
@@ -48,6 +49,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   onTabPress 
 }) => {
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
 
   const dynamicStyle = useMemo(() => [
     styles.bottomNavigation,
@@ -72,7 +74,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <ThemedText style={[
           styles.bottomNavText,
           { color: activeTab === 'home' ? brandColor : '#9ca3af' }
-        ]}>Home</ThemedText>
+        ]}>{t('nav.home')}</ThemedText>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -89,7 +91,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <ThemedText style={[
           styles.bottomNavText,
           { color: activeTab === 'menu' ? brandColor : '#9ca3af' }
-        ]}>Menu</ThemedText>
+        ]}>{t('nav.menu')}</ThemedText>
       </TouchableOpacity>
     </View>
   );

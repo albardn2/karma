@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polygon, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import { useLanguage } from '@/contexts/LanguageContext';
 import type { PolygonRings } from '@/utils/wkt';
 
 export interface TripMapStop {
@@ -52,6 +53,7 @@ export function TripMap({
   onSetCurrent?: (stop: TripMapStop) => void;
   areas?: TripMapArea[];
 }) {
+  const { t } = useLanguage();
   const mapRef = useRef<MapView>(null);
   const [ready, setReady] = useState(false);
   // On iOS (Apple provider) a marker tap ALSO fires MapView.onPress, which would
@@ -153,7 +155,7 @@ export function TripMap({
               key={`${s.taskExecutionUuid}:${currentStopUuid ?? 'none'}`}
               coordinate={{ latitude: s.lat as number, longitude: s.lng as number }}
               title={s.customerName}
-              description={isCurrent ? 'Current stop' : s.status}
+              description={isCurrent ? t('map.currentStop') : s.status}
               // keep the current (blue) pin on top; stops render in chain order,
               // so an early-drawn current pin would otherwise be hidden under the
               // later upcoming pins in a dense cluster.
@@ -184,7 +186,7 @@ export function TripMap({
               onPress={() => { onSetCurrent?.(armedStop); onArm?.(null); }}
               testID={`map-set-current-${armedStop.tripStopUuid}`}
             >
-              <Text style={styles.armedBtnText}>Set current</Text>
+              <Text style={styles.armedBtnText}>{t('map.setCurrent')}</Text>
             </TouchableOpacity>
           </View>
         </View>

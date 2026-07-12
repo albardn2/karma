@@ -13,8 +13,10 @@ import { ThemedView } from '@/components/ThemedView';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function OrderActionsScreen() {
+  const { t, te } = useLanguage();
   const router = useRouter();
   const { orderUuid, tripStopUuid } = useLocalSearchParams<{ orderUuid?: string; tripStopUuid?: string }>();
 
@@ -57,7 +59,7 @@ export default function OrderActionsScreen() {
             trip_stop_uuid: tripStopUuid || null,
           }),
         });
-        if (r.status !== 200 && r.status !== 201) throw new Error(r.error || 'Failed to fulfill');
+        if (r.status !== 200 && r.status !== 201) throw new Error(r.error || t('order.failedToFulfill'));
       }
       if (doPay && canPay) {
         const r = await apiCall('/payment/', {
@@ -71,11 +73,11 @@ export default function OrderActionsScreen() {
             trip_stop_uuid: tripStopUuid || null,
           }),
         });
-        if (r.status !== 200 && r.status !== 201) throw new Error(r.error || 'Failed to record payment');
+        if (r.status !== 200 && r.status !== 201) throw new Error(r.error || t('order.failedToRecordPayment'));
       }
       router.back();
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Could not update the order');
+      Alert.alert(t('order.error'), e?.message || t('order.couldNotUpdateOrder'));
     } finally {
       setSubmitting(false);
     }
@@ -93,7 +95,7 @@ export default function OrderActionsScreen() {
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <NativeHeader
-        title="Order"
+        title={t('order.title')}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))}
       />
 
@@ -106,10 +108,10 @@ export default function OrderActionsScreen() {
             <ThemedText style={styles.date}>{fmtDate(order.created_at)}</ThemedText>
             <View style={styles.badges}>
               <View style={[styles.badge, order.is_paid ? styles.badgeGreen : styles.badgeRed]}>
-                <ThemedText style={styles.badgeText}>{order.is_paid ? 'Paid' : 'Unpaid'}</ThemedText>
+                <ThemedText style={styles.badgeText}>{order.is_paid ? t('order.paid') : t('order.unpaid')}</ThemedText>
               </View>
               <View style={[styles.badge, order.is_fulfilled ? styles.badgeGreen : styles.badgeGray]}>
-                <ThemedText style={styles.badgeText}>{order.is_fulfilled ? 'Fulfilled' : 'Unfulfilled'}</ThemedText>
+                <ThemedText style={styles.badgeText}>{order.is_fulfilled ? t('order.fulfilled') : t('order.unfulfilled')}</ThemedText>
               </View>
             </View>
           </View>
@@ -120,7 +122,7 @@ export default function OrderActionsScreen() {
               <View key={i.uuid} style={styles.itemRow}>
                 <ThemedText style={styles.itemName}>{i.material_name} × {i.quantity} {i.unit || ''}</ThemedText>
                 <ThemedText style={[styles.itemTag, i.is_fulfilled ? styles.tagGreen : styles.tagGray]}>
-                  {i.is_fulfilled ? 'fulfilled' : 'pending'}
+                  {i.is_fulfilled ? t('order.itemFulfilled') : t('order.itemPending')}
                 </ThemedText>
               </View>
             ))}
@@ -128,9 +130,9 @@ export default function OrderActionsScreen() {
 
           {/* totals */}
           <View style={styles.totals}>
-            <View style={styles.totalLine}><ThemedText style={styles.totalKey}>Total</ThemedText><ThemedText>{invoice?.total_amount ?? order.total_adjusted_amount ?? 0} {currency}</ThemedText></View>
-            <View style={styles.totalLine}><ThemedText style={styles.totalKey}>Paid</ThemedText><ThemedText>{invoice?.net_amount_paid ?? order.net_amount_paid ?? 0} {currency}</ThemedText></View>
-            <View style={styles.totalLine}><ThemedText style={styles.totalKeyBold}>Due</ThemedText><ThemedText style={styles.totalKeyBold}>{amountDue} {currency}</ThemedText></View>
+            <View style={styles.totalLine}><ThemedText style={styles.totalKey}>{t('order.total')}</ThemedText><ThemedText>{invoice?.total_amount ?? order.total_adjusted_amount ?? 0} {te(currency)}</ThemedText></View>
+            <View style={styles.totalLine}><ThemedText style={styles.totalKey}>{t('order.totalPaid')}</ThemedText><ThemedText>{invoice?.net_amount_paid ?? order.net_amount_paid ?? 0} {te(currency)}</ThemedText></View>
+            <View style={styles.totalLine}><ThemedText style={styles.totalKeyBold}>{t('order.due')}</ThemedText><ThemedText style={styles.totalKeyBold}>{amountDue} {te(currency)}</ThemedText></View>
           </View>
 
           {/* actions */}
@@ -138,13 +140,13 @@ export default function OrderActionsScreen() {
             <View style={styles.actions}>
               {canFulfill && (
                 <View style={styles.toggleRow}>
-                  <ThemedText style={styles.toggleLabel}>Mark fulfilled ({unfulfilled.length} item{unfulfilled.length > 1 ? 's' : ''})</ThemedText>
+                  <ThemedText style={styles.toggleLabel}>{unfulfilled.length > 1 ? t('order.markFulfilledMany', { count: unfulfilled.length }) : t('order.markFulfilledOne', { count: unfulfilled.length })}</ThemedText>
                   <Switch value={doFulfill} onValueChange={setDoFulfill} trackColor={{ true: '#5469D4' }} testID="toggle-fulfill" />
                 </View>
               )}
               {canPay && (
                 <View style={styles.toggleRow}>
-                  <ThemedText style={styles.toggleLabel}>Mark paid ({amountDue} {currency})</ThemedText>
+                  <ThemedText style={styles.toggleLabel}>{t('order.markPaid', { amount: amountDue, currency: te(currency) })}</ThemedText>
                   <Switch value={doPay} onValueChange={setDoPay} trackColor={{ true: '#5469D4' }} testID="toggle-pay" />
                 </View>
               )}
@@ -154,11 +156,11 @@ export default function OrderActionsScreen() {
                 disabled={nothingSelected || submitting}
                 testID="button-submit-order-actions"
               >
-                {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.submitText}>Submit</ThemedText>}
+                {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.submitText}>{t('order.submit')}</ThemedText>}
               </TouchableOpacity>
             </View>
           ) : (
-            <ThemedText style={styles.settled}>This order is fully paid and fulfilled.</ThemedText>
+            <ThemedText style={styles.settled}>{t('order.fullySettled')}</ThemedText>
           )}
         </ScrollView>
       )}

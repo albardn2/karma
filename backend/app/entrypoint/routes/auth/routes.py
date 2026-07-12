@@ -215,3 +215,24 @@ def me():
         dto = UserRead.from_orm(user).model_dump(mode="json")
         return jsonify(dto), 200
 
+
+@auth_blueprint.route("/me", methods=["PUT"])
+@jwt_required()
+def update_me():
+    """Self-service update of the caller's own preferences (e.g. preferred
+    language). Deliberately separate from the admin-only /user/<uuid> PUT —
+    MeUpdate only exposes safe fields."""
+    from app.dto.auth import MeUpdate
+
+    req = MeUpdate(**request.json)
+    current_uuid = get_jwt_identity()
+    with SqlAlchemyUnitOfWork() as uow:
+        user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
+        if not user:
+            raise NotFoundError("User not found")
+        for key, value in req.model_dump(exclude_unset=True).items():
+            setattr(user, key, value)
+        uow.user_repository.save(model=user, commit=True)
+        dto = UserRead.from_orm(user).model_dump(mode="json")
+    return jsonify(dto), 200
+

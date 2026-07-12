@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface CustomerForm {
   full_name: string;
@@ -24,6 +25,7 @@ interface CustomerForm {
 
 export default function CreateCustomerScreen() {
   const insets = useSafeAreaInsets();
+  const { t, tef } = useLanguage();
   const [form, setForm] = useState<CustomerForm>({
     full_name: '',
     email_address: '',
@@ -92,18 +94,18 @@ export default function CreateCustomerScreen() {
     const newErrors: Partial<Record<keyof CustomerForm, string>> = {};
 
     if (!form.full_name.trim()) {
-      newErrors.full_name = 'Customer name is required';
+      newErrors.full_name = t('custcreate.customerNameRequired');
     }
     if (!form.company_name.trim()) {
-      newErrors.company_name = 'Company name is required';
+      newErrors.company_name = t('custcreate.companyNameRequired');
     }
     if (!form.phone_number.trim()) {
-      newErrors.phone_number = 'Phone number is required';
+      newErrors.phone_number = t('custcreate.phoneNumberRequired');
     }
-    
+
     // Email is optional, but validate format if provided
     if (form.email_address.trim() && !/\S+@\S+\.\S+/.test(form.email_address)) {
-      newErrors.email_address = 'Please enter a valid email address';
+      newErrors.email_address = t('custcreate.emailInvalid');
     }
 
     setErrors(newErrors);
@@ -137,7 +139,7 @@ export default function CreateCustomerScreen() {
 
       console.log('API response:', response);
       if (response.status === 200 || response.status === 201) {
-        showBanner('success', 'Customer created successfully!');
+        showBanner('success', t('custcreate.createSuccess'));
         setTimeout(() => {
           // Navigate back and trigger refresh
           if (isNative) {
@@ -149,7 +151,7 @@ export default function CreateCustomerScreen() {
         return;
       }
 
-      let errorMsg = 'Failed to create customer';
+      let errorMsg = t('custcreate.createFailed');
       if (response.error) {
         try {
           const err = typeof response.error === 'string' ? JSON.parse(response.error) : response.error;
@@ -160,7 +162,7 @@ export default function CreateCustomerScreen() {
 
     } catch (e) {
       console.error('Network error:', e);
-      showBanner('error', 'Network error – please try again.');
+      showBanner('error', t('custcreate.networkError'));
     } finally {
       setLoading(false);
     }
@@ -174,9 +176,9 @@ export default function CreateCustomerScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Permission Denied',
-          'Location permission is required to get your current location.',
-          [{ text: 'OK' }]
+          t('custcreate.permissionDeniedTitle'),
+          t('custcreate.permissionDeniedMessage'),
+          [{ text: t('custcreate.ok') }]
         );
         return;
       }
@@ -190,14 +192,14 @@ export default function CreateCustomerScreen() {
       const coordinates = `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
       
       updateForm('coordinates', coordinates);
-      showBanner('success', 'Location retrieved successfully!');
+      showBanner('success', t('custcreate.locationSuccess'));
       
     } catch (error) {
       console.error('Error getting location:', error);
       Alert.alert(
-        'Location Error',
-        'Failed to get your current location. Please try again or enter coordinates manually.',
-        [{ text: 'OK' }]
+        t('custcreate.locationErrorTitle'),
+        t('custcreate.locationErrorMessage'),
+        [{ text: t('custcreate.ok') }]
       );
     } finally {
       setLocationLoading(false);
@@ -213,7 +215,7 @@ export default function CreateCustomerScreen() {
         {/* Native Header for mobile */}
         {isNative && (
           <NativeHeader
-            title="Create Customer"
+            title={t('custcreate.title')}
             onBack={handleCancel}
         />
       )}
@@ -240,13 +242,13 @@ export default function CreateCustomerScreen() {
           isDesktop ? styles.desktopHeader : isMobileWeb ? styles.mobileHeader : undefined
         ]}>
           <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
-            <ThemedText style={styles.backButtonText}>← Back</ThemedText>
+            <ThemedText style={styles.backButtonText}>{t('custcreate.back')}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={[
             styles.title,
             isDesktop ? styles.desktopTitle : styles.mobileTitle
           ]}>
-            Create Customer
+            {t('custcreate.title')}
           </ThemedText>
           <View style={styles.placeholder} />
         </View>
@@ -260,33 +262,33 @@ export default function CreateCustomerScreen() {
         <View style={styles.formCard}>
           {/* Customer Name */}
           <View style={styles.fieldContainer}>
-            <ThemedText style={styles.label}>Customer Name *</ThemedText>
+            <ThemedText style={styles.label}>{t('custcreate.customerNameLabel')}</ThemedText>
             <TextInput style={[styles.input, errors.full_name && styles.inputError]}
               value={form.full_name}
               onChangeText={(v) => updateForm('full_name', v)}
-              placeholder="Enter customer full name"
+              placeholder={t('custcreate.customerNamePlaceholder')}
               placeholderTextColor="#9ca3af" />
             {errors.full_name && <ThemedText style={styles.errorText}>{errors.full_name}</ThemedText>}
           </View>
 
           {/* Company Name */}
           <View style={styles.fieldContainer}>
-            <ThemedText style={styles.label}>Company Name *</ThemedText>
+            <ThemedText style={styles.label}>{t('custcreate.companyNameLabel')}</ThemedText>
             <TextInput style={[styles.input, errors.company_name && styles.inputError]}
               value={form.company_name}
               onChangeText={(v) => updateForm('company_name', v)}
-              placeholder="Enter company name"
+              placeholder={t('custcreate.companyNamePlaceholder')}
               placeholderTextColor="#9ca3af" />
             {errors.company_name && <ThemedText style={styles.errorText}>{errors.company_name}</ThemedText>}
           </View>
 
           {/* Phone */}
           <View style={styles.fieldContainer}>
-            <ThemedText style={styles.label}>Phone Number *</ThemedText>
+            <ThemedText style={styles.label}>{t('custcreate.phoneNumberLabel')}</ThemedText>
             <TextInput style={[styles.input, errors.phone_number && styles.inputError]}
               value={form.phone_number}
               onChangeText={(v) => updateForm('phone_number', v)}
-              placeholder="Enter phone number"
+              placeholder={t('custcreate.phoneNumberPlaceholder')}
               keyboardType="phone-pad"
               placeholderTextColor="#9ca3af" />
             {errors.phone_number && <ThemedText style={styles.errorText}>{errors.phone_number}</ThemedText>}
@@ -294,11 +296,11 @@ export default function CreateCustomerScreen() {
 
           {/* Email */}
           <View style={styles.fieldContainer}>
-            <ThemedText style={styles.label}>Email Address (Optional)</ThemedText>
+            <ThemedText style={styles.label}>{t('custcreate.emailLabel')}</ThemedText>
             <TextInput style={[styles.input, errors.email_address && styles.inputError]}
               value={form.email_address}
               onChangeText={(v) => updateForm('email_address', v)}
-              placeholder="Enter email address (optional)"
+              placeholder={t('custcreate.emailPlaceholder')}
               keyboardType="email-address"
               autoCapitalize="none"
               placeholderTextColor="#9ca3af" />
@@ -307,14 +309,14 @@ export default function CreateCustomerScreen() {
 
           {/* Category */}
           <View style={styles.fieldContainer}>
-            <ThemedText style={styles.label}>Customer Category *</ThemedText>
+            <ThemedText style={styles.label}>{t('custcreate.categoryLabel')}</ThemedText>
             <View style={styles.categoryContainer}>
               {categories.map(cat => (
                 <TouchableOpacity key={cat}
                   style={[styles.categoryButton, form.category===cat && styles.activeCategoryButton]}
                   onPress={()=>updateForm('category',cat as any)}>
                   <ThemedText style={[styles.categoryButtonText, form.category===cat && styles.activeCategoryButtonText]}>
-                    {cat.charAt(0).toUpperCase()+cat.slice(1)}
+                    {tef(cat)}
                   </ThemedText>
                 </TouchableOpacity>
               ))}
@@ -323,33 +325,33 @@ export default function CreateCustomerScreen() {
 
           {/* Full Address */}
           <View style={styles.fieldContainer}>
-            <ThemedText style={styles.label}>Full Address</ThemedText>
+            <ThemedText style={styles.label}>{t('custcreate.fullAddressLabel')}</ThemedText>
             <TextInput style={[styles.input, styles.textArea]}
               value={form.full_address}
               onChangeText={(v)=>updateForm('full_address',v)}
-              placeholder="Enter full address"
+              placeholder={t('custcreate.fullAddressPlaceholder')}
               multiline numberOfLines={3}
               placeholderTextColor="#9ca3af" />
           </View>
 
           {/* Business Cards */}
           <View style={styles.fieldContainer}>
-            <ThemedText style={styles.label}>Business Cards (Optional)</ThemedText>
+            <ThemedText style={styles.label}>{t('custcreate.businessCardsLabel')}</ThemedText>
             <TextInput style={styles.input}
               value={form.business_cards}
               onChangeText={(v) => updateForm('business_cards', v)}
-              placeholder="Business card information (optional)"
+              placeholder={t('custcreate.businessCardsPlaceholder')}
               placeholderTextColor="#9ca3af" />
           </View>
 
           {/* Coordinates */}
           <View style={styles.fieldContainer}>
-            <ThemedText style={styles.label}>Coordinates (Optional)</ThemedText>
+            <ThemedText style={styles.label}>{t('custcreate.coordinatesLabel')}</ThemedText>
             <View style={styles.coordinatesInputContainer}>
               <TextInput style={[styles.input, styles.coordinatesInput]}
                 value={form.coordinates}
                 onChangeText={(v) => updateForm('coordinates', v)}
-                placeholder="Latitude,Longitude (optional)"
+                placeholder={t('custcreate.coordinatesPlaceholder')}
                 placeholderTextColor="#9ca3af" />
               <TouchableOpacity
                 style={[styles.locateButton, locationLoading && styles.locateButtonDisabled]}
@@ -357,7 +359,7 @@ export default function CreateCustomerScreen() {
                 disabled={locationLoading}
               >
                 <ThemedText style={styles.locateButtonText}>
-                  {locationLoading ? '📍...' : '📍 Locate Me'}
+                  {locationLoading ? '📍...' : t('custcreate.locateMe')}
                 </ThemedText>
               </TouchableOpacity>
             </View>
@@ -365,11 +367,11 @@ export default function CreateCustomerScreen() {
 
           {/* Notes */}
           <View style={styles.fieldContainer}>
-            <ThemedText style={styles.label}>Notes</ThemedText>
+            <ThemedText style={styles.label}>{t('custcreate.notesLabel')}</ThemedText>
             <TextInput style={[styles.input, styles.textArea]}
               value={form.notes}
               onChangeText={(v) => updateForm('notes', v)}
-              placeholder="Additional notes (optional)"
+              placeholder={t('custcreate.notesPlaceholder')}
               multiline numberOfLines={4}
               placeholderTextColor="#9ca3af" />
           </View>
@@ -381,7 +383,7 @@ export default function CreateCustomerScreen() {
               onPress={handleCancel}
               disabled={loading}
             >
-              <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+              <ThemedText style={styles.cancelButtonText}>{t('custcreate.cancel')}</ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleSubmit} disabled={loading}>
@@ -390,7 +392,7 @@ export default function CreateCustomerScreen() {
                 style={styles.submitButton}
               >
                 <ThemedText style={styles.submitButtonText}>
-                  {loading ? 'Creating...' : 'Create Customer'}
+                  {loading ? t('custcreate.creating') : t('custcreate.title')}
                 </ThemedText>
               </LinearGradient>
             </TouchableOpacity>

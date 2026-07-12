@@ -11,6 +11,7 @@ import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { DesktopCustomersLayout } from '@/components/layouts/DesktopCustomersLayout';
 import { Colors } from '@/constants/Colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Customer {
   uuid: string;
@@ -41,6 +42,7 @@ type ViewMode = 'list' | 'map';
 export default function CustomersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t, tef } = useLanguage();
   const { deleted, message } = useLocalSearchParams<{ deleted?: string; message?: string }>();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,11 +187,11 @@ export default function CustomersScreen() {
         console.error('Failed to load customers from backend:', response);
         // Show error message instead of mock data
         if (response.status === 0) {
-          Alert.alert('Network Error', 'Unable to connect to the backend server. Please check your connection.');
+          Alert.alert(t('customers.networkError'), t('customers.networkErrorMessage'));
         } else if (response.status === 401) {
-          Alert.alert('Authentication Error', 'Your session has expired. Please log in again.');
+          Alert.alert(t('customers.authenticationError'), t('customers.sessionExpired'));
         } else {
-          Alert.alert('Error', `Failed to load customers: ${response.error || 'Unknown error'}`);
+          Alert.alert(t('customers.error'), t('customers.failedToLoadCustomersDetail', { error: response.error || t('customers.unknownError') }));
         }
         // Set empty arrays instead of mock data
         // setCustomers([]);  // Modified to only set customers
@@ -198,7 +200,7 @@ export default function CustomersScreen() {
       }
     } catch (error) {
       console.error('Error fetching customers:', error);
-      Alert.alert('Error', 'Failed to load customers');
+      Alert.alert(t('customers.error'), t('customers.failedToLoadCustomers'));
     } finally {
       setLoading(false);
     }
@@ -259,7 +261,7 @@ export default function CustomersScreen() {
       console.log('Refresh completed successfully');
     } catch (error) {
       console.error('Error refreshing customers:', error);
-      Alert.alert('Error', 'Failed to refresh customer data');
+      Alert.alert(t('customers.error'), t('customers.failedToRefresh'));
     } finally {
       setRefreshing(false);
     }
@@ -286,10 +288,10 @@ export default function CustomersScreen() {
 
   const TableHeader = () => (
     <View style={styles.tableHeader}>
-      <ThemedText style={[styles.tableHeaderText, styles.nameHeaderColumn]}>Name & Company</ThemedText>
-      <ThemedText style={[styles.tableHeaderText, styles.categoryHeaderColumn]}>Category</ThemedText>
-      <ThemedText style={[styles.tableHeaderText, styles.contactHeaderColumn]}>Contact</ThemedText>
-      <ThemedText style={[styles.tableHeaderText, styles.balanceHeaderColumn]}>Balance</ThemedText>
+      <ThemedText style={[styles.tableHeaderText, styles.nameHeaderColumn]}>{t('customers.nameAndCompany')}</ThemedText>
+      <ThemedText style={[styles.tableHeaderText, styles.categoryHeaderColumn]}>{t('customers.category')}</ThemedText>
+      <ThemedText style={[styles.tableHeaderText, styles.contactHeaderColumn]}>{t('customers.contact')}</ThemedText>
+      <ThemedText style={[styles.tableHeaderText, styles.balanceHeaderColumn]}>{t('customers.balance')}</ThemedText>
       <View style={styles.arrowHeaderColumn} />
     </View>
   );
@@ -330,7 +332,7 @@ export default function CustomersScreen() {
         <View style={styles.categoryColumn}>
           <View style={[styles.categoryBadge, { backgroundColor: '#5469D4' }]}>
             <ThemedText style={styles.categoryText}>
-              {customer.category.charAt(0).toUpperCase() + customer.category.slice(1)}
+              {tef(customer.category)}
             </ThemedText>
           </View>
         </View>
@@ -341,7 +343,7 @@ export default function CustomersScreen() {
             {customer.phone_number}
           </ThemedText>
           <ThemedText style={styles.contactText} numberOfLines={1}>
-            {customer.email_address || 'No email'}
+            {customer.email_address || t('customers.noEmail')}
           </ThemedText>
         </View>
 
@@ -395,7 +397,7 @@ export default function CustomersScreen() {
           isDesktop && styles.desktopSearchInput,
           (isMobileWeb || isNative) && styles.mobileSearchInput
         ]}
-        placeholder="Search by customer name..."
+        placeholder={t('customers.searchByCustomerName')}
         value={searchTerm}
         onChangeText={setSearchTerm}
         placeholderTextColor="#666"
@@ -415,7 +417,7 @@ export default function CustomersScreen() {
               styles.filterButtonText,
               categoryFilter === category && styles.activeFilterButtonText
             ]}>
-              {category.charAt(0).toUpperCase() + category.slice(1)}
+              {category === 'all' ? t('customers.all') : tef(category)}
             </ThemedText>
           </TouchableOpacity>
         ))}
@@ -430,7 +432,7 @@ export default function CustomersScreen() {
       <ThemedView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#5469D4" />
-          <ThemedText style={styles.loadingText}>Loading customers...</ThemedText>
+          <ThemedText style={styles.loadingText}>{t('customers.loadingCustomers')}</ThemedText>
         </View>
       </ThemedView>
     );
@@ -492,7 +494,7 @@ export default function CustomersScreen() {
           isDesktop && styles.desktopTitle,
           (isMobileWeb || isNative) && styles.mobileTitle
         ]}>
-          Customers
+          {t('customers.title')}
         </ThemedText>
 
         <View style={styles.headerActions}>
@@ -503,7 +505,7 @@ export default function CustomersScreen() {
               onPress={() => setShowFilters(true)}
             >
               <ThemedText style={[styles.filterToggleText, hasActiveFilters && styles.filterToggleTextActive]}>
-                🔍 Filters {hasActiveFilters && `(${Object.values(appliedFilters).filter(v => v.trim()).length})`}
+                🔍 {t('customers.filters')} {hasActiveFilters && `(${Object.values(appliedFilters).filter(v => v.trim()).length})`}
               </ThemedText>
             </TouchableOpacity>
           )}
@@ -517,7 +519,7 @@ export default function CustomersScreen() {
                 (isMobileWeb || isNative) && styles.mobileCreateButton
               ]}
             >
-              <ThemedText style={styles.createButtonText}>+ Add Customer</ThemedText>
+              <ThemedText style={styles.createButtonText}>+ {t('customers.addCustomer')}</ThemedText>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -538,7 +540,7 @@ export default function CustomersScreen() {
               styles.mobileViewToggleText,
               viewMode === 'list' && styles.activeMobileViewToggleText
             ]}>
-              📋 List View
+              📋 {t('customers.listView')}
             </ThemedText>
           </TouchableOpacity>
 
@@ -554,7 +556,7 @@ export default function CustomersScreen() {
               styles.mobileViewToggleText,
               viewMode === 'map' && styles.activeMobileViewToggleText
             ]}>
-              🗺️ Map View
+              🗺️ {t('customers.mapView')}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -585,7 +587,7 @@ export default function CustomersScreen() {
                     tintColor="#5469D4"
                     colors={['#5469D4']}
                     titleColor="#5469D4"
-                    title="Pull to refresh"
+                    title={t('customers.pullToRefresh')}
                     progressBackgroundColor="#ffffff"
                   />
                 ) : undefined
@@ -596,7 +598,7 @@ export default function CustomersScreen() {
               {filteredCustomers.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <ThemedText style={styles.emptyText}>
-                    {customers.length === 0 ? 'No customers found' : 'No customers match your filters'}
+                    {customers.length === 0 ? t('customers.noCustomersFound') : t('customers.noCustomersMatchFilters')}
                   </ThemedText>
                 </View>
               ) : (
@@ -628,13 +630,13 @@ export default function CustomersScreen() {
                     styles.pageButtonText,
                     page === 1 && styles.pageButtonTextDisabled
                   ]}>
-                    Previous
+                    {t('customers.previous')}
                   </ThemedText>
                 </TouchableOpacity>
 
                 <View style={styles.pageInfo}>
                   <ThemedText style={styles.pageInfoText}>
-                    Page {page} of {totalPages}
+                    {t('customers.pageOf', { page, total: totalPages })}
                   </ThemedText>
                 </View>
 
@@ -650,7 +652,7 @@ export default function CustomersScreen() {
                     styles.pageButtonText,
                     page === totalPages && styles.pageButtonTextDisabled
                   ]}>
-                    Next
+                    {t('customers.next')}
                   </ThemedText>
                 </TouchableOpacity>
                 </View>
@@ -688,7 +690,7 @@ export default function CustomersScreen() {
               (isMobileWeb || isNative) && styles.mobileFilterModal
             ]}>
               <View style={styles.filterHeader}>
-                <ThemedText style={styles.filterTitle}>Filter Customers</ThemedText>
+                <ThemedText style={styles.filterTitle}>{t('customers.filterCustomers')}</ThemedText>
                 <TouchableOpacity 
                   onPress={() => {
                     setShowFilters(false);
@@ -708,12 +710,12 @@ export default function CustomersScreen() {
               >
                 {/* UUID Filter */}
                 <View style={styles.filterGroup}>
-                  <ThemedText style={styles.filterLabel}>UUID</ThemedText>
+                  <ThemedText style={styles.filterLabel}>{t('customers.uuid')}</ThemedText>
                   <TextInput
                     style={styles.filterInput}
                     value={filters.uuid}
                     onChangeText={(value) => handleFilterChange('uuid', value)}
-                    placeholder="Enter UUID"
+                    placeholder={t('customers.enterUuid')}
                     placeholderTextColor="#9ca3af"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -722,14 +724,14 @@ export default function CustomersScreen() {
 
                 {/* Category Filter */}
                 <View style={styles.filterGroup}>
-                  <ThemedText style={styles.filterLabel}>Category</ThemedText>
+                  <ThemedText style={styles.filterLabel}>{t('customers.category')}</ThemedText>
                   <TouchableOpacity 
                     style={styles.dropdown}
                     onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
                     activeOpacity={0.7}
                   >
                     <ThemedText style={[styles.dropdownText, !filters.category && styles.placeholderText]}>
-                      {filters.category ? filters.category.charAt(0).toUpperCase() + filters.category.slice(1) : 'Select category'}
+                      {filters.category ? tef(filters.category) : t('customers.selectCategory')}
                     </ThemedText>
                     <ThemedText style={styles.dropdownArrow}>
                       {showCategoryDropdown ? '▲' : '▼'}
@@ -745,7 +747,7 @@ export default function CustomersScreen() {
                         }}
                         activeOpacity={0.7}
                       >
-                        <ThemedText style={styles.dropdownOptionText}>All Categories</ThemedText>
+                        <ThemedText style={styles.dropdownOptionText}>{t('customers.allCategories')}</ThemedText>
                       </TouchableOpacity>
                       {categories.map((category) => (
                         <TouchableOpacity
@@ -758,7 +760,7 @@ export default function CustomersScreen() {
                           activeOpacity={0.7}
                         >
                           <ThemedText style={styles.dropdownOptionText}>
-                            {category.charAt(0).toUpperCase() + category.slice(1)}
+                            {tef(category)}
                           </ThemedText>
                         </TouchableOpacity>
                       ))}
@@ -768,12 +770,12 @@ export default function CustomersScreen() {
 
                 {/* Email Filter */}
                 <View style={styles.filterGroup}>
-                  <ThemedText style={styles.filterLabel}>Email Address</ThemedText>
+                  <ThemedText style={styles.filterLabel}>{t('customers.emailAddress')}</ThemedText>
                   <TextInput
                     style={styles.filterInput}
                     value={filters.email_address}
                     onChangeText={(value) => handleFilterChange('email_address', value)}
-                    placeholder="Enter email address"
+                    placeholder={t('customers.enterEmailAddress')}
                     placeholderTextColor="#9ca3af"
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -783,12 +785,12 @@ export default function CustomersScreen() {
 
                 {/* Company Name Filter */}
                 <View style={styles.filterGroup}>
-                  <ThemedText style={styles.filterLabel}>Company Name</ThemedText>
+                  <ThemedText style={styles.filterLabel}>{t('customers.companyName')}</ThemedText>
                   <TextInput
                     style={styles.filterInput}
                     value={filters.company_name}
                     onChangeText={(value) => handleFilterChange('company_name', value)}
-                    placeholder="Enter company name"
+                    placeholder={t('customers.enterCompanyName')}
                     placeholderTextColor="#9ca3af"
                     autoCorrect={false}
                   />
@@ -796,12 +798,12 @@ export default function CustomersScreen() {
 
                 {/* Full Name Filter */}
                 <View style={styles.filterGroup}>
-                  <ThemedText style={styles.filterLabel}>Full Name</ThemedText>
+                  <ThemedText style={styles.filterLabel}>{t('customers.fullName')}</ThemedText>
                   <TextInput
                     style={styles.filterInput}
                     value={filters.full_name}
                     onChangeText={(value) => handleFilterChange('full_name', value)}
-                    placeholder="Enter customer name"
+                    placeholder={t('customers.enterCustomerName')}
                     placeholderTextColor="#9ca3af"
                     autoCorrect={false}
                   />
@@ -809,12 +811,12 @@ export default function CustomersScreen() {
 
                 {/* Phone Number Filter */}
                 <View style={styles.filterGroup}>
-                  <ThemedText style={styles.filterLabel}>Phone Number</ThemedText>
+                  <ThemedText style={styles.filterLabel}>{t('customers.phoneNumber')}</ThemedText>
                   <TextInput
                     style={styles.filterInput}
                     value={filters.phone_number}
                     onChangeText={(value) => handleFilterChange('phone_number', value)}
-                    placeholder="Enter phone number"
+                    placeholder={t('customers.enterPhoneNumber')}
                     placeholderTextColor="#9ca3af"
                     keyboardType="phone-pad"
                     autoCorrect={false}
@@ -828,14 +830,14 @@ export default function CustomersScreen() {
                   onPress={clearFilters}
                   activeOpacity={0.7}
                 >
-                  <ThemedText style={styles.clearButtonText}>Clear All</ThemedText>
+                  <ThemedText style={styles.clearButtonText}>{t('customers.clearAll')}</ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   onPress={applyFilters}
                   activeOpacity={0.7}
                 >
                   <LinearGradient colors={['#5469D4', '#4F46E5']} style={styles.applyButton}>
-                    <ThemedText style={styles.applyButtonText}>Apply Filters</ThemedText>
+                    <ThemedText style={styles.applyButtonText}>{t('customers.applyFilters')}</ThemedText>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
