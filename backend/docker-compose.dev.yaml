@@ -45,6 +45,8 @@ services:
       # JWT signing secret; comes from the droplet-side .env written by the
       # deploy workflow (sourced from GitHub secrets)
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      # namespaces the MQTT location topics (karma-grp/location/dev/...)
+      KARMA_ENV: dev
     networks:
       - proxy
 
