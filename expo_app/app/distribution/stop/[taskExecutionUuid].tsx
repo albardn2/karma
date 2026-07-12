@@ -107,7 +107,7 @@ export default function StopDetailScreen() {
       if (!f.required) continue;
       const v = values[f.name];
       const empty = f.type === 'checklist' ? !(v || []).length : !v;
-      if (empty) { Alert.alert(t('stopdetail.missingInfo'), t('stopdetail.fieldRequired', { field: f.label })); return; }
+      if (empty) { Alert.alert(t('stopdetail.missingInfo'), t('stopdetail.fieldRequired', { field: tef(f.label) })); return; }
     }
     const result: Record<string, any> = {};
     for (const f of fields) {
@@ -136,7 +136,7 @@ export default function StopDetailScreen() {
       const value = values[f.name];
       return (
         <View key={f.name} style={styles.fieldBlock}>
-          <ThemedText style={styles.fieldLabel}>{f.label}{f.required ? ' *' : ''}</ThemedText>
+          <ThemedText style={styles.fieldLabel}>{tef(f.label)}{f.required ? ' *' : ''}</ThemedText>
           <TouchableOpacity style={styles.dropdown} onPress={() => setPickerField(f.name)} testID={`select-${f.name}`}>
             <ThemedText style={[styles.dropdownText, !value && styles.dropdownPlaceholder]} numberOfLines={1}>
               {value ? te(value) : (f.placeholder || t('stopdetail.selectPlaceholder'))}
@@ -150,7 +150,7 @@ export default function StopDetailScreen() {
       const selected: string[] = values[f.name] || [];
       return (
         <View key={f.name} style={styles.fieldBlock}>
-          <ThemedText style={styles.fieldLabel}>{f.label}{f.required ? ' *' : ''}</ThemedText>
+          <ThemedText style={styles.fieldLabel}>{tef(f.label)}{f.required ? ' *' : ''}</ThemedText>
           <View style={styles.chipWrap}>
             {(f.options || []).map((opt) => {
               const active = selected.includes(opt);
@@ -166,7 +166,7 @@ export default function StopDetailScreen() {
     }
     return (
       <View key={f.name} style={styles.fieldBlock}>
-        <ThemedText style={styles.fieldLabel}>{f.label}{f.required ? ' *' : ''}</ThemedText>
+        <ThemedText style={styles.fieldLabel}>{tef(f.label)}{f.required ? ' *' : ''}</ThemedText>
         <TextInput
           style={styles.input}
           value={String(values[f.name] ?? '')}
