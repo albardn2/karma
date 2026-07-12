@@ -107,18 +107,6 @@ function LiveTripMap({
   workflowExecutionUuid?: string | null;
   points: PlaybackPoint[];
 }) {
-  const [status, setStatus] = useState<"resolving" | "connecting" | "connected" | "disconnected">("resolving");
-  const [live, setLive] = useState<LivePosition | null>(null);
-  const [liveTrail, setLiveTrail] = useState<[number, number][]>([]);
-  const [noDriver, setNoDriver] = useState(false);
-  const [tick, setTick] = useState(0); // refresh "last seen" labels
-  const clientRef = useRef<MqttClient | null>(null);
-  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const delayRef = useRef(5000);
-  const mapRef = useRef<L.Map | null>(null);
-  const centeredRef = useRef(false);
-
-  // the driver: the execution's start_trip assignee (username or uuid)
   const { data: execution } = useQuery<{ task_executions?: TaskExecution[] }>({
     queryKey: ["/workflow-execution", workflowExecutionUuid],
     queryFn: () => apiRequest(`/workflow-execution/${workflowExecutionUuid}`),
@@ -130,11 +118,6 @@ function LiveTripMap({
     queryFn: () => apiRequest("/auth/users?per_page=100"),
     retry: false,
   });
-  const { data: clientConfig } = useQuery<ClientConfig>({
-    queryKey: ["/location/client-config"],
-    queryFn: () => apiRequest("/location/client-config"),
-    retry: false,
-  });
 
   const driver = useMemo(() => {
     if (!execution?.task_executions || !usersData?.users) return null;
@@ -144,9 +127,43 @@ function LiveTripMap({
     return usersData.users.find((u) => u.username === assigned || u.uuid === assigned) ?? null;
   }, [execution, usersData]);
 
-  useEffect(() => {
-    if (execution && usersData && !driver) setNoDriver(true);
-  }, [execution, usersData, driver]);
+  if (execution && usersData && !driver) {
+    return (
+      <p className="text-sm text-gray-500" data-testid="trip-live-no-driver">
+        Live tracking is unavailable: this trip has no assigned driver.
+      </p>
+    );
+  }
+  if (!driver) {
+    return <p className="text-sm text-gray-500">Resolving the assigned driver…</p>;
+  }
+  return <LiveLocationMap userUuid={driver.uuid} username={driver.username} points={points} />;
+}
+
+export function LiveLocationMap({
+  userUuid,
+  username,
+  points,
+}: {
+  userUuid: string;
+  username?: string;
+  points: PlaybackPoint[];
+}) {
+  const [status, setStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
+  const [live, setLive] = useState<LivePosition | null>(null);
+  const [liveTrail, setLiveTrail] = useState<[number, number][]>([]);
+  const [tick, setTick] = useState(0); // refresh "last seen" labels
+  const clientRef = useRef<MqttClient | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const delayRef = useRef(5000);
+  const mapRef = useRef<L.Map | null>(null);
+  const centeredRef = useRef(false);
+
+  const { data: clientConfig } = useQuery<ClientConfig>({
+    queryKey: ["/location/client-config"],
+    queryFn: () => apiRequest("/location/client-config"),
+    retry: false,
+  });
 
   // live "last seen" ages
   useEffect(() => {
@@ -155,7 +172,7 @@ function LiveTripMap({
   }, []);
 
   useEffect(() => {
-    if (!driver || !clientConfig) return;
+    if (!clientConfig) return;
     let disposed = false;
 
     const connect = async () => {
@@ -190,7 +207,7 @@ function LiveTripMap({
           if (s === "connected") {
             setStatus("connected");
             delayRef.current = 5000;
-            client.subscribe(`${clientConfig.topic_prefix}/${driver.uuid}`);
+            client.subscribe(`${clientConfig.topic_prefix}/${userUuid}`);
           } else if (s === "closed" || s === "error") {
             setStatus("disconnected");
             if (!reconnectRef.current) {
@@ -218,7 +235,7 @@ function LiveTripMap({
       clientRef.current?.close();
       clientRef.current = null;
     };
-  }, [driver?.uuid, clientConfig?.broker_ws_url, clientConfig?.topic_prefix]);
+  }, [userUuid, clientConfig?.broker_ws_url, clientConfig?.topic_prefix]);
 
   // center on the driver the first time a live position arrives
   useEffect(() => {
@@ -233,14 +250,6 @@ function LiveTripMap({
     [points]
   );
 
-  if (noDriver) {
-    return (
-      <p className="text-sm text-gray-500" data-testid="trip-live-no-driver">
-        Live tracking is unavailable: this trip has no assigned driver.
-      </p>
-    );
-  }
-
   const lastSeenSec = live ? Math.max(0, Math.round((Date.now() - live.receivedAt) / 1000)) : null;
   void tick;
 
@@ -254,7 +263,7 @@ function LiveTripMap({
           className={`px-2 py-0.5 rounded-full text-xs font-medium ${
             status === "connected"
               ? "bg-green-100 text-green-800"
-              : status === "connecting" || status === "resolving"
+              : status === "connecting"
               ? "bg-yellow-100 text-yellow-800"
               : "bg-red-100 text-red-800"
           }`}
@@ -264,7 +273,7 @@ function LiveTripMap({
         </span>
         {live ? (
           <span className="text-gray-600">
-            {live.username ?? "Driver"} · last seen {lastSeenSec}s ago
+            {live.username ?? username ?? "Driver"} · last seen {lastSeenSec}s ago
             {typeof live.speed === "number" ? ` · ${(live.speed * 3.6).toFixed(1)} km/h` : ""}
           </span>
         ) : (
@@ -292,7 +301,7 @@ function LiveTripMap({
             <Marker position={[live.lat, live.lon]}>
               <Popup>
                 <div className="text-sm">
-                  <div className="font-semibold">{live.username ?? "Driver"}</div>
+                  <div className="font-semibold">{live.username ?? username ?? "Driver"}</div>
                   <div>
                     {live.lat.toFixed(5)}, {live.lon.toFixed(5)}
                   </div>

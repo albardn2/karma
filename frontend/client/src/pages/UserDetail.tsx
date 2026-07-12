@@ -41,6 +41,7 @@ import {
   History
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { UserLocationMap } from "@/components/location/UserLocationMap";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { User, UserUpdateData, PermissionScope } from "@/lib/types";
 
@@ -771,6 +772,13 @@ export default function UserDetail() {
             </Card>
           </div>
         </div>
+
+        {/* live + playback location tracking for this user (admins) */}
+        <UserLocationMap
+          userUuid={user.uuid}
+          username={user.username}
+          trackLocation={user.track_location}
+        />
         </div>
       </div>
     </AppLayout>
