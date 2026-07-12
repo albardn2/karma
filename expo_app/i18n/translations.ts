@@ -183,6 +183,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     'stopdetail.stop': 'Stop',
     'stopdetail.unfulfilled': 'Unfulfilled',
     'stopdetail.unpaid': 'Unpaid',
+    'stopdetail.stopCompleted': '✓ Stop completed',
     // createorder
     'createorder.addItem': '+ Add item',
     'createorder.createError': 'Could not create the order',
@@ -529,6 +530,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     'stopdetail.stop': 'محطة',
     'stopdetail.unfulfilled': 'غير مُسلَّم',
     'stopdetail.unpaid': 'غير مدفوع',
+    'stopdetail.stopCompleted': '✓ اكتملت المحطة',
     // createorder
     'createorder.addItem': '+ إضافة صنف',
     'createorder.createError': 'تعذر إنشاء الطلب',

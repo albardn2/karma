@@ -50,6 +50,7 @@ export default function StopDetailScreen() {
 
   const [fields, setFields] = useState<Field[]>([]);
   const [values, setValues] = useState<Record<string, any>>({});
+  const [exeStatus, setExeStatus] = useState<string | null>(null);
   const [balance, setBalance] = useState<Record<string, number> | null>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,18 +64,29 @@ export default function StopDetailScreen() {
   useEffect(() => {
     (async () => {
       if (!taskUuid || !customerUuid) { setLoading(false); return; }
-      const [taskRes, custRes, ordersRes] = await Promise.all([
+      const [taskRes, custRes, ordersRes, exeRes] = await Promise.all([
         apiCall<any>(`/task/${taskUuid}`),
         apiCall<any>(`/customer/${customerUuid}`),
         apiCall<any>(`/customer-order/?customer_uuid=${customerUuid}&per_page=50`),
+        taskExecutionUuid ? apiCall<any>(`/task-execution/${taskExecutionUuid}`) : Promise.resolve({ data: null } as any),
       ]);
       const f: Field[] = taskRes.data?.task_inputs?.fields || [];
       setFields(f);
+      const exe = exeRes.data;
+      const isCompleted = exe?.status === 'completed';
+      // completing a stop stores the form keyed by field LABEL
+      const savedResult: Record<string, any> = exe?.result || {};
+      setExeStatus(exe?.status || null);
       setValues((prev) => {
-        // keep any in-progress edits across focus refreshes
-        if (Object.keys(prev).length) return prev;
+        // keep any in-progress edits across focus refreshes; a completed stop
+        // always shows what was submitted
+        if (!isCompleted && Object.keys(prev).length) return prev;
         const init: Record<string, any> = {};
-        for (const x of f) init[x.name] = x.type === 'checklist' ? [] : '';
+        for (const x of f) {
+          const saved = savedResult[x.label] ?? savedResult[x.name];
+          if (x.type === 'checklist') init[x.name] = Array.isArray(saved) ? saved : [];
+          else init[x.name] = saved == null ? '' : String(saved);
+        }
         return init;
       });
       setBalance(custRes.data?.balance_per_currency || {});
@@ -131,17 +143,24 @@ export default function StopDetailScreen() {
     }
   };
 
+  const completed = exeStatus === 'completed';
+
   const renderField = (f: Field) => {
     if (f.type === 'select') {
       const value = values[f.name];
       return (
         <View key={f.name} style={styles.fieldBlock}>
           <ThemedText style={styles.fieldLabel}>{tef(f.label)}{f.required ? ' *' : ''}</ThemedText>
-          <TouchableOpacity style={styles.dropdown} onPress={() => setPickerField(f.name)} testID={`select-${f.name}`}>
+          <TouchableOpacity
+            style={styles.dropdown}
+            onPress={() => setPickerField(f.name)}
+            disabled={completed}
+            testID={`select-${f.name}`}
+          >
             <ThemedText style={[styles.dropdownText, !value && styles.dropdownPlaceholder]} numberOfLines={1}>
               {value ? te(value) : (f.placeholder || t('stopdetail.selectPlaceholder'))}
             </ThemedText>
-            <ThemedText style={styles.caret}>▾</ThemedText>
+            {!completed && <ThemedText style={styles.caret}>▾</ThemedText>}
           </TouchableOpacity>
         </View>
       );
@@ -155,7 +174,7 @@ export default function StopDetailScreen() {
             {(f.options || []).map((opt) => {
               const active = selected.includes(opt);
               return (
-                <TouchableOpacity key={opt} style={[styles.chip, active && styles.chipActive]} onPress={() => toggleChecklist(f.name, opt)}>
+                <TouchableOpacity key={opt} style={[styles.chip, active && styles.chipActive]} onPress={() => toggleChecklist(f.name, opt)} disabled={completed}>
                   <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>{active ? '✓ ' : ''}{te(opt)}</ThemedText>
                 </TouchableOpacity>
               );
@@ -174,6 +193,7 @@ export default function StopDetailScreen() {
           keyboardType={f.type === 'number' ? 'numeric' : 'default'}
           placeholder={f.placeholder || ''}
           placeholderTextColor="#9ca3af"
+          editable={!completed}
           testID={`input-${f.name}`}
         />
       </View>
@@ -251,14 +271,20 @@ export default function StopDetailScreen() {
           <View style={styles.divider} />
           {fields.map(renderField)}
 
-          <TouchableOpacity
-            style={[styles.completeBtn, submitting && styles.completeDisabled]}
-            onPress={complete}
-            disabled={submitting}
-            testID="button-complete-stop"
-          >
-            {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.completeText}>{t('stopdetail.completeStop')}</ThemedText>}
-          </TouchableOpacity>
+          {completed ? (
+            <View style={styles.completedBanner} testID="stop-completed-banner">
+              <ThemedText style={styles.completedBannerText}>{t('stopdetail.stopCompleted')}</ThemedText>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.completeBtn, submitting && styles.completeDisabled]}
+              onPress={complete}
+              disabled={submitting}
+              testID="button-complete-stop"
+            >
+              {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.completeText}>{t('stopdetail.completeStop')}</ThemedText>}
+            </TouchableOpacity>
+          )}
         </ScrollView>
       )}
 
@@ -325,6 +351,8 @@ const styles = StyleSheet.create({
   completeBtn: { marginTop: 8, backgroundColor: '#5469D4', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   completeDisabled: { opacity: 0.6 },
   completeText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  completedBanner: { marginTop: 8, backgroundColor: '#D1FAE5', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+  completedBannerText: { color: '#047857', fontSize: 16, fontWeight: '700' },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '70%', paddingBottom: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.1)' },
