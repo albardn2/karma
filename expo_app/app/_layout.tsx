@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { LocationTrackingProvider } from '@/contexts/LocationTrackingContext';
 
 function NavigationContent() {
   const { isAuthenticated, loading } = useAuth();
@@ -57,10 +58,12 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <LanguageProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <NavigationContent />
-          <StatusBar style="auto" />
-        </ThemeProvider>
+        <LocationTrackingProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <NavigationContent />
+            <StatusBar style="auto" />
+          </ThemeProvider>
+        </LocationTrackingProvider>
       </LanguageProvider>
     </AuthProvider>
   );
