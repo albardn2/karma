@@ -43,6 +43,9 @@ class User(Base):
     phone_number = Column(String(256), nullable=True)
     language = Column(String(10), nullable=True)
     is_deleted = Column(Boolean, default=False)
+    # location tracking: master switch + live publish cadence (seconds)
+    track_location = Column(Boolean, nullable=False, default=False, server_default=false())
+    location_ping_seconds = Column(Integer, nullable=False, default=15, server_default='15')
 
     # Method to set password securely
     def set_password(self, plaintext_password):
@@ -2076,3 +2079,39 @@ class VehicleInventoryEvent(Base):
             f"<VehicleInventoryEvent(uuid={self.uuid}, type={self.event_type}, "
             f"quantity={self.quantity})>"
         )
+
+
+class LocationPing(Base):
+    """A stored location sample for a tracked user. Points recorded during a
+    trip carry trip_uuid and are kept forever (they belong to the trip);
+    general history points are purged past the configured retention window."""
+    __tablename__ = "location_ping"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_uuid = Column(String(36), ForeignKey("user.uuid"), nullable=False)
+    trip_uuid = Column(String(36), ForeignKey("trip.uuid"), nullable=True)
+    coordinates = Column(Geometry("POINT", srid=4326), nullable=False)
+    recorded_at = Column(DateTime, nullable=False)
+    speed = Column(Float, nullable=True)      # m/s, as reported by the device
+    heading = Column(Float, nullable=True)    # degrees
+    accuracy = Column(Float, nullable=True)   # meters
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    trip = relationship("Trip")
+
+    __table_args__ = (
+        Index("ix_location_ping_user_recorded", "user_uuid", "recorded_at"),
+        Index("ix_location_ping_trip_recorded", "trip_uuid", "recorded_at"),
+    )
+
+
+class LocationTrackingConfig(Base):
+    """Single-row global configuration for location tracking storage."""
+    __tablename__ = "location_tracking_config"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    trip_cadence_seconds = Column(Integer, nullable=False, default=30)
+    history_cadence_seconds = Column(Integer, nullable=False, default=120)
+    history_retention_days = Column(Integer, nullable=False, default=14)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
