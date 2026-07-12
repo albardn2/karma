@@ -16,7 +16,8 @@ import { cn } from "@/lib/utils";
 import type { Trip } from "@/lib/types";
 import { VehicleInventoryChart } from "@/components/vehicles/VehicleInventoryChart";
 import { TripStopsMap } from "@/components/map/TripStopsMap";
-import { LocationPlayback, type PlaybackPoint } from "@/components/location/LocationPlayback";
+import { type PlaybackPoint } from "@/components/location/LocationPlayback";
+import { TripLocationMap } from "@/components/location/TripLocationMap";
 import { Table as TableIcon, Map as MapIcon } from "lucide-react";
 
 export default function TripDetail() {
@@ -503,16 +504,14 @@ export default function TripDetail() {
         {locationData && (
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Location Playback</CardTitle>
+              <CardTitle>Location Tracking</CardTitle>
             </CardHeader>
             <CardContent>
-              {locationData.total_count > 0 ? (
-                <LocationPlayback points={locationData.points} />
-              ) : (
-                <p className="text-sm text-gray-500" data-testid="trip-location-empty">
-                  No location points recorded for this trip.
-                </p>
-              )}
+              <TripLocationMap
+                tripStatus={trip.status}
+                workflowExecutionUuid={trip.workflow_execution_uuid}
+                points={locationData.points}
+              />
             </CardContent>
           </Card>
         )}
