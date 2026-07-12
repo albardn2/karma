@@ -34,7 +34,7 @@ interface LineItem {
 
 export default function CreateOrderScreen() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, te } = useLanguage();
   const { tripStopUuid, customerUuid, customerName } = useLocalSearchParams<{
     tripStopUuid?: string;
     customerUuid?: string;
@@ -153,13 +153,13 @@ export default function CreateOrderScreen() {
                   onPress={() => setCurrency(c)}
                   testID={`currency-${c}`}
                 >
-                  <ThemedText style={[styles.chipText, currency === c && styles.chipTextActive]}>{c}</ThemedText>
+                  <ThemedText style={[styles.chipText, currency === c && styles.chipTextActive]}>{te(c)}</ThemedText>
                 </TouchableOpacity>
               ))}
             </View>
             <View style={styles.totalWrap}>
               <ThemedText style={styles.totalLabel}>{t('createorder.total')}</ThemedText>
-              <ThemedText style={styles.totalValue}>{total.toFixed(2)} {currency}</ThemedText>
+              <ThemedText style={styles.totalValue}>{total.toFixed(2)} {te(currency)}</ThemedText>
             </View>
           </View>
 

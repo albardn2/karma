@@ -36,7 +36,7 @@ interface CustomerRow {
 
 export default function AddStopScreen() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, te } = useLanguage();
   const { executionUuid } = useLocalSearchParams<{ executionUuid?: string }>();
 
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
@@ -270,7 +270,7 @@ export default function AddStopScreen() {
                   onPress={() => setNewCustomer((p) => ({ ...p, category: c }))}
                   testID={`category-${c}`}
                 >
-                  <ThemedText style={[styles.chipText, newCustomer.category === c && styles.chipTextActive]}>{c}</ThemedText>
+                  <ThemedText style={[styles.chipText, newCustomer.category === c && styles.chipTextActive]}>{te(c)}</ThemedText>
                 </TouchableOpacity>
               ))}
             </View>

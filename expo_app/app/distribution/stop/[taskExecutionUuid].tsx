@@ -38,7 +38,7 @@ const fmt = (s?: string | null) => {
 
 export default function StopDetailScreen() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, te, tef } = useLanguage();
   const { taskExecutionUuid, taskUuid, tripStopUuid, customerUuid, customerName } =
     useLocalSearchParams<{
       taskExecutionUuid?: string;
@@ -139,7 +139,7 @@ export default function StopDetailScreen() {
           <ThemedText style={styles.fieldLabel}>{f.label}{f.required ? ' *' : ''}</ThemedText>
           <TouchableOpacity style={styles.dropdown} onPress={() => setPickerField(f.name)} testID={`select-${f.name}`}>
             <ThemedText style={[styles.dropdownText, !value && styles.dropdownPlaceholder]} numberOfLines={1}>
-              {value || f.placeholder || t('stopdetail.selectPlaceholder')}
+              {value ? te(value) : (f.placeholder || t('stopdetail.selectPlaceholder'))}
             </ThemedText>
             <ThemedText style={styles.caret}>▾</ThemedText>
           </TouchableOpacity>
@@ -156,7 +156,7 @@ export default function StopDetailScreen() {
               const active = selected.includes(opt);
               return (
                 <TouchableOpacity key={opt} style={[styles.chip, active && styles.chipActive]} onPress={() => toggleChecklist(f.name, opt)}>
-                  <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>{active ? '✓ ' : ''}{opt}</ThemedText>
+                  <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>{active ? '✓ ' : ''}{te(opt)}</ThemedText>
                 </TouchableOpacity>
               );
             })}
@@ -207,7 +207,7 @@ export default function StopDetailScreen() {
               ) : (
                 Object.entries(balance).map(([cur, amt]) => (
                   <View key={cur} style={[styles.balanceBadge, Number(amt) > 0 ? styles.owed : styles.clear]}>
-                    <ThemedText style={styles.balanceBadgeText}>{Number(amt).toFixed(2)} {cur}</ThemedText>
+                    <ThemedText style={styles.balanceBadgeText}>{Number(amt).toFixed(2)} {te(cur)}</ThemedText>
                   </View>
                 ))
               )}
@@ -274,7 +274,7 @@ export default function StopDetailScreen() {
                 const active = pickerField ? values[pickerField] === opt : false;
                 return (
                   <TouchableOpacity key={opt} style={styles.modalOption} onPress={() => { if (pickerField) setValue(pickerField, opt); setPickerField(null); }} testID={`picker-opt-${opt}`}>
-                    <ThemedText style={[styles.modalOptionText, active && styles.modalOptionActive]}>{active ? '✓ ' : ''}{opt}</ThemedText>
+                    <ThemedText style={[styles.modalOptionText, active && styles.modalOptionActive]}>{active ? '✓ ' : ''}{te(opt)}</ThemedText>
                   </TouchableOpacity>
                 );
               })}

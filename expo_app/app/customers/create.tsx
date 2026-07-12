@@ -25,7 +25,7 @@ interface CustomerForm {
 
 export default function CreateCustomerScreen() {
   const insets = useSafeAreaInsets();
-  const { t } = useLanguage();
+  const { t, tef } = useLanguage();
   const [form, setForm] = useState<CustomerForm>({
     full_name: '',
     email_address: '',
@@ -316,7 +316,7 @@ export default function CreateCustomerScreen() {
                   style={[styles.categoryButton, form.category===cat && styles.activeCategoryButton]}
                   onPress={()=>updateForm('category',cat as any)}>
                   <ThemedText style={[styles.categoryButtonText, form.category===cat && styles.activeCategoryButtonText]}>
-                    {cat.charAt(0).toUpperCase()+cat.slice(1)}
+                    {tef(cat)}
                   </ThemedText>
                 </TouchableOpacity>
               ))}

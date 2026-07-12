@@ -42,7 +42,7 @@ type ViewMode = 'list' | 'map';
 export default function CustomersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { t } = useLanguage();
+  const { t, tef } = useLanguage();
   const { deleted, message } = useLocalSearchParams<{ deleted?: string; message?: string }>();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -332,7 +332,7 @@ export default function CustomersScreen() {
         <View style={styles.categoryColumn}>
           <View style={[styles.categoryBadge, { backgroundColor: '#5469D4' }]}>
             <ThemedText style={styles.categoryText}>
-              {customer.category.charAt(0).toUpperCase() + customer.category.slice(1)}
+              {tef(customer.category)}
             </ThemedText>
           </View>
         </View>
@@ -417,7 +417,7 @@ export default function CustomersScreen() {
               styles.filterButtonText,
               categoryFilter === category && styles.activeFilterButtonText
             ]}>
-              {category === 'all' ? t('customers.all') : category.charAt(0).toUpperCase() + category.slice(1)}
+              {category === 'all' ? t('customers.all') : tef(category)}
             </ThemedText>
           </TouchableOpacity>
         ))}
@@ -731,7 +731,7 @@ export default function CustomersScreen() {
                     activeOpacity={0.7}
                   >
                     <ThemedText style={[styles.dropdownText, !filters.category && styles.placeholderText]}>
-                      {filters.category ? filters.category.charAt(0).toUpperCase() + filters.category.slice(1) : t('customers.selectCategory')}
+                      {filters.category ? tef(filters.category) : t('customers.selectCategory')}
                     </ThemedText>
                     <ThemedText style={styles.dropdownArrow}>
                       {showCategoryDropdown ? '▲' : '▼'}
@@ -760,7 +760,7 @@ export default function CustomersScreen() {
                           activeOpacity={0.7}
                         >
                           <ThemedText style={styles.dropdownOptionText}>
-                            {category.charAt(0).toUpperCase() + category.slice(1)}
+                            {tef(category)}
                           </ThemedText>
                         </TouchableOpacity>
                       ))}

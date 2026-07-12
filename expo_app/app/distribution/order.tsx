@@ -16,7 +16,7 @@ import { apiCall } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function OrderActionsScreen() {
-  const { t } = useLanguage();
+  const { t, te } = useLanguage();
   const router = useRouter();
   const { orderUuid, tripStopUuid } = useLocalSearchParams<{ orderUuid?: string; tripStopUuid?: string }>();
 
@@ -130,9 +130,9 @@ export default function OrderActionsScreen() {
 
           {/* totals */}
           <View style={styles.totals}>
-            <View style={styles.totalLine}><ThemedText style={styles.totalKey}>{t('order.total')}</ThemedText><ThemedText>{invoice?.total_amount ?? order.total_adjusted_amount ?? 0} {currency}</ThemedText></View>
-            <View style={styles.totalLine}><ThemedText style={styles.totalKey}>{t('order.totalPaid')}</ThemedText><ThemedText>{invoice?.net_amount_paid ?? order.net_amount_paid ?? 0} {currency}</ThemedText></View>
-            <View style={styles.totalLine}><ThemedText style={styles.totalKeyBold}>{t('order.due')}</ThemedText><ThemedText style={styles.totalKeyBold}>{amountDue} {currency}</ThemedText></View>
+            <View style={styles.totalLine}><ThemedText style={styles.totalKey}>{t('order.total')}</ThemedText><ThemedText>{invoice?.total_amount ?? order.total_adjusted_amount ?? 0} {te(currency)}</ThemedText></View>
+            <View style={styles.totalLine}><ThemedText style={styles.totalKey}>{t('order.totalPaid')}</ThemedText><ThemedText>{invoice?.net_amount_paid ?? order.net_amount_paid ?? 0} {te(currency)}</ThemedText></View>
+            <View style={styles.totalLine}><ThemedText style={styles.totalKeyBold}>{t('order.due')}</ThemedText><ThemedText style={styles.totalKeyBold}>{amountDue} {te(currency)}</ThemedText></View>
           </View>
 
           {/* actions */}
@@ -146,7 +146,7 @@ export default function OrderActionsScreen() {
               )}
               {canPay && (
                 <View style={styles.toggleRow}>
-                  <ThemedText style={styles.toggleLabel}>{t('order.markPaid', { amount: amountDue, currency })}</ThemedText>
+                  <ThemedText style={styles.toggleLabel}>{t('order.markPaid', { amount: amountDue, currency: te(currency) })}</ThemedText>
                   <Switch value={doPay} onValueChange={setDoPay} trackColor={{ true: '#5469D4' }} testID="toggle-pay" />
                 </View>
               )}

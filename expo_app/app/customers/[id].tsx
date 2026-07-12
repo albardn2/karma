@@ -79,7 +79,7 @@ const InfoRow: React.FC<InfoRowProps> = ({
     locationLoading = false,
     onGetLocation
   }) => {
-  const { t } = useLanguage();
+  const { t, tef } = useLanguage();
   const isCoordinatesField = fieldName === 'coordinates';
   const copyToClipboard = async (text: string) => {
     if (!text || text === t('custdetail.notProvided')) return;
@@ -176,7 +176,7 @@ export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { t } = useLanguage();
+  const { t, tef } = useLanguage();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [screenData, setScreenData] = useState(Dimensions.get("window"));
@@ -557,8 +557,7 @@ export default function CustomerDetailScreen() {
           ]}
         >
           <ThemedText style={styles.categoryText}>
-            {customer.category.charAt(0).toUpperCase() +
-              customer.category.slice(1)}
+            {tef(customer.category)}
           </ThemedText>
         </View>
       );
@@ -599,7 +598,7 @@ export default function CustomerDetailScreen() {
                   styles.activeCategoryOptionText,
               ]}
             >
-              {category.charAt(0).toUpperCase() + category.slice(1)}
+              {tef(category)}
             </ThemedText>
           </TouchableOpacity>
         ))}

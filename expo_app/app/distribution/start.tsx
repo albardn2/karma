@@ -42,19 +42,10 @@ interface Field {
   placeholder?: string | null;
 }
 
-// prettier labels than the raw snake_case field names
-const prettyLabel = (name: string) =>
-  name
-    .replace(/_/g, ' ')
-    .replace(/\buuid\b/i, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^\w/, (c) => c.toUpperCase());
-
 export default function StartTripScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, te, tef } = useLanguage();
 
   const [workflowUuid, setWorkflowUuid] = useState<string | null>(null);
   const [fields, setFields] = useState<Field[]>([]);
@@ -212,7 +203,7 @@ export default function StartTripScreen() {
       return (
         <View key={f.name} style={styles.fieldBlock}>
           <ThemedText style={styles.fieldLabel}>
-            {prettyLabel(f.name)}
+            {tef(f.name)}
           </ThemedText>
           <View style={styles.chipWrap}>
             {(f.options || []).map((opt) => {
@@ -225,7 +216,7 @@ export default function StartTripScreen() {
                   testID={`opt-${f.name}-${opt}`}
                 >
                   <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
-                    {opt}
+                    {f.name === 'customer_categories' ? te(opt) : opt}
                   </ThemedText>
                 </TouchableOpacity>
               );
@@ -241,7 +232,7 @@ export default function StartTripScreen() {
       const selected: string[] = values[f.name] || [];
       return (
         <View key={f.name} style={styles.fieldBlock}>
-          <ThemedText style={styles.fieldLabel}>{prettyLabel(f.name)}</ThemedText>
+          <ThemedText style={styles.fieldLabel}>{tef(f.name)}</ThemedText>
           <View style={styles.chipWrap}>
             {(f.options || []).map((opt) => {
               const active = selected.includes(opt);
@@ -253,7 +244,7 @@ export default function StartTripScreen() {
                   testID={`opt-${f.name}-${opt}`}
                 >
                   <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
-                    {active ? '✓ ' : ''}{opt}
+                    {active ? '✓ ' : ''}{f.name === 'customer_categories' ? te(opt) : opt}
                   </ThemedText>
                 </TouchableOpacity>
               );
@@ -265,7 +256,7 @@ export default function StartTripScreen() {
     // text / number
     return (
       <View key={f.name} style={styles.fieldBlock}>
-        <ThemedText style={styles.fieldLabel}>{prettyLabel(f.name)}</ThemedText>
+        <ThemedText style={styles.fieldLabel}>{tef(f.name)}</ThemedText>
         <TextInput
           style={styles.input}
           value={String(values[f.name] ?? '')}
