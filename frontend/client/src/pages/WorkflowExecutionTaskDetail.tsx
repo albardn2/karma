@@ -67,7 +67,7 @@ export default function WorkflowExecutionTaskDetail() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Fetch workflow execution details (includes task_executions)
-  const { data: workflowExecution, isLoading: executionLoading } = useQuery<WorkflowExecution>({
+  const { data: workflowExecution, isLoading: executionLoading, error: executionError } = useQuery<WorkflowExecution>({
     queryKey: ["/workflow-execution/", executionUuid],
     queryFn: async () => {
       return await apiRequest(`/workflow-execution/${executionUuid}`);
@@ -1144,6 +1144,25 @@ export default function WorkflowExecutionTaskDetail() {
             <div className="flex justify-center items-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>
+          ) : executionError || !workflowExecution ? (
+            <Card>
+              <CardContent className="pt-6 text-center space-y-3">
+                <AlertCircle className="h-10 w-10 text-gray-400 mx-auto" />
+                <p className="font-medium text-gray-900 dark:text-gray-100">
+                  This workflow execution could not be loaded.
+                </p>
+                <p className="text-sm text-gray-500" data-testid="text-execution-not-found">
+                  It may have been deleted, or the link is out of date.
+                  {executionError ? ` (${executionError.message})` : ""}
+                </p>
+                <Link href={`/workflow-execution/${workflowUuid}`}>
+                  <Button variant="outline" data-testid="button-back-to-executions">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to executions
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
           ) : (
             <>
               {/* Workflow Execution Info */}
