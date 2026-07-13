@@ -17,7 +17,7 @@ import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-const CURRENCIES = ['USD', 'SYP'];
+const CURRENCIES = ['SYP', 'USD'];
 
 interface Material {
   uuid: string;
@@ -41,7 +41,7 @@ export default function CreateOrderScreen() {
     customerName?: string;
   }>();
 
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState('SYP');
   const [items, setItems] = useState<LineItem[]>([{ material_uuid: '', quantity: '', price_per_unit: '' }]);
   const [markFulfilled, setMarkFulfilled] = useState(true);
   const [markPaid, setMarkPaid] = useState(true);
