@@ -48,7 +48,7 @@ class WorkflowExecutionDomain:
     def cancel_workflow_execution(
         uow: SqlAlchemyUnitOfWork, uuid: str
     ) -> WorkflowExecutionRead:
-        workflow_execution = uow.workflow_execution_repository.find_one(uuid=uuid)
+        workflow_execution = uow.workflow_execution_repository.find_one(uuid=uuid, is_deleted=False)
         if not workflow_execution:
             raise NotFoundError(f"WorkflowExecution not found with uuid: {uuid}")
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation} from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -38,7 +38,9 @@ import {
   AlertCircle,
   Loader2,
   Ban,
+  Trash2,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { TaskExecutionProgress } from "@/components/TaskExecutionProgress";
 import { TripOperatorMap } from "@/components/map/TripOperatorMap";
@@ -55,11 +57,14 @@ import type { TaskInputField, FieldType } from "@/types/taskInputs";
 
 export default function WorkflowExecutionTaskDetail() {
   const [, params] = useRoute("/workflow-execution/:workflow_uuid/:execution_uuid");
+  const [, setLocation] = useLocation();
   const workflowUuid = params?.workflow_uuid || "";
   const executionUuid = params?.execution_uuid || "";
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const [selectedTaskExecutionUuid, setSelectedTaskExecutionUuid] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Fetch workflow execution details (includes task_executions)
   const { data: workflowExecution, isLoading: executionLoading } = useQuery<WorkflowExecution>({
@@ -361,6 +366,29 @@ export default function WorkflowExecutionTaskDetail() {
         variant: "destructive",
       });
       setShowCancelDialog(false);
+    },
+  });
+
+  // Soft-delete workflow execution (admins only)
+  const deleteExecutionMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest(`/workflow-execution/${executionUuid}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/workflow-execution/"] });
+      queryClient.invalidateQueries({ queryKey: ["/trip/"] });
+      toast({ title: "Execution deleted" });
+      setLocation(`/workflow-execution/${workflowUuid}`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete execution",
+        description: error.message,
+        variant: "destructive",
+      });
+      setShowDeleteDialog(false);
     },
   });
 
@@ -1069,12 +1097,48 @@ export default function WorkflowExecutionTaskDetail() {
                     {cancelExecutionMutation.isPending ? "Cancelling..." : "Cancel Execution"}
                   </Button>
                 )}
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={() => setShowDeleteDialog(true)}
+                    disabled={deleteExecutionMutation.isPending}
+                    data-testid="button-delete-execution"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {deleteExecutionMutation.isPending ? "Deleting..." : "Delete"}
+                  </Button>
+                )}
                 <Badge variant={getStatusBadgeVariant(workflowExecution.status)}>
                   {workflowExecution.status}
                 </Badge>
               </div>
             )}
           </div>
+
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this execution?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  The execution and any trip it created will be removed from all lists.
+                  This cannot be undone from the app.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete-execution">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700"
+                  disabled={deleteExecutionMutation.isPending}
+                  onClick={() => deleteExecutionMutation.mutate()}
+                  data-testid="button-confirm-delete-execution"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {isLoading ? (
             <div className="flex justify-center items-center h-64">

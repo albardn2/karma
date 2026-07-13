@@ -51,6 +51,12 @@ def list_task_executions():
     if params.end_time:
         filters.append(TaskExecutionModel.end_time <= params.end_time)
 
+    # never list children of a soft-deleted execution
+    from models.common import WorkflowExecution as WorkflowExecutionModel
+    filters.append(
+        TaskExecutionModel.workflow_execution.has(WorkflowExecutionModel.is_deleted.is_(False))
+    )
+
     with SqlAlchemyUnitOfWork() as uow:
         page = uow.task_execution_repository.find_all_by_filters_paginated(
             filters=filters,
@@ -114,7 +120,7 @@ def list_task_operators():
 def get_task_execution(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         task_exe = uow.task_execution_repository.find_one(uuid=uuid)
-        if not task_exe:
+        if not task_exe or (task_exe.workflow_execution and task_exe.workflow_execution.is_deleted):
             raise NotFoundError(f"task_exe not found with uuid: {uuid}")
 
         dto = TaskExecutionRead.from_orm(task_exe).model_dump(mode="json")

@@ -113,6 +113,8 @@ class Ingestor:
             .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
             .filter(
                 TripModel.status == "in_progress",
+                TripModel.is_deleted.is_(False),
+                WFEModel.is_deleted.is_(False),
                 TaskModel.operator == "start_trip_operator",
                 TaskExecutionModel.result["assigned_user_uuid"].astext.in_(values),
             )

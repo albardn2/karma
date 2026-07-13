@@ -18,6 +18,7 @@ import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { apiCall } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { formatMonthDayTime } from '@/utils/date';
 
 const TRIP_WORKFLOW_NAME = 'simple_trip_workflow';
 
@@ -73,12 +74,7 @@ const toDate = (s?: string | null) => {
 const formatDateTime = (s?: string | null) => {
   const d = toDate(s);
   if (!d) return '—';
-  return d.toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatMonthDayTime(d);
 };
 
 export default function DistributionScreen() {

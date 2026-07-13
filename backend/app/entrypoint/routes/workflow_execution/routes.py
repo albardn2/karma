@@ -145,7 +145,7 @@ def create_workflow_execution():
     PermissionScope.SALES.value)
 def get_workflow_execution(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
-        workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid)
+        workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid, is_deleted=False)
         if not workflow_exe:
             raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
 
@@ -177,7 +177,7 @@ def add_manual_stop(uuid: str):
     current_uuid = get_jwt_identity()
     payload = ManualStopCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
-        workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid)
+        workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid, is_deleted=False)
         if not workflow_exe:
             raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
         _assert_execution_access(uow, workflow_exe)
@@ -327,7 +327,7 @@ def set_current_stop(uuid: str):
 
     params = SetCurrentStopParams(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
-        workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid)
+        workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid, is_deleted=False)
         if not workflow_exe:
             raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
         _assert_execution_access(uow, workflow_exe)
@@ -477,6 +477,7 @@ def list_workflow_executions():
             if target:
                 filters.append(owned_or_assigned_filter(target))
 
+        filters.append(WorkflowExecutionModel.is_deleted.is_(False))
         page = uow.workflow_execution_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
@@ -524,3 +525,37 @@ def list_workflow_status():
 
     values = [cat.value for cat in WorkflowStatus]
     return jsonify(values), 200
+
+
+@workflow_execution_blueprint.route("/<string:uuid>", methods=["DELETE"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+)
+def delete_workflow_execution(uuid: str):
+    """Soft-delete a workflow execution (admins only). An active execution is
+    cancelled first (trips, stops and task executions included) so the deleted
+    execution is inert, not just hidden. Its trips are soft-deleted with it."""
+    from app.domains.trip.domain import TripDomain
+    from app.dto.trip import TripStatus
+
+    with SqlAlchemyUnitOfWork() as uow:
+        workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid, is_deleted=False)
+        if not workflow_exe:
+            raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
+
+        if workflow_exe.status not in (
+            WorkflowStatus.COMPLETED.value, WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value
+        ):
+            WorkflowExecutionDomain.cancel_workflow_execution(uow=uow, uuid=uuid)
+
+        workflow_exe.is_deleted = True
+        uow.workflow_execution_repository.save(model=workflow_exe, commit=False)
+        for trip in workflow_exe.trips or []:
+            if trip.status not in (TripStatus.COMPLETED.value, TripStatus.CANCELLED.value):
+                TripDomain.cancel_trip(uow=uow, uuid=trip.uuid)
+            trip.is_deleted = True
+            uow.trip_repository.save(model=trip, commit=False)
+        uow.commit()
+    return jsonify({"uuid": uuid, "is_deleted": True}), 200

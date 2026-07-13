@@ -53,6 +53,8 @@ def create_trip_stop():
 def get_trip_stop(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         m = uow.trip_stop_repository.find_one(uuid=uuid)
+        if m and m.trip and m.trip.is_deleted:
+            m = None
         if not m:
             raise NotFoundError("TripStop not found")
         dto = TripStopRead.from_orm(m).model_dump(mode="json")
@@ -117,6 +119,8 @@ def list_trip_stops():
         filters.append(func.ST_Intersects(TripStopModel.coordinates, geom_expr))
 
     with SqlAlchemyUnitOfWork() as uow:
+        from models.common import Trip as TripModel
+        filters.append(TripStopModel.trip.has(TripModel.is_deleted.is_(False)))
         page = uow.trip_stop_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,

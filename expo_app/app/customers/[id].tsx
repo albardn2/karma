@@ -24,6 +24,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { formatMonthDayTime, formatNumericDate } from '@/utils/date';
 
 interface Customer {
   uuid: string;
@@ -487,11 +488,7 @@ export default function CustomerDetailScreen() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    return formatNumericDate(new Date(dateString));
   };
 
   const getTotalBalance = () => {
