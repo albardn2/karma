@@ -85,7 +85,10 @@ def delete_material(uuid: str):
 @jwt_required()
 @scopes_required(PermissionScope.ADMIN.value,
                  PermissionScope.SUPER_ADMIN.value,
-                 PermissionScope.OPERATION_MANAGER.value)
+                 PermissionScope.OPERATION_MANAGER.value,
+                 # drivers/sales pick materials when creating an order at a trip stop
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.SALES.value)
 def list_materials():
     # Parse & validate pagination params
     params = MaterialListParams(**request.args)

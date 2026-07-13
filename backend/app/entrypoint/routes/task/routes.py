@@ -43,7 +43,11 @@ def create_task():
     PermissionScope.ADMIN.value,
     PermissionScope.SUPER_ADMIN.value,
     PermissionScope.OPERATION_MANAGER.value,
-    PermissionScope.OPERATOR.value)
+    PermissionScope.OPERATOR.value,
+    # the mobile trip screen reads each stop's task; assignees can be
+    # drivers or sales (same audience as the workflow-execution routes)
+    PermissionScope.DRIVER.value,
+    PermissionScope.SALES.value)
 def get_task(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         task = uow.task_repository.find_one(uuid=uuid, is_deleted=False)
