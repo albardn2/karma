@@ -53,6 +53,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Free disk on server (before any file copies)
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.FRONTEND_PROD_DROPLET_HOST }}
+          username: root
+          password: ${{ secrets.FRONTEND_PROD_DROPLET_PASSWORD }}
+          port: 22
+          script: |
+            docker image prune -af || true
+            docker builder prune -af || true
+            docker container prune -f || true
+            journalctl --vacuum-size=100M || true
+            df -h /
+
       - name: Copy compose to prod server
         uses: appleboy/scp-action@v0.1.7
         with:
