@@ -8,6 +8,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   loading: boolean;
   user: any;
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,7 +16,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     // when a token refresh fails mid-session, drop straight to the login screen
@@ -164,8 +165,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const scopes = String(user?.permission_scope ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const isAdmin = scopes.includes('admin') || scopes.includes('superuser');
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout, loading, user }}>
+    <AuthContext.Provider value={{ isAuthenticated, login, logout, loading, user, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

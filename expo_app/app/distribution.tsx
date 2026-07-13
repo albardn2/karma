@@ -204,7 +204,7 @@ export default function DistributionScreen() {
       <NativeHeader
         title={t('dist.title')}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-        rightButton={{ label: t('dist.startTripButton'), onPress: handleStartTrip }}
+        rightButton={isAdmin ? { label: t('dist.startTripButton'), onPress: handleStartTrip } : undefined}
       />
 
       {/* Status filter chips */}
