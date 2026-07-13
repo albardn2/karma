@@ -705,9 +705,11 @@ export default function WorkflowExecutionTaskDetail() {
   };
   const orderContext = getTripStopOrderContext();
 
-  // manual-stops mode: when checked on the start_trip form, hide the routing inputs
+  // manual-stops mode: when checked on the start_trip form, hide the routing
+  // inputs. service_areas intentionally stays visible: manual trips also carry
+  // a service area (parity with the mobile app's start-trip form).
   const ROUTING_FIELD_NAMES = new Set([
-    "service_areas", "start_warehouse_name", "end_warehouse_name", "start_point", "end_point",
+    "start_warehouse_name", "end_warehouse_name", "start_point", "end_point",
     "customer_categories", "last_visit_threshold_days", "max_stops", "min_stops",
   ]);
   const manualStopsValue = form.watch("manual_stops" as any);
