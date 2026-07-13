@@ -25,6 +25,7 @@
     }
   },
   "submit": {
+    "local": {},
     "preview": {
       "ios": {
         "ascAppId": "${ASC_APP_ID}",
