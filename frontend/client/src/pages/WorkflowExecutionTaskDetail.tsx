@@ -209,7 +209,20 @@ export default function WorkflowExecutionTaskDetail() {
         // Results are stored as label:value, so find the value by label
         const existingValue = selectedTaskExecution.result[field.label];
         if (existingValue !== undefined && existingValue !== null) {
-          defaults[field.name] = existingValue;
+          // stored results may not match the field shape (e.g. the backend
+          // persists checklist manual_stops as a boolean) — coerce, or the
+          // checklist renderer crashes calling .includes on a non-array
+          if (field.type === 'checklist') {
+            defaults[field.name] = Array.isArray(existingValue)
+              ? existingValue
+              : existingValue === true
+                ? (field.options?.length ? [field.options[0]] : [])
+                : typeof existingValue === 'string' && existingValue
+                  ? [existingValue]
+                  : [];
+          } else {
+            defaults[field.name] = existingValue;
+          }
           return;
         }
       }
@@ -814,9 +827,9 @@ export default function WorkflowExecutionTaskDetail() {
                           <FormControl>
                             <Checkbox
                               data-testid={`checkbox-${key}-${option}`}
-                              checked={(formField.value as string[])?.includes(option)}
+                              checked={Array.isArray(formField.value) && (formField.value as string[]).includes(option)}
                               onCheckedChange={(checked) => {
-                                const current = formField.value as string[] || [];
+                                const current = Array.isArray(formField.value) ? (formField.value as string[]) : [];
                                 if (checked) {
                                   formField.onChange([...current, option]);
                                 } else {
