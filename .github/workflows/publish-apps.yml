@@ -103,7 +103,6 @@ jobs:
       - name: Submit iOS to App Store
         if: contains(fromJSON('["all","ios"]'), github.event.inputs.platforms)
         env:
-          ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
           APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}

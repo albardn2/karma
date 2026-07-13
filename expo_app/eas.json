@@ -28,7 +28,7 @@
     "local": {},
     "preview": {
       "ios": {
-        "ascAppId": "${ASC_APP_ID}",
+        "ascAppId": "6753890262",
         "ascApiKeyId": "${APPLE_API_KEY_ID}",
         "ascApiKeyIssuerId": "${APPLE_API_ISSUER_ID}",
         "ascApiKeyPath": "./asc-api-key.p8"
@@ -41,7 +41,7 @@
     },
     "production": {
       "ios": {
-        "ascAppId": "${ASC_APP_ID}",
+        "ascAppId": "6753890262",
         "ascApiKeyId": "${APPLE_API_KEY_ID}",
         "ascApiKeyIssuerId": "${APPLE_API_ISSUER_ID}",
         "ascApiKeyPath": "./asc-api-key.p8"

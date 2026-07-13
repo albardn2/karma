@@ -131,7 +131,6 @@ jobs:
 
       - name: Submit iOS to TestFlight
         env:
-          ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
           APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
