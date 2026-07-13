@@ -51,7 +51,7 @@ def create_trip():
 )
 def get_trip(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
-        m = uow.trip_repository.find_one(uuid=uuid)
+        m = uow.trip_repository.find_one(uuid=uuid, is_deleted=False)
         if not m:
             raise NotFoundError("Trip not found")
         dto = TripRead.from_orm(m).model_dump(mode="json")
@@ -73,7 +73,7 @@ def get_trip_activity(uuid: str):
     from app.utils.geom_utils import wkt_or_wkb_to_lat_lon
 
     with SqlAlchemyUnitOfWork() as uow:
-        trip = uow.trip_repository.find_one(uuid=uuid)
+        trip = uow.trip_repository.find_one(uuid=uuid, is_deleted=False)
         if not trip:
             raise NotFoundError("Trip not found")
 
@@ -206,6 +206,8 @@ def list_trips():
         geom_expr = func.ST_GeomFromText(params.intersects_area, 4326)
         filters.append(func.ST_Intersects(TripModel.geometry, geom_expr))
 
+    filters.append(TripModel.is_deleted.is_(False))
+
     with SqlAlchemyUnitOfWork() as uow:
         page = uow.trip_repository.find_all_by_filters_paginated(
             filters=filters,
@@ -222,3 +224,48 @@ def list_trips():
             pages=page.pages,
         ).model_dump(mode="json")
     return jsonify(result), 200
+
+
+@trip_blueprint.route("/<string:uuid>", methods=["DELETE"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+)
+def delete_trip(uuid: str):
+    """Soft-delete a trip (admins only). An active trip is cancelled first
+    (stops + task executions included) so the deleted trip is inert, not just
+    hidden. The paired workflow execution is soft-deleted with it — unless it
+    still has other live trips."""
+    from app.domains.workflow_execution.domain import WorkflowExecutionDomain
+    from app.dto.trip import TripStatus
+    from app.dto.workflow_execution import WorkflowStatus
+
+    with SqlAlchemyUnitOfWork() as uow:
+        trip = uow.trip_repository.find_one(uuid=uuid, is_deleted=False)
+        if not trip:
+            raise NotFoundError("Trip not found")
+
+        wfe = (
+            uow.workflow_execution_repository.find_one(uuid=trip.workflow_execution_uuid)
+            if trip.workflow_execution_uuid else None
+        )
+        # cancel anything still running so nothing keeps writing to a deleted trip
+        if wfe and wfe.status not in (
+            WorkflowStatus.COMPLETED.value, WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value
+        ):
+            WorkflowExecutionDomain.cancel_workflow_execution(uow=uow, uuid=wfe.uuid)
+        if trip.status not in (TripStatus.COMPLETED.value, TripStatus.CANCELLED.value):
+            TripDomain.cancel_trip(uow=uow, uuid=trip.uuid)
+
+        trip.is_deleted = True
+        uow.trip_repository.save(model=trip, commit=False)
+        if wfe:
+            live_siblings = [
+                t for t in (wfe.trips or []) if t.uuid != trip.uuid and not t.is_deleted
+            ]
+            if not live_siblings:
+                wfe.is_deleted = True
+                uow.workflow_execution_repository.save(model=wfe, commit=False)
+        uow.commit()
+    return jsonify({"uuid": uuid, "is_deleted": True}), 200

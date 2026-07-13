@@ -8,6 +8,8 @@ interface User {
   lastName: string;
   email?: string;
   permissionScope?: string;
+  /** comma-separated scopes as returned by /auth/me, e.g. "superuser,admin" */
+  permission_scope?: string;
   phoneNumber?: string;
   language?: string;
 }
@@ -18,6 +20,7 @@ interface AuthContextType {
   logout: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -118,12 +121,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const scopes = (user?.permission_scope ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   const value: AuthContextType = {
     user,
     login,
     logout,
     isLoading,
     isAuthenticated: !!user,
+    isAdmin: scopes.includes('admin') || scopes.includes('superuser'),
   };
 
   return (

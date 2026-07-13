@@ -1,10 +1,22 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Truck, Plus } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { Truck, Plus, Trash2 } from "lucide-react";
 import { TripFilters } from "@/components/trips/TripFilters";
 import { AddTripDialog } from "@/components/trips/AddTripDialog";
 import { format } from "date-fns";
@@ -17,6 +29,25 @@ export default function Trips() {
   const [perPage, setPerPage] = useState(20);
   const [activeTab, setActiveTab] = useState('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [deleteTargetUuid, setDeleteTargetUuid] = useState<string | null>(null);
+  const { isAdmin } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const deleteTripMutation = useMutation({
+    mutationFn: (uuid: string) => apiRequest(`/trip/${uuid}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/trip/"] });
+      // the paired workflow execution is soft-deleted too
+      queryClient.invalidateQueries({ queryKey: ["/workflow-execution/"] });
+      if (trips.length === 1 && currentPage > 1) setCurrentPage(currentPage - 1);
+      toast({ title: "Trip deleted" });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Failed to delete trip", description: e.message, variant: "destructive" });
+    },
+    onSettled: () => setDeleteTargetUuid(null),
+  });
 
   const {
     data: tripData,
@@ -235,12 +266,17 @@ export default function Trips() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Created
                   </th>
+                  {isAdmin && (
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-16 text-center">
+                    <td colSpan={isAdmin ? 8 : 7} className="px-6 py-16 text-center">
                       <div className="animate-pulse space-y-4">
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-32 mx-auto"></div>
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-48 mx-auto"></div>
@@ -251,7 +287,7 @@ export default function Trips() {
                   </tr>
                 ) : trips.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-16 text-center">
+                    <td colSpan={isAdmin ? 8 : 7} className="px-6 py-16 text-center">
                       <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                         {error ? "Error loading trips" : "No trips"}
@@ -314,6 +350,22 @@ export default function Trips() {
                           {format(new Date(trip.created_at), 'MMM d, yyyy')}
                         </span>
                       </td>
+                      {isAdmin && (
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-gray-400 hover:text-red-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTargetUuid(trip.uuid);
+                            }}
+                            data-testid={`button-delete-trip-${trip.uuid}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -353,7 +405,30 @@ export default function Trips() {
       </div>
 
       {/* Create Trip Dialog */}
-      <AddTripDialog 
+      <AlertDialog open={!!deleteTargetUuid} onOpenChange={(open) => !open && setDeleteTargetUuid(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this trip?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The trip and its workflow execution will be removed from all lists. This
+              cannot be undone from the app.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-trip">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteTripMutation.isPending}
+              onClick={() => deleteTargetUuid && deleteTripMutation.mutate(deleteTargetUuid)}
+              data-testid="button-confirm-delete-trip"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AddTripDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
         onSuccess={() => {

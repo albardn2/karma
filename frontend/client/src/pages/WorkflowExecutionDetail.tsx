@@ -38,9 +38,21 @@ import {
   XCircle,
   AlertCircle,
   Loader2,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import type { Workflow } from "@shared/schema";
 import type {
@@ -70,6 +82,26 @@ export default function WorkflowExecutionDetail() {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [tempFilters, setTempFilters] = useState(filters);
+  const [deleteTargetUuid, setDeleteTargetUuid] = useState<string | null>(null);
+  const { isAdmin } = useAuth();
+
+  const deleteExecutionMutation = useMutation({
+    mutationFn: (uuid: string) => apiRequest(`/workflow-execution/${uuid}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/workflow-execution/"] });
+      // any trip the execution created is soft-deleted too
+      queryClient.invalidateQueries({ queryKey: ["/trip/"] });
+      toast({ title: "Execution deleted" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete execution",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+    onSettled: () => setDeleteTargetUuid(null),
+  });
 
   // Fetch workflow details
   const { data: workflow } = useQuery<Workflow>({
@@ -326,6 +358,7 @@ export default function WorkflowExecutionDetail() {
                       <TableHead>Ended</TableHead>
                       <TableHead>Duration</TableHead>
                       <TableHead>Tags</TableHead>
+                      {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -366,10 +399,54 @@ export default function WorkflowExecutionDetail() {
                             )}
                           </div>
                         </TableCell>
+                        {isAdmin && (
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-gray-400 hover:text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTargetUuid(execution.uuid);
+                              }}
+                              data-testid={`button-delete-execution-${execution.uuid}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+
+                <AlertDialog
+                  open={!!deleteTargetUuid}
+                  onOpenChange={(open) => !open && setDeleteTargetUuid(null)}
+                >
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this execution?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        The execution and any trip it created will be removed from all
+                        lists. This cannot be undone from the app.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel data-testid="button-cancel-delete-execution">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-red-600 hover:bg-red-700"
+                        disabled={deleteExecutionMutation.isPending}
+                        onClick={() => deleteTargetUuid && deleteExecutionMutation.mutate(deleteTargetUuid)}
+                        data-testid="button-confirm-delete-execution"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
 
                 {/* Pagination */}
                 {totalPages > 1 && (

@@ -22,7 +22,7 @@ class TripDomain:
 
     @staticmethod
     def update_trip(uow: SqlAlchemyUnitOfWork, uuid: str, payload: TripUpdate) -> TripRead:
-        trip = uow.trip_repository.find_one(uuid=uuid)
+        trip = uow.trip_repository.find_one(uuid=uuid, is_deleted=False)
         if not trip:
             raise NotFoundError('Trip not found')
 

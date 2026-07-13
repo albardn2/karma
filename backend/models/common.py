@@ -1739,6 +1739,7 @@ class WorkflowExecution(Base):
     __tablename__ = "workflow_execution"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    is_deleted = Column(Boolean, nullable=False, default=False, server_default=false())
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     workflow_uuid = Column(String(36), ForeignKey("workflow.uuid"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -1877,6 +1878,7 @@ class Trip(Base):
     uuid        = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    is_deleted = Column(Boolean, nullable=False, default=False, server_default=false())
     vehicle_uuid = Column(String(36), ForeignKey("vehicle.uuid"), nullable=False)
     distribution_area = Column(Geometry("POLYGON", srid=4326), nullable=True)  # Area covered by the trip
     notes = Column(Text, nullable=True)

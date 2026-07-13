@@ -105,6 +105,10 @@ class TaskExecutionDomain:
         if task_exe.status in [WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value,WorkflowStatus.NOT_STARTED]:
             raise BadRequestError(f"TaskExecution cannot be completed with status: {task_exe.status}")
 
+        # a soft-deleted execution must be inert, not just hidden
+        if task_exe.workflow_execution and task_exe.workflow_execution.is_deleted:
+            raise NotFoundError(f"TaskExecution not found with uuid: {payload.uuid}")
+
         # execute
         OperatorEntryPoint().execute(
             uow=uow,

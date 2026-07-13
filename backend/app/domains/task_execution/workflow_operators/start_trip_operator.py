@@ -99,6 +99,7 @@ class StartTripOperator(OperatorInterface):
                 .join(TaskModel, TaskModel.uuid == TEModel.task_uuid)
                 .filter(
                     WFEModel.status == WorkflowStatus.IN_PROGRESS.value,
+                    WFEModel.is_deleted.is_(False),
                     WFEModel.uuid != task_exe.workflow_execution_uuid,
                     TaskModel.operator == "start_trip_operator",
                     TEModel.result["assigned_user_uuid"].astext.in_(values),

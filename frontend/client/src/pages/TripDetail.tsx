@@ -9,7 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit3, Save, X, Copy, Check, Truck, Banknote, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Edit3, Save, X, Copy, Check, Truck, Banknote, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -26,6 +37,22 @@ export default function TripDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotes, setEditedNotes] = useState("");
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const { isAdmin } = useAuth();
+
+  const deleteTripMutation = useMutation({
+    mutationFn: () => apiRequest(`/trip/${params?.uuid}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/trip/"] });
+      queryClient.invalidateQueries({ queryKey: ["/workflow-execution/"] });
+      toast({ title: "Trip deleted" });
+      setLocation("/trips");
+    },
+    onError: (e: Error) => {
+      toast({ title: "Failed to delete trip", description: e.message, variant: "destructive" });
+      setConfirmDelete(false);
+    },
+  });
 
   const { data: trip, isLoading, error } = useQuery<Trip>({
     queryKey: ["/trip/", params?.uuid],
@@ -212,11 +239,47 @@ export default function TripDetail() {
               </div>
               <p className="text-gray-500" data-testid="text-header-trip-uuid">Trip UUID: {trip.uuid}</p>
             </div>
-            <Badge className={getStatusBadgeClass(trip.status)} data-testid="badge-status">
-              {formatStatus(trip.status)}
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Badge className={getStatusBadgeClass(trip.status)} data-testid="badge-status">
+                {formatStatus(trip.status)}
+              </Badge>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => setConfirmDelete(true)}
+                  data-testid="button-delete-trip"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Trip
+                </Button>
+              )}
+            </div>
           </div>
         </div>
+
+        <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this trip?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The trip and its workflow execution will be removed from all lists. This
+                cannot be undone from the app.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete-trip">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700"
+                disabled={deleteTripMutation.isPending}
+                onClick={() => deleteTripMutation.mutate()}
+                data-testid="button-confirm-delete-trip"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* General Information */}
