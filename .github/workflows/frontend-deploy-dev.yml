@@ -43,6 +43,11 @@ jobs:
           port: 22
           script: |
             cd /root/app/frontend
+            # Auth to GHCR + reclaim disk before pulling the private image.
+            # Without this, expired creds or a full disk make `pull` silently
+            # no-op and stale code keeps running despite a "successful" deploy.
             echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker image prune -af
+            docker builder prune -af
             docker compose -f docker-compose.dev.yaml pull
             docker compose -f docker-compose.dev.yaml up -d --remove-orphans
