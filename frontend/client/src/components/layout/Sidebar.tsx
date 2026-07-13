@@ -62,11 +62,18 @@ const navigation = [
   { name: "Processes", href: "/processes", icon: Factory },
   { name: "Workflows", href: "/workflows", icon: GitBranch },
   { name: "Workflow Execution", href: "/workflow-execution", icon: Play },
+  // adminOnly entries are filtered out for non-admin users below
+  { name: "Live Map", href: "/live-map", icon: MapPin, adminOnly: true },
+  { name: "Location Tracking", href: "/location-tracking", icon: MapPin, adminOnly: true },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  // /auth/me returns snake_case; the typed camelCase field is never populated
+  const permissionScope = (user as any)?.permissionScope ?? (user as any)?.permission_scope ?? '';
+  const isAdmin = permissionScope.includes('admin') || permissionScope.includes('superuser');
+  const visibleNavigation = navigation.filter((item: any) => !item.adminOnly || isAdmin);
 
   // Prevent body scroll when mobile sidebar is open
   useEffect(() => {
@@ -158,7 +165,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           }}
         >
           <nav className="px-4 py-6 space-y-2">
-            {navigation.map((item) => {
+            {visibleNavigation.map((item) => {
               const isActive = location === item.href;
               return (
                 <Link

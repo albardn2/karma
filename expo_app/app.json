@@ -8,12 +8,10 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.karmagrp.business"
     },
-
     "android": {
       "package": "com.karmagrp.business",
       "versionCode": 2,
@@ -23,13 +21,11 @@
       },
       "edgeToEdgeEnabled": true
     },
-
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-
     "plugins": [
       "expo-router",
       "expo-dev-client",
@@ -47,10 +43,15 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Karma uses your location to show your position on the trip map and list the nearest customers when adding a stop."
+          "locationWhenInUsePermission": "Karma uses your location to show your position on the trip map and list the nearest customers when adding a stop.",
+          "locationAlwaysAndWhenInUsePermission": "Karma tracks your location during trips, including in the background, so dispatch can follow route progress.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
         }
       ]
     ],
-    "experiments": { "typedRoutes": true }
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

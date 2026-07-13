@@ -48,6 +48,11 @@ class UserDomain:
             raise BadRequestError("You are not authorized to change permission scope")
 
         updates = payload.model_dump(exclude_unset=True)
+        # these columns are NOT NULL; an explicit null in the payload means
+        # "leave unchanged" (email/phone may still be cleared via null)
+        for key in ("track_location", "location_ping_seconds"):
+            if updates.get(key) is None:
+                updates.pop(key, None)
         for field, val in updates.items():
             setattr(user, field, val)
         if payload.password:

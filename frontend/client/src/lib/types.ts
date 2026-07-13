@@ -56,6 +56,8 @@ export interface User {
   created_at: string;
   permission_scope?: string;
   is_deleted: boolean;
+  track_location?: boolean;
+  location_ping_seconds?: number;
 }
 
 export interface UserFormData {
@@ -80,6 +82,8 @@ export interface UserUpdateData {
   password?: string;
   permission_scope?: string;
   rfid_token?: string;
+  track_location?: boolean;
+  location_ping_seconds?: number;
 }
 
 export interface UserFilters {

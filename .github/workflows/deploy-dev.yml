@@ -66,4 +66,7 @@ jobs:
             docker builder prune -af
             docker compose -f docker-compose.dev.yaml down
             docker compose -f docker-compose.dev.yaml pull
+            # apply pending schema migrations before starting the web service
+            # (prod already does this; dev previously never ran them)
+            docker compose -f docker-compose.dev.yaml run --rm migrate
             docker compose -f docker-compose.dev.yaml up -d --scale migrate=0 --remove-orphans

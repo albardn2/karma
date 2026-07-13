@@ -31,6 +31,9 @@ import FinancialAccountDetail from "@/pages/FinancialAccountDetail";
 import Orders from "@/pages/Orders";
 import Invoices from "@/pages/Invoices";
 import Reports from "@/pages/Reports";
+import LiveMap from "@/pages/LiveMap";
+import UserLocationHistory from "@/pages/UserLocationHistory";
+import LocationTrackingSettings from "@/pages/LocationTrackingSettings";
 import Pricing from "@/pages/Pricing";
 import PricingDetail from "@/pages/PricingDetail";
 import FixedAssets from "@/pages/FixedAssets";
@@ -141,6 +144,7 @@ function Router() {
       <Route path="/workflow-execution/:uuid" component={() => <ProtectedRoute><WorkflowExecutionDetail /></ProtectedRoute>} />
       <Route path="/users" component={() => <ProtectedRoute><Users /></ProtectedRoute>} />
       <Route path="/users/:uuid" component={() => <ProtectedRoute><UserDetail /></ProtectedRoute>} />
+      <Route path="/users/:uuid/location-history" component={() => <ProtectedRoute><UserLocationHistory /></ProtectedRoute>} />
       <Route path="/vehicles" component={() => <ProtectedRoute><Vehicles /></ProtectedRoute>} />
       <Route path="/vehicles/:uuid" component={() => <ProtectedRoute><VehicleDetail /></ProtectedRoute>} />
       <Route path="/trips" component={() => <ProtectedRoute><Trips /></ProtectedRoute>} />
@@ -151,6 +155,8 @@ function Router() {
       <Route path="/materials" component={() => <ProtectedRoute><Materials /></ProtectedRoute>} />
       <Route path="/invoices" component={() => <ProtectedRoute><Invoices /></ProtectedRoute>} />
       <Route path="/reports" component={() => <ProtectedRoute><Reports /></ProtectedRoute>} />
+      <Route path="/live-map" component={() => <ProtectedRoute><LiveMap /></ProtectedRoute>} />
+      <Route path="/location-tracking" component={() => <ProtectedRoute><LocationTrackingSettings /></ProtectedRoute>} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -38,6 +38,7 @@ from app.entrypoint.routes.task_execution import task_execution_blueprint
 from app.entrypoint.routes.quality_control import quality_control_blueprint
 from app.entrypoint.routes.vehicle import vehicle_blueprint
 from app.entrypoint.routes.service_area import service_area_blueprint
+from app.entrypoint.routes.location import location_blueprint
 from app.entrypoint.routes.trip import trip_blueprint
 from app.entrypoint.routes.trip_stop import trip_stop_blueprint
 from app.entrypoint.routes.vehicle_inventory import vehicle_inventory_blueprint
@@ -106,6 +107,7 @@ def create_app(config_object=Config):
     app.register_blueprint(quality_control_blueprint, url_prefix='/quality-control')
     app.register_blueprint(vehicle_blueprint, url_prefix='/vehicle')
     app.register_blueprint(service_area_blueprint, url_prefix='/service-area')
+    app.register_blueprint(location_blueprint, url_prefix='/location')
     app.register_blueprint(trip_blueprint, url_prefix='/trip')
     app.register_blueprint(trip_stop_blueprint, url_prefix='/trip-stop')
     app.register_blueprint(vehicle_inventory_blueprint, url_prefix='/vehicle-inventory')
