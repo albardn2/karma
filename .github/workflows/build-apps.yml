@@ -1,0 +1,220 @@
+name: CI – Build Mobile Apps (TestFlight & Play Internal)
+
+# Builds run on EAS. Triggered by:
+#  - a commit message starting with [build_apps] on any branch
+#    ([build_apps:ios] / [build_apps:android] to build one platform), or
+#  - manual dispatch (choose targets + platform).
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: 'Which builds to run'
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - stores-only
+          - preview-only
+      platforms:
+        description: 'Which platforms to build'
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - ios
+          - android
+
+jobs:
+  check-trigger:
+    runs-on: ubuntu-latest
+    outputs:
+      build_preview: ${{ steps.check.outputs.build_preview }}
+      build_stores: ${{ steps.check.outputs.build_stores }}
+      ios: ${{ steps.check.outputs.ios }}
+      android: ${{ steps.check.outputs.android }}
+    steps:
+      - name: Decide what to build
+        id: check
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TARGETS="${{ github.event.inputs.targets }}"
+            PLATFORMS="${{ github.event.inputs.platforms }}"
+            [[ "$TARGETS" == "all" || "$TARGETS" == "preview-only" ]] && PREVIEW=true || PREVIEW=false
+            [[ "$TARGETS" == "all" || "$TARGETS" == "stores-only" ]] && STORES=true || STORES=false
+          else
+            PREVIEW=false; STORES=false; PLATFORMS=all
+            if [[ "$COMMIT_MSG" == \[build_apps\]* ]]; then
+              PREVIEW=true; STORES=true
+              [[ "$COMMIT_MSG" == \[build_apps:ios\]* ]] && PLATFORMS=ios
+              [[ "$COMMIT_MSG" == \[build_apps:android\]* ]] && PLATFORMS=android
+            fi
+          fi
+          [[ "$PLATFORMS" == "all" || "$PLATFORMS" == "ios" ]] && IOS=true || IOS=false
+          [[ "$PLATFORMS" == "all" || "$PLATFORMS" == "android" ]] && ANDROID=true || ANDROID=false
+          echo "build_preview=$PREVIEW" >> "$GITHUB_OUTPUT"
+          echo "build_stores=$STORES" >> "$GITHUB_OUTPUT"
+          echo "ios=$IOS" >> "$GITHUB_OUTPUT"
+          echo "android=$ANDROID" >> "$GITHUB_OUTPUT"
+
+  build-ios-preview:
+    name: iOS ad-hoc (internal install)
+    needs: check-trigger
+    if: needs.check-trigger.outputs.build_preview == 'true' && needs.check-trigger.outputs.ios == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expo_app
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: expo_app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build iOS (ad-hoc)
+        run: eas build --platform ios --profile preview --non-interactive
+
+  build-ios-testflight:
+    name: iOS store build → TestFlight
+    needs: check-trigger
+    if: needs.check-trigger.outputs.build_stores == 'true' && needs.check-trigger.outputs.ios == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expo_app
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: expo_app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build iOS (store)
+        run: eas build --platform ios --profile production --non-interactive
+
+      - name: Submit iOS to TestFlight
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+        run: |
+          echo "$APPLE_API_KEY_P8_BASE64" | base64 --decode > asc-api-key.p8
+          eas submit --platform ios --profile preview --non-interactive --latest
+
+      - name: Cleanup secrets
+        if: always()
+        run: rm -f asc-api-key.p8
+
+  build-android-preview:
+    name: Android APK (internal install)
+    needs: check-trigger
+    if: needs.check-trigger.outputs.build_preview == 'true' && needs.check-trigger.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expo_app
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: expo_app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build Android (internal distribution)
+        run: eas build --platform android --profile preview --non-interactive
+
+  build-android-google-play:
+    name: Android store build → Play internal track
+    needs: check-trigger
+    if: needs.check-trigger.outputs.build_stores == 'true' && needs.check-trigger.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expo_app
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: expo_app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build Android (store)
+        run: eas build --platform android --profile production --non-interactive
+
+      - name: Submit Android to Google Play (internal track)
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64 }}
+        run: |
+          echo "$GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64" | base64 --decode > google-service-account-key.json
+          eas submit --platform android --profile preview --non-interactive --latest
+
+      - name: Cleanup secrets
+        if: always()
+        run: rm -f google-service-account-key.json

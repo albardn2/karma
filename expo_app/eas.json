@@ -1,5 +1,8 @@
 {
-  "cli": { "version": ">= 13.2.0" },
+  "cli": {
+    "version": ">= 13.2.0",
+    "appVersionSource": "remote"
+  },
   "build": {
     "development": {
       "developmentClient": true,
@@ -10,17 +13,43 @@
     },
     "preview": {
       "distribution": "internal",
+      "autoIncrement": true,
       "android": { "buildType": "apk" },
       "ios": { "simulator": false },
       "env": { "API_BASE_URL": "https://api-dev.karma-grp.com" }
     },
     "production": {
-      "android": { "gradleCommand": ":app:bundleRelease" }, // outputs AAB
-      "ios": { "simulator": false },
+      "distribution": "store",
+      "autoIncrement": true,
       "env": { "API_BASE_URL": "https://api-prod.karma-grp.com" }
     }
   },
   "submit": {
-    "production": {}
+    "local": {},
+    "preview": {
+      "ios": {
+        "ascAppId": "6753890262",
+        "ascApiKeyId": "${APPLE_API_KEY_ID}",
+        "ascApiKeyIssuerId": "${APPLE_API_ISSUER_ID}",
+        "ascApiKeyPath": "./asc-api-key.p8"
+      },
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft",
+        "serviceAccountKeyPath": "./google-service-account-key.json"
+      }
+    },
+    "production": {
+      "ios": {
+        "ascAppId": "6753890262",
+        "ascApiKeyId": "${APPLE_API_KEY_ID}",
+        "ascApiKeyIssuerId": "${APPLE_API_ISSUER_ID}",
+        "ascApiKeyPath": "./asc-api-key.p8"
+      },
+      "android": {
+        "track": "production",
+        "serviceAccountKeyPath": "./google-service-account-key.json"
+      }
+    }
   }
 }
