@@ -16,6 +16,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { formatMonthDayTime } from '@/utils/date';
 
 interface Field {
   name: string;
@@ -33,7 +34,7 @@ const toDate = (s?: string | null) => {
 };
 const fmt = (s?: string | null) => {
   const d = toDate(s);
-  return d ? d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  return d ? formatMonthDayTime(d) : '';
 };
 
 export default function StopDetailScreen() {

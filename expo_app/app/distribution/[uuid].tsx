@@ -17,6 +17,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { TripMap, TripMapArea, TripMapStop } from '@/components/TripMap';
 import { StopsSheet } from '@/components/StopsSheet';
 import { parseWktPolygons } from '@/utils/wkt';
+import { formatMonthDayTime } from '@/utils/date';
 
 interface TaskExecution {
   uuid: string;
@@ -84,7 +85,7 @@ const toDate = (s?: string | null) => {
 };
 const fmt = (s?: string | null) => {
   const d = toDate(s);
-  return d ? d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+  return d ? formatMonthDayTime(d) : '—';
 };
 const taskLabel = (te: TaskExecution, t: (key: string, vars?: Record<string, string | number>) => string) => {
   if (te.operator === 'trip_stop_operator') {

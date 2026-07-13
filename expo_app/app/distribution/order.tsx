@@ -14,6 +14,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { formatMonthDayTime } from '@/utils/date';
 
 export default function OrderActionsScreen() {
   const { t, te } = useLanguage();
@@ -88,7 +89,7 @@ export default function OrderActionsScreen() {
   const fmtDate = (s?: string) => {
     if (!s) return '';
     const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z');
-    return isNaN(d.getTime()) ? s : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return isNaN(d.getTime()) ? s : formatMonthDayTime(d);
   };
 
   return (
