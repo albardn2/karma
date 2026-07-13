@@ -1,8 +1,9 @@
 name: CI – Build Mobile Apps (TestFlight & Play Internal)
 
 # Builds run on EAS. Triggered by:
-#  - a commit message starting with [build_apps] on any branch, or
-#  - manual dispatch (choose which targets to build).
+#  - a commit message starting with [build_apps] on any branch
+#    ([build_apps:ios] / [build_apps:android] to build one platform), or
+#  - manual dispatch (choose targets + platform).
 on:
   push:
     branches:
@@ -18,6 +19,15 @@ on:
           - all
           - stores-only
           - preview-only
+      platforms:
+        description: 'Which platforms to build'
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - ios
+          - android
 
 jobs:
   check-trigger:
@@ -25,6 +35,8 @@ jobs:
     outputs:
       build_preview: ${{ steps.check.outputs.build_preview }}
       build_stores: ${{ steps.check.outputs.build_stores }}
+      ios: ${{ steps.check.outputs.ios }}
+      android: ${{ steps.check.outputs.android }}
     steps:
       - name: Decide what to build
         id: check
@@ -33,22 +45,28 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             TARGETS="${{ github.event.inputs.targets }}"
+            PLATFORMS="${{ github.event.inputs.platforms }}"
             [[ "$TARGETS" == "all" || "$TARGETS" == "preview-only" ]] && PREVIEW=true || PREVIEW=false
             [[ "$TARGETS" == "all" || "$TARGETS" == "stores-only" ]] && STORES=true || STORES=false
           else
+            PREVIEW=false; STORES=false; PLATFORMS=all
             if [[ "$COMMIT_MSG" == \[build_apps\]* ]]; then
               PREVIEW=true; STORES=true
-            else
-              PREVIEW=false; STORES=false
+              [[ "$COMMIT_MSG" == \[build_apps:ios\]* ]] && PLATFORMS=ios
+              [[ "$COMMIT_MSG" == \[build_apps:android\]* ]] && PLATFORMS=android
             fi
           fi
+          [[ "$PLATFORMS" == "all" || "$PLATFORMS" == "ios" ]] && IOS=true || IOS=false
+          [[ "$PLATFORMS" == "all" || "$PLATFORMS" == "android" ]] && ANDROID=true || ANDROID=false
           echo "build_preview=$PREVIEW" >> "$GITHUB_OUTPUT"
           echo "build_stores=$STORES" >> "$GITHUB_OUTPUT"
+          echo "ios=$IOS" >> "$GITHUB_OUTPUT"
+          echo "android=$ANDROID" >> "$GITHUB_OUTPUT"
 
   build-ios-preview:
     name: iOS ad-hoc (internal install)
     needs: check-trigger
-    if: needs.check-trigger.outputs.build_preview == 'true'
+    if: needs.check-trigger.outputs.build_preview == 'true' && needs.check-trigger.outputs.ios == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -81,7 +99,7 @@ jobs:
   build-ios-testflight:
     name: iOS store build → TestFlight
     needs: check-trigger
-    if: needs.check-trigger.outputs.build_stores == 'true'
+    if: needs.check-trigger.outputs.build_stores == 'true' && needs.check-trigger.outputs.ios == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -128,7 +146,7 @@ jobs:
   build-android-preview:
     name: Android APK (internal install)
     needs: check-trigger
-    if: needs.check-trigger.outputs.build_preview == 'true'
+    if: needs.check-trigger.outputs.build_preview == 'true' && needs.check-trigger.outputs.android == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -161,7 +179,7 @@ jobs:
   build-android-google-play:
     name: Android store build → Play internal track
     needs: check-trigger
-    if: needs.check-trigger.outputs.build_stores == 'true'
+    if: needs.check-trigger.outputs.build_stores == 'true' && needs.check-trigger.outputs.android == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:

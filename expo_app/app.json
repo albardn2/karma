@@ -11,7 +11,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.karmagrp.business"
+      "bundleIdentifier": "com.karmagrp.business",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.karmagrp.business",
@@ -53,6 +56,13 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "apiBaseUrl": "https://api-prod.karma-grp.com",
+      "router": {},
+      "eas": {
+        "projectId": "e559e48d-42a5-444d-ba19-f3cd52d1bc27"
+      }
     }
   }
 }
