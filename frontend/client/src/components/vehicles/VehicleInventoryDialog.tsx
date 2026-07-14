@@ -105,8 +105,13 @@ export function VehicleInventoryDialog({ vehicleUuid }: { vehicleUuid: string })
   const materials = materialsData?.materials || [];
 
   const refresh = () => {
+    // prefix-matches the dialog list, the Current Inventory table, and the
+    // chart's inventory query (["/vehicle-inventory/", vehicleUuid, ...])
     queryClient.invalidateQueries({ queryKey: invKey });
     queryClient.refetchQueries({ queryKey: invKey });
+    // the chart's line data lives under its own key — without this the chart
+    // doesn't move until a full page reload
+    queryClient.invalidateQueries({ queryKey: ["/vehicle-inventory-event/series"] });
   };
 
   const createInventory = useMutation({
