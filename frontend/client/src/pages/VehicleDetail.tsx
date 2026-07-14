@@ -37,6 +37,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { VehicleStatus, type Vehicle, type VehicleUpdateData } from "@/lib/types";
 import { VehicleInventoryDialog } from "@/components/vehicles/VehicleInventoryDialog";
 import { VehicleInventoryChart } from "@/components/vehicles/VehicleInventoryChart";
+import { VehicleInventoryTable } from "@/components/vehicles/VehicleInventoryTable";
 
 const vehicleUpdateSchema = z.object({
   plate_number: z.string().min(1, "Plate number is required").optional(),
@@ -600,6 +601,11 @@ export default function VehicleDetail() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Current inventory per material */}
+        <div className="mt-6">
+          <VehicleInventoryTable vehicleUuid={uuid as string} />
         </div>
 
         {/* Inventory time series chart */}

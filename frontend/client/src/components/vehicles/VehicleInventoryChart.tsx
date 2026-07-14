@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ResponsiveContainer,
@@ -77,6 +77,7 @@ export function VehicleInventoryChart({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const seenRef = useRef<Set<string>>(new Set());
 
   const { data: invData } = useQuery({
     queryKey: ["/vehicle-inventory/", vehicleUuid, "chart"],
@@ -84,10 +85,21 @@ export function VehicleInventoryChart({
   });
   const inventories: VehicleInventory[] = invData?.vehicle_inventories || [];
 
-  // default: all materials selected (once they load)
+  // default: all materials selected; materials added later auto-select too
+  // (without re-selecting ones the user unchecked)
   useEffect(() => {
-    if (inventories.length && selected.size === 0) {
+    if (!inventories.length) return;
+    const firstLoad = seenRef.current.size === 0;
+    const fresh = inventories.filter((i) => !seenRef.current.has(i.uuid));
+    seenRef.current = new Set(inventories.map((i) => i.uuid));
+    if (firstLoad) {
       setSelected(new Set(inventories.map((i) => i.uuid)));
+    } else if (fresh.length) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        fresh.forEach((i) => next.add(i.uuid));
+        return next;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invData]);
