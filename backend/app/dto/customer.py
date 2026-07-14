@@ -16,6 +16,9 @@ class CustomerCategory(str, Enum):
     MINIMARKET = "minimarket"
     SUPERMARKET = "supermarket"
     DISTRIBUTER = "distributer"
+    SCHOOL = "school"
+    UNIVERSITY = "university"
+    HOSPITAL = "hospital"
 
 
 

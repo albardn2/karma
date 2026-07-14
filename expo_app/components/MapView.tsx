@@ -14,7 +14,7 @@ interface Customer {
   full_address: string;
   business_cards: string | null;
   notes: string | null;
-  category: 'roastery' | 'restaurant' | 'minimarket' | 'supermarket' | 'distributer';
+  category: 'roastery' | 'restaurant' | 'minimarket' | 'supermarket' | 'distributer' | 'school' | 'university' | 'hospital';
   coordinates: string | null;
   created_at: string;
   is_deleted: boolean;
