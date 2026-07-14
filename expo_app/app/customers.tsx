@@ -22,7 +22,7 @@ interface Customer {
   full_address: string;
   business_cards: string | null;
   notes: string | null;
-  category: 'roastery' | 'restaurant' | 'minimarket' | 'supermarket' | 'distributer';
+  category: 'roastery' | 'restaurant' | 'minimarket' | 'supermarket' | 'distributer' | 'school' | 'university' | 'hospital';
   coordinates: string | null;
   created_at: string;
   is_deleted: boolean;
@@ -47,7 +47,7 @@ export default function CustomersScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'roastery' | 'restaurant' | 'minimarket' | 'supermarket' | 'distributer'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'roastery' | 'restaurant' | 'minimarket' | 'supermarket' | 'distributer' | 'school' | 'university' | 'hospital'>('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [screenData, setScreenData] = useState(Dimensions.get('window'));
@@ -126,12 +126,12 @@ export default function CustomersScreen() {
       } else {
         console.error('Error fetching categories:', response.error);
         // Fallback to static categories
-        setCategories(['roastery', 'restaurant', 'minimarket', 'supermarket', 'distributer']);
+        setCategories(['roastery', 'restaurant', 'minimarket', 'supermarket', 'distributer', 'school', 'university', 'hospital']);
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
       // Fallback to static categories
-      setCategories(['roastery', 'restaurant', 'minimarket', 'supermarket', 'distributer']);
+      setCategories(['roastery', 'restaurant', 'minimarket', 'supermarket', 'distributer', 'school', 'university', 'hospital']);
     }
   };
 
@@ -404,7 +404,7 @@ export default function CustomersScreen() {
       />
 
       <View style={styles.categoryFilterContainer}>
-        {(['all', 'roastery', 'restaurant', 'minimarket', 'supermarket', 'distributer'] as const).map((category) => (
+        {(['all', 'roastery', 'restaurant', 'minimarket', 'supermarket', 'distributer', 'school', 'university', 'hospital'] as const).map((category) => (
           <TouchableOpacity
             key={category}
             style={[

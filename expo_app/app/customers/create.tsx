@@ -17,7 +17,7 @@ interface CustomerForm {
   phone_number: string;
   company_name: string;
   full_address: string;
-  category: 'roastery' | 'restaurant' | 'minimarket' | 'supermarket' | 'distributer';
+  category: 'roastery' | 'restaurant' | 'minimarket' | 'supermarket' | 'distributer' | 'school' | 'university' | 'hospital';
   business_cards: string;
   notes: string;
   coordinates: string;
@@ -38,7 +38,7 @@ export default function CreateCustomerScreen() {
     coordinates: '',
   });
   const [loading, setLoading] = useState(false);
-  const [categories, setCategories] = useState<string[]>(['restaurant', 'roastery', 'minimarket', 'supermarket', 'distributer']);
+  const [categories, setCategories] = useState<string[]>(['restaurant', 'roastery', 'minimarket', 'supermarket', 'distributer', 'school', 'university', 'hospital']);
   const [screenData, setScreenData] = useState(Dimensions.get('window'));
   const [banner, setBanner] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const bannerAnimation = useState(new Animated.Value(0))[0];

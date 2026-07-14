@@ -40,7 +40,10 @@ interface Customer {
     | "restaurant"
     | "minimarket"
     | "supermarket"
-    | "distributer";
+    | "distributer"
+    | "school"
+    | "university"
+    | "hospital";
   coordinates: string | null;
   created_at: string;
   is_deleted: boolean;
@@ -511,6 +514,9 @@ export default function CustomerDetailScreen() {
     minimarket: "#5469D4",
     supermarket: "#5469D4",
     distributer: "#5469D4",
+    school: "#5469D4",
+    university: "#5469D4",
+    hospital: "#5469D4",
   };
 
   if (loading) {
@@ -569,6 +575,9 @@ export default function CustomerDetailScreen() {
             "minimarket",
             "supermarket",
             "distributer",
+            "school",
+            "university",
+            "hospital",
           ] as const
         ).map((category) => (
           <TouchableOpacity

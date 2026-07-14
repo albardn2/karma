@@ -10,6 +10,9 @@ const ENUM_AR: Record<string, string> = {
   minimarket: 'ميني ماركت',
   supermarket: 'سوبر ماركت',
   distributer: 'موزّع',
+  school: 'مدرسة',
+  university: 'جامعة',
+  hospital: 'مشفى',
   // currencies (Currency)
   USD: 'دولار',
   SYP: 'ل.س',
