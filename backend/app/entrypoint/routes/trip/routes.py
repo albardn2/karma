@@ -145,6 +145,10 @@ def get_trip_activity(uuid: str):
                     continue
                 item = ev.customer_order_item
                 order = item.customer_order if item else None
+                # legacy voids: the order was deleted without cascading — its
+                # leftover sale events must not count as trip activity
+                if (item and item.is_deleted) or (order and order.is_deleted):
+                    continue
                 fulfillments.append({
                     "created_at": ev.created_at.isoformat() if ev.created_at else None,
                     "material_name": material_name(ev.material_uuid),
@@ -157,6 +161,8 @@ def get_trip_activity(uuid: str):
                     continue
                 inv = p.invoice
                 order = inv.customer_order if inv else None
+                if (inv and inv.is_deleted) or (order and order.is_deleted):
+                    continue
                 payments.append({
                     "created_at": p.created_at.isoformat() if p.created_at else None,
                     "amount": p.amount,

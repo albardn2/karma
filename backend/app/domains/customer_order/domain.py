@@ -181,12 +181,57 @@ class CustomerOrderDomain:
 
     @staticmethod
     def delete_customer_order(uuid:str, uow: SqlAlchemyUnitOfWork) -> CustomerOrderRead:
-        # fetch existing order
+        """Void an order: soft-delete it together with everything it caused —
+        items, invoices, payments, and the inventory/vehicle events its
+        fulfillment created (which restores warehouse/vehicle stock, since
+        quantities are computed from non-deleted events). Unlike the
+        validated delete, this intentionally works on paid/fulfilled orders:
+        it exists to undo mistakes (e.g. an erroneous trip-stop checkout)."""
+        from models.common import (
+            InventoryEvent as InventoryEventModel,
+            VehicleInventoryEvent as VehicleInventoryEventModel,
+        )
+
         order = uow.customer_order_repository.find_one(uuid=uuid, is_deleted=False)
         if not order:
             raise NotFoundError("CustomerOrder not found")
 
-        #TODO: delete all related items
+        item_uuids = []
+        for item in order.customer_order_items:
+            if item.is_deleted:
+                continue
+            item.is_deleted = True
+            item_uuids.append(item.uuid)
+            uow.customer_order_item_repository.save(model=item, commit=False)
+
+        for invoice in order.invoices:
+            if invoice.is_deleted:
+                continue
+            for payment in invoice.payments:
+                if not payment.is_deleted:
+                    payment.is_deleted = True
+                    uow.payment_repository.save(model=payment, commit=False)
+            for inv_item in invoice.invoice_items:
+                if not inv_item.is_deleted:
+                    inv_item.is_deleted = True
+                    uow.invoice_item_repository.save(model=inv_item, commit=False)
+            invoice.is_deleted = True
+            uow.invoice_repository.save(model=invoice, commit=False)
+
+        if item_uuids:
+            # warehouse-side deductions
+            for ev in uow.session.query(InventoryEventModel).filter(
+                InventoryEventModel.customer_order_item_uuid.in_(item_uuids),
+                InventoryEventModel.is_deleted.is_(False),
+            ):
+                ev.is_deleted = True
+            # vehicle-side sale events (trip checkouts)
+            for ev in uow.session.query(VehicleInventoryEventModel).filter(
+                VehicleInventoryEventModel.customer_order_item_uuid.in_(item_uuids),
+                VehicleInventoryEventModel.is_deleted.is_(False),
+            ):
+                ev.is_deleted = True
+
         order.is_deleted = True
         uow.customer_order_repository.save(model=order, commit=False)
         result = CustomerOrderRead.from_orm(order)
