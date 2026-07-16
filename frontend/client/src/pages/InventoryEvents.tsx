@@ -16,6 +16,7 @@ interface InventoryEvent {
   uuid: string;
   inventory_uuid: string;
   material_uuid: string;
+  material_name?: string | null;
   event_type: string;
   quantity: number;
   notes?: string;
@@ -166,8 +167,10 @@ export default function InventoryEvents() {
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Inventory UUID</p>
-                              <p className="text-sm">{event.inventory_uuid}</p>
+                              <p className="text-sm font-medium text-muted-foreground">Material</p>
+                              <p className="text-sm" data-testid={`text-event-material-${event.uuid}`}>
+                                {event.material_name || event.material_uuid}
+                              </p>
                             </div>
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">Quantity</p>

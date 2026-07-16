@@ -1,5 +1,5 @@
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 from app.entrypoint.routes.common.errors import BadRequestError
@@ -74,6 +74,9 @@ class InventoryEventRead(InventoryEventBase):
     material_uuid: str
     created_at: datetime
     is_deleted: bool
+    material_name: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("material_name", AliasPath("material", "name")))
 
 
 class InventoryEventListParams(BaseModel):

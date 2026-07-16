@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 from app.dto.common_enums import UnitOfMeasure, Currency
@@ -43,6 +43,9 @@ class InventoryRead(InventoryBase):
     created_at: datetime
     is_deleted: bool
     total_original_cost: Optional[float] = None
+    material_name: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("material_name", AliasPath("material", "name")))
 
 class InventoryListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
