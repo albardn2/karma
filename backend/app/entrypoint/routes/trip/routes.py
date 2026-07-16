@@ -117,14 +117,28 @@ def get_trip_activity(uuid: str):
             for o in stop.customer_orders:
                 if o.is_deleted:
                     continue
+                items = []
+                for item in o.customer_order_items:
+                    if item.is_deleted:
+                        continue
+                    price = item.invoice_item.price_per_unit if item.invoice_item else None
+                    items.append({
+                        "material_name": material_name(item.material_uuid),
+                        "quantity": item.quantity,
+                        "price_per_unit": price,
+                        "amount": (item.quantity or 0) * price if price is not None else None,
+                    })
                 orders.append({
                     "uuid": o.uuid,
                     "created_at": o.created_at.isoformat() if o.created_at else None,
                     "customer_name": customer_name(o.customer),
                     "total": o.total_adjusted_amount,
+                    "amount_due": o.net_amount_due,
+                    "amount_paid": o.net_amount_paid,
                     "currency": o.currency,
                     "is_paid": o.is_paid,
                     "is_fulfilled": o.is_fulfilled,
+                    "items": items,
                 })
             for ev in stop.vehicle_inventory_events:
                 if ev.is_deleted or ev.event_type != "sale":

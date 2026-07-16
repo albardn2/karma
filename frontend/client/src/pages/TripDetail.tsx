@@ -29,6 +29,7 @@ import { VehicleInventoryChart } from "@/components/vehicles/VehicleInventoryCha
 import { TripStopsMap } from "@/components/map/TripStopsMap";
 import { type PlaybackPoint } from "@/components/location/LocationPlayback";
 import { TripLocationMap } from "@/components/location/TripLocationMap";
+import { TripAnalytics } from "@/components/trips/TripAnalytics";
 import { Table as TableIcon, Map as MapIcon } from "lucide-react";
 
 export default function TripDetail() {
@@ -599,10 +600,15 @@ export default function TripDetail() {
                 <TabsTrigger value="payments" data-testid="tab-payments">
                   Paid ({activity?.payments?.length ?? 0})
                 </TabsTrigger>
+                <TabsTrigger value="analytics" data-testid="tab-analytics">
+                  Analytics
+                </TabsTrigger>
               </TabsList>
 
               <div className="mt-4">
-                {pageRows.length === 0 ? (
+                {activityTab === "analytics" ? (
+                  <TripAnalytics activity={activity} />
+                ) : pageRows.length === 0 ? (
                   <p className="text-sm text-gray-500 py-6 text-center" data-testid="trip-activity-empty">
                     Nothing here for this trip yet.
                   </p>
@@ -677,7 +683,7 @@ export default function TripDetail() {
                 )}
 
                 {/* pagination */}
-                {activityRows.length > PAGE_SIZE && (
+                {activityTab !== "analytics" && activityRows.length > PAGE_SIZE && (
                   <div className="flex items-center justify-end gap-3 mt-3">
                     <span className="text-xs text-gray-500" data-testid="trip-activity-page-info">
                       {activityPage * PAGE_SIZE + 1}–{Math.min((activityPage + 1) * PAGE_SIZE, activityRows.length)} of {activityRows.length}
