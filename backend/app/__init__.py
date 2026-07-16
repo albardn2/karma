@@ -30,6 +30,7 @@ from app.entrypoint.routes.inventory_event import inventory_event_blueprint
 from app.entrypoint.routes.debit_note import debit_note_item_blueprint
 from app.entrypoint.routes.credit_note import credit_note_item_blueprint
 from app.entrypoint.routes.process import process_blueprint
+from app.entrypoint.routes.process_template import process_template_blueprint
 from app.entrypoint.routes.auth import auth_blueprint
 from app.entrypoint.routes.workflow import workflow_blueprint
 from app.entrypoint.routes.task import task_blueprint
@@ -99,6 +100,7 @@ def create_app(config_object=Config):
     app.register_blueprint(debit_note_item_blueprint, url_prefix='/debit-note-item')
     app.register_blueprint(credit_note_item_blueprint, url_prefix='/credit-note-item')
     app.register_blueprint(process_blueprint, url_prefix='/process')
+    app.register_blueprint(process_template_blueprint, url_prefix='/process-template')
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
     app.register_blueprint(workflow_blueprint, url_prefix='/workflow')
     app.register_blueprint(task_blueprint, url_prefix='/task')
