@@ -1947,6 +1947,13 @@ class Trip(Base):
             for ev in stop.vehicle_inventory_events:
                 if ev.is_deleted or ev.event_type != "sale":
                     continue
+                # skip sales of deleted (voided) orders — new voids soft-delete
+                # the event itself, but orders deleted before that cascade
+                # existed left their sale events alive
+                item = ev.customer_order_item
+                order = item.customer_order if item else None
+                if (item and item.is_deleted) or (order and order.is_deleted):
+                    continue
                 sold[ev.material_uuid] = sold.get(ev.material_uuid, 0) - ev.quantity
         return sold
 
