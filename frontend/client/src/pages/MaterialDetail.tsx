@@ -3,6 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MaterialInventorySection } from "@/components/materials/MaterialInventorySection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -538,6 +539,8 @@ export default function MaterialDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <MaterialInventorySection materialUuid={material.uuid} />
     </div>
   );
 }

@@ -228,8 +228,47 @@ def list_trips():
             page=params.page,
             per_page=params.per_page,
         )
-        # Convert each geometry field to WKT via TripRead validator
-        items = [TripRead.from_orm(m).model_dump(mode="json") for m in page.items]
+
+        # batch-resolve each trip's assignee (start_trip result, stored as
+        # username or uuid) — two queries for the whole page, no N+1
+        from models.common import (
+            TaskExecution as TaskExecutionModel,
+            Task as TaskModel,
+            User as UserModel,
+        )
+        wfe_uuids = [t.workflow_execution_uuid for t in page.items if t.workflow_execution_uuid]
+        assigned_by_wfe: dict = {}
+        if wfe_uuids:
+            rows = (
+                uow.session.query(
+                    TaskExecutionModel.workflow_execution_uuid,
+                    TaskExecutionModel.result["assigned_user_uuid"].astext,
+                )
+                .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
+                .filter(
+                    TaskExecutionModel.workflow_execution_uuid.in_(wfe_uuids),
+                    TaskModel.operator == "start_trip_operator",
+                )
+                .all()
+            )
+            values = {v for _, v in rows if v}
+            users = (
+                uow.session.query(UserModel.uuid, UserModel.username)
+                .filter(UserModel.uuid.in_(values) | UserModel.username.in_(values))
+                .all()
+            ) if values else []
+            uuid_to_name = {u[0]: u[1] for u in users}
+            usernames = {u[1] for u in users}
+            for wfe_uuid, v in rows:
+                if not v:
+                    continue
+                assigned_by_wfe[wfe_uuid] = uuid_to_name.get(v) or (v if v in usernames else v)
+
+        items = []
+        for m in page.items:
+            dto = TripRead.from_orm(m)
+            dto.assigned_username = assigned_by_wfe.get(m.workflow_execution_uuid)
+            items.append(dto.model_dump(mode="json"))
         result = TripPage(
             items=items,
             total_count=page.total,

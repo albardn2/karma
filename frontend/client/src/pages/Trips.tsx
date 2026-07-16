@@ -252,6 +252,9 @@ export default function Trips() {
                     Vehicle
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Assigned To
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -276,7 +279,7 @@ export default function Trips() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={isAdmin ? 8 : 7} className="px-6 py-16 text-center">
+                    <td colSpan={isAdmin ? 9 : 8} className="px-6 py-16 text-center">
                       <div className="animate-pulse space-y-4">
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-32 mx-auto"></div>
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-48 mx-auto"></div>
@@ -287,7 +290,7 @@ export default function Trips() {
                   </tr>
                 ) : trips.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdmin ? 8 : 7} className="px-6 py-16 text-center">
+                    <td colSpan={isAdmin ? 9 : 8} className="px-6 py-16 text-center">
                       <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                         {error ? "Error loading trips" : "No trips"}
@@ -321,8 +324,13 @@ export default function Trips() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900 dark:text-gray-100">
-                          {trip.vehicle_uuid.substring(0, 8)}...
+                        <span className="text-sm text-gray-900 dark:text-gray-100" data-testid={`text-trip-vehicle-${trip.uuid}`}>
+                          {trip.vehicle_plate || `${trip.vehicle_uuid.substring(0, 8)}...`}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900 dark:text-gray-100" data-testid={`text-trip-assigned-${trip.uuid}`}>
+                          {trip.assigned_username || "—"}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

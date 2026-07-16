@@ -508,6 +508,8 @@ export interface Trip {
   end_point?: string;
   data?: TripData;
   workflow_execution_uuid?: string;
+  vehicle_plate?: string | null;
+  assigned_username?: string | null;
   start_inventory?: Record<string, number> | null;
   end_inventory?: Record<string, number> | null;
   inventory_reconciliation?: Record<

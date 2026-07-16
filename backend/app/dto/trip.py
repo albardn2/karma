@@ -1,7 +1,7 @@
 # app/dto/trip.py
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -183,6 +183,12 @@ class TripRead(BaseModel):
     workflow_execution_uuid: Optional[str] = None
     start_inventory: Optional[dict] = None
     end_inventory: Optional[dict] = None
+    # display fields: plate from the vehicle relationship; assignee is
+    # enriched by the list route (it lives on the start_trip task result)
+    vehicle_plate: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("vehicle_plate", AliasPath("vehicle", "plate_number")))
+    assigned_username: Optional[str] = None
     inventory_reconciliation: Optional[dict] = None
     expected_cash: Optional[dict] = None  # {currency: amount} collected at this trip's stops
 

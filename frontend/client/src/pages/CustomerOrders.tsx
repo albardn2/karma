@@ -13,6 +13,8 @@ interface CustomerOrder {
   created_by_uuid?: string;
   customer_uuid: string;
   customer_name?: string;
+  customer_company_name?: string;
+  customer_full_name?: string;
   created_at: string;
   is_fulfilled: boolean;
   fulfilled_at?: string;
@@ -302,6 +304,9 @@ export default function CustomerOrders() {
                     Net Amount Paid
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Company
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Customer
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -321,7 +326,7 @@ export default function CustomerOrders() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-16 text-center">
+                    <td colSpan={8} className="px-6 py-16 text-center">
                       <div className="animate-pulse space-y-4">
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-32 mx-auto"></div>
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-48 mx-auto"></div>
@@ -332,7 +337,7 @@ export default function CustomerOrders() {
                   </tr>
                 ) : customerOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-16 text-center">
+                    <td colSpan={8} className="px-6 py-16 text-center">
                       <ShoppingBag className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                         {error ? "Authentication Required" : "No customer orders"}
@@ -382,8 +387,13 @@ export default function CustomerOrders() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900 dark:text-gray-100">
-                          {order.customer_name || order.customer_uuid}
+                        <span className="text-sm text-gray-900 dark:text-gray-100" data-testid={`text-order-company-${order.uuid}`}>
+                          {order.customer_company_name || "—"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900 dark:text-gray-100" data-testid={`text-order-customer-${order.uuid}`}>
+                          {order.customer_full_name || order.customer_name || order.customer_uuid.slice(0, 8)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

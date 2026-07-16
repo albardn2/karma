@@ -14,6 +14,7 @@ import { Package, Building } from "lucide-react";
 interface Inventory {
   uuid: string;
   material_uuid: string;
+  material_name?: string | null;
   warehouse_uuid: string | null;
   created_by_uuid: string | null;
   notes: string | null;
@@ -163,8 +164,10 @@ export default function Inventory() {
                               <Package className="h-5 w-5 text-white" />
                             </div>
                             <div>
-                              <h3 className="font-semibold text-lg">{inventory.material_uuid}</h3>
-                              <p className="text-sm text-muted-foreground">Material UUID: {inventory.material_uuid}</p>
+                              <h3 className="font-semibold text-lg" data-testid={`text-inventory-material-${inventory.uuid}`}>
+                                {inventory.material_name || inventory.material_uuid}
+                              </h3>
+                              <p className="text-sm text-muted-foreground">Lot: {inventory.lot_id || "—"}</p>
                             </div>
                           </div>
                           

@@ -1330,6 +1330,20 @@ class FixedAsset(Base):
         return self.price_per_unit * self.quantity
 
 
+class ProcessTemplate(Base):
+    """Named, reusable pre-fill for the process create form (type, notes,
+    inputs/outputs). Pure convenience data — no FK side effects."""
+    __tablename__ = "process_template"
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    name = Column(String(255), nullable=False)
+    type = Column(String(120), nullable=False)
+    notes = Column(Text, nullable=True)
+    data = Column(MutableDict.as_mutable(JSONB), default=dict)
+    is_deleted = Column(Boolean, default=False, nullable=False, server_default=false())
+
+
 class Process(Base):
     __tablename__ = "process"
 

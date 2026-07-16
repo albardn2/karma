@@ -4,7 +4,14 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm, useFieldArray, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, Plus, Trash2, Factory, Package, ArrowRight } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Factory, Package, ArrowRight, BookmarkPlus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +94,59 @@ export default function ProcessCreate() {
   const { data: warehouses, isLoading: warehousesLoading, error: warehousesError } = useQuery({
     queryKey: ["/warehouse/"],
     queryFn: () => apiRequest("/warehouse/?per_page=100"),
+  });
+
+  // ---- presets: saved templates + recent processes (both just pre-fill
+  // the form; everything stays editable before submit) ----
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+
+  const { data: templates } = useQuery({
+    queryKey: ["/process-template/"],
+    queryFn: () => apiRequest("/process-template/?per_page=100"),
+  });
+  const { data: recentProcesses } = useQuery({
+    queryKey: ["/process/", "recent-for-clone"],
+    queryFn: () => apiRequest("/process/?page=1&per_page=25"),
+  });
+
+  // strip execution enrichment (inventory_uuid, cost_per_unit, ...) down to
+  // what the create schema accepts
+  const applyPreset = (preset: { type?: string; notes?: string | null; data?: any }) => {
+    const cleanRows = (rows: any[] | undefined) =>
+      (rows || [])
+        .map((r) => ({ material_uuid: r.material_uuid || "", quantity: Number(r.quantity) || 0 }))
+        .filter((r) => r.material_uuid);
+    const inputs = cleanRows(preset.data?.inputs);
+    const outputs = cleanRows(preset.data?.outputs);
+    form.reset({
+      type: (preset.type as ProcessType) || ProcessType.COATED_PEANUT_BATCH,
+      notes: preset.notes || "",
+      data: {
+        inputs: inputs.length ? inputs : [{ material_uuid: "", quantity: 0 }],
+        outputs: outputs.length ? outputs : [{ material_uuid: "", quantity: 0 }],
+        output_warehouse_uuid: preset.data?.output_warehouse_uuid || "",
+      },
+    });
+    toast({ title: "Form pre-filled", description: "Review and adjust before submitting." });
+  };
+
+  const saveTemplateMutation = useMutation({
+    mutationFn: async () => {
+      const v = form.getValues();
+      return apiRequest("/process-template/", {
+        method: "POST",
+        body: { name: templateName.trim(), type: v.type, notes: v.notes || null, data: v.data },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/process-template/"] });
+      toast({ title: "Template saved", description: `"${templateName.trim()}" can now pre-fill new processes.` });
+      setShowSaveTemplate(false);
+      setTemplateName("");
+    },
+    onError: (e: Error) =>
+      toast({ title: "Failed to save template", description: e.message, variant: "destructive" }),
   });
 
 
@@ -177,6 +237,75 @@ export default function ProcessCreate() {
         </div>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          {/* Start from a template or an existing process */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Start From (optional)</CardTitle>
+              <CardDescription>
+                Pre-fill the form from a saved template or a previous process — you can
+                still edit everything before submitting.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-end gap-4">
+              <div className="min-w-[260px]">
+                <Label className="mb-1 block">Template</Label>
+                <Select
+                  value=""
+                  onValueChange={(uuid) => {
+                    const t = (templates?.items || []).find((t: any) => t.uuid === uuid);
+                    if (t) applyPreset(t);
+                  }}
+                >
+                  <SelectTrigger data-testid="select-process-template">
+                    <SelectValue placeholder="Load a template..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(templates?.items || []).length === 0 ? (
+                      <SelectItem value="__none" disabled>No templates saved yet</SelectItem>
+                    ) : (
+                      (templates?.items || []).map((t: any) => (
+                        <SelectItem key={t.uuid} value={t.uuid}>
+                          {t.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="min-w-[260px]">
+                <Label className="mb-1 block">Clone a recent process</Label>
+                <Select
+                  value=""
+                  onValueChange={(uuid) => {
+                    const p = (recentProcesses?.items || []).find((p: any) => p.uuid === uuid);
+                    if (p) applyPreset(p);
+                  }}
+                >
+                  <SelectTrigger data-testid="select-process-clone">
+                    <SelectValue placeholder="Clone from recent..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(recentProcesses?.items || []).map((p: any) => (
+                      <SelectItem key={p.uuid} value={p.uuid}>
+                        {(ProcessTypeLabels as any)[p.type] || p.type} · {new Date(p.created_at).toLocaleDateString()}
+                        {p.notes ? ` · ${String(p.notes).slice(0, 30)}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowSaveTemplate(true)}
+                data-testid="button-save-template"
+              >
+                <BookmarkPlus className="h-4 w-4 mr-2" />
+                Save current as template
+              </Button>
+            </CardContent>
+          </Card>
+
           {/* Process Information */}
           <Card>
             <CardHeader>
@@ -412,6 +541,35 @@ export default function ProcessCreate() {
           </div>
         </form>
       </div>
+
+      <Dialog open={showSaveTemplate} onOpenChange={setShowSaveTemplate}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save as template</DialogTitle>
+          </DialogHeader>
+          <div>
+            <Label className="mb-1 block">Template name</Label>
+            <Input
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="e.g. Standard coated peanut batch"
+              data-testid="input-template-name"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!templateName.trim() || saveTemplateMutation.isPending}
+              onClick={() => saveTemplateMutation.mutate()}
+              data-testid="button-confirm-save-template"
+            >
+              {saveTemplateMutation.isPending ? "Saving..." : "Save template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

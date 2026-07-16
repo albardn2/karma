@@ -153,6 +153,9 @@ class AbstractRepository(Generic[BASE]):
             query = query.filter(*filters)
         if ordering:
             query = query.order_by(*ordering)
+        elif hasattr(self._type, "created_at"):
+            # list pages default to newest-first
+            query = query.order_by(self._type.created_at.desc())
         total = query.count()
         offset = (page - 1) * per_page
         items = query.offset(offset).limit(per_page).all()
