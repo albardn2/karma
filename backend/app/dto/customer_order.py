@@ -1,5 +1,5 @@
 # app/dto/customer_order.py
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -49,6 +49,15 @@ class CustomerOrderRead(CustomerOrderBase):
     net_amount_due: Optional[float] = None
     net_amount_paid: Optional[float] = None
     trip_stop_uuid: Optional[str] = None
+    # display names resolved from the customer relationship
+    customer_company_name: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices(
+            "customer_company_name", AliasPath("customer", "company_name")))
+    customer_full_name: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices(
+            "customer_full_name", AliasPath("customer", "full_name")))
     is_paid: Optional[bool] = None
     currency: Optional[Currency] = None
 
