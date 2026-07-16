@@ -122,6 +122,69 @@ def list_materials():
     return jsonify(result), 200
 
 
+@material_blueprint.route('/<string:uuid>/inventory-summary', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.OPERATION_MANAGER.value)
+def material_inventory_summary(uuid: str):
+    """Stock-over-time series + per-lot cost breakdown for one material.
+
+    - events: every inventory-event delta, oldest first (the client
+      cumulative-sums them into the total-stock series)
+    - lots: non-deleted inventories with remaining stock (> 0), each with its
+      cost per unit computed the same way the inventory detail does
+      (event costs -> purchase item prices -> process output costing)
+    """
+    from models.common import InventoryEvent as InventoryEventModel
+    from app.domains.inventory.domain import InventoryDomain
+    from app.dto.inventory import InventoryRead
+
+    with SqlAlchemyUnitOfWork() as uow:
+        m = uow.material_repository.find_one(uuid=uuid, is_deleted=False)
+        if not m:
+            return jsonify({'message': 'Material not found'}), 404
+
+        rows = (
+            uow.session.query(InventoryEventModel.created_at, InventoryEventModel.quantity)
+            .filter(
+                InventoryEventModel.material_uuid == uuid,
+                InventoryEventModel.is_deleted.is_(False),
+            )
+            .order_by(InventoryEventModel.created_at.asc())
+            .all()
+        )
+        events = [
+            {"t": r[0].isoformat() if r[0] else None, "quantity": r[1]}
+            for r in rows
+        ]
+
+        lots = []
+        for inv in uow.inventory_repository.find_all(material_uuid=uuid, is_deleted=False):
+            qty = inv.current_quantity
+            if not qty or qty <= 0:
+                continue  # empty lots are noise — hidden by design
+            dto = InventoryRead.from_orm(inv)
+            InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=dto)
+            currency = inv.currency or next(
+                (e.currency for e in inv.inventory_events if not e.is_deleted and e.currency),
+                None,
+            )
+            lots.append({
+                "uuid": inv.uuid,
+                "lot_id": inv.lot_id,
+                "warehouse_name": inv.warehouse.name if inv.warehouse else None,
+                "current_quantity": qty,
+                "unit": inv.unit,
+                "cost_per_unit": dto.cost_per_unit,
+                "currency": currency,
+                "created_at": inv.created_at.isoformat() if inv.created_at else None,
+                "expiration_date": inv.expiration_date.isoformat() if inv.expiration_date else None,
+            })
+        lots.sort(key=lambda l: l["created_at"] or "")
+    return jsonify({"events": events, "lots": lots}), 200
+
+
 # unit of measure enum list route
 @material_blueprint.route('/unit-of-measure', methods=['GET'])
 def list_unit_of_measure():
