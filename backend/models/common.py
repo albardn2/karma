@@ -1923,8 +1923,14 @@ class Trip(Base):
         totals: dict[str, float] = {}
         for stop in self.stops:
             for payment in stop.payments:
-                if not payment.is_deleted:
-                    totals[payment.currency] = totals.get(payment.currency, 0) + payment.amount
+                if payment.is_deleted:
+                    continue
+                inv = payment.invoice
+                order = inv.customer_order if inv else None
+                # ignore money from deleted invoices/orders (legacy non-cascaded voids)
+                if (inv and inv.is_deleted) or (order and order.is_deleted):
+                    continue
+                totals[payment.currency] = totals.get(payment.currency, 0) + payment.amount
         return totals
 
     @property
