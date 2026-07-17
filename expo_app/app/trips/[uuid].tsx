@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime } from '@/utils/date';
 import { TripTrackingMap } from '@/components/TripTrackingMap';
+import { TripAnalyticsCard } from '@/components/TripAnalyticsCard';
 import type { TripMapStop } from '@/components/TripMap';
 import { STATUS_BADGE } from '../trips';
 
@@ -250,6 +251,9 @@ export default function TripDetailScreen() {
           <MoneyRow label={t('trips.collected')} totals={money.collected} />
           <MoneyRow label={t('trips.debt')} totals={money.debt} highlightNonZero />
         </View>
+
+        {/* analytics */}
+        <TripAnalyticsCard activity={activity} />
 
         {/* expected cash */}
         {cash.length > 0 && (

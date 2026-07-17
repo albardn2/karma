@@ -13,6 +13,13 @@ export const translations: Record<Lang, Record<string, string>> = {
   en: {
     // trips module (admin)
     'menu.trips': 'Trips',
+    'trips.analytics': 'Analytics',
+    'trips.chipStops': 'Stops: {count}',
+    'trips.chipCompleted': 'Completed: {count}',
+    'trips.chipSales': 'Sales: {count}',
+    'trips.chipUnpaid': 'Unpaid orders: {count}',
+    'trips.revenuePerMaterial': 'Revenue per material',
+    'trips.deliveredQty': 'Delivered quantity per material',
     'trips.title': 'Trips',
     'trips.adminsOnly': 'This module is for admins only.',
     'trips.empty': 'No trips found.',
@@ -410,6 +417,13 @@ export const translations: Record<Lang, Record<string, string>> = {
   ar: {
     // trips module (admin)
     'menu.trips': 'الرحلات',
+    'trips.analytics': 'التحليلات',
+    'trips.chipStops': 'المحطات: {count}',
+    'trips.chipCompleted': 'المكتملة: {count}',
+    'trips.chipSales': 'المبيعات: {count}',
+    'trips.chipUnpaid': 'طلبات غير مدفوعة: {count}',
+    'trips.revenuePerMaterial': 'الإيرادات حسب المادة',
+    'trips.deliveredQty': 'الكمية المسلَّمة حسب المادة',
     'trips.title': 'الرحلات',
     'trips.adminsOnly': 'هذه الوحدة للمشرفين فقط.',
     'trips.empty': 'لا توجد رحلات.',
