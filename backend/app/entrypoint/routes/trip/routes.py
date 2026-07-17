@@ -220,6 +220,8 @@ def list_trips():
         filters.append(TripModel.vehicle_uuid == params.vehicle_uuid)
     if params.service_area_uuid:
         filters.append(TripModel.service_area_uuid == params.service_area_uuid)
+    if params.workflow_execution_uuid:
+        filters.append(TripModel.workflow_execution_uuid == params.workflow_execution_uuid)
     if params.status:
         filters.append(TripModel.status.ilike(f"%{params.status}%"))
     if params.intersects_area:

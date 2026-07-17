@@ -15,6 +15,8 @@ import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { TripMap, TripMapArea, TripMapStop } from '@/components/TripMap';
+import { TripTrackingMap } from '@/components/TripTrackingMap';
+import { useAuth } from '@/contexts/AuthContext';
 import { StopsSheet } from '@/components/StopsSheet';
 import { parseWktPolygons } from '@/utils/wkt';
 import { formatMonthDayTime } from '@/utils/date';
@@ -154,6 +156,8 @@ export default function ExecutionDetailScreen() {
   const { t } = useLanguage();
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
 
+  const { isAdmin } = useAuth();
+  const [trackingOn, setTrackingOn] = useState(false);
   const [execution, setExecution] = useState<WorkflowExecution | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -214,6 +218,13 @@ export default function ExecutionDetailScreen() {
     () => (execution?.task_executions || []).find((t) => t.operator === 'trip_finish_operator') || null,
     [execution]
   );
+
+  // who the trip is assigned to (username or uuid, from the setup result)
+  const assignedValue = useMemo(() => {
+    const setup = (execution?.task_executions || []).find((t) => t.operator === 'start_trip_operator');
+    const v = setup?.result?.assigned_user_uuid;
+    return typeof v === 'string' && v ? v : null;
+  }, [execution]);
 
   // service areas picked in the start_trip setup (names from its result)
   const pickedAreaNames = useMemo(() => {
@@ -433,6 +444,15 @@ export default function ExecutionDetailScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <NativeHeader title={t('trip.trip')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
         <View style={styles.mapArea}>
+          {trackingOn && isAdmin ? (
+            <TripTrackingMap
+              executionUuid={execution.uuid}
+              assignedValue={assignedValue}
+              stops={tripStops}
+              onClose={() => setTrackingOn(false)}
+            />
+          ) : (
+          <>
           <TripMap
             stops={tripStops}
             currentStopUuid={currentStopUuid}
@@ -442,6 +462,15 @@ export default function ExecutionDetailScreen() {
             onSetCurrent={setCurrentStop}
             areas={serviceAreas}
           />
+          {isAdmin && (
+            <TouchableOpacity
+              style={styles.trackingBtn}
+              onPress={() => setTrackingOn(true)}
+              testID="button-open-tracking"
+            >
+              <ThemedText style={styles.trackingBtnText}>{t('tracking.button')}</ThemedText>
+            </TouchableOpacity>
+          )}
           {stopsLoading && (
             <View style={styles.stopsLoading}><ActivityIndicator color="#5469D4" /></View>
           )}
@@ -455,6 +484,8 @@ export default function ExecutionDetailScreen() {
             onArm={setArmedStopUuid}
             finishAction={finishActive ? { label: t('trip.finishTripButton'), onPress: finishTrip } : null}
           />
+          </>
+          )}
         </View>
       </ThemedView>
     );
@@ -527,6 +558,12 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 14, opacity: 0.6, textAlign: 'center' },
   mapArea: { flex: 1 },
   stopsLoading: { position: 'absolute', top: 12, alignSelf: 'center', backgroundColor: '#fff', borderRadius: 20, padding: 8, elevation: 4 },
+  trackingBtn: {
+    position: 'absolute', top: 12, right: 12, backgroundColor: '#111827', borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 8,
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 6,
+  },
+  trackingBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   content: { padding: 16, paddingBottom: 40 },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   badgeText: { fontSize: 12, fontWeight: '600' },

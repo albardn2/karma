@@ -11,6 +11,17 @@ export const LANGUAGE_LABELS: Record<Lang, string> = {
 
 export const translations: Record<Lang, Record<string, string>> = {
   en: {
+    // tracking (admin live/playback on the trip map)
+    'tracking.button': 'Tracking',
+    'tracking.live': 'Live',
+    'tracking.playback': 'Playback',
+    'tracking.connecting': 'Connecting…',
+    'tracking.disconnected': 'Disconnected — retrying…',
+    'tracking.waiting': "Waiting for the driver's app to report…",
+    'tracking.lastSeen': 'seen {sec}s ago',
+    'tracking.noPoints': 'No recorded locations for this trip yet.',
+    'tracking.recenter': 'Recenter',
+    'tracking.noDriver': 'No assigned driver',
     // common
     'common.cancel': 'Cancel',
     'common.error': 'Error',
@@ -358,6 +369,17 @@ export const translations: Record<Lang, Record<string, string>> = {
     'custdetail.uuid': 'UUID',
   },
   ar: {
+    // tracking (admin live/playback on the trip map)
+    'tracking.button': 'التتبع',
+    'tracking.live': 'مباشر',
+    'tracking.playback': 'إعادة العرض',
+    'tracking.connecting': 'جارٍ الاتصال…',
+    'tracking.disconnected': 'انقطع الاتصال — تجري إعادة المحاولة…',
+    'tracking.waiting': 'بانتظار إشارة تطبيق السائق…',
+    'tracking.lastSeen': 'آخر ظهور قبل {sec} ث',
+    'tracking.noPoints': 'لا توجد مواقع مسجلة لهذه الرحلة بعد.',
+    'tracking.recenter': 'إعادة التمركز',
+    'tracking.noDriver': 'لا يوجد سائق معيّن',
     // common
     'common.cancel': 'إلغاء',
     'common.error': 'خطأ',
