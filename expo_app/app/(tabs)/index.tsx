@@ -17,12 +17,14 @@ interface MenuItem {
   icon: string;
   section: string;
   color: string;
+  adminOnly?: boolean;
 }
 
 const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 1, titleKey: 'menu.customers', icon: '👥', section: 'customers', color: '#5469D4' },
   { id: 2, titleKey: 'menu.customerOrders', icon: '📋', section: 'customer_orders', color: '#e74c3c' },
   { id: 3, titleKey: 'menu.distribution', icon: '🚚', section: 'distribution', color: '#16a34a' },
+  { id: 4, titleKey: 'menu.trips', icon: '🗺️', section: 'trips', color: '#d97706', adminOnly: true },
 ];
 
 const LANGS: Lang[] = ['en', 'ar'];
@@ -46,9 +48,9 @@ export default function HomeScreen() {
       .map((s: string) => s.trim())
       .filter(Boolean);
     const fieldOnly = scopes.length > 0 && scopes.every((s) => FIELD_ROLES.has(s));
-    return fieldOnly
-      ? ALL_MENU_ITEMS.filter((i) => i.section === 'distribution')
-      : ALL_MENU_ITEMS;
+    const isAdmin = scopes.includes('admin') || scopes.includes('superuser');
+    if (fieldOnly) return ALL_MENU_ITEMS.filter((i) => i.section === 'distribution');
+    return ALL_MENU_ITEMS.filter((i) => !i.adminOnly || isAdmin);
   }, [user?.permission_scope]);
 
   const handleLogout = () => {
@@ -71,6 +73,8 @@ export default function HomeScreen() {
       router.push('/customers');
     } else if (item.section === 'distribution') {
       router.push('/distribution');
+    } else if (item.section === 'trips') {
+      router.push('/trips');
     } else if (item.section === 'customer_orders') {
       Alert.alert(t('menu.comingSoon'), t('menu.comingSoonMsg'));
     }

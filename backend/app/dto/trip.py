@@ -221,6 +221,7 @@ class TripListParams(BaseModel):
     created_by_uuid: Optional[str] = None
     vehicle_uuid: Optional[str] = None
     service_area_uuid: Optional[str] = None
+    workflow_execution_uuid: Optional[str] = None
     status: Optional[TripStatus] = None
     intersects_area: Optional[str] = None  # POLYGON WKT to intersect with trip.geometry
 
