@@ -54,8 +54,40 @@ def get_trip(uuid: str):
         m = uow.trip_repository.find_one(uuid=uuid, is_deleted=False)
         if not m:
             raise NotFoundError("Trip not found")
-        dto = TripRead.from_orm(m).model_dump(mode="json")
+        dto = TripRead.from_orm(m)
+        dto.assigned_username = _assigned_username_for_wfe(uow, m.workflow_execution_uuid)
+        dto = dto.model_dump(mode="json")
     return jsonify(dto), 200
+
+
+def _assigned_username_for_wfe(uow, wfe_uuid):
+    """Resolve a workflow execution's assignee (stored on the start_trip task
+    result as username-or-uuid) to a username; None when unassigned."""
+    if not wfe_uuid:
+        return None
+    from models.common import (
+        TaskExecution as TaskExecutionModel,
+        Task as TaskModel,
+        User as UserModel,
+    )
+    row = (
+        uow.session.query(TaskExecutionModel.result["assigned_user_uuid"].astext)
+        .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
+        .filter(
+            TaskExecutionModel.workflow_execution_uuid == wfe_uuid,
+            TaskModel.operator == "start_trip_operator",
+        )
+        .first()
+    )
+    v = row[0] if row else None
+    if not v:
+        return None
+    u = (
+        uow.session.query(UserModel.username)
+        .filter((UserModel.uuid == v) | (UserModel.username == v))
+        .first()
+    )
+    return u[0] if u else v
 #
 #
 @trip_blueprint.route("/<string:uuid>/activity", methods=["GET"])
