@@ -13,6 +13,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface SeriesPoint {
   t: string; // "YYYY-MM-DD"
@@ -41,9 +42,9 @@ interface DashboardOverview {
 }
 
 const RANGE_PRESETS = [
-  { days: 7, label: "7 days" },
-  { days: 30, label: "30 days" },
-  { days: 90, label: "90 days" },
+  { days: 7, labelKey: "dashboard.range7" },
+  { days: 30, labelKey: "dashboard.range30" },
+  { days: 90, labelKey: "dashboard.range90" },
 ];
 
 const fmtMoney = (n: number) =>
@@ -94,7 +95,7 @@ function PillGroup({
 function Sparkline({ data, color }: { data: SeriesPoint[]; color: string }) {
   if (!data.length) return <div className="h-10" />;
   return (
-    <div className="h-10 -mx-2">
+    <div className="h-10 -mx-2" dir="ltr">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
           <Area
@@ -155,6 +156,7 @@ function StatCard({
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { t, te } = useLanguage();
   const [days, setDays] = useState(30);
   const [pickedCurrency, setPickedCurrency] = useState<string | null>(null);
 
@@ -191,17 +193,16 @@ export default function Dashboard() {
         {/* header */}
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{t("dashboard.title")}</h2>
             <p className="text-sm text-gray-600">
-              Welcome back{firstName ? `, ${firstName}` : ""}. Here's how the
-              business is doing.
+              {t("dashboard.welcome", { name: firstName ? `, ${firstName}` : "" })}
             </p>
           </div>
           {!forbidden && (
             <div className="flex items-center gap-2 flex-wrap">
               {(overview?.currencies.length || 0) > 1 && (
                 <PillGroup
-                  options={overview!.currencies.map((c) => ({ key: c, label: c }))}
+                  options={overview!.currencies.map((c) => ({ key: c, label: te(c) }))}
                   value={currency}
                   onChange={setPickedCurrency}
                   testPrefix="currency"
@@ -210,7 +211,7 @@ export default function Dashboard() {
               <PillGroup
                 options={RANGE_PRESETS.map((r) => ({
                   key: String(r.days),
-                  label: r.label,
+                  label: t(r.labelKey),
                 }))}
                 value={String(days)}
                 onChange={(k) => setDays(Number(k))}
@@ -223,8 +224,7 @@ export default function Dashboard() {
         {forbidden ? (
           <Card>
             <CardContent className="pt-6 text-sm text-gray-500">
-              Business analytics are visible to admins, operation managers and
-              accountants.
+              {t("dashboard.analyticsRestricted")}
             </CardContent>
           </Card>
         ) : (
@@ -235,7 +235,7 @@ export default function Dashboard() {
                 <div className="grid lg:grid-cols-[1fr_240px] gap-6">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      Total revenue · last {days} days
+                      {t("dashboard.totalRevenue", { days })}
                     </p>
                     <p
                       className="text-3xl font-semibold text-gray-900 mt-1"
@@ -243,10 +243,10 @@ export default function Dashboard() {
                     >
                       {totals ? fmtMoney(totals.revenue[currency] || 0) : "—"}{" "}
                       <span className="text-base text-gray-500 font-normal">
-                        {currency}
+                        {te(currency)}
                       </span>
                     </p>
-                    <div className="mt-4 h-60">
+                    <div className="mt-4 h-60" dir="ltr">
                       {isLoading ? (
                         <div className="h-full rounded-lg bg-gray-50 animate-pulse" />
                       ) : (
@@ -271,10 +271,10 @@ export default function Dashboard() {
                               axisLine={false}
                             />
                             <Tooltip
-                              labelFormatter={(t) => fmtDay(t as string)}
+                              labelFormatter={(d) => fmtDay(d as string)}
                               formatter={(v) => [
-                                `${fmtMoney(v as number)} ${currency}`,
-                                "Cumulative revenue",
+                                `${fmtMoney(v as number)} ${te(currency)}`,
+                                t("dashboard.cumulativeRevenue"),
                               ]}
                             />
                             <Area
@@ -294,7 +294,7 @@ export default function Dashboard() {
                   <div className="space-y-5 lg:border-s lg:border-gray-200 lg:ps-6">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        Collected
+                        {t("dashboard.collected")}
                       </p>
                       <p
                         className="text-2xl font-semibold text-gray-900 mt-1"
@@ -302,13 +302,13 @@ export default function Dashboard() {
                       >
                         {totals ? fmtMoney(totals.collected[currency] || 0) : "—"}{" "}
                         <span className="text-sm text-gray-500 font-normal">
-                          {currency}
+                          {te(currency)}
                         </span>
                       </p>
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        Outstanding debt
+                        {t("dashboard.outstandingDebt")}
                       </p>
                       <p
                         className={`text-2xl font-semibold mt-1 ${
@@ -322,16 +322,16 @@ export default function Dashboard() {
                           ? fmtMoney(totals.window_debt[currency] || 0)
                           : "—"}{" "}
                         <span className="text-sm text-gray-500 font-normal">
-                          {currency}
+                          {te(currency)}
                         </span>
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        on orders from this window
+                        {t("dashboard.debtWindowNote")}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        New customers
+                        {t("dashboard.newCustomers")}
                       </p>
                       <p
                         className="text-2xl font-semibold text-gray-900 mt-1"
@@ -348,25 +348,25 @@ export default function Dashboard() {
             {/* stat cards with sparklines */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <StatCard
-                label="Revenue"
+                label={t("dashboard.revenue")}
                 value={totals ? fmtMoney(totals.revenue[currency] || 0) : "—"}
-                suffix={currency}
+                suffix={te(currency)}
                 spark={overview?.series.revenue[currency] || []}
                 color="#5469D4"
                 testId="stat-revenue"
               />
               <StatCard
-                label="Collected"
+                label={t("dashboard.collected")}
                 value={totals ? fmtMoney(totals.collected[currency] || 0) : "—"}
-                suffix={currency}
+                suffix={te(currency)}
                 spark={overview?.series.collected[currency] || []}
                 color="#16a34a"
                 testId="stat-collected"
               />
               <StatCard
-                label="Outstanding debt"
+                label={t("dashboard.outstandingDebt")}
                 value={totals ? fmtMoney(totals.window_debt[currency] || 0) : "—"}
-                suffix={currency}
+                suffix={te(currency)}
                 spark={[]}
                 color="#dc2626"
                 valueClassName={
@@ -377,21 +377,21 @@ export default function Dashboard() {
                 testId="stat-debt"
               />
               <StatCard
-                label="New customers"
+                label={t("dashboard.newCustomers")}
                 value={totals ? String(totals.new_customers) : "—"}
                 spark={overview?.series.new_customers || []}
                 color="#0891b2"
                 testId="stat-customers"
               />
               <StatCard
-                label="Orders"
+                label={t("dashboard.orders")}
                 value={totals ? String(totals.orders) : "—"}
                 spark={overview?.series.orders || []}
                 color="#d97706"
                 testId="stat-orders"
               />
               <StatCard
-                label="Trips"
+                label={t("dashboard.trips")}
                 value={totals ? String(totals.trips) : "—"}
                 spark={overview?.series.trips || []}
                 color="#7c3aed"
