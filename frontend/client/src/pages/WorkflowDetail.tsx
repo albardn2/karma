@@ -521,7 +521,7 @@ export default function WorkflowDetail() {
           <div className="flex items-center gap-4">
             <Link href="/workflows">
               <Button variant="ghost" size="sm" data-testid="button-back">
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="h-4 w-4 me-2" />
                 Back
               </Button>
             </Link>
@@ -546,7 +546,7 @@ export default function WorkflowDetail() {
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" data-testid="button-delete">
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash2 className="h-4 w-4 me-2" />
                       Delete
                     </Button>
                   </AlertDialogTrigger>
@@ -578,7 +578,7 @@ export default function WorkflowDetail() {
                   onClick={handleCancel}
                   data-testid="button-cancel"
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-4 w-4 me-2" />
                   Cancel
                 </Button>
                 <Button
@@ -586,7 +586,7 @@ export default function WorkflowDetail() {
                   disabled={updateMutation.isPending}
                   data-testid="button-save"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 me-2" />
                   {updateMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </>
@@ -766,20 +766,20 @@ export default function WorkflowDetail() {
                   size="sm"
                   variant={taskViewMode === "list" ? "default" : "ghost"}
                   onClick={() => setTaskViewMode("list")}
-                  className="rounded-r-none"
+                  className="rounded-e-none"
                   data-testid="button-view-list"
                 >
-                  <List className="h-4 w-4 mr-1" />
+                  <List className="h-4 w-4 me-1" />
                   List
                 </Button>
                 <Button
                   size="sm"
                   variant={taskViewMode === "dag" ? "default" : "ghost"}
                   onClick={() => setTaskViewMode("dag")}
-                  className="rounded-l-none"
+                  className="rounded-s-none"
                   data-testid="button-view-dag"
                 >
-                  <Network className="h-4 w-4 mr-1" />
+                  <Network className="h-4 w-4 me-1" />
                   DAG
                 </Button>
               </div>
@@ -790,7 +790,7 @@ export default function WorkflowDetail() {
                     onClick={() => handleOpenTaskDialog()}
                     data-testid="button-create-task"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="h-4 w-4 me-2" />
                     Create Task
                   </Button>
                 </DialogTrigger>
@@ -886,7 +886,7 @@ export default function WorkflowDetail() {
                         tasks
                           .filter(t => !editingTask || t.uuid !== editingTask.uuid)
                           .map((task) => (
-                            <div key={task.uuid} className="flex items-center space-x-2">
+                            <div key={task.uuid} className="flex items-center space-x-2 rtl:space-x-reverse">
                               <input
                                 type="checkbox"
                                 id={`dep-${task.uuid}`}
@@ -910,7 +910,7 @@ export default function WorkflowDetail() {
                   <div>
                     <Label htmlFor="task-callbacks">
                       Callback Functions
-                      <span className="text-gray-500 text-xs ml-2">
+                      <span className="text-gray-500 text-xs ms-2">
                         Comma-separated
                       </span>
                     </Label>
@@ -992,7 +992,7 @@ export default function WorkflowDetail() {
                               <Badge
                                 key={idx}
                                 variant="secondary"
-                                className="mr-1 text-xs"
+                                className="me-1 text-xs"
                               >
                                 {dep}
                               </Badge>
@@ -1006,7 +1006,7 @@ export default function WorkflowDetail() {
                               <Badge
                                 key={idx}
                                 variant="outline"
-                                className="mr-1 text-xs"
+                                className="me-1 text-xs"
                               >
                                 {cb}
                               </Badge>
@@ -1017,7 +1017,7 @@ export default function WorkflowDetail() {
                           Created {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : 'N/A'}
                         </p>
                       </div>
-                      <div className="flex gap-2 ml-4">
+                      <div className="flex gap-2 ms-4">
                         <Button
                           size="sm"
                           variant="outline"

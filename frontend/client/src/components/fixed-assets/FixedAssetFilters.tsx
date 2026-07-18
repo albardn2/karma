@@ -48,10 +48,10 @@ export function FixedAssetFilters({ filters, onFiltersChange, totalCount, perPag
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" className="relative">
-          <Filter className="h-4 w-4 mr-2" />
+          <Filter className="h-4 w-4 me-2" />
           Filters
           {hasActiveFilters && (
-            <span className="absolute -top-1 -right-1 h-3 w-3 bg-[#5469D4] rounded-full"></span>
+            <span className="absolute -top-1 -end-1 h-3 w-3 bg-[#5469D4] rounded-full"></span>
           )}
         </Button>
       </SheetTrigger>

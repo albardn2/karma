@@ -240,7 +240,7 @@ export default function VehicleDetail() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Vehicle not found</h2>
             <p className="text-gray-600 mb-4">The vehicle you're looking for doesn't exist.</p>
             <Button onClick={() => history.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Go Back
             </Button>
           </div>
@@ -261,7 +261,7 @@ export default function VehicleDetail() {
               onClick={() => history.back()}
               data-testid="button-back"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
             <div>
@@ -282,13 +282,13 @@ export default function VehicleDetail() {
                   onClick={() => setIsEditing(true)}
                   data-testid="button-edit"
                 >
-                  <Edit className="h-4 w-4 mr-2" />
+                  <Edit className="h-4 w-4 me-2" />
                   Edit
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" data-testid="button-delete">
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash2 className="h-4 w-4 me-2" />
                       Delete
                     </Button>
                   </AlertDialogTrigger>
@@ -323,7 +323,7 @@ export default function VehicleDetail() {
                   }}
                   data-testid="button-cancel-edit"
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-4 w-4 me-2" />
                   Cancel
                 </Button>
                 <Button
@@ -331,7 +331,7 @@ export default function VehicleDetail() {
                   disabled={updateVehicleMutation.isPending}
                   data-testid="button-save"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 me-2" />
                   {updateVehicleMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </>

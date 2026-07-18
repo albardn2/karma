@@ -111,7 +111,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
             onClick={startAddingNew}
             data-testid="button-add-input-field"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 me-2" />
             Add Field
           </Button>
         )}
@@ -152,7 +152,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2 ml-4">
+                <div className="flex gap-2 ms-4">
                   <Button
                     type="button"
                     size="sm"
@@ -235,7 +235,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
               </Select>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
               <Checkbox
                 id="field-required"
                 checked={currentField.required}
@@ -339,7 +339,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                     data-testid="input-field-accept"
                   />
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 rtl:space-x-reverse">
                   <Checkbox
                     id="field-multiple"
                     checked={currentField.multiple}
@@ -373,7 +373,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                 onClick={handleCancel}
                 data-testid="button-cancel-field"
               >
-                <X className="h-4 w-4 mr-2" />
+                <X className="h-4 w-4 me-2" />
                 Cancel
               </Button>
               <Button
@@ -381,7 +381,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                 onClick={editingIndex !== null ? handleUpdateField : handleAddField}
                 data-testid="button-save-field"
               >
-                <Check className="h-4 w-4 mr-2" />
+                <Check className="h-4 w-4 me-2" />
                 {editingIndex !== null ? "Update" : "Add"} Field
               </Button>
             </div>

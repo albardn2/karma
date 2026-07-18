@@ -128,7 +128,7 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="max-h-96 overflow-y-auto pr-2 space-y-4">
+            <div className="max-h-96 overflow-y-auto pe-2 space-y-4">
               <FormField
                 control={form.control}
                 name="vehicle_uuid"

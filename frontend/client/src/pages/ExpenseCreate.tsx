@@ -141,7 +141,7 @@ export default function ExpenseCreate() {
               variant="ghost"
               size="sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
             <div>
@@ -158,7 +158,7 @@ export default function ExpenseCreate() {
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={createMutation.isPending} className="bg-[#5469D4] hover:bg-[#4356C7] text-white">
-              <Save className="h-4 w-4 mr-2" />
+              <Save className="h-4 w-4 me-2" />
               {createMutation.isPending ? "Creating..." : "Create Expense"}
             </Button>
           </div>
@@ -258,7 +258,7 @@ export default function ExpenseCreate() {
 
               {/* Auto Pay */}
               <div className="space-y-2">
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 rtl:space-x-reverse">
                   <Switch
                     id="should_pay"
                     checked={formData.should_pay || false}

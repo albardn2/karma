@@ -219,7 +219,7 @@ export default function CreditNoteItemDetail() {
               className="mt-4"
               variant="outline"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back to Credit Note Items
             </Button>
           </div>
@@ -286,7 +286,7 @@ export default function CreditNoteItemDetail() {
                 </Badge>
                 {creditNoteItem.is_paid && (
                   <Badge className="bg-green-100 text-green-800">
-                    <CheckCircle className="h-3 w-3 mr-1" />
+                    <CheckCircle className="h-3 w-3 me-1" />
                     Paid
                   </Badge>
                 )}
@@ -319,7 +319,7 @@ export default function CreditNoteItemDetail() {
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash2 className="h-4 w-4 me-2" />
                       Delete
                     </Button>
                   </AlertDialogTrigger>
@@ -350,7 +350,7 @@ export default function CreditNoteItemDetail() {
                   onClick={handleCancel}
                   disabled={updateMutation.isPending}
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-4 w-4 me-2" />
                   Cancel
                 </Button>
                 <Button
@@ -358,7 +358,7 @@ export default function CreditNoteItemDetail() {
                   disabled={updateMutation.isPending}
                   className="bg-purple-600 hover:bg-purple-700"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 me-2" />
                   {updateMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </>
@@ -501,7 +501,7 @@ export default function CreditNoteItemDetail() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 w-6 p-0 flex-shrink-0 ml-2"
+                          className="h-6 w-6 p-0 flex-shrink-0 ms-2"
                           onClick={() => copyToClipboard(creditNoteItem?.notes || "", "Notes")}
                         >
                           <Copy className="h-3 w-3" />
@@ -559,7 +559,7 @@ export default function CreditNoteItemDetail() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0 flex-shrink-0 ml-2"
+                      className="h-6 w-6 p-0 flex-shrink-0 ms-2"
                       onClick={() => copyToClipboard(creditNoteItem ? getReferenceUuid(creditNoteItem) : "", "Reference UUID")}
                     >
                       <Copy className="h-3 w-3" />
@@ -608,7 +608,7 @@ export default function CreditNoteItemDetail() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 w-6 p-0 flex-shrink-0 ml-2"
+                        className="h-6 w-6 p-0 flex-shrink-0 ms-2"
                         onClick={() => copyToClipboard(creditNoteItem?.created_by_uuid || '', "Created By UUID")}
                       >
                         <Copy className="h-3 w-3" />

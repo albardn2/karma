@@ -205,11 +205,11 @@ export function LocationPlayback({
         >
           {playing ? (
             <>
-              <Pause className="h-4 w-4 mr-2" /> Pause
+              <Pause className="h-4 w-4 me-2" /> Pause
             </>
           ) : (
             <>
-              <Play className="h-4 w-4 mr-2" /> Play
+              <Play className="h-4 w-4 me-2" /> Play
             </>
           )}
         </Button>

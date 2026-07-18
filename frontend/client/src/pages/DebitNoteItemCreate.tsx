@@ -240,7 +240,7 @@ export default function DebitNoteItemCreate() {
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 rtl:space-x-reverse">
                 <Checkbox
                   id="create_payment"
                   checked={form.watch("create_payment")}

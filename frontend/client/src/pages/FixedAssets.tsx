@@ -199,7 +199,7 @@ export default function FixedAssets() {
               <p className="text-sm text-muted-foreground">
                 Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, totalCount)} of {totalCount} fixed assets
               </p>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 rtl:space-x-reverse">
                 <Button
                   variant="outline"
                   size="sm"

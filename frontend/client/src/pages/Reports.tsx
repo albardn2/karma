@@ -88,7 +88,7 @@ export default function Reports() {
           {reportCards.map((report, index) => (
             <Card key={index} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-4">
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 rtl:space-x-reverse">
                   <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${report.color}`}>
                     <report.icon className="w-6 h-6" />
                   </div>
@@ -99,7 +99,7 @@ export default function Reports() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 rtl:space-x-reverse">
                   <Button variant="outline" className="flex-1">
                     View Report
                   </Button>

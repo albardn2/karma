@@ -112,7 +112,7 @@ export default function FinancialAccounts() {
               <Sheet open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
                 <SheetTrigger asChild>
                   <Button variant="outline">
-                    <Filter className="h-4 w-4 mr-2" />
+                    <Filter className="h-4 w-4 me-2" />
                     Filters
                   </Button>
                 </SheetTrigger>
@@ -256,7 +256,7 @@ export default function FinancialAccounts() {
                       onClick={handlePreviousPage}
                       disabled={currentPage <= 1}
                     >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      <ChevronLeft className="h-4 w-4 me-1" />
                       Previous
                     </Button>
                     <Button
@@ -266,7 +266,7 @@ export default function FinancialAccounts() {
                       disabled={currentPage >= accountsData.pages}
                     >
                       Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
+                      <ChevronRight className="h-4 w-4 ms-1" />
                     </Button>
                   </div>
                 </div>

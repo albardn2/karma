@@ -248,7 +248,7 @@ export default function Customers() {
           <div className="mb-6">
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg px-4 py-3">
               <div className="flex items-center">
-                <div className="w-3 h-3 bg-indigo-500 rounded-full mr-3"></div>
+                <div className="w-3 h-3 bg-indigo-500 rounded-full me-3"></div>
                 <span className="text-sm font-medium text-indigo-900">
                   {displayText}
                 </span>
@@ -260,14 +260,14 @@ export default function Customers() {
         {/* View Toggle and Filters */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4 relative z-10">
           {/* View Toggle */}
-          <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center space-x-2 rtl:space-x-reverse bg-gray-100 rounded-lg p-1">
             <Button
               variant={viewMode === 'list' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => handleViewModeChange('list')}
               className={viewMode === 'list' ? 'brand-gradient' : ''}
             >
-              <List className="w-4 h-4 mr-2" />
+              <List className="w-4 h-4 me-2" />
               List
             </Button>
             <Button
@@ -276,7 +276,7 @@ export default function Customers() {
               onClick={() => handleViewModeChange('map')}
               className={viewMode === 'map' ? 'brand-gradient' : ''}
             >
-              <Map className="w-4 h-4 mr-2" />
+              <Map className="w-4 h-4 me-2" />
               Map
             </Button>
           </div>
@@ -310,7 +310,7 @@ export default function Customers() {
                       </h3>
                       <p className="text-sm text-gray-600">{customer.full_name}</p>
                     </div>
-                    <Badge variant="secondary" className="ml-2 capitalize">
+                    <Badge variant="secondary" className="ms-2 capitalize">
                       {customer.category}
                     </Badge>
                   </div>
@@ -384,7 +384,7 @@ export default function Customers() {
 
         {/* Pagination - Only show for list view */}
         {viewMode === 'list' && customersData && customersData.pages > 1 && (
-          <div className="flex justify-center items-center space-x-4 mt-8">
+          <div className="flex justify-center items-center space-x-4 rtl:space-x-reverse mt-8">
             <Button
               variant="outline"
               disabled={filters.page === 1}

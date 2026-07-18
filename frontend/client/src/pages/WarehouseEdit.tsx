@@ -113,7 +113,7 @@ export default function WarehouseEdit() {
             <div className="flex items-center gap-4">
               <Link href={`/warehouses/${id}`}>
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back
                 </Button>
               </Link>
@@ -136,7 +136,7 @@ export default function WarehouseEdit() {
             <div className="flex items-center gap-4">
               <Link href="/warehouses">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back to Warehouses
                 </Button>
               </Link>
@@ -160,7 +160,7 @@ export default function WarehouseEdit() {
           <div className="flex items-center gap-4">
             <Link href={`/warehouses/${id}`}>
               <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="h-4 w-4 me-2" />
                 Back
               </Button>
             </Link>
@@ -230,7 +230,7 @@ export default function WarehouseEdit() {
                     type="submit"
                     disabled={updateWarehouseMutation.isPending}
                   >
-                    <Save className="h-4 w-4 mr-2" />
+                    <Save className="h-4 w-4 me-2" />
                     {updateWarehouseMutation.isPending ? "Saving..." : "Save Changes"}
                   </Button>
                   <Link href={`/warehouses/${id}`}>

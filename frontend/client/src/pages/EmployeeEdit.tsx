@@ -138,7 +138,7 @@ export default function EmployeeEdit() {
             <div className="flex items-center gap-4">
               <Link href={`/employees/${id}`}>
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back
                 </Button>
               </Link>
@@ -161,7 +161,7 @@ export default function EmployeeEdit() {
             <div className="flex items-center gap-4">
               <Link href="/employees">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back to Employees
                 </Button>
               </Link>
@@ -185,7 +185,7 @@ export default function EmployeeEdit() {
           <div className="flex items-center gap-4">
             <Link href={`/employees/${id}`}>
               <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="h-4 w-4 me-2" />
                 Back
               </Button>
             </Link>
@@ -308,7 +308,7 @@ export default function EmployeeEdit() {
                     type="submit"
                     disabled={updateEmployeeMutation.isPending}
                   >
-                    <Save className="h-4 w-4 mr-2" />
+                    <Save className="h-4 w-4 me-2" />
                     {updateEmployeeMutation.isPending ? "Saving..." : "Save Changes"}
                   </Button>
                   <Link href={`/employees/${id}`}>

@@ -134,7 +134,7 @@ export default function Processes() {
             />
             <Link href="/processes/create">
               <Button className="bg-purple-600 hover:bg-purple-700">
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 me-2" />
                 Create Process
               </Button>
             </Link>
@@ -160,7 +160,7 @@ export default function Processes() {
                 </p>
                 <Link href="/processes/create">
                   <Button className="bg-purple-600 hover:bg-purple-700">
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="h-4 w-4 me-2" />
                     Create Process
                   </Button>
                 </Link>
@@ -237,7 +237,7 @@ export default function Processes() {
                       onClick={() => setPage(Math.max(1, page - 1))}
                       disabled={page === 1}
                     >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      <ChevronLeft className="h-4 w-4 me-1" />
                       Previous
                     </Button>
                     <span className="text-sm text-gray-500">
@@ -249,7 +249,7 @@ export default function Processes() {
                       disabled={page === processesPage.pages}
                     >
                       Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
+                      <ChevronRight className="h-4 w-4 ms-1" />
                     </Button>
                   </div>
                 </div>

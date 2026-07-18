@@ -249,7 +249,7 @@ export default function UserDetail() {
         <div className="space-y-6">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => history.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
           </div>
@@ -267,7 +267,7 @@ export default function UserDetail() {
         <div className="space-y-6">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => history.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
           </div>
@@ -288,7 +288,7 @@ export default function UserDetail() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => history.back()}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="h-4 w-4 me-2" />
                 Back
               </Button>
               <div>
@@ -312,14 +312,14 @@ export default function UserDetail() {
                     }}
                     disabled={updateUserMutation.isPending}
                   >
-                    <X className="h-4 w-4 mr-2" />
+                    <X className="h-4 w-4 me-2" />
                     Cancel
                   </Button>
                   <Button
                     onClick={form.handleSubmit(onSubmit)}
                     disabled={updateUserMutation.isPending}
                   >
-                    <Save className="h-4 w-4 mr-2" />
+                    <Save className="h-4 w-4 me-2" />
                     {updateUserMutation.isPending ? "Saving..." : "Save Changes"}
                   </Button>
                 </>
@@ -328,7 +328,7 @@ export default function UserDetail() {
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" size="sm">
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        <Trash2 className="h-4 w-4 me-2" />
                         Delete
                       </Button>
                     </AlertDialogTrigger>
@@ -355,11 +355,11 @@ export default function UserDetail() {
                     variant="outline"
                     onClick={() => setLocation(`/users/${uuid}/location-history`)}
                   >
-                    <History className="h-4 w-4 mr-2" />
+                    <History className="h-4 w-4 me-2" />
                     Location History
                   </Button>
                   <Button onClick={() => setIsEditing(true)}>
-                    <Edit className="h-4 w-4 mr-2" />
+                    <Edit className="h-4 w-4 me-2" />
                     Edit User
                   </Button>
                 </>

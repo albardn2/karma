@@ -59,7 +59,7 @@ export default function WorkflowExecution() {
             </p>
             <Link href="/workflows/new">
               <Button data-testid="button-create-first-workflow">
-                <GitBranch className="h-4 w-4 mr-2" />
+                <GitBranch className="h-4 w-4 me-2" />
                 Create Workflow
               </Button>
             </Link>
@@ -87,14 +87,14 @@ export default function WorkflowExecution() {
                           </p>
                         )}
                       </div>
-                      <GitBranch className="h-5 w-5 text-gray-400 group-hover:text-primary transition-colors flex-shrink-0 ml-2" />
+                      <GitBranch className="h-5 w-5 text-gray-400 group-hover:text-primary transition-colors flex-shrink-0 ms-2" />
                     </div>
                   </CardHeader>
                   <CardContent>
                     {/* Tags */}
                     {workflow.tags && workflow.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mb-3">
-                        <Tag className="h-3 w-3 text-gray-400 mr-1 mt-0.5" />
+                        <Tag className="h-3 w-3 text-gray-400 me-1 mt-0.5" />
                         {workflow.tags.slice(0, 3).map((tag, idx) => (
                           <Badge
                             key={idx}
@@ -115,7 +115,7 @@ export default function WorkflowExecution() {
                     {/* Metadata */}
                     <div className="space-y-1 text-xs text-gray-500">
                       <div className="flex items-center">
-                        <Calendar className="h-3 w-3 mr-1.5" />
+                        <Calendar className="h-3 w-3 me-1.5" />
                         <span>
                           Created{" "}
                           {workflow.createdAt

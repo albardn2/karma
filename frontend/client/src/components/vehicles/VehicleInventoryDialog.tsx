@@ -142,7 +142,7 @@ export function VehicleInventoryDialog({ vehicleUuid }: { vehicleUuid: string })
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" data-testid="button-vehicle-inventory">
-          <Boxes className="h-4 w-4 mr-2" />
+          <Boxes className="h-4 w-4 me-2" />
           Inventory
         </Button>
       </DialogTrigger>
@@ -174,7 +174,7 @@ export function VehicleInventoryDialog({ vehicleUuid }: { vehicleUuid: string })
             disabled={!materialUuid || createInventory.isPending}
             data-testid="button-add-vinv"
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus className="h-4 w-4 me-1" />
             Add
           </Button>
         </div>

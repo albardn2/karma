@@ -113,7 +113,7 @@ export function AddFinancialAccountDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4 me-2" />
           Add Account
         </Button>
       </DialogTrigger>
@@ -179,7 +179,7 @@ export function AddFinancialAccountDialog() {
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
             <Button
               type="button"
               variant="outline"

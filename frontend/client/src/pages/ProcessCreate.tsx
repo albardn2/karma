@@ -300,7 +300,7 @@ export default function ProcessCreate() {
                 onClick={() => setShowSaveTemplate(true)}
                 data-testid="button-save-template"
               >
-                <BookmarkPlus className="h-4 w-4 mr-2" />
+                <BookmarkPlus className="h-4 w-4 me-2" />
                 Save current as template
               </Button>
             </CardContent>
@@ -439,7 +439,7 @@ export default function ProcessCreate() {
                 onClick={() => appendInput({ material_uuid: "", quantity: 0 })}
                 className="mt-4"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 me-2" />
                 Add Input Material
               </Button>
             </CardContent>
@@ -514,7 +514,7 @@ export default function ProcessCreate() {
                 onClick={() => appendOutput({ material_uuid: "", quantity: 0 })}
                 className="mt-4"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 me-2" />
                 Add Output Product
               </Button>
             </CardContent>

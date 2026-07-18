@@ -46,19 +46,19 @@ export default function Invoices() {
             <p className="text-sm text-gray-600">Manage invoices and payments</p>
           </div>
           <Button className="brand-gradient hover:opacity-90">
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="w-4 h-4 me-2" />
             Generate Invoice
           </Button>
         </div>
 
         {/* Search */}
         <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute start-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
             placeholder="Search invoices..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="ps-10"
           />
         </div>
 
@@ -69,22 +69,22 @@ export default function Invoices() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Invoice ID
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Customer
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Currency
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Due Date
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -112,13 +112,13 @@ export default function Invoices() {
                         </Badge>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-2 rtl:space-x-reverse">
                           <Button variant="outline" size="sm">
-                            <Eye className="w-4 h-4 mr-1" />
+                            <Eye className="w-4 h-4 me-1" />
                             View
                           </Button>
                           <Button variant="outline" size="sm">
-                            <Download className="w-4 h-4 mr-1" />
+                            <Download className="w-4 h-4 me-1" />
                             Download
                           </Button>
                         </div>
@@ -139,7 +139,7 @@ export default function Invoices() {
               {searchTerm ? "Try adjusting your search terms" : "Get started by generating your first invoice"}
             </p>
             <Button className="brand-gradient hover:opacity-90">
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4 me-2" />
               Generate Invoice
             </Button>
           </div>

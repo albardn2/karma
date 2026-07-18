@@ -213,7 +213,7 @@ export function TaskDAG({ tasks, onEditTask, onDeleteTask }: TaskDAGProps) {
                       {node.task.operator}
                     </Badge>
                   </div>
-                  <div className="flex gap-1 ml-2">
+                  <div className="flex gap-1 ms-2">
                     <Button
                       size="sm"
                       variant="ghost"

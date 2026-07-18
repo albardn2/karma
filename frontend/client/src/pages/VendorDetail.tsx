@@ -730,7 +730,7 @@ export default function VendorDetail() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity ms-2"
                             onClick={() => copyToClipboard(vendor.full_address!, "Address")}
                           >
                             <Copy className="h-3 w-3" />
@@ -852,7 +852,7 @@ export default function VendorDetail() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity ms-2"
                               onClick={() => copyToClipboard(vendor.business_cards!, "Business cards")}
                             >
                               <Copy className="h-3 w-3" />
@@ -870,7 +870,7 @@ export default function VendorDetail() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity ms-2"
                             onClick={() => copyToClipboard(vendor.notes!, "Notes")}
                           >
                             <Copy className="h-3 w-3" />

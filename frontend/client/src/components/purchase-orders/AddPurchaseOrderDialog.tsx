@@ -205,7 +205,7 @@ export function AddPurchaseOrderDialog() {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button className="bg-[#5469D4] hover:bg-[#4356C7]">
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4 me-2" />
           Add Purchase Order
         </Button>
       </DialogTrigger>
@@ -275,7 +275,7 @@ export function AddPurchaseOrderDialog() {
                             {vendorValue
                               ? vendors?.find((vendor: any) => vendor.uuid === vendorValue)?.company_name || "Vendor not found"
                               : "Select vendor..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                           
                           {vendorOpen && (
@@ -303,7 +303,7 @@ export function AddPurchaseOrderDialog() {
                                     >
                                       <Check
                                         className={cn(
-                                          "mr-2 h-4 w-4",
+                                          "me-2 h-4 w-4",
                                           vendorValue === vendor.uuid ? "opacity-100" : "opacity-0"
                                         )}
                                       />
@@ -363,7 +363,7 @@ export function AddPurchaseOrderDialog() {
                           <Button
                             variant={"outline"}
                             className={cn(
-                              "w-full pl-3 text-left font-normal",
+                              "w-full ps-3 text-start font-normal",
                               !field.value && "text-muted-foreground"
                             )}
                           >
@@ -372,7 +372,7 @@ export function AddPurchaseOrderDialog() {
                             ) : (
                               <span>Pick a date</span>
                             )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            <CalendarIcon className="ms-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
@@ -428,7 +428,7 @@ export function AddPurchaseOrderDialog() {
                     quantity_received: 0,
                   })}
                 >
-                  <Plus className="h-4 w-4 mr-1" />
+                  <Plus className="h-4 w-4 me-1" />
                   Add Item
                 </Button>
               </CardHeader>
@@ -520,7 +520,7 @@ export function AddPurchaseOrderDialog() {
                                       {itemState.materialValue
                                         ? materials?.find((material: any) => material.uuid === itemState.materialValue)?.name || "Material not found"
                                         : "Select material..."}
-                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                     
                                     {itemState.materialOpen && (
@@ -555,7 +555,7 @@ export function AddPurchaseOrderDialog() {
                                               >
                                                 <Check
                                                   className={cn(
-                                                    "mr-2 h-4 w-4",
+                                                    "me-2 h-4 w-4",
                                                     itemState.materialValue === material.uuid ? "opacity-100" : "opacity-0"
                                                   )}
                                                 />
@@ -657,7 +657,7 @@ export function AddPurchaseOrderDialog() {
               </CardContent>
             </Card>
 
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-end space-x-2 rtl:space-x-reverse">
               <Button
                 type="button"
                 variant="outline"

@@ -56,10 +56,10 @@ export function InventoryEventFilters({ filters, onFiltersChange, totalCount, pe
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" className="relative">
-          <Filter className="h-4 w-4 mr-2" />
+          <Filter className="h-4 w-4 me-2" />
           Filters
           {hasActiveFilters && (
-            <div className="absolute -top-1 -right-1 h-2 w-2 bg-[#5469D4] rounded-full" />
+            <div className="absolute -top-1 -end-1 h-2 w-2 bg-[#5469D4] rounded-full" />
           )}
         </Button>
       </SheetTrigger>

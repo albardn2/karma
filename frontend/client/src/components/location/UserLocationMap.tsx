@@ -67,7 +67,7 @@ export function UserLocationMap({
           >
             Playback
           </Button>
-          <span className="text-xs text-gray-500 ml-auto">
+          <span className="text-xs text-gray-500 ms-auto">
             {liveAvailable ? "" : "Live is off — location tracking is disabled for this user. "}
             Playback shows the last 7 days ·{" "}
             <Link href={`/users/${userUuid}/location-history`} className="underline">

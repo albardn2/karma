@@ -39,7 +39,7 @@ export function WarehouseFiltersComponent({ filters, onFiltersChange }: Warehous
           <Filter className="h-4 w-4" />
           Filters
           {hasActiveFilters && (
-            <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+            <span className="ms-1 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
               {Object.keys(filters).filter(key => key !== 'page' && key !== 'per_page' && filters[key as keyof WarehouseFilters]).length}
             </span>
           )}

@@ -69,10 +69,10 @@ export function PaymentFilters({
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
           <Button variant="outline" className="relative">
-            <Filter className="h-4 w-4 mr-2" />
+            <Filter className="h-4 w-4 me-2" />
             Filters
             {hasActiveFilters && (
-              <span className="absolute -top-2 -right-2 bg-[#5469D4] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="absolute -top-2 -end-2 bg-[#5469D4] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
@@ -129,7 +129,7 @@ export function PaymentFilters({
                 Apply Filters
               </Button>
               <Button onClick={handleClearFilters} variant="outline" className="flex-1">
-                <X className="h-4 w-4 mr-2" />
+                <X className="h-4 w-4 me-2" />
                 Clear
               </Button>
             </div>

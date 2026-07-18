@@ -89,7 +89,7 @@ export function AddVehicleDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button data-testid="button-add-vehicle">
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4 me-2" />
           Add Vehicle
         </Button>
       </DialogTrigger>
@@ -103,7 +103,7 @@ export function AddVehicleDialog() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="max-h-96 overflow-y-auto pr-2 space-y-4">
+            <div className="max-h-96 overflow-y-auto pe-2 space-y-4">
               <FormField
                 control={form.control}
                 name="plate_number"

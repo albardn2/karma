@@ -50,10 +50,10 @@ export function PurchaseOrderFilters({ filters, onFiltersChange, totalCount, per
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" className="relative">
-          <Filter className="h-4 w-4 mr-2" />
+          <Filter className="h-4 w-4 me-2" />
           Filters
           {hasActiveFilters && (
-            <div className="absolute -top-1 -right-1 h-2 w-2 bg-[#5469D4] rounded-full" />
+            <div className="absolute -top-1 -end-1 h-2 w-2 bg-[#5469D4] rounded-full" />
           )}
         </Button>
       </SheetTrigger>
@@ -61,7 +61,7 @@ export function PurchaseOrderFilters({ filters, onFiltersChange, totalCount, per
         <SheetHeader className="flex-shrink-0">
           <SheetTitle>Filter Purchase Orders</SheetTitle>
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto space-y-6 mt-6 pr-2">
+        <div className="flex-1 overflow-y-auto space-y-6 mt-6 pe-2">
           <div className="space-y-4">
             <div>
               <Label htmlFor="uuid">UUID</Label>

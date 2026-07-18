@@ -123,7 +123,7 @@ export function CreateOrderDialog({
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button data-testid="button-create-order" className="bg-[#5469D4] hover:bg-[#5469D4]/90">
-          <ShoppingCart className="h-4 w-4 mr-2" />
+          <ShoppingCart className="h-4 w-4 me-2" />
           Create Order
         </Button>
       </DialogTrigger>
@@ -144,7 +144,7 @@ export function CreateOrderDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="ml-auto text-right">
+            <div className="ms-auto text-end">
               <div className="text-sm text-gray-500">Total</div>
               <div className="text-lg font-semibold">{total.toFixed(2)} {currency}</div>
             </div>
@@ -167,10 +167,10 @@ export function CreateOrderDialog({
                 </Select>
                 <div className="relative w-24">
                   <Input type="number" min="1" step="1" placeholder="Qty"
-                    className={unitOf(it.material_uuid) ? "pr-10" : ""}
+                    className={unitOf(it.material_uuid) ? "pe-10" : ""}
                     value={it.quantity} onChange={(e) => setItem(i, { quantity: e.target.value })} />
                   {unitOf(it.material_uuid) && (
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none"
+                    <span className="absolute end-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none"
                       data-testid={`unit-${i}`}>
                       {unitOf(it.material_uuid)}
                     </span>
@@ -184,7 +184,7 @@ export function CreateOrderDialog({
               </div>
             ))}
             <Button type="button" variant="outline" size="sm" onClick={addItem}>
-              <Plus className="h-4 w-4 mr-1" /> Add item
+              <Plus className="h-4 w-4 me-1" /> Add item
             </Button>
           </div>
 

@@ -165,7 +165,7 @@ export default function Login() {
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                <CreditCard className="w-4 h-4 mr-2" />
+                <CreditCard className="w-4 h-4 me-2" />
                 RFID Scan
               </button>
               <button
@@ -178,7 +178,7 @@ export default function Login() {
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                <KeyboardIcon className="w-4 h-4 mr-2" />
+                <KeyboardIcon className="w-4 h-4 me-2" />
                 Username & Password
               </button>
             </div>
@@ -215,14 +215,14 @@ export default function Login() {
                     Username or Email
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <User className="absolute start-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                     <Input
                       id="username"
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="Enter your username or email"
-                      className="pl-10"
+                      className="ps-10"
                       disabled={isLoading}
                       autoComplete="username"
                     />
@@ -234,14 +234,14 @@ export default function Login() {
                     Password
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Lock className="absolute start-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                     <Input
                       id="password"
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
-                      className="pl-10"
+                      className="ps-10"
                       disabled={isLoading}
                       autoComplete="current-password"
                     />

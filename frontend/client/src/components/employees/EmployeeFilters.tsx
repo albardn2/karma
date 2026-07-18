@@ -48,7 +48,7 @@ export function EmployeeFiltersComponent({ filters, onFiltersChange }: EmployeeF
           <Filter className="h-4 w-4" />
           Filters
           {hasActiveFilters && (
-            <span className="bg-blue-600 text-white text-xs font-medium rounded-full px-2 py-1 ml-2">
+            <span className="bg-blue-600 text-white text-xs font-medium rounded-full px-2 py-1 ms-2">
               {Object.keys(filters).filter(key => key !== 'page' && key !== 'per_page' && filters[key as keyof EmployeeFilters]).length}
             </span>
           )}

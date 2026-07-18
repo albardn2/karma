@@ -204,7 +204,7 @@ export default function TripDetail() {
             className="mb-6"
             data-testid="button-back"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-4 w-4 me-2" />
             Back to trips
           </Button>
           <Card>
@@ -226,7 +226,7 @@ export default function TripDetail() {
           className="mb-6"
           data-testid="button-back"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
+          <ArrowLeft className="h-4 w-4 me-2" />
           Back to trips
         </Button>
 
@@ -251,7 +251,7 @@ export default function TripDetail() {
                   onClick={() => setConfirmDelete(true)}
                   data-testid="button-delete-trip"
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
+                  <Trash2 className="h-4 w-4 me-2" />
                   Delete Trip
                 </Button>
               )}
@@ -424,24 +424,24 @@ export default function TripDetail() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm" data-testid="table-trip-inventory">
                   <thead>
-                    <tr className="text-left text-gray-500 border-b">
-                      <th className="py-2 pr-4 font-medium">Material</th>
-                      <th className="py-2 pr-4 font-medium text-right">Start</th>
-                      <th className="py-2 pr-4 font-medium text-right">Sold</th>
-                      <th className="py-2 pr-4 font-medium text-right">Expected End</th>
-                      <th className="py-2 pr-4 font-medium text-right">End</th>
-                      <th className="py-2 font-medium text-right">Variance</th>
+                    <tr className="text-start text-gray-500 border-b">
+                      <th className="py-2 pe-4 font-medium">Material</th>
+                      <th className="py-2 pe-4 font-medium text-end">Start</th>
+                      <th className="py-2 pe-4 font-medium text-end">Sold</th>
+                      <th className="py-2 pe-4 font-medium text-end">Expected End</th>
+                      <th className="py-2 pe-4 font-medium text-end">End</th>
+                      <th className="py-2 font-medium text-end">Variance</th>
                     </tr>
                   </thead>
                   <tbody>
                     {Object.entries(trip.inventory_reconciliation).map(([mu, r]) => (
                       <tr key={mu} className="border-b last:border-0">
-                        <td className="py-2 pr-4">{materialName(mu)}</td>
-                        <td className="py-2 pr-4 text-right">{r.start}</td>
-                        <td className="py-2 pr-4 text-right">{r.sold}</td>
-                        <td className="py-2 pr-4 text-right">{r.expected_end}</td>
-                        <td className="py-2 pr-4 text-right">{r.actual_end ?? "—"}</td>
-                        <td className="py-2 text-right">
+                        <td className="py-2 pe-4">{materialName(mu)}</td>
+                        <td className="py-2 pe-4 text-end">{r.start}</td>
+                        <td className="py-2 pe-4 text-end">{r.sold}</td>
+                        <td className="py-2 pe-4 text-end">{r.expected_end}</td>
+                        <td className="py-2 pe-4 text-end">{r.actual_end ?? "—"}</td>
+                        <td className="py-2 text-end">
                           {r.variance === null || r.variance === undefined ? (
                             <span className="text-gray-400">—</span>
                           ) : (
@@ -488,7 +488,7 @@ export default function TripDetail() {
                   onClick={() => setStopsView("table")}
                   data-testid="button-stops-table"
                 >
-                  <TableIcon className="h-4 w-4 mr-2" /> Table
+                  <TableIcon className="h-4 w-4 me-2" /> Table
                 </Button>
                 <Button
                   variant={stopsView === "map" ? "default" : "outline"}
@@ -496,7 +496,7 @@ export default function TripDetail() {
                   onClick={() => setStopsView("map")}
                   data-testid="button-stops-map"
                 >
-                  <MapIcon className="h-4 w-4 mr-2" /> Map
+                  <MapIcon className="h-4 w-4 me-2" /> Map
                 </Button>
               </div>
             </div>
@@ -510,25 +510,25 @@ export default function TripDetail() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm" data-testid="table-trip-stops">
                   <thead>
-                    <tr className="text-left text-gray-500 border-b">
-                      <th className="py-2 pr-4 font-medium">#</th>
-                      <th className="py-2 pr-4 font-medium">Customer</th>
-                      <th className="py-2 pr-4 font-medium">Status</th>
-                      <th className="py-2 pr-4 font-medium">Outcome</th>
+                    <tr className="text-start text-gray-500 border-b">
+                      <th className="py-2 pe-4 font-medium">#</th>
+                      <th className="py-2 pe-4 font-medium">Customer</th>
+                      <th className="py-2 pe-4 font-medium">Status</th>
+                      <th className="py-2 pe-4 font-medium">Outcome</th>
                       <th className="py-2 font-medium">Completed</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stopsPageRows.map((s: any, i: number) => (
                       <tr key={s.uuid} className="border-b last:border-0">
-                        <td className="py-2 pr-4 text-gray-500">{stopsPage * PAGE_SIZE + i + 1}</td>
-                        <td className="py-2 pr-4">{s.customer_name || "—"}</td>
-                        <td className="py-2 pr-4">
+                        <td className="py-2 pe-4 text-gray-500">{stopsPage * PAGE_SIZE + i + 1}</td>
+                        <td className="py-2 pe-4">{s.customer_name || "—"}</td>
+                        <td className="py-2 pe-4">
                           <Badge variant={s.status === "completed" ? "secondary" : "outline"}>
                             {s.status || "—"}
                           </Badge>
                         </td>
-                        <td className="py-2 pr-4 max-w-[240px] truncate">{s.outcome || "—"}</td>
+                        <td className="py-2 pe-4 max-w-[240px] truncate">{s.outcome || "—"}</td>
                         <td className="py-2 whitespace-nowrap">{s.completed_at ? formatDateTime(s.completed_at) : "—"}</td>
                       </tr>
                     ))}
@@ -616,23 +616,23 @@ export default function TripDetail() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm" data-testid="table-trip-activity">
                       <thead>
-                        <tr className="text-left text-gray-500 border-b">
-                          <th className="py-2 pr-4 font-medium">Date</th>
-                          <th className="py-2 pr-4 font-medium">Customer</th>
+                        <tr className="text-start text-gray-500 border-b">
+                          <th className="py-2 pe-4 font-medium">Date</th>
+                          <th className="py-2 pe-4 font-medium">Customer</th>
                           {activityTab === "orders" && (
                             <>
-                              <th className="py-2 pr-4 font-medium text-right">Total</th>
+                              <th className="py-2 pe-4 font-medium text-end">Total</th>
                               <th className="py-2 font-medium">Status</th>
                             </>
                           )}
                           {activityTab === "fulfillments" && (
                             <>
-                              <th className="py-2 pr-4 font-medium">Material</th>
-                              <th className="py-2 font-medium text-right">Qty</th>
+                              <th className="py-2 pe-4 font-medium">Material</th>
+                              <th className="py-2 font-medium text-end">Qty</th>
                             </>
                           )}
                           {activityTab === "payments" && (
-                            <th className="py-2 font-medium text-right">Amount</th>
+                            <th className="py-2 font-medium text-end">Amount</th>
                           )}
                         </tr>
                       </thead>
@@ -649,11 +649,11 @@ export default function TripDetail() {
                               if (target) setLocation(`/customer-orders/${target}`);
                             }}
                           >
-                            <td className="py-2 pr-4 whitespace-nowrap">{formatDateTime(r.created_at)}</td>
-                            <td className="py-2 pr-4">{r.customer_name || "—"}</td>
+                            <td className="py-2 pe-4 whitespace-nowrap">{formatDateTime(r.created_at)}</td>
+                            <td className="py-2 pe-4">{r.customer_name || "—"}</td>
                             {activityTab === "orders" && (
                               <>
-                                <td className="py-2 pr-4 text-right">{r.total} {r.currency}</td>
+                                <td className="py-2 pe-4 text-end">{r.total} {r.currency}</td>
                                 <td className="py-2">
                                   <div className="flex gap-2">
                                     <Badge variant={r.is_paid ? "secondary" : "destructive"}>
@@ -668,12 +668,12 @@ export default function TripDetail() {
                             )}
                             {activityTab === "fulfillments" && (
                               <>
-                                <td className="py-2 pr-4">{r.material_name}</td>
-                                <td className="py-2 text-right">{r.quantity}</td>
+                                <td className="py-2 pe-4">{r.material_name}</td>
+                                <td className="py-2 text-end">{r.quantity}</td>
                               </>
                             )}
                             {activityTab === "payments" && (
-                              <td className="py-2 text-right">{r.amount} {r.currency}</td>
+                              <td className="py-2 text-end">{r.amount} {r.currency}</td>
                             )}
                           </tr>
                         ))}
@@ -725,7 +725,7 @@ export default function TripDetail() {
                   onClick={handleEditClick}
                   data-testid="button-edit-notes"
                 >
-                  <Edit3 className="h-4 w-4 mr-2" />
+                  <Edit3 className="h-4 w-4 me-2" />
                   Edit
                 </Button>
               )}
@@ -748,7 +748,7 @@ export default function TripDetail() {
                     className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                     data-testid="button-save-notes"
                   >
-                    <Save className="h-4 w-4 mr-2" />
+                    <Save className="h-4 w-4 me-2" />
                     {updateTripMutation.isPending ? 'Saving...' : 'Save'}
                   </Button>
                   <Button
@@ -757,7 +757,7 @@ export default function TripDetail() {
                     disabled={updateTripMutation.isPending}
                     data-testid="button-cancel-edit"
                   >
-                    <X className="h-4 w-4 mr-2" />
+                    <X className="h-4 w-4 me-2" />
                     Cancel
                   </Button>
                 </div>

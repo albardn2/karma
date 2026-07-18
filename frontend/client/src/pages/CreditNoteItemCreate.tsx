@@ -314,7 +314,7 @@ export default function CreditNoteItemCreate() {
               </div>
 
               {/* Auto Pay Checkbox */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 rtl:space-x-reverse">
                 <Checkbox
                   id="create_payout"
                   checked={form.watch("create_payout")}
@@ -326,7 +326,7 @@ export default function CreditNoteItemCreate() {
               </div>
 
               {/* Form Actions */}
-              <div className="flex justify-end space-x-3 pt-6 border-t">
+              <div className="flex justify-end space-x-3 rtl:space-x-reverse pt-6 border-t">
                 <Button
                   type="button"
                   variant="outline"

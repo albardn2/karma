@@ -201,7 +201,7 @@ export default function InventoryEventDetail() {
             <h1 className="text-2xl font-bold">Inventory Event Not Found</h1>
             <Link href="/inventory-events">
               <Button className="mt-4">
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="h-4 w-4 me-2" />
                 Back to Inventory Events
               </Button>
             </Link>
@@ -234,13 +234,13 @@ export default function InventoryEventDetail() {
                   onClick={() => setIsEditing(true)}
                   disabled={inventoryEvent.event_type !== 'manual'}
                 >
-                  <Edit2 className="h-4 w-4 mr-2" />
+                  <Edit2 className="h-4 w-4 me-2" />
                   Edit
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive">
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash2 className="h-4 w-4 me-2" />
                       Delete
                     </Button>
                   </AlertDialogTrigger>
@@ -281,7 +281,7 @@ export default function InventoryEventDetail() {
                     }
                   }}
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-4 w-4 me-2" />
                   Cancel
                 </Button>
                 <Button
@@ -289,7 +289,7 @@ export default function InventoryEventDetail() {
                   disabled={updateInventoryEventMutation.isPending}
                   className="bg-[#5469D4] hover:bg-[#4356C7]"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 me-2" />
                   {updateInventoryEventMutation.isPending ? "Saving..." : "Save"}
                 </Button>
               </>

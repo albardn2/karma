@@ -70,7 +70,7 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
                   >
                     {card.change}
                   </Badge>
-                  <span className="text-xs text-gray-500 ml-2">{card.period}</span>
+                  <span className="text-xs text-gray-500 ms-2">{card.period}</span>
                 </div>
               </div>
               <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${

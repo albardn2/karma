@@ -114,7 +114,7 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
             onClick={() => setIsAnimated(false)}
             data-testid="button-full-route"
           >
-            <Square className="h-4 w-4 mr-2" />
+            <Square className="h-4 w-4 me-2" />
             Full Route
           </Button>
           <Button
@@ -123,7 +123,7 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
             onClick={() => setIsAnimated(true)}
             data-testid="button-animated-route"
           >
-            <Play className="h-4 w-4 mr-2" />
+            <Play className="h-4 w-4 me-2" />
             Animated Route
           </Button>
         </div>

@@ -131,7 +131,7 @@ export function AddStopDialog({
     <Dialog open={isOpen} onOpenChange={(o) => { setIsOpen(o); if (!o) reset(); }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" data-testid="button-add-stop">
-          <MapPin className="h-4 w-4 mr-2" />
+          <MapPin className="h-4 w-4 me-2" />
           Add Stop
         </Button>
       </DialogTrigger>
@@ -159,7 +159,7 @@ export function AddStopDialog({
               onClick={() => setMode("new")}
               data-testid="mode-new-customer"
             >
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="h-4 w-4 me-1" />
               New customer
             </Button>
           </div>

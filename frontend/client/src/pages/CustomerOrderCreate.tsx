@@ -180,7 +180,7 @@ export default function CustomerOrderCreate() {
               size="sm"
               onClick={() => setLocation("/customer-orders")}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
             <div>
@@ -288,7 +288,7 @@ export default function CustomerOrderCreate() {
                           <Button
                             variant="outline"
                             type="button"
-                            className="w-full justify-between h-12 text-lg text-left border-2 border-gray-200 dark:border-gray-600 hover:border-[#5469D4] transition-colors"
+                            className="w-full justify-between h-12 text-lg text-start border-2 border-gray-200 dark:border-gray-600 hover:border-[#5469D4] transition-colors"
                             onClick={() => setCustomerOpen(!customerOpen)}
                           >
                             {customerValue
@@ -297,7 +297,7 @@ export default function CustomerOrderCreate() {
                                 customers?.find((customer: any) => customer.uuid === customerValue)?.last_name || 
                                 "Customer not found"
                               : "Select customer..."}
-                            <ChevronsUpDown className="ml-2 h-5 w-5 shrink-0 opacity-50" />
+                            <ChevronsUpDown className="ms-2 h-5 w-5 shrink-0 opacity-50" />
                           </Button>
                           
                           {customerOpen && (
@@ -324,7 +324,7 @@ export default function CustomerOrderCreate() {
                                     >
                                       <Check
                                         className={cn(
-                                          "mr-3 h-4 w-4 text-[#5469D4]",
+                                          "me-3 h-4 w-4 text-[#5469D4]",
                                           customerValue === customer.uuid ? "opacity-100" : "opacity-0"
                                         )}
                                       />
@@ -405,7 +405,7 @@ export default function CustomerOrderCreate() {
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full h-12 pl-4 text-lg text-left font-normal justify-start border-2 border-gray-200 dark:border-gray-600 hover:border-amber-500 transition-colors",
+                            "w-full h-12 ps-4 text-lg text-start font-normal justify-start border-2 border-gray-200 dark:border-gray-600 hover:border-amber-500 transition-colors",
                             !form.watch("due_date") && "text-muted-foreground"
                           )}
                         >
@@ -414,7 +414,7 @@ export default function CustomerOrderCreate() {
                           ) : (
                             <span>Choose a due date</span>
                           )}
-                          <CalendarIcon className="ml-auto h-5 w-5 opacity-50" />
+                          <CalendarIcon className="ms-auto h-5 w-5 opacity-50" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -471,7 +471,7 @@ export default function CustomerOrderCreate() {
                 className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 disabled={!form.watch("customer_uuid") || !form.watch("currency")}
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 me-2" />
                 Add Item
               </Button>
             </CardHeader>
@@ -493,7 +493,7 @@ export default function CustomerOrderCreate() {
                     className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                     disabled={!form.watch("customer_uuid") || !form.watch("currency")}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="h-4 w-4 me-2" />
                     Add First Item
                   </Button>
                 </div>
@@ -503,11 +503,11 @@ export default function CustomerOrderCreate() {
                     <table className="w-full">
                       <thead className="border-b border-gray-200 dark:border-gray-700">
                         <tr>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Material</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Quantity</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Unit Price</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Total</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Material</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Quantity</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Unit Price</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Total</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -566,7 +566,7 @@ export default function CustomerOrderCreate() {
 
                   {/* Total Section */}
                   <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <div className="text-right space-y-2">
+                    <div className="text-end space-y-2">
                       <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Total: ${items.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0).toFixed(2)}
                       </div>

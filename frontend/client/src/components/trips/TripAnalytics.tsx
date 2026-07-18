@@ -241,9 +241,9 @@ export function TripAnalytics({ activity }: { activity?: TripActivityData | null
           <CardContent>
             <table className="w-full text-sm" data-testid="analytics-qty-table">
               <thead>
-                <tr className="text-left text-gray-500 border-b">
-                  <th className="py-2 pr-4 font-medium">Material</th>
-                  <th className="py-2 font-medium text-right">Quantity</th>
+                <tr className="text-start text-gray-500 border-b">
+                  <th className="py-2 pe-4 font-medium">Material</th>
+                  <th className="py-2 font-medium text-end">Quantity</th>
                 </tr>
               </thead>
               <tbody>
@@ -251,8 +251,8 @@ export function TripAnalytics({ activity }: { activity?: TripActivityData | null
                   .sort(([, a], [, b]) => b - a)
                   .map(([name, qty]) => (
                     <tr key={name} className="border-b last:border-0">
-                      <td className="py-2 pr-4">{name}</td>
-                      <td className="py-2 text-right font-semibold tabular-nums">{fmt(qty)}</td>
+                      <td className="py-2 pe-4">{name}</td>
+                      <td className="py-2 text-end font-semibold tabular-nums">{fmt(qty)}</td>
                     </tr>
                   ))}
               </tbody>

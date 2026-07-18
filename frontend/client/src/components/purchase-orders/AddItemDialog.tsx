@@ -182,7 +182,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                           {materialValue
                             ? materials?.find((material: any) => material.uuid === materialValue)?.name || "Material not found"
                             : "Select material..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                         
                         {materialOpen && (
@@ -216,7 +216,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                                   >
                                     <Check
                                       className={cn(
-                                        "mr-2 h-4 w-4",
+                                        "me-2 h-4 w-4",
                                         materialValue === material.uuid ? "opacity-100" : "opacity-0"
                                       )}
                                     />
@@ -268,7 +268,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                     <FormLabel>
                       Quantity
                       {materialUnit && (
-                        <span className="text-sm text-gray-500 ml-1">({materialUnit})</span>
+                        <span className="text-sm text-gray-500 ms-1">({materialUnit})</span>
                       )}
                     </FormLabel>
                     <FormControl>
@@ -292,7 +292,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                     <FormLabel>
                       Price per Unit
                       {materialUnit && (
-                        <span className="text-sm text-gray-500 ml-1">(per {materialUnit})</span>
+                        <span className="text-sm text-gray-500 ms-1">(per {materialUnit})</span>
                       )}
                     </FormLabel>
                     <FormControl>
@@ -312,7 +312,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
 
 
 
-            <div className="flex justify-end space-x-2 pt-4">
+            <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>

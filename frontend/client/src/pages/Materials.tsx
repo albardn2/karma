@@ -203,7 +203,7 @@ export default function Materials() {
                       onClick={() => setFilters(prev => ({ ...prev, page: currentPage - 1 }))}
                       disabled={currentPage <= 1}
                     >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      <ChevronLeft className="h-4 w-4 me-1" />
                       Previous
                     </Button>
                     <Button
@@ -213,7 +213,7 @@ export default function Materials() {
                       disabled={currentPage >= totalPages}
                     >
                       Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
+                      <ChevronRight className="h-4 w-4 ms-1" />
                     </Button>
                   </div>
                 </div>

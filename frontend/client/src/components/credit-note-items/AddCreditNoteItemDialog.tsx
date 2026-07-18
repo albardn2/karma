@@ -303,7 +303,7 @@ export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteIte
             />
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 rtl:space-x-reverse">
             <Switch
               id="create_payout"
               checked={formData.create_payout}
@@ -312,7 +312,7 @@ export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteIte
             <Label htmlFor="create_payout">Create automatic payout</Label>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
             <Button
               type="button"
               variant="outline"

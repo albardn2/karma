@@ -200,7 +200,7 @@ export default function InventoryEvents() {
                             <p className="text-sm">{new Date(event.created_at).toLocaleString()}</p>
                           </div>
                         </div>
-                        <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0 ml-4" />
+                        <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0 ms-4" />
                       </div>
                     </CardContent>
                   </Card>

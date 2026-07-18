@@ -157,7 +157,7 @@ export function AddWarehouseDialog() {
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>

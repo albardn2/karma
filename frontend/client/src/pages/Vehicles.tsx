@@ -150,7 +150,7 @@ export default function Vehicles() {
               : "bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200"
           }`}>
             <div className="flex items-center">
-              <div className={`w-3 h-3 rounded-full mr-3 ${
+              <div className={`w-3 h-3 rounded-full me-3 ${
                 isError ? "bg-red-500" : "bg-indigo-500"
               }`}></div>
               <span className={`text-sm font-medium ${
@@ -255,7 +255,7 @@ export default function Vehicles() {
                       {vehicle.vin && (
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">VIN</span>
-                          <span className="font-medium text-xs truncate ml-2" data-testid={`text-vin-${vehicle.uuid}`}>{vehicle.vin}</span>
+                          <span className="font-medium text-xs truncate ms-2" data-testid={`text-vin-${vehicle.uuid}`}>{vehicle.vin}</span>
                         </div>
                       )}
                     </div>

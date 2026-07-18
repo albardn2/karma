@@ -195,7 +195,7 @@ export default function TransactionCreate() {
               variant="ghost"
               size="sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
             <div>
@@ -212,7 +212,7 @@ export default function TransactionCreate() {
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={createMutation.isPending} className="bg-[#5469D4] hover:bg-[#4356C7] text-white">
-              <Save className="h-4 w-4 mr-2" />
+              <Save className="h-4 w-4 me-2" />
               {createMutation.isPending ? "Creating..." : "Create Transaction"}
             </Button>
           </div>
@@ -314,7 +314,7 @@ export default function TransactionCreate() {
 
           {/* Exchange Rate */}
           <Card className="relative flex items-center justify-center">
-            <div className="absolute top-4 left-4 right-4">
+            <div className="absolute top-4 start-4 end-4">
               <CardTitle className="text-lg flex items-center gap-2 justify-center">
                 <ArrowRightLeft className="h-5 w-5 text-[#5469D4]" />
                 Exchange

@@ -123,7 +123,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 shadow-sm transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
+        "fixed inset-y-0 start-0 z-50 w-64 bg-white border-e border-gray-200 shadow-sm transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
         isOpen ? "translate-x-0" : "-translate-x-full",
         "flex flex-col h-screen touch-none"
       )}
@@ -179,7 +179,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                   )}
                 >
-                  <item.icon className="w-5 h-5 mr-3" />
+                  <item.icon className="w-5 h-5 me-3" />
                   {item.name}
                 </Link>
               );
@@ -189,7 +189,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         
         {/* Fixed Footer */}
         <div className="px-4 py-4 border-t border-gray-200 flex-shrink-0">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 rtl:space-x-reverse">
             <div className="w-8 h-8 brand-gradient rounded-full flex items-center justify-center">
               <span className="text-sm font-medium text-white">{getUserInitials(user)}</span>
             </div>

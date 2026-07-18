@@ -302,7 +302,7 @@ export default function Vendors() {
                                 <h3 className="font-semibold text-sm leading-tight">{vendor.company_name}</h3>
                                 <p className="text-xs text-muted-foreground">{vendor.full_name}</p>
                               </div>
-                              <div className="flex gap-1 ml-2">
+                              <div className="flex gap-1 ms-2">
                                 {vendor.category && (
                                   <Badge 
                                     variant="secondary" 

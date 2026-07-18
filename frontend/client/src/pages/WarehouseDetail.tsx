@@ -97,7 +97,7 @@ export default function WarehouseDetail() {
             <div className="flex items-center gap-4">
               <Link href="/warehouses">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back to Warehouses
                 </Button>
               </Link>
@@ -123,7 +123,7 @@ export default function WarehouseDetail() {
             <div className="flex items-center gap-4">
               <Link href="/warehouses">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back to Warehouses
                 </Button>
               </Link>
@@ -152,7 +152,7 @@ export default function WarehouseDetail() {
             <div className="flex items-center gap-4">
               <Link href="/warehouses">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back to Warehouses
                 </Button>
               </Link>
@@ -168,7 +168,7 @@ export default function WarehouseDetail() {
             <div className="flex gap-2">
               <Link href={`/warehouses/${uuid}/edit`}>
                 <Button variant="outline" size="sm">
-                  <Edit className="h-4 w-4 mr-2" />
+                  <Edit className="h-4 w-4 me-2" />
                   Edit
                 </Button>
               </Link>
@@ -176,7 +176,7 @@ export default function WarehouseDetail() {
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4 mr-2" />
+                    <Trash2 className="h-4 w-4 me-2" />
                     Delete
                   </Button>
                 </AlertDialogTrigger>
@@ -236,7 +236,7 @@ export default function WarehouseDetail() {
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-medium">Address:</span>
                     </div>
-                    <div className="flex items-start gap-2 text-right">
+                    <div className="flex items-start gap-2 text-end">
                       <span className="text-sm max-w-[200px]">{warehouse.address}</span>
                       <Button
                         variant="ghost"
@@ -308,7 +308,7 @@ export default function WarehouseDetail() {
                           <StickyNote className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm font-medium">Notes:</span>
                         </div>
-                        <div className="flex items-start gap-2 text-right">
+                        <div className="flex items-start gap-2 text-end">
                           <span className="text-sm max-w-[200px] whitespace-pre-wrap">{warehouse.notes}</span>
                           <Button
                             variant="ghost"

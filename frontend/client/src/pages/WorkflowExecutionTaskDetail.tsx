@@ -823,7 +823,7 @@ export default function WorkflowExecutionTaskDetail() {
                       control={form.control}
                       name={key as any}
                       render={({ field: formField }) => (
-                        <FormItem className="flex items-center space-x-2">
+                        <FormItem className="flex items-center space-x-2 rtl:space-x-reverse">
                           <FormControl>
                             <Checkbox
                               data-testid={`checkbox-${key}-${option}`}
@@ -868,7 +868,7 @@ export default function WorkflowExecutionTaskDetail() {
                     data-testid={`radio-${key}`}
                   >
                     {field.options?.map((option) => (
-                      <div key={option} className="flex items-center space-x-2">
+                      <div key={option} className="flex items-center space-x-2 rtl:space-x-reverse">
                         <RadioGroupItem value={option} id={`${key}-${option}`} />
                         <Label htmlFor={`${key}-${option}`}>{option}</Label>
                       </div>
@@ -1079,7 +1079,7 @@ export default function WorkflowExecutionTaskDetail() {
             <div className="flex items-center gap-4">
               <Link href={`/workflow-execution/${workflowUuid}`}>
                 <Button variant="ghost" size="sm" data-testid="button-back">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back
                 </Button>
               </Link>
@@ -1106,7 +1106,7 @@ export default function WorkflowExecutionTaskDetail() {
                     disabled={cancelExecutionMutation.isPending}
                     data-testid="button-cancel-execution"
                   >
-                    <Ban className="h-4 w-4 mr-2" />
+                    <Ban className="h-4 w-4 me-2" />
                     {cancelExecutionMutation.isPending ? "Cancelling..." : "Cancel Execution"}
                   </Button>
                 )}
@@ -1119,7 +1119,7 @@ export default function WorkflowExecutionTaskDetail() {
                     disabled={deleteExecutionMutation.isPending}
                     data-testid="button-delete-execution"
                   >
-                    <Trash2 className="h-4 w-4 mr-2" />
+                    <Trash2 className="h-4 w-4 me-2" />
                     {deleteExecutionMutation.isPending ? "Deleting..." : "Delete"}
                   </Button>
                 )}
@@ -1170,7 +1170,7 @@ export default function WorkflowExecutionTaskDetail() {
                 </p>
                 <Link href={`/workflow-execution/${workflowUuid}`}>
                   <Button variant="outline" data-testid="button-back-to-executions">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    <ArrowLeft className="h-4 w-4 me-2" />
                     Back to executions
                   </Button>
                 </Link>
@@ -1310,7 +1310,7 @@ export default function WorkflowExecutionTaskDetail() {
                         >
                           {completeTaskMutation.isPending ? (
                             <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              <Loader2 className="me-2 h-4 w-4 animate-spin" />
                               {selectedTaskExecution.status === "completed" ? "Updating..." : "Completing..."}
                             </>
                           ) : selectedTaskExecution.status === "completed" ? (

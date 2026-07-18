@@ -160,7 +160,7 @@ export default function Payouts() {
             onClick={() => setLocation("/payouts/create")}
             className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 me-2" />
             Create Payout
           </Button>
         </div>
@@ -191,7 +191,7 @@ export default function Payouts() {
                   onClick={() => setLocation("/payouts/create")}
                   className="mt-4 bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-4 w-4 me-2" />
                   Create First Payout
                 </Button>
               </div>
@@ -254,7 +254,7 @@ export default function Payouts() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={() => setLocation(`/payouts/${payout.uuid}`)}>
-                                  <Eye className="h-4 w-4 mr-2" />
+                                  <Eye className="h-4 w-4 me-2" />
                                   View Details
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 

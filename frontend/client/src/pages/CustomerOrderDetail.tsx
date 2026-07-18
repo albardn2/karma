@@ -318,7 +318,7 @@ export default function CustomerOrderDetail() {
             Failed to load customer order: {error?.message}
           </p>
           <Button onClick={() => setLocation("/customer-orders")} variant="outline">
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-4 w-4 me-2" />
             Back to Customer Orders
           </Button>
         </div>
@@ -334,7 +334,7 @@ export default function CustomerOrderDetail() {
             Customer Order Not Found
           </h1>
           <Button onClick={() => setLocation("/customer-orders")} variant="outline">
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-4 w-4 me-2" />
             Back to Customer Orders
           </Button>
         </div>
@@ -354,7 +354,7 @@ export default function CustomerOrderDetail() {
                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
               </div>
-              <div className="ml-3">
+              <div className="ms-3">
                 <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
                   Order Overdue
                 </h3>
@@ -374,7 +374,7 @@ export default function CustomerOrderDetail() {
               size="sm"
               onClick={() => setLocation("/customer-orders")}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
             <div>
@@ -391,7 +391,7 @@ export default function CustomerOrderDetail() {
             {!isEditing ? (
               <>
                 <Button onClick={handleEdit} variant="outline" size="sm">
-                  <Edit3 className="h-4 w-4 mr-2" />
+                  <Edit3 className="h-4 w-4 me-2" />
                   Edit
                 </Button>
                 <Button 
@@ -401,14 +401,14 @@ export default function CustomerOrderDetail() {
                   className="text-red-600 border-red-600 hover:bg-red-50 dark:text-red-400 dark:border-red-400 dark:hover:bg-red-900/20"
                   disabled={deleteMutation.isPending}
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
+                  <Trash2 className="h-4 w-4 me-2" />
                   Delete
                 </Button>
               </>
             ) : (
               <>
                 <Button onClick={handleCancel} variant="outline" size="sm">
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-4 w-4 me-2" />
                   Cancel
                 </Button>
                 <Button 
@@ -417,7 +417,7 @@ export default function CustomerOrderDetail() {
                   size="sm"
                   className="bg-[#5469D4] hover:bg-[#4356C7]"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 me-2" />
                   Save
                 </Button>
               </>
@@ -468,7 +468,7 @@ export default function CustomerOrderDetail() {
                   <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                     {customerOrder.uuid}
                   </p>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Order UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -480,7 +480,7 @@ export default function CustomerOrderDetail() {
                   <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                     {customerOrder.customer_uuid}
                   </p>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Customer UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -492,7 +492,7 @@ export default function CustomerOrderDetail() {
                   <p className="text-sm text-gray-900 dark:text-gray-100">
                     {format(new Date(customerOrder.created_at), 'MMM d, yyyy h:mm a')}
                   </p>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Created Date" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -504,7 +504,7 @@ export default function CustomerOrderDetail() {
                   <p className={`text-sm font-mono break-all ${customerOrder.trip_stop_uuid ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 italic'}`}>
                     {customerOrder.trip_stop_uuid || "Not set"}
                   </p>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Trip Stop UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -516,7 +516,7 @@ export default function CustomerOrderDetail() {
                   <p className={`text-sm ${customerOrder.fulfilled_at ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 italic'}`}>
                     {customerOrder.fulfilled_at ? format(new Date(customerOrder.fulfilled_at), 'MMM d, yyyy h:mm a') : "Not fulfilled"}
                   </p>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Fulfilled At" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -568,10 +568,10 @@ export default function CustomerOrderDetail() {
                 <table className="w-full">
                   <thead className="border-b border-gray-200 dark:border-gray-700">
                     <tr>
-                      <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Material</th>
-                      <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Quantity</th>
-                      <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
-                      <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Material</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Quantity</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -743,7 +743,7 @@ export default function CustomerOrderDetail() {
                           {invoice.due_date && ` • Due ${format(new Date(invoice.due_date), 'MMM d, yyyy')}`}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-end">
                         <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                           {formatCurrency(invoice.total_adjusted_amount, invoice.currency)}
                         </p>
@@ -827,7 +827,7 @@ export default function CustomerOrderDetail() {
                       <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                         {selectedItem.uuid}
                       </p>
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Item UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
@@ -839,7 +839,7 @@ export default function CustomerOrderDetail() {
                       <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                         {selectedItem.material_uuid}
                       </p>
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Material UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
@@ -851,7 +851,7 @@ export default function CustomerOrderDetail() {
                       <p className="text-sm text-gray-900 dark:text-gray-100">
                         {selectedItem.material_name || 'Unknown Material'}
                       </p>
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Material Name" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
@@ -863,7 +863,7 @@ export default function CustomerOrderDetail() {
                       <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                         {selectedItem.customer_order_uuid}
                       </p>
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Customer Order UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
@@ -875,7 +875,7 @@ export default function CustomerOrderDetail() {
                       <p className="text-sm text-gray-900 dark:text-gray-100">
                         {selectedItem.quantity || 0} {selectedItem.unit || 'N/A'}
                       </p>
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Quantity" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
@@ -887,7 +887,7 @@ export default function CustomerOrderDetail() {
                       <p className="text-sm text-gray-900 dark:text-gray-100">
                         {format(new Date(selectedItem.created_at), 'MMM d, yyyy h:mm a')}
                       </p>
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Created At" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
@@ -900,7 +900,7 @@ export default function CustomerOrderDetail() {
                         <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                           {selectedItem.created_by_uuid}
                         </p>
-                        <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                        <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                           {copiedField === "Created By UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         </Button>
                       </div>

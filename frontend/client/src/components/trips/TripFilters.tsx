@@ -95,7 +95,7 @@ export function TripFilters({
             <Filter className="h-4 w-4" />
             Filters
             {hasActiveFilters && (
-              <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#5469D4] text-xs text-white">
+              <span className="ms-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#5469D4] text-xs text-white">
                 {Object.keys(filters).filter(key => 
                   filters[key as keyof typeof filters] !== undefined &&
                   filters[key as keyof typeof filters] !== null &&

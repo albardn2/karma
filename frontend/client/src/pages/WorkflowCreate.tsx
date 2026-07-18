@@ -107,7 +107,7 @@ export default function WorkflowCreate() {
         <div className="flex items-center gap-4">
           <Link href="/workflows">
             <Button variant="ghost" size="sm" data-testid="button-back">
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
           </Link>
@@ -207,7 +207,7 @@ export default function WorkflowCreate() {
                   disabled={createMutation.isPending}
                   data-testid="button-submit"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 me-2" />
                   {createMutation.isPending ? "Creating..." : "Create Workflow"}
                 </Button>
                 <Link href="/workflows">

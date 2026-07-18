@@ -171,7 +171,7 @@ export default function TransactionDetail() {
               variant="ghost"
               size="sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back to Transactions
             </Button>
             <div>
@@ -196,13 +196,13 @@ export default function TransactionDetail() {
             ) : (
               <>
                 <Button onClick={handleEdit} variant="outline">
-                  <Edit className="h-4 w-4 mr-2" />
+                  <Edit className="h-4 w-4 me-2" />
                   Edit
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" className="text-red-600 hover:text-red-700">
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash2 className="h-4 w-4 me-2" />
                       Delete
                     </Button>
                   </AlertDialogTrigger>
@@ -233,7 +233,7 @@ export default function TransactionDetail() {
         {/* Transaction Flow Visual */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* From Section */}
-          <Card className="border-l-4 border-l-green-500">
+          <Card className="border-s-4 border-s-green-500">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -304,7 +304,7 @@ export default function TransactionDetail() {
           </Card>
 
           {/* To Section */}
-          <Card className="border-l-4 border-l-blue-500">
+          <Card className="border-s-4 border-s-blue-500">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>

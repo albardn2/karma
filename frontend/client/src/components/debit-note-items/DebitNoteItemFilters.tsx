@@ -122,10 +122,10 @@ export function DebitNoteItemFilters({
       <Sheet>
         <SheetTrigger asChild>
           <Button variant="outline" className="relative">
-            <Filter className="h-4 w-4 mr-2" />
+            <Filter className="h-4 w-4 me-2" />
             Filters
             {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
+              <Badge variant="secondary" className="ms-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
                 {activeFilterCount}
               </Badge>
             )}

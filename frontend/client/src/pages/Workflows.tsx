@@ -85,7 +85,7 @@ export default function Workflows() {
           </div>
           <Link href="/workflows/new">
             <Button data-testid="button-create-workflow">
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="me-2 h-4 w-4" />
               Create Workflow
             </Button>
           </Link>
@@ -147,7 +147,7 @@ export default function Workflows() {
               </p>
               <Link href="/workflows/new">
                 <Button>
-                  <Plus className="mr-2 h-4 w-4" />
+                  <Plus className="me-2 h-4 w-4" />
                   Create Workflow
                 </Button>
               </Link>

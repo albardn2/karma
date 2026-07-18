@@ -56,7 +56,7 @@ export function QuickActions() {
             }`}
             size="lg"
           >
-            <action.icon className="w-4 h-4 mr-2" />
+            <action.icon className="w-4 h-4 me-2" />
             {action.label}
           </Button>
         ))}

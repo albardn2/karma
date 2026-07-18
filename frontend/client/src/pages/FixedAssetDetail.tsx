@@ -190,7 +190,7 @@ export default function FixedAssetDetail() {
             <h2 className="text-2xl font-bold mb-2">Fixed Asset Not Found</h2>
             <p className="text-gray-600 mb-4">The fixed asset you're looking for doesn't exist.</p>
             <Button onClick={() => navigate("/fixed-assets")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back to Fixed Assets
             </Button>
           </div>
@@ -206,7 +206,7 @@ export default function FixedAssetDetail() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <Button variant="outline" onClick={() => navigate("/fixed-assets")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
             <div>
@@ -224,7 +224,7 @@ export default function FixedAssetDetail() {
                   onClick={handleCancel}
                   disabled={updateMutation.isPending}
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-4 w-4 me-2" />
                   Cancel
                 </Button>
                 <Button
@@ -232,20 +232,20 @@ export default function FixedAssetDetail() {
                   disabled={updateMutation.isPending}
                   className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 me-2" />
                   {updateMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </>
             ) : (
               <>
                 <Button variant="outline" onClick={() => setIsEditing(true)}>
-                  <Edit className="h-4 w-4 mr-2" />
+                  <Edit className="h-4 w-4 me-2" />
                   Edit
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" className="text-red-600 hover:text-red-700">
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash2 className="h-4 w-4 me-2" />
                       Delete
                     </Button>
                   </AlertDialogTrigger>

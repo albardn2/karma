@@ -236,7 +236,7 @@ export default function InventoryDetail() {
             {isEditing ? (
               <>
                 <Button variant="outline" onClick={handleCancel} size="sm">
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-4 w-4 me-2" />
                   Cancel
                 </Button>
                 <Button 
@@ -245,20 +245,20 @@ export default function InventoryDetail() {
                   size="sm"
                   className="bg-[#5469D4] hover:bg-[#5469D4]/90"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 me-2" />
                   {updateInventoryMutation.isPending ? "Saving..." : "Save"}
                 </Button>
               </>
             ) : (
               <>
                 <Button variant="outline" onClick={() => setIsEditing(true)} size="sm">
-                  <Edit2 className="h-4 w-4 mr-2" />
+                  <Edit2 className="h-4 w-4 me-2" />
                   Edit
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash2 className="h-4 w-4 me-2" />
                       Delete
                     </Button>
                   </AlertDialogTrigger>

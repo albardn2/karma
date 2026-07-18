@@ -65,10 +65,10 @@ export function ProcessFilters({ filters, onFiltersChange }: ProcessFiltersProps
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" className="relative">
-          <Filter className="h-4 w-4 mr-2" />
+          <Filter className="h-4 w-4 me-2" />
           Filter
           {getFilterCount() > 0 && (
-            <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center">
+            <Badge variant="secondary" className="ms-2 h-5 w-5 p-0 flex items-center justify-center">
               {getFilterCount()}
             </Badge>
           )}
@@ -169,7 +169,7 @@ export function ProcessFilters({ filters, onFiltersChange }: ProcessFiltersProps
             Apply Filters
           </Button>
           <Button variant="outline" onClick={handleClearFilters} className="flex-1">
-            <X className="h-4 w-4 mr-2" />
+            <X className="h-4 w-4 me-2" />
             Clear
           </Button>
         </div>

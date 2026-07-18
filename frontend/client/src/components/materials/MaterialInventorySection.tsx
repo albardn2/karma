@@ -141,35 +141,35 @@ export function MaterialInventorySection({ materialUuid }: { materialUuid: strin
               <div className="overflow-x-auto">
                 <table className="w-full text-sm" data-testid="table-material-lots">
                   <thead>
-                    <tr className="text-left text-gray-500 border-b">
-                      <th className="py-2 pr-4 font-medium">Lot</th>
-                      <th className="py-2 pr-4 font-medium">Warehouse</th>
-                      <th className="py-2 pr-4 font-medium text-right">On hand</th>
-                      <th className="py-2 pr-4 font-medium">Unit</th>
-                      <th className="py-2 pr-4 font-medium text-right">Cost / unit</th>
-                      <th className="py-2 pr-4 font-medium text-right">Stock value</th>
-                      <th className="py-2 pr-4 font-medium">Received</th>
+                    <tr className="text-start text-gray-500 border-b">
+                      <th className="py-2 pe-4 font-medium">Lot</th>
+                      <th className="py-2 pe-4 font-medium">Warehouse</th>
+                      <th className="py-2 pe-4 font-medium text-end">On hand</th>
+                      <th className="py-2 pe-4 font-medium">Unit</th>
+                      <th className="py-2 pe-4 font-medium text-end">Cost / unit</th>
+                      <th className="py-2 pe-4 font-medium text-end">Stock value</th>
+                      <th className="py-2 pe-4 font-medium">Received</th>
                       <th className="py-2 font-medium">Expires</th>
                     </tr>
                   </thead>
                   <tbody>
                     {lots.map((l) => (
                       <tr key={l.uuid} className="border-b last:border-0" data-testid={`row-lot-${l.uuid}`}>
-                        <td className="py-2 pr-4 font-mono text-xs">{l.lot_id || l.uuid.slice(0, 8)}</td>
-                        <td className="py-2 pr-4">{l.warehouse_name || "—"}</td>
-                        <td className="py-2 pr-4 text-right font-semibold tabular-nums">
+                        <td className="py-2 pe-4 font-mono text-xs">{l.lot_id || l.uuid.slice(0, 8)}</td>
+                        <td className="py-2 pe-4">{l.warehouse_name || "—"}</td>
+                        <td className="py-2 pe-4 text-end font-semibold tabular-nums">
                           {fmt(l.current_quantity || 0)}
                         </td>
-                        <td className="py-2 pr-4 text-gray-500">{l.unit || "—"}</td>
-                        <td className="py-2 pr-4 text-right tabular-nums">
+                        <td className="py-2 pe-4 text-gray-500">{l.unit || "—"}</td>
+                        <td className="py-2 pe-4 text-end tabular-nums">
                           {l.cost_per_unit != null ? `${fmt(l.cost_per_unit)} ${l.currency || ""}` : "—"}
                         </td>
-                        <td className="py-2 pr-4 text-right tabular-nums">
+                        <td className="py-2 pe-4 text-end tabular-nums">
                           {l.cost_per_unit != null
                             ? `${fmt((l.current_quantity || 0) * l.cost_per_unit)} ${l.currency || ""}`
                             : "—"}
                         </td>
-                        <td className="py-2 pr-4 whitespace-nowrap">{fmtDate(l.created_at)}</td>
+                        <td className="py-2 pe-4 whitespace-nowrap">{fmtDate(l.created_at)}</td>
                         <td className="py-2 whitespace-nowrap">{fmtDate(l.expiration_date)}</td>
                       </tr>
                     ))}

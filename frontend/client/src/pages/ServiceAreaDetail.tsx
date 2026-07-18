@@ -220,7 +220,7 @@ export default function ServiceAreaDetail() {
             <h1 className="text-2xl font-bold">Service Area Not Found</h1>
             <Link href="/service-areas">
               <Button className="mt-4">
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="h-4 w-4 me-2" />
                 Back to Service Areas
               </Button>
             </Link>
@@ -252,13 +252,13 @@ export default function ServiceAreaDetail() {
                   variant="outline"
                   onClick={() => setIsEditing(true)}
                 >
-                  <Edit2 className="h-4 w-4 mr-2" />
+                  <Edit2 className="h-4 w-4 me-2" />
                   Edit
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive">
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash2 className="h-4 w-4 me-2" />
                       Delete
                     </Button>
                   </AlertDialogTrigger>
@@ -297,7 +297,7 @@ export default function ServiceAreaDetail() {
                     }
                   }}
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-4 w-4 me-2" />
                   Cancel
                 </Button>
                 <Button
@@ -305,7 +305,7 @@ export default function ServiceAreaDetail() {
                   disabled={updateServiceAreaMutation.isPending}
                   className="bg-[#5469D4] hover:bg-[#4356C7]"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 me-2" />
                   {updateServiceAreaMutation.isPending ? "Saving..." : "Save"}
                 </Button>
               </>

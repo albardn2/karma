@@ -46,7 +46,7 @@ export function VendorFiltersComponent({ filters, onFiltersChange }: VendorFilte
           <Filter className="h-4 w-4" />
           Filters
           {hasActiveFilters && (
-            <span className="ml-1 h-2 w-2 rounded-full bg-blue-600" />
+            <span className="ms-1 h-2 w-2 rounded-full bg-blue-600" />
           )}
         </Button>
       </SheetTrigger>

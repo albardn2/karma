@@ -201,7 +201,7 @@ export default function PurchaseOrderCreate() {
               size="sm"
               onClick={() => setLocation("/purchase-orders")}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
             <div>
@@ -317,13 +317,13 @@ export default function PurchaseOrderCreate() {
                           <Button
                             variant="outline"
                             type="button"
-                            className="w-full justify-between h-12 text-lg text-left border-2 border-gray-200 dark:border-gray-600 hover:border-[#5469D4] transition-colors"
+                            className="w-full justify-between h-12 text-lg text-start border-2 border-gray-200 dark:border-gray-600 hover:border-[#5469D4] transition-colors"
                             onClick={() => setVendorOpen(!vendorOpen)}
                           >
                             {vendorValue
                               ? vendors?.find((vendor: any) => vendor.uuid === vendorValue)?.company_name || "Vendor not found"
                               : "Select vendor..."}
-                            <ChevronsUpDown className="ml-2 h-5 w-5 shrink-0 opacity-50" />
+                            <ChevronsUpDown className="ms-2 h-5 w-5 shrink-0 opacity-50" />
                           </Button>
                           
                           {vendorOpen && (
@@ -350,7 +350,7 @@ export default function PurchaseOrderCreate() {
                                     >
                                       <Check
                                         className={cn(
-                                          "mr-3 h-4 w-4 text-[#5469D4]",
+                                          "me-3 h-4 w-4 text-[#5469D4]",
                                           vendorValue === vendor.uuid ? "opacity-100" : "opacity-0"
                                         )}
                                       />
@@ -430,7 +430,7 @@ export default function PurchaseOrderCreate() {
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full h-12 pl-4 text-lg text-left font-normal justify-start border-2 border-gray-200 dark:border-gray-600 hover:border-amber-500 transition-colors",
+                            "w-full h-12 ps-4 text-lg text-start font-normal justify-start border-2 border-gray-200 dark:border-gray-600 hover:border-amber-500 transition-colors",
                             !form.watch("payout_due_date") && "text-muted-foreground"
                           )}
                         >
@@ -439,7 +439,7 @@ export default function PurchaseOrderCreate() {
                           ) : (
                             <span>Choose a due date</span>
                           )}
-                          <CalendarIcon className="ml-auto h-5 w-5 opacity-50" />
+                          <CalendarIcon className="ms-auto h-5 w-5 opacity-50" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -497,7 +497,7 @@ export default function PurchaseOrderCreate() {
                 size="sm"
                 className="bg-[#5469D4] hover:bg-[#4356C7] text-white border-[#5469D4]"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 me-2" />
                 Add Item
               </Button>
             </CardHeader>
@@ -518,7 +518,7 @@ export default function PurchaseOrderCreate() {
                     onClick={() => setAddItemDialogOpen(true)}
                     className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="h-4 w-4 me-2" />
                     Add First Item
                   </Button>
                 </div>
@@ -528,11 +528,11 @@ export default function PurchaseOrderCreate() {
                     <table className="w-full">
                       <thead className="border-b border-gray-200 dark:border-gray-700">
                         <tr>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Material</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Quantity</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Unit Price</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Total</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Material</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Quantity</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Unit Price</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Total</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -592,7 +592,7 @@ export default function PurchaseOrderCreate() {
 
                   {/* Total Section */}
                   <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <div className="text-right space-y-2">
+                    <div className="text-end space-y-2">
                       <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Total: ${items.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0).toFixed(2)}
                       </div>

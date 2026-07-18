@@ -109,15 +109,15 @@ export function TripStopsMap({ stops }: { stops: TripStopPoint[] }) {
       <div className="flex items-center gap-4">
         {playing ? (
           <Button variant="outline" size="sm" onClick={() => setPlaying(false)} data-testid="button-stops-pause">
-            <Pause className="h-4 w-4 mr-2" /> Pause
+            <Pause className="h-4 w-4 me-2" /> Pause
           </Button>
         ) : (
           <Button variant="outline" size="sm" onClick={play} data-testid="button-stops-play">
-            <Play className="h-4 w-4 mr-2" /> Play
+            <Play className="h-4 w-4 me-2" /> Play
           </Button>
         )}
         <Button variant="ghost" size="sm" onClick={() => { setPlaying(false); setVisibleCount(points.length); }} data-testid="button-stops-reset">
-          <RotateCcw className="h-4 w-4 mr-2" /> Show all
+          <RotateCcw className="h-4 w-4 me-2" /> Show all
         </Button>
         <span className="text-sm text-gray-500 whitespace-nowrap" data-testid="stops-map-progress">
           {Math.min(visibleCount, points.length)} / {points.length} stops

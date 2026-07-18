@@ -196,7 +196,7 @@ export default function PaymentDetail() {
                 The payment you're looking for doesn't exist or has been deleted.
               </p>
               <Button onClick={() => setLocation("/payments")} variant="outline">
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="h-4 w-4 me-2" />
                 Back to payments
               </Button>
             </CardContent>
@@ -217,7 +217,7 @@ export default function PaymentDetail() {
               variant="ghost"
               size="sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back to payments
             </Button>
             <div>
@@ -233,22 +233,22 @@ export default function PaymentDetail() {
             {!isEditing ? (
               <>
                 <Button onClick={handleEdit} variant="outline">
-                  <Edit3 className="h-4 w-4 mr-2" />
+                  <Edit3 className="h-4 w-4 me-2" />
                   Edit
                 </Button>
                 <Button onClick={handleDelete} variant="destructive">
-                  <Trash2 className="h-4 w-4 mr-2" />
+                  <Trash2 className="h-4 w-4 me-2" />
                   Delete
                 </Button>
               </>
             ) : (
               <>
                 <Button onClick={handleCancel} variant="outline">
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-4 w-4 me-2" />
                   Cancel
                 </Button>
                 <Button onClick={handleSave} disabled={updateMutation.isPending}>
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 me-2" />
                   {updateMutation.isPending ? "Saving..." : "Save"}
                 </Button>
               </>
@@ -273,7 +273,7 @@ export default function PaymentDetail() {
                   <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                     {payment.uuid}
                   </p>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Payment UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -286,7 +286,7 @@ export default function PaymentDetail() {
                   <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {formatCurrency(payment.amount, payment.currency)}
                   </p>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Amount" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -314,7 +314,7 @@ export default function PaymentDetail() {
                       <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
                         {payment.payment_method}
                       </span>
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Payment Method" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
@@ -330,7 +330,7 @@ export default function PaymentDetail() {
                     <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                       {payment.invoice_uuid}
                     </p>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                       {copiedField === "Invoice UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -345,7 +345,7 @@ export default function PaymentDetail() {
                     <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                       {payment.financial_account_uuid}
                     </p>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                       {copiedField === "Financial Account UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -360,7 +360,7 @@ export default function PaymentDetail() {
                     <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                       {payment.debit_note_item_uuid}
                     </p>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                       {copiedField === "Debit Note Item UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -374,7 +374,7 @@ export default function PaymentDetail() {
                   <p className="text-sm text-gray-900 dark:text-gray-100">
                     {format(new Date(payment.created_at), 'MMM d, yyyy h:mm a')}
                   </p>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Created At" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -388,7 +388,7 @@ export default function PaymentDetail() {
                     <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                       {payment.created_by_uuid}
                     </p>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                       {copiedField === "Created By UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -412,7 +412,7 @@ export default function PaymentDetail() {
                       <p className="text-sm text-gray-900 dark:text-gray-100">
                         {payment.notes || 'No notes'}
                       </p>
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Notes" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>

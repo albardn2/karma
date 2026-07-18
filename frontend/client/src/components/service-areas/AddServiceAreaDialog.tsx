@@ -94,7 +94,7 @@ export function AddServiceAreaDialog() {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button className="bg-[#5469D4] hover:bg-[#4356C7] text-white">
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4 me-2" />
           Add Service Area
         </Button>
       </DialogTrigger>

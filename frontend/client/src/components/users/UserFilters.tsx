@@ -52,10 +52,10 @@ export function UserFiltersComponent({
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" className="relative">
-          <Filter className="w-4 h-4 mr-2" />
+          <Filter className="w-4 h-4 me-2" />
           Filters
           {hasActiveFilters && (
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-600 rounded-full" />
+            <span className="absolute -top-1 -end-1 w-3 h-3 bg-blue-600 rounded-full" />
           )}
         </Button>
       </SheetTrigger>

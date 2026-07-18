@@ -133,7 +133,7 @@ export function AddCustomerDialog({ categories }: AddCustomerDialogProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="brand-gradient hover:opacity-90">
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="w-4 h-4 me-2" />
           Add Customer
         </Button>
       </DialogTrigger>

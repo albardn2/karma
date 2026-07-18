@@ -134,7 +134,7 @@ export default function CustomerDetail() {
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Customer Not Found</h2>
             <p className="text-gray-600 mb-6">The customer you're looking for doesn't exist.</p>
             <Button onClick={() => setLocation("/customers")}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <ArrowLeft className="w-4 h-4 me-2" />
               Back to Customers
             </Button>
           </div>
@@ -148,13 +148,13 @@ export default function CustomerDetail() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 rtl:space-x-reverse">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setLocation("/customers")}
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <ArrowLeft className="w-4 h-4 me-2" />
               Back
             </Button>
             <div>
@@ -166,19 +166,19 @@ export default function CustomerDetail() {
             </Badge>
           </div>
           
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 rtl:space-x-reverse">
             <Button
               onClick={() => setLocation(`/customer-orders/create?customer_uuid=${customer.uuid}`)}
               className="bg-purple-600 hover:bg-purple-700 text-white"
             >
-              <ClipboardList className="w-4 h-4 mr-2" />
+              <ClipboardList className="w-4 h-4 me-2" />
               Create Customer Order
             </Button>
             <Button
               variant="outline"
               onClick={() => setEditDialogOpen(true)}
             >
-              <Edit className="w-4 h-4 mr-2" />
+              <Edit className="w-4 h-4 me-2" />
               Edit
             </Button>
             <Button
@@ -187,7 +187,7 @@ export default function CustomerDetail() {
               onClick={handleDeleteCustomer}
               disabled={deleteCustomerMutation.isPending}
             >
-              <Trash2 className="w-4 h-4 mr-2" />
+              <Trash2 className="w-4 h-4 me-2" />
               Delete
             </Button>
           </div>
@@ -200,13 +200,13 @@ export default function CustomerDetail() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <User className="w-5 h-5 mr-2" />
+                  <User className="w-5 h-5 me-2" />
                   Contact Information
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 rtl:space-x-reverse">
                     <Building className="w-4 h-4 text-gray-500" />
                     <div>
                       <p className="text-sm text-gray-500">Company</p>
@@ -223,7 +223,7 @@ export default function CustomerDetail() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 rtl:space-x-reverse">
                     <User className="w-4 h-4 text-gray-500" />
                     <div>
                       <p className="text-sm text-gray-500">Contact Person</p>
@@ -240,7 +240,7 @@ export default function CustomerDetail() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 rtl:space-x-reverse">
                     <Phone className="w-4 h-4 text-gray-500" />
                     <div>
                       <p className="text-sm text-gray-500">Phone</p>
@@ -258,7 +258,7 @@ export default function CustomerDetail() {
                     </div>
                   </div>
                   {customer.email_address && (
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3 rtl:space-x-reverse">
                       <Mail className="w-4 h-4 text-gray-500" />
                       <div>
                         <p className="text-sm text-gray-500">Email</p>
@@ -280,7 +280,7 @@ export default function CustomerDetail() {
                 
                 <Separator />
                 
-                <div className="flex items-start space-x-3">
+                <div className="flex items-start space-x-3 rtl:space-x-reverse">
                   <MapPin className="w-4 h-4 text-gray-500 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Address</p>
@@ -343,7 +343,7 @@ export default function CustomerDetail() {
                 <CardTitle>Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 rtl:space-x-reverse">
                   <Calendar className="w-4 h-4 text-gray-500" />
                   <div>
                     <p className="text-sm text-gray-500">Added</p>
@@ -353,7 +353,7 @@ export default function CustomerDetail() {
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 rtl:space-x-reverse">
                   <Building className="w-4 h-4 text-gray-500" />
                   <div>
                     <p className="text-sm text-gray-500">Category</p>
@@ -373,7 +373,7 @@ export default function CustomerDetail() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 rtl:space-x-reverse">
                   <CreditCard className="w-4 h-4 text-gray-500" />
                   <div>
                     <p className="text-sm text-gray-500">Customer ID</p>
@@ -398,7 +398,7 @@ export default function CustomerDetail() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
-                    <DollarSign className="w-5 h-5 mr-2" />
+                    <DollarSign className="w-5 h-5 me-2" />
                     Account Balance
                   </CardTitle>
                 </CardHeader>
@@ -422,7 +422,7 @@ export default function CustomerDetail() {
         {/* Customer Location Map */}
         <div className="mt-8">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <MapPin className="w-5 h-5 mr-2" />
+            <MapPin className="w-5 h-5 me-2" />
             Customer Location
           </h3>
           <CustomerDetailMap customer={customer} />

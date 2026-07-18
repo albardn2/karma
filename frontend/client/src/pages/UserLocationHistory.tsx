@@ -97,7 +97,7 @@ export default function UserLocationHistory() {
               size="sm"
               onClick={() => setLocation(`/users/${uuid}`)}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
             <div>

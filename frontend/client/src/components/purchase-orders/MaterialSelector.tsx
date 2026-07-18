@@ -104,7 +104,7 @@ export function MaterialSelector<T extends FieldValues>({
                   {materialValue
                     ? materials?.find((material: any) => material.uuid === materialValue)?.name || "Material not found"
                     : "Select material..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
                 {materialOpen && (
                   <div className="absolute top-full z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
@@ -120,7 +120,7 @@ export function MaterialSelector<T extends FieldValues>({
                           materials.map((material: any) => (
                             <div
                               key={material.uuid}
-                              className="flex items-center space-x-2 p-2 hover:bg-gray-100 cursor-pointer"
+                              className="flex items-center space-x-2 rtl:space-x-reverse p-2 hover:bg-gray-100 cursor-pointer"
                               onClick={() => {
                                 setMaterialValue(material.uuid);
                                 field.onChange(material.uuid);
@@ -129,7 +129,7 @@ export function MaterialSelector<T extends FieldValues>({
                             >
                               <Check
                                 className={cn(
-                                  "mr-2 h-4 w-4",
+                                  "me-2 h-4 w-4",
                                   materialValue === material.uuid ? "opacity-100" : "opacity-0"
                                 )}
                               />

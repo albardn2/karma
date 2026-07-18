@@ -105,7 +105,7 @@ export default function EmployeeDetail() {
             <div className="flex items-center gap-4">
               <Link href="/employees">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back to Employees
                 </Button>
               </Link>
@@ -131,7 +131,7 @@ export default function EmployeeDetail() {
             <div className="flex items-center gap-4">
               <Link href="/employees">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back to Employees
                 </Button>
               </Link>
@@ -156,7 +156,7 @@ export default function EmployeeDetail() {
             <div className="flex items-center gap-4">
               <Link href="/employees">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back to Employees
                 </Button>
               </Link>
@@ -175,13 +175,13 @@ export default function EmployeeDetail() {
                 className="bg-green-600 hover:bg-green-700 text-white"
                 size="sm"
               >
-                <DollarSign className="h-4 w-4 mr-2" />
+                <DollarSign className="h-4 w-4 me-2" />
                 Create Salary
               </Button>
               
               <Link href={`/employees/${uuid}/edit`}>
                 <Button variant="outline" size="sm">
-                  <Edit className="h-4 w-4 mr-2" />
+                  <Edit className="h-4 w-4 me-2" />
                   Edit
                 </Button>
               </Link>
@@ -189,7 +189,7 @@ export default function EmployeeDetail() {
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4 mr-2" />
+                    <Trash2 className="h-4 w-4 me-2" />
                     Delete
                   </Button>
                 </AlertDialogTrigger>

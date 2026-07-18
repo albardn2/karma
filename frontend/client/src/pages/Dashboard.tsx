@@ -291,7 +291,7 @@ export default function Dashboard() {
                       )}
                     </div>
                   </div>
-                  <div className="space-y-5 lg:border-l lg:border-gray-200 lg:pl-6">
+                  <div className="space-y-5 lg:border-s lg:border-gray-200 lg:ps-6">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
                         Collected

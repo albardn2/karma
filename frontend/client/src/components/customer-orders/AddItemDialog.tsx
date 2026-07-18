@@ -173,7 +173,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                       {materialValue
                         ? materials?.find((material: any) => material.uuid === materialValue)?.name || "Material not found"
                         : "Select material..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                     
                     {materialOpen && (
@@ -201,7 +201,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                               >
                                 <Check
                                   className={cn(
-                                    "mr-2 h-4 w-4",
+                                    "me-2 h-4 w-4",
                                     materialValue === material.uuid ? "opacity-100" : "opacity-0"
                                   )}
                                 />

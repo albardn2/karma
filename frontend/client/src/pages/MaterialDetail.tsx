@@ -230,7 +230,7 @@ export default function MaterialDetail() {
         <div className="flex items-center gap-4">
           <Link href="/materials">
             <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back to Materials
             </Button>
           </Link>
@@ -244,13 +244,13 @@ export default function MaterialDetail() {
           {!isEditing ? (
             <>
               <Button variant="outline" size="sm" onClick={handleEdit}>
-                <Edit className="h-4 w-4 mr-2" />
+                <Edit className="h-4 w-4 me-2" />
                 Edit
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4 mr-2" />
+                    <Trash2 className="h-4 w-4 me-2" />
                     Delete
                   </Button>
                 </AlertDialogTrigger>
@@ -282,11 +282,11 @@ export default function MaterialDetail() {
                 disabled={updateMaterialMutation.isPending}
                 className="bg-gradient-to-r from-[#5469D4] to-[#8B5CF6] hover:from-[#4F63D2] hover:to-[#8A5AF5]"
               >
-                <Save className="h-4 w-4 mr-2" />
+                <Save className="h-4 w-4 me-2" />
                 {updateMaterialMutation.isPending ? "Saving..." : "Save"}
               </Button>
               <Button variant="outline" size="sm" onClick={handleCancelEdit}>
-                <X className="h-4 w-4 mr-2" />
+                <X className="h-4 w-4 me-2" />
                 Cancel
               </Button>
             </>

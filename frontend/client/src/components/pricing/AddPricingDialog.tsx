@@ -114,7 +114,7 @@ export function AddPricingDialog() {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button className="bg-[#5469D4] hover:bg-[#4356C7] text-white">
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4 me-2" />
           Add Pricing
         </Button>
       </DialogTrigger>
@@ -182,7 +182,7 @@ export function AddPricingDialog() {
                           {materialValue
                             ? materials?.find((material) => material.uuid === materialValue)?.name || "Material not found"
                             : "Select material..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                         
                         {materialOpen && (
@@ -209,7 +209,7 @@ export function AddPricingDialog() {
                                   >
                                     <Check
                                       className={cn(
-                                        "mr-2 h-4 w-4",
+                                        "me-2 h-4 w-4",
                                         materialValue === material.uuid ? "opacity-100" : "opacity-0"
                                       )}
                                     />

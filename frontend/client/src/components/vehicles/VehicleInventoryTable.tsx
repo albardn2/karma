@@ -48,7 +48,7 @@ export function VehicleInventoryTable({ vehicleUuid }: { vehicleUuid: string }) 
             <TableHeader>
               <TableRow>
                 <TableHead>Material</TableHead>
-                <TableHead className="text-right">On hand</TableHead>
+                <TableHead className="text-end">On hand</TableHead>
                 <TableHead>Unit</TableHead>
               </TableRow>
             </TableHeader>
@@ -59,7 +59,7 @@ export function VehicleInventoryTable({ vehicleUuid }: { vehicleUuid: string }) 
                     {inv.material_name || inv.material_uuid}
                   </TableCell>
                   <TableCell
-                    className="text-right font-semibold tabular-nums"
+                    className="text-end font-semibold tabular-nums"
                     data-testid={`text-vinv-qty-${inv.uuid}`}
                   >
                     {inv.current_quantity ?? 0}

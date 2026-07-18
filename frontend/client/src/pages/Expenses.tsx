@@ -177,7 +177,7 @@ export default function Expenses() {
             onClick={() => setLocation("/expenses/create")}
             className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 me-2" />
             Create Expense
           </Button>
         </div>
@@ -208,7 +208,7 @@ export default function Expenses() {
                   onClick={() => setLocation("/expenses/create")}
                   className="mt-4 bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-4 w-4 me-2" />
                   Create First Expense
                 </Button>
               </div>
@@ -278,7 +278,7 @@ export default function Expenses() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setLocation(`/expenses/${expense.uuid}`)}>
-                                <Eye className="h-4 w-4 mr-2" />
+                                <Eye className="h-4 w-4 me-2" />
                                 View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem 

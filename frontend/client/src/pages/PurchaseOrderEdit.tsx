@@ -187,7 +187,7 @@ export default function PurchaseOrderEdit() {
               size="sm"
               onClick={() => setLocation(`/purchase-orders/${id}`)}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back to Purchase Order
             </Button>
             <div>
@@ -311,7 +311,7 @@ export default function PurchaseOrderEdit() {
                               <Button
                                 variant={"outline"}
                                 className={cn(
-                                  "w-full pl-3 text-left font-normal",
+                                  "w-full ps-3 text-start font-normal",
                                   !field.value && "text-muted-foreground"
                                 )}
                               >
@@ -320,7 +320,7 @@ export default function PurchaseOrderEdit() {
                                 ) : (
                                   <span>Pick a date</span>
                                 )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                <CalendarIcon className="ms-auto h-4 w-4 opacity-50" />
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
@@ -376,7 +376,7 @@ export default function PurchaseOrderEdit() {
                         quantity_received: 0,
                       })}
                     >
-                      <Plus className="h-4 w-4 mr-1" />
+                      <Plus className="h-4 w-4 me-1" />
                       Add Item
                     </Button>
                   </CardHeader>
@@ -533,7 +533,7 @@ export default function PurchaseOrderEdit() {
                   </CardContent>
                 </Card>
 
-                <div className="flex justify-end space-x-2">
+                <div className="flex justify-end space-x-2 rtl:space-x-reverse">
                   <Button
                     type="button"
                     variant="outline"

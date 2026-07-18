@@ -137,7 +137,7 @@ export function AddInventoryDialog() {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button className="bg-[#5469D4] hover:bg-[#5469D4]/90">
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4 me-2" />
           Add Inventory
         </Button>
       </DialogTrigger>
@@ -206,7 +206,7 @@ export function AddInventoryDialog() {
                           {materialValue
                             ? materials?.find((material) => material.uuid === materialValue)?.name || "Material not found"
                             : "Select material..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                         
                         {materialOpen && (
@@ -233,7 +233,7 @@ export function AddInventoryDialog() {
                                   >
                                     <Check
                                       className={cn(
-                                        "mr-2 h-4 w-4",
+                                        "me-2 h-4 w-4",
                                         materialValue === material.uuid ? "opacity-100" : "opacity-0"
                                       )}
                                     />
@@ -313,7 +313,7 @@ export function AddInventoryDialog() {
                           {warehouseValue
                             ? warehouses?.find((warehouse) => warehouse.uuid === warehouseValue)?.name || "Warehouse not found"
                             : "Select warehouse..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                         
                         {warehouseOpen && (
@@ -340,7 +340,7 @@ export function AddInventoryDialog() {
                                   >
                                     <Check
                                       className={cn(
-                                        "mr-2 h-4 w-4",
+                                        "me-2 h-4 w-4",
                                         warehouseValue === warehouse.uuid ? "opacity-100" : "opacity-0"
                                       )}
                                     />
@@ -432,7 +432,7 @@ export function AddInventoryDialog() {
               )}
             />
 
-            <div className="flex justify-end space-x-2 pt-4">
+            <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
                 Cancel
               </Button>

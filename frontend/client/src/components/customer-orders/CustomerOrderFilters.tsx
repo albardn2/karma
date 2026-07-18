@@ -63,10 +63,10 @@ export function CustomerOrderFilters({
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
           <Button variant="outline" size="sm" className="relative">
-            <Filter className="h-4 w-4 mr-2" />
+            <Filter className="h-4 w-4 me-2" />
             Filters
             {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-[#5469D4] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="absolute -top-1 -end-1 bg-[#5469D4] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}

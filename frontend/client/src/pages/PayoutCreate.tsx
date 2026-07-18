@@ -215,7 +215,7 @@ export default function PayoutCreate() {
               variant="ghost"
               size="sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 me-2" />
               Back
             </Button>
             <div>
@@ -232,7 +232,7 @@ export default function PayoutCreate() {
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={createMutation.isPending} className="bg-[#5469D4] hover:bg-[#4356C7] text-white">
-              <Save className="h-4 w-4 mr-2" />
+              <Save className="h-4 w-4 me-2" />
               {createMutation.isPending ? "Creating..." : "Create Payout"}
             </Button>
           </div>

@@ -162,7 +162,7 @@ export default function Transactions() {
             onClick={() => setLocation("/transactions/create")}
             className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 me-2" />
             Create Transaction
           </Button>
         </div>
@@ -193,7 +193,7 @@ export default function Transactions() {
                   onClick={() => setLocation("/transactions/create")}
                   className="mt-4 bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-4 w-4 me-2" />
                   Create First Transaction
                 </Button>
               </div>
@@ -261,7 +261,7 @@ export default function Transactions() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setLocation(`/transactions/${transaction.uuid}`)}>
-                                <Eye className="h-4 w-4 mr-2" />
+                                <Eye className="h-4 w-4 me-2" />
                                 View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem 

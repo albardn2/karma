@@ -236,7 +236,7 @@ export default function LocationTrackingSettings() {
                       <span />
                     )}
                     <Button type="submit" disabled={updateConfigMutation.isPending}>
-                      <Save className="h-4 w-4 mr-2" />
+                      <Save className="h-4 w-4 me-2" />
                       {updateConfigMutation.isPending ? "Saving..." : "Save Settings"}
                     </Button>
                   </div>

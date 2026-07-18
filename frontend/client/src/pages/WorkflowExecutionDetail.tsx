@@ -287,7 +287,7 @@ export default function WorkflowExecutionDetail() {
             <div className="flex items-center gap-4">
               <Link href="/workflow-execution">
                 <Button variant="ghost" size="sm" data-testid="button-back">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 me-2" />
                   Back
                 </Button>
               </Link>
@@ -306,7 +306,7 @@ export default function WorkflowExecutionDetail() {
               onClick={() => setShowExecuteDialog(true)}
               data-testid="button-execute-workflow"
             >
-              <Play className="h-4 w-4 mr-2" />
+              <Play className="h-4 w-4 me-2" />
               Execute Workflow
             </Button>
           </div>
@@ -320,10 +320,10 @@ export default function WorkflowExecutionDetail() {
                 onClick={handleOpenFiltersModal}
                 data-testid="button-open-filters"
               >
-                <Filter className="h-4 w-4 mr-2" />
+                <Filter className="h-4 w-4 me-2" />
                 Filters
                 {activeFiltersCount > 0 && (
-                  <Badge variant="secondary" className="ml-2">
+                  <Badge variant="secondary" className="ms-2">
                     {activeFiltersCount}
                   </Badge>
                 )}
@@ -343,7 +343,7 @@ export default function WorkflowExecutionDetail() {
                   className="mt-4"
                   data-testid="button-execute-first"
                 >
-                  <Play className="h-4 w-4 mr-2" />
+                  <Play className="h-4 w-4 me-2" />
                   Execute Workflow
                 </Button>
               </div>
@@ -358,7 +358,7 @@ export default function WorkflowExecutionDetail() {
                       <TableHead>Ended</TableHead>
                       <TableHead>Duration</TableHead>
                       <TableHead>Tags</TableHead>
-                      {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                      {isAdmin && <TableHead className="text-end">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -400,7 +400,7 @@ export default function WorkflowExecutionDetail() {
                           </div>
                         </TableCell>
                         {isAdmin && (
-                          <TableCell className="text-right">
+                          <TableCell className="text-end">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -583,7 +583,7 @@ export default function WorkflowExecutionDetail() {
 
               <DialogFooter>
                 <Button variant="outline" onClick={clearFilters} data-testid="button-clear-filters">
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-4 w-4 me-2" />
                   Clear Filters
                 </Button>
                 <Button onClick={handleApplyFilters} data-testid="button-apply-filters">
@@ -618,12 +618,12 @@ export default function WorkflowExecutionDetail() {
                 >
                   {createExecutionMutation.isPending ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="me-2 h-4 w-4 animate-spin" />
                       Starting...
                     </>
                   ) : (
                     <>
-                      <Play className="h-4 w-4 mr-2" />
+                      <Play className="h-4 w-4 me-2" />
                       Execute
                     </>
                   )}

@@ -149,7 +149,7 @@ export default function Users() {
               : "bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200"
           }`}>
             <div className="flex items-center">
-              <div className={`w-3 h-3 rounded-full mr-3 ${
+              <div className={`w-3 h-3 rounded-full me-3 ${
                 isError ? "bg-red-500" : "bg-indigo-500"
               }`}></div>
               <span className={`text-sm font-medium ${
@@ -234,7 +234,7 @@ export default function Users() {
                     variant="secondary" 
                     className={`${getPermissionBadgeColor(user.permission_scope)} text-xs`}
                   >
-                    <Shield className="h-3 w-3 mr-1" />
+                    <Shield className="h-3 w-3 me-1" />
                     {formatPermissionScope(user.permission_scope)}
                   </Badge>
                   
@@ -275,7 +275,7 @@ export default function Users() {
             
             {/* Pagination */}
             {usersData && usersData.pages > 1 && (
-              <div className="flex justify-center items-center space-x-4 mt-8">
+              <div className="flex justify-center items-center space-x-4 rtl:space-x-reverse mt-8">
                 <Button
                   variant="outline"
                   disabled={filters.page === 1}

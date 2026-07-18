@@ -154,7 +154,7 @@ export function OrderDetailDialog({
                   className="w-full bg-[#5469D4] hover:bg-[#5469D4]/90"
                   data-testid="button-submit-order-actions"
                 >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  <CheckCircle2 className="h-4 w-4 me-2" />
                   {submitMutation.isPending ? "Submitting…" : "Submit"}
                 </Button>
               </div>
