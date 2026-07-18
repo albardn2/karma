@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Edit3, Save, X, Trash2, Copy, Check } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PurchaseOrderItem {
   uuid: string;
@@ -63,6 +64,7 @@ interface FulfillItemModalProps {
 }
 
 function FulfillItemModal({ isOpen, onClose, item, onFulfill, isLoading }: FulfillItemModalProps) {
+  const { t } = useLanguage();
   const [warehouseUuid, setWarehouseUuid] = useState("");
   const [inventoryUuid, setInventoryUuid] = useState("");
   const [useWarehouse, setUseWarehouse] = useState(true);
@@ -99,8 +101,8 @@ function FulfillItemModal({ isOpen, onClose, item, onFulfill, isLoading }: Fulfi
     // Validate that either warehouse or inventory is provided
     if ((!useWarehouse && !inventoryUuid) || (useWarehouse && !warehouseUuid)) {
       toast({
-        title: "Error",
-        description: "Please select either a warehouse or inventory",
+        title: t('common.error'),
+        description: t('purchaseOrders.selectWarehouseOrInventory'),
         variant: "destructive",
       });
       return;
@@ -125,14 +127,14 @@ function FulfillItemModal({ isOpen, onClose, item, onFulfill, isLoading }: Fulfi
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Fulfill Item</DialogTitle>
+          <DialogTitle>{t('purchaseOrders.fulfillItem')}</DialogTitle>
           <p className="text-sm text-gray-500">{item?.material_name}</p>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Toggle between Warehouse and Inventory */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Select By</Label>
+            <Label className="text-sm font-medium">{t('purchaseOrders.selectBy')}</Label>
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -141,7 +143,7 @@ function FulfillItemModal({ isOpen, onClose, item, onFulfill, isLoading }: Fulfi
                 onClick={() => setUseWarehouse(true)}
                 className="flex-1"
               >
-                Warehouse
+                {t('purchaseOrders.warehouse')}
               </Button>
               <Button
                 type="button"
@@ -150,7 +152,7 @@ function FulfillItemModal({ isOpen, onClose, item, onFulfill, isLoading }: Fulfi
                 onClick={() => setUseWarehouse(false)}
                 className="flex-1"
               >
-                Inventory
+                {t('purchaseOrders.inventory')}
               </Button>
             </div>
           </div>
@@ -159,11 +161,11 @@ function FulfillItemModal({ isOpen, onClose, item, onFulfill, isLoading }: Fulfi
           {useWarehouse && (
             <div className="space-y-2">
               <Label htmlFor="warehouse" className="text-sm font-medium">
-                Warehouse
+                {t('purchaseOrders.warehouse')}
               </Label>
               <Select value={warehouseUuid} onValueChange={setWarehouseUuid}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select warehouse" />
+                  <SelectValue placeholder={t('purchaseOrders.selectWarehouse')} />
                 </SelectTrigger>
                 <SelectContent>
                   {warehouses.map((warehouse: any) => (
@@ -180,11 +182,11 @@ function FulfillItemModal({ isOpen, onClose, item, onFulfill, isLoading }: Fulfi
           {!useWarehouse && (
             <div className="space-y-2">
               <Label htmlFor="inventory" className="text-sm font-medium">
-                Inventory
+                {t('purchaseOrders.inventory')}
               </Label>
               <Select value={inventoryUuid} onValueChange={setInventoryUuid}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select inventory" />
+                  <SelectValue placeholder={t('purchaseOrders.selectInventory')} />
                 </SelectTrigger>
                 <SelectContent>
                   {inventories.map((inventory: any) => (
@@ -206,14 +208,14 @@ function FulfillItemModal({ isOpen, onClose, item, onFulfill, isLoading }: Fulfi
               disabled={isLoading}
               className="flex-1"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
               className="flex-1 bg-[#5469D4] hover:bg-[#4356C7] text-white"
             >
-              {isLoading ? "Fulfilling..." : "Fulfill Item"}
+              {isLoading ? t('purchaseOrders.fulfilling') : t('purchaseOrders.fulfillItem')}
             </Button>
           </div>
         </form>
@@ -224,6 +226,7 @@ function FulfillItemModal({ isOpen, onClose, item, onFulfill, isLoading }: Fulfi
 
 export default function PurchaseOrderDetail() {
   const params = useParams();
+  const { t, te } = useLanguage();
   const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotes, setEditedNotes] = useState("");
@@ -252,14 +255,14 @@ export default function PurchaseOrderDetail() {
       queryClient.invalidateQueries({ queryKey: ["/purchase-order", params?.id] });
       setIsEditing(false);
       toast({
-        title: "Success",
-        description: "Purchase order updated successfully",
+        title: t('common.success'),
+        description: t('purchaseOrders.updateSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update purchase order",
+        title: t('common.error'),
+        description: error.message || t('purchaseOrders.updateError'),
         variant: "destructive",
       });
     },
@@ -273,15 +276,15 @@ export default function PurchaseOrderDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/purchase-order"] });
       toast({
-        title: "Success",
-        description: "Purchase order deleted successfully",
+        title: t('common.success'),
+        description: t('purchaseOrders.deleteSuccess'),
       });
       setLocation("/purchase-orders");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete purchase order",
+        title: t('common.error'),
+        description: error.message || t('purchaseOrders.deleteError'),
         variant: "destructive",
       });
     },
@@ -334,18 +337,35 @@ export default function PurchaseOrderDetail() {
   };
 
   const handleDelete = () => {
-    if (window.confirm("Are you sure you want to delete this purchase order?")) {
+    if (window.confirm(t('purchaseOrders.deleteConfirm'))) {
       deleteMutation.mutate();
     }
   };
+
+  // Map the stable raw field identifier (used for the copied-state comparison)
+  // to a translated label for display in the toast.
+  const fieldDisplayLabel = (fieldName: string): string =>
+    ({
+      "Payout Due Date": t('purchaseOrders.payoutDueDate'),
+      "Notes": t('common.notes'),
+      "Purchase Order UUID": t('purchaseOrders.purchaseOrderUuid'),
+      "Vendor UUID": t('purchaseOrders.vendorUuid'),
+      "Created By UUID": t('purchaseOrders.createdByUuid'),
+      "Currency": t('common.currency'),
+      "Created At": t('common.createdAt'),
+      "Fulfilled At": t('purchaseOrders.fulfilledAt'),
+      "Material Name": t('purchaseOrders.materialName'),
+      "Item UUID": t('purchaseOrders.itemUuid'),
+      "Material UUID": t('purchaseOrders.materialUuid'),
+    } as Record<string, string>)[fieldName] ?? fieldName;
 
   const copyToClipboard = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
     toast({
-      title: "Copied",
-      description: `${fieldName} copied to clipboard`,
+      title: t('purchaseOrders.copied'),
+      description: t('purchaseOrders.copiedToClipboard', { field: fieldDisplayLabel(fieldName) }),
     });
   };
 
@@ -365,14 +385,14 @@ export default function PurchaseOrderDetail() {
       setFulfillModalOpen(false);
       setItemToFulfill(null);
       toast({
-        title: "Success",
-        description: "Item fulfilled successfully",
+        title: t('common.success'),
+        description: t('purchaseOrders.itemFulfilledSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to fulfill item",
+        title: t('common.error'),
+        description: error.message || t('purchaseOrders.itemFulfillError'),
         variant: "destructive",
       });
     },
@@ -387,14 +407,14 @@ export default function PurchaseOrderDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/purchase-order", params?.id] });
       toast({
-        title: "Success",
-        description: "Item unfulfilled successfully",
+        title: t('common.success'),
+        description: t('purchaseOrders.itemUnfulfilledSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to unfulfill item",
+        title: t('common.error'),
+        description: error.message || t('purchaseOrders.itemUnfulfillError'),
         variant: "destructive",
       });
     },
@@ -443,14 +463,14 @@ export default function PurchaseOrderDetail() {
       <AppLayout>
         <div className="p-8 text-center">
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            Error Loading Purchase Order
+            {t('purchaseOrders.errorLoadingTitle')}
           </h1>
           <p className="text-red-600 dark:text-red-400">
-            Failed to load purchase order: {error?.message}
+            {t('purchaseOrders.failedLoadWithMsg', { message: error?.message ?? '' })}
           </p>
           <Button onClick={() => setLocation("/purchase-orders")} variant="outline">
             <ArrowLeft className="h-4 w-4 me-2" />
-            Back to Purchase Orders
+            {t('purchaseOrders.backToPurchaseOrders')}
           </Button>
         </div>
       </AppLayout>
@@ -462,11 +482,11 @@ export default function PurchaseOrderDetail() {
       <AppLayout>
         <div className="p-8 text-center">
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            Purchase Order Not Found
+            {t('purchaseOrders.notFoundTitle')}
           </h1>
           <Button onClick={() => setLocation("/purchase-orders")} variant="outline">
             <ArrowLeft className="h-4 w-4 me-2" />
-            Back to Purchase Orders
+            {t('purchaseOrders.backToPurchaseOrders')}
           </Button>
         </div>
       </AppLayout>
@@ -487,10 +507,10 @@ export default function PurchaseOrderDetail() {
               </div>
               <div className="ms-3">
                 <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
-                  Payment Overdue
+                  {t('purchaseOrders.paymentOverdue')}
                 </h3>
                 <p className="mt-1 text-sm text-red-700 dark:text-red-300">
-                  This purchase order payment is past due. Please review and process payment immediately.
+                  {t('purchaseOrders.overdueBannerDesc')}
                 </p>
               </div>
             </div>
@@ -506,11 +526,11 @@ export default function PurchaseOrderDetail() {
               onClick={() => setLocation("/purchase-orders")}
             >
               <ArrowLeft className="h-4 w-4 me-2" />
-              Back
+              {t('common.back')}
             </Button>
             <div>
               <h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
-                Purchase Order
+                {t('purchaseOrders.detailTitle')}
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {purchaseOrder.uuid}
@@ -526,41 +546,41 @@ export default function PurchaseOrderDetail() {
                 className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 size="sm"
               >
-                Create Payout
+                {t('purchaseOrders.createPayout')}
               </Button>
             )}
-            
+
             {!isEditing ? (
               <>
                 <Button onClick={handleEdit} variant="outline" size="sm">
                   <Edit3 className="h-4 w-4 me-2" />
-                  Edit
+                  {t('common.edit')}
                 </Button>
-                <Button 
+                <Button
                   onClick={handleDelete}
-                  variant="outline" 
+                  variant="outline"
                   size="sm"
                   className="text-red-600 border-red-600 hover:bg-red-50 dark:text-red-400 dark:border-red-400 dark:hover:bg-red-900/20"
                   disabled={deleteMutation.isPending}
                 >
                   <Trash2 className="h-4 w-4 me-2" />
-                  Delete
+                  {t('common.delete')}
                 </Button>
               </>
             ) : (
               <>
                 <Button onClick={handleCancel} variant="outline" size="sm">
                   <X className="h-4 w-4 me-2" />
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
-                <Button 
-                  onClick={handleSave} 
+                <Button
+                  onClick={handleSave}
                   disabled={updateMutation.isPending}
                   size="sm"
                   className="bg-[#5469D4] hover:bg-[#4356C7]"
                 >
                   <Save className="h-4 w-4 me-2" />
-                  Save
+                  {t('common.save')}
                 </Button>
               </>
             )}
@@ -572,7 +592,7 @@ export default function PurchaseOrderDetail() {
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Order Information</CardTitle>
+                <CardTitle className="text-lg">{t('purchaseOrders.orderInformation')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Status Badges */}
@@ -586,40 +606,40 @@ export default function PurchaseOrderDetail() {
                         : 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-300'
                     }`}
                   >
-                    Status: {purchaseOrder.status}
+                    {t('common.status')}: {te(purchaseOrder.status)}
                   </Badge>
-                  
-                  <Badge 
+
+                  <Badge
                     className={`text-xs ${
                       purchaseOrder.is_fulfilled
                         ? 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300'
                         : 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300'
                     }`}
                   >
-                    {purchaseOrder.is_fulfilled ? "Fulfilled" : "Unfulfilled"}
+                    {purchaseOrder.is_fulfilled ? t('purchaseOrders.fulfilled') : t('purchaseOrders.unfulfilled')}
                   </Badge>
 
                   {purchaseOrder.is_overdue && (
                     <Badge className="text-xs bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300">
-                      Payment Overdue
+                      {t('purchaseOrders.paymentOverdue')}
                     </Badge>
                   )}
 
-                  <Badge 
+                  <Badge
                     className={`text-xs ${
                       purchaseOrder.is_paid
                         ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300'
                         : 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300'
                     }`}
                   >
-                    {purchaseOrder.is_paid ? "Paid" : "Unpaid"}
+                    {purchaseOrder.is_paid ? t('purchaseOrders.paid') : t('purchaseOrders.unpaid')}
                   </Badge>
                 </div>
 
                 {/* Financial Information Grid */}
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Amount</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.totalAmount')}</Label>
                     <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                       ${purchaseOrder.total_amount?.toFixed(2) || '0.00'}
                     </p>
@@ -627,7 +647,7 @@ export default function PurchaseOrderDetail() {
                   </div>
                   
                   <div>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Adjusted Amount</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.adjustedAmount')}</Label>
                     <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                       ${purchaseOrder.total_adjusted_amount?.toFixed(2) || '0.00'}
                     </p>
@@ -635,14 +655,14 @@ export default function PurchaseOrderDetail() {
                   </div>
                   
                   <div>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount Paid</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.amountPaid')}</Label>
                     <p className="text-xl font-medium text-green-600 dark:text-green-400">
                       ${purchaseOrder.net_amount_paid?.toFixed(2) || '0.00'}
                     </p>
                   </div>
                   
                   <div>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount Due</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.amountDue')}</Label>
                     <p className={`text-xl font-medium ${
                       (purchaseOrder.net_amount_due || 0) > 0 
                         ? 'text-red-600 dark:text-red-400' 
@@ -655,7 +675,7 @@ export default function PurchaseOrderDetail() {
 
                 {/* Due Date Section */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Payout Due Date</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.payoutDueDate')}</Label>
                   {isEditing ? (
                     <div className="mt-2">
                       <Input
@@ -666,12 +686,12 @@ export default function PurchaseOrderDetail() {
                       />
                     </div>
                   ) : (
-                    <div className="mt-2 group cursor-pointer" onClick={() => copyToClipboard(purchaseOrder.payout_due_date ? format(new Date(purchaseOrder.payout_due_date), 'PPpp') : "No due date set", "Payout Due Date")}>
+                    <div className="mt-2 group cursor-pointer" onClick={() => copyToClipboard(purchaseOrder.payout_due_date ? format(new Date(purchaseOrder.payout_due_date), 'PPpp') : t('purchaseOrders.noDueDateSet'), "Payout Due Date")}>
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-gray-900 dark:text-gray-100">
-                          {purchaseOrder.payout_due_date 
+                          {purchaseOrder.payout_due_date
                             ? format(new Date(purchaseOrder.payout_due_date), 'PPpp')
-                            : "No due date set"
+                            : t('purchaseOrders.noDueDateSet')
                           }
                         </p>
                         <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -684,21 +704,21 @@ export default function PurchaseOrderDetail() {
 
                 {/* Notes Section */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Notes</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.notes')}</Label>
                   {isEditing ? (
                     <div className="mt-2">
                       <Input
                         value={editedNotes}
                         onChange={(e) => setEditedNotes(e.target.value)}
-                        placeholder="Add notes..."
+                        placeholder={t('purchaseOrders.addNotesPlaceholder')}
                         className="w-full"
                       />
                     </div>
                   ) : (
-                    <div className="mt-2 group cursor-pointer" onClick={() => copyToClipboard(purchaseOrder.notes || "No notes", "Notes")}>
+                    <div className="mt-2 group cursor-pointer" onClick={() => copyToClipboard(purchaseOrder.notes || t('purchaseOrders.noNotes'), "Notes")}>
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-gray-900 dark:text-gray-100">
-                          {purchaseOrder.notes || "No notes"}
+                          {purchaseOrder.notes || t('purchaseOrders.noNotes')}
                         </p>
                         <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
                           {copiedField === "Notes" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -715,11 +735,11 @@ export default function PurchaseOrderDetail() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Details</CardTitle>
+                <CardTitle className="text-lg">{t('common.details')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(purchaseOrder.uuid, "Purchase Order UUID")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Purchase Order UUID</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.purchaseOrderUuid')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-900 dark:text-gray-100 break-all">
                       {purchaseOrder.uuid}
@@ -731,7 +751,7 @@ export default function PurchaseOrderDetail() {
                 </div>
 
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(purchaseOrder.vendor_uuid, "Vendor UUID")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Vendor UUID</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.vendorUuid')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-900 dark:text-gray-100 break-all">
                       {purchaseOrder.vendor_uuid}
@@ -744,7 +764,7 @@ export default function PurchaseOrderDetail() {
 
                 {purchaseOrder.created_by_uuid && (
                   <div className="group cursor-pointer" onClick={() => copyToClipboard(purchaseOrder.created_by_uuid, "Created By UUID")}>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created By UUID</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.createdByUuid')}</Label>
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-900 dark:text-gray-100 break-all">
                         {purchaseOrder.created_by_uuid}
@@ -757,10 +777,10 @@ export default function PurchaseOrderDetail() {
                 )}
 
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(purchaseOrder.currency, "Currency")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Currency</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.currency')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-900 dark:text-gray-100">
-                      {purchaseOrder.currency}
+                      {te(purchaseOrder.currency)}
                     </p>
                     <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
                       {copiedField === "Currency" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -769,7 +789,7 @@ export default function PurchaseOrderDetail() {
                 </div>
 
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(format(new Date(purchaseOrder.created_at), 'PPpp'), "Created At")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created At</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.createdAt')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-900 dark:text-gray-100">
                       {format(new Date(purchaseOrder.created_at), 'PPpp')}
@@ -782,7 +802,7 @@ export default function PurchaseOrderDetail() {
 
                 {purchaseOrder.fulfilled_at && (
                   <div className="group cursor-pointer" onClick={() => copyToClipboard(format(new Date(purchaseOrder.fulfilled_at), 'PPpp'), "Fulfilled At")}>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Fulfilled At</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.fulfilledAt')}</Label>
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-900 dark:text-gray-100">
                         {format(new Date(purchaseOrder.fulfilled_at), 'PPpp')}
@@ -803,7 +823,7 @@ export default function PurchaseOrderDetail() {
         {/* Purchase Order Items - Full Width */}
         <Card className="mt-8">
           <CardHeader>
-            <CardTitle className="text-lg">Order Items</CardTitle>
+            <CardTitle className="text-lg">{t('purchaseOrders.orderItems')}</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -816,20 +836,20 @@ export default function PurchaseOrderDetail() {
               </div>
             ) : !Array.isArray(purchaseOrderItems) || purchaseOrderItems.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-500 dark:text-gray-400">No items found for this purchase order</p>
+                <p className="text-gray-500 dark:text-gray-400">{t('purchaseOrders.noItemsFound')}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="border-b border-gray-200 dark:border-gray-700">
                     <tr>
-                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Material</th>
-                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Quantity</th>
-                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Unit Price</th>
-                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Total</th>
-                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Received</th>
-                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
-                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.material')}</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.quantity')}</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.unitPrice')}</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.total')}</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.received')}</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.status')}</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -870,7 +890,7 @@ export default function PurchaseOrderDetail() {
                           </div>
                           {item.quantity_received > 0 && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {Math.round((item.quantity_received / item.quantity) * 100)}% received
+                              {t('purchaseOrders.percentReceived', { percent: Math.round((item.quantity_received / item.quantity) * 100) })}
                             </div>
                           )}
                         </td>
@@ -882,7 +902,7 @@ export default function PurchaseOrderDetail() {
                                 : 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-300'
                             }`}
                           >
-                            {item.is_fulfilled ? "Fulfilled" : "Pending"}
+                            {item.is_fulfilled ? t('purchaseOrders.fulfilled') : t('purchaseOrders.pending')}
                           </Badge>
                           {item.fulfilled_at && (
                             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -902,7 +922,7 @@ export default function PurchaseOrderDetail() {
                                 : 'bg-[#5469D4] hover:bg-[#4356C7] text-white'
                             }`}
                           >
-                            {(fulfillItemMutation.isPending || unfulfillItemMutation.isPending) ? "..." : (item.is_fulfilled ? "Unfulfill" : "Fulfill")}
+                            {(fulfillItemMutation.isPending || unfulfillItemMutation.isPending) ? "..." : (item.is_fulfilled ? t('purchaseOrders.unfulfill') : t('purchaseOrders.fulfill'))}
                           </Button>
                         </td>
                       </tr>
@@ -918,7 +938,7 @@ export default function PurchaseOrderDetail() {
         <Dialog open={itemModalOpen} onOpenChange={setItemModalOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader className="pb-4 border-b">
-              <DialogTitle className="text-xl font-semibold">Purchase Order Item Details</DialogTitle>
+              <DialogTitle className="text-xl font-semibold">{t('purchaseOrders.itemDetailsTitle')}</DialogTitle>
               <p className="text-sm text-gray-500">{selectedItem?.material_name}</p>
             </DialogHeader>
             {selectedItem && (
@@ -927,12 +947,12 @@ export default function PurchaseOrderDetail() {
                 <div className="space-y-4">
                   {/* Material & IDs */}
                   <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 space-y-3">
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm uppercase tracking-wide">Material & IDs</h3>
-                    
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm uppercase tracking-wide">{t('purchaseOrders.materialAndIds')}</h3>
+
                     <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.material_name, "Material Name")}>
                       <div className="flex items-center justify-between">
                         <div>
-                          <Label className="text-xs text-gray-500 dark:text-gray-400">Material Name</Label>
+                          <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.materialName')}</Label>
                           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedItem.material_name}</p>
                         </div>
                         <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -944,7 +964,7 @@ export default function PurchaseOrderDetail() {
                     <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.uuid, "Item UUID")}>
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
-                          <Label className="text-xs text-gray-500 dark:text-gray-400">Item UUID</Label>
+                          <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.itemUuid')}</Label>
                           <p className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{selectedItem.uuid}</p>
                         </div>
                         <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -956,7 +976,7 @@ export default function PurchaseOrderDetail() {
                     <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.material_uuid, "Material UUID")}>
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
-                          <Label className="text-xs text-gray-500 dark:text-gray-400">Material UUID</Label>
+                          <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.materialUuid')}</Label>
                           <p className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{selectedItem.material_uuid}</p>
                         </div>
                         <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -968,7 +988,7 @@ export default function PurchaseOrderDetail() {
                     <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.purchase_order_uuid, "Purchase Order UUID")}>
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
-                          <Label className="text-xs text-gray-500 dark:text-gray-400">Purchase Order UUID</Label>
+                          <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.purchaseOrderUuid')}</Label>
                           <p className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{selectedItem.purchase_order_uuid}</p>
                         </div>
                         <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -981,7 +1001,7 @@ export default function PurchaseOrderDetail() {
                       <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.created_by_uuid, "Created By UUID")}>
                         <div className="flex items-center justify-between">
                           <div className="min-w-0 flex-1">
-                            <Label className="text-xs text-gray-500 dark:text-gray-400">Created By UUID</Label>
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.createdByUuid')}</Label>
                             <p className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{selectedItem.created_by_uuid}</p>
                           </div>
                           <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -994,24 +1014,24 @@ export default function PurchaseOrderDetail() {
 
                   {/* Quantities */}
                   <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 space-y-3">
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm uppercase tracking-wide">Quantities</h3>
-                    
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm uppercase tracking-wide">{t('purchaseOrders.quantities')}</h3>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-xs text-gray-500 dark:text-gray-400">Ordered</Label>
+                        <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.ordered')}</Label>
                         <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                           {selectedItem.quantity} <span className="text-sm font-normal text-gray-500">{selectedItem.unit}</span>
                         </p>
                       </div>
-                      
+
                       <div>
-                        <Label className="text-xs text-gray-500 dark:text-gray-400">Received</Label>
+                        <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.received')}</Label>
                         <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                           {selectedItem.quantity_received} <span className="text-sm font-normal text-gray-500">{selectedItem.unit}</span>
                         </p>
                         {selectedItem.quantity_received > 0 && (
                           <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                            {Math.round((selectedItem.quantity_received / selectedItem.quantity) * 100)}% complete
+                            {t('purchaseOrders.percentComplete', { percent: Math.round((selectedItem.quantity_received / selectedItem.quantity) * 100) })}
                           </p>
                         )}
                       </div>
@@ -1023,20 +1043,20 @@ export default function PurchaseOrderDetail() {
                 <div className="space-y-4">
                   {/* Pricing */}
                   <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 space-y-3">
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm uppercase tracking-wide">Pricing</h3>
-                    
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm uppercase tracking-wide">{t('purchaseOrders.pricing')}</h3>
+
                     <div className="grid grid-cols-1 gap-3">
                       <div>
-                        <Label className="text-xs text-gray-500 dark:text-gray-400">Price Per Unit</Label>
+                        <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.pricePerUnit')}</Label>
                         <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                          ${selectedItem.price_per_unit.toFixed(2)} <span className="text-sm font-normal text-gray-500">{selectedItem.currency}</span>
+                          ${selectedItem.price_per_unit.toFixed(2)} <span className="text-sm font-normal text-gray-500">{te(selectedItem.currency)}</span>
                         </p>
                       </div>
-                      
+
                       <div className="pt-2 border-t border-green-200 dark:border-green-700">
-                        <Label className="text-xs text-gray-500 dark:text-gray-400">Total Price</Label>
+                        <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.totalPrice')}</Label>
                         <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                          ${selectedItem.total_price.toFixed(2)} <span className="text-lg font-normal text-gray-500">{selectedItem.currency}</span>
+                          ${selectedItem.total_price.toFixed(2)} <span className="text-lg font-normal text-gray-500">{te(selectedItem.currency)}</span>
                         </p>
                       </div>
                     </div>
@@ -1044,10 +1064,10 @@ export default function PurchaseOrderDetail() {
 
                   {/* Status & Timestamps */}
                   <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 space-y-3">
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm uppercase tracking-wide">Status & Timeline</h3>
-                    
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm uppercase tracking-wide">{t('purchaseOrders.statusTimeline')}</h3>
+
                     <div>
-                      <Label className="text-xs text-gray-500 dark:text-gray-400">Fulfillment Status</Label>
+                      <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.fulfillmentStatus')}</Label>
                       <div className="mt-1">
                         <Badge 
                           className={`text-xs ${
@@ -1056,7 +1076,7 @@ export default function PurchaseOrderDetail() {
                               : 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300'
                           }`}
                         >
-                          {selectedItem.is_fulfilled ? "Fulfilled" : "Pending"}
+                          {selectedItem.is_fulfilled ? t('purchaseOrders.fulfilled') : t('purchaseOrders.pending')}
                         </Badge>
                       </div>
                     </div>
@@ -1064,7 +1084,7 @@ export default function PurchaseOrderDetail() {
                     <div className="group cursor-pointer" onClick={() => copyToClipboard(format(new Date(selectedItem.created_at), 'PPp'), "Created At")}>
                       <div className="flex items-center justify-between">
                         <div>
-                          <Label className="text-xs text-gray-500 dark:text-gray-400">Created At</Label>
+                          <Label className="text-xs text-gray-500 dark:text-gray-400">{t('common.createdAt')}</Label>
                           <p className="text-sm text-gray-900 dark:text-gray-100">
                             {format(new Date(selectedItem.created_at), 'PPp')}
                           </p>
@@ -1079,7 +1099,7 @@ export default function PurchaseOrderDetail() {
                       <div className="group cursor-pointer" onClick={() => copyToClipboard(format(new Date(selectedItem.fulfilled_at), 'PPp'), "Fulfilled At")}>
                         <div className="flex items-center justify-between">
                           <div>
-                            <Label className="text-xs text-gray-500 dark:text-gray-400">Fulfilled At</Label>
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.fulfilledAt')}</Label>
                             <p className="text-sm text-gray-900 dark:text-gray-100">
                               {format(new Date(selectedItem.fulfilled_at), 'PPp')}
                             </p>
@@ -1092,10 +1112,10 @@ export default function PurchaseOrderDetail() {
                     )}
 
                     <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                      <Label className="text-xs text-gray-500 dark:text-gray-400">System Flags</Label>
+                      <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.systemFlags')}</Label>
                       <div className="flex gap-2 mt-1">
                         <Badge variant="outline" className="text-xs">
-                          {selectedItem.is_deleted ? "Deleted" : "Active"}
+                          {selectedItem.is_deleted ? t('purchaseOrders.deleted') : t('purchaseOrders.active')}
                         </Badge>
                       </div>
                     </div>
@@ -1117,7 +1137,7 @@ export default function PurchaseOrderDetail() {
                       : 'bg-[#5469D4] hover:bg-[#4356C7] text-white'
                   }`}
                 >
-                  {(fulfillItemMutation.isPending || unfulfillItemMutation.isPending) ? "Updating..." : (selectedItem.is_fulfilled ? "Unfulfill Item" : "Fulfill Item")}
+                  {(fulfillItemMutation.isPending || unfulfillItemMutation.isPending) ? t('common.updating') : (selectedItem.is_fulfilled ? t('purchaseOrders.unfulfillItem') : t('purchaseOrders.fulfillItem'))}
                 </Button>
               </div>
             )}

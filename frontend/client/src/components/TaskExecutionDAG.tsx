@@ -6,6 +6,7 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { TaskExecution } from "@/types/taskExecution";
 
 interface TaskExecutionDAGProps {
@@ -184,14 +185,15 @@ export function TaskExecutionDAG({
   selectedTaskExecutionUuid,
   onSelectTaskExecution 
 }: TaskExecutionDAGProps) {
+  const { t, te } = useLanguage();
   const { nodes, edges } = calculateDAGLayout(taskExecutions);
 
   if (taskExecutions.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 mb-4">No task executions yet</p>
+        <p className="text-gray-500 mb-4">{t('workflows.noTaskExecutions')}</p>
         <p className="text-sm text-gray-400">
-          Task executions will appear here once the workflow starts
+          {t('workflows.taskExecutionsHint')}
         </p>
       </div>
     );
@@ -202,7 +204,7 @@ export function TaskExecutionDAG({
   const maxY = Math.max(...nodes.map((n) => n.y)) + CARD_HEIGHT + PADDING;
 
   return (
-    <div className="w-full overflow-auto border rounded-lg bg-gray-50 dark:bg-gray-900">
+    <div className="w-full overflow-auto border rounded-lg bg-gray-50 dark:bg-gray-900" dir="ltr">
       <svg
         width={Math.max(maxX, 800)}
         height={Math.max(maxY, 400)}
@@ -277,26 +279,26 @@ export function TaskExecutionDAG({
                       <h4
                         className="font-medium text-sm truncate"
                         data-testid={`dag-text-task-name-${node.taskExecution.name}`}
-                        title={node.taskExecution.name || "Unnamed Task"}
+                        title={node.taskExecution.name || t('workflows.unnamedTask')}
                       >
-                        {node.taskExecution.name || "Unnamed Task"}
+                        {node.taskExecution.name || t('workflows.unnamedTask')}
                       </h4>
                       <div className="flex items-center gap-2 mt-1">
                         {getStatusIcon(node.taskExecution.status)}
                         <Badge variant="outline" className="text-xs">
-                          {node.taskExecution.status}
+                          {te(node.taskExecution.status)}
                         </Badge>
                       </div>
                     </div>
                   </div>
                   {node.taskExecution.start_time && (
                     <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                      Started: {new Date(node.taskExecution.start_time).toLocaleTimeString()}
+                      {t('workflows.startedLabel', { time: new Date(node.taskExecution.start_time).toLocaleTimeString() })}
                     </p>
                   )}
                   {node.taskExecution.error_message && (
                     <p className="text-xs text-red-600 dark:text-red-400 mt-1 line-clamp-2">
-                      Error: {node.taskExecution.error_message}
+                      {t('workflows.errorLabel', { error: node.taskExecution.error_message })}
                     </p>
                   )}
                 </div>

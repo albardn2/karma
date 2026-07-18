@@ -5,6 +5,7 @@ import L from "leaflet";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, RotateCcw } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface TripStopPoint {
   uuid: string;
@@ -45,6 +46,7 @@ function numberedIcon(number: number, done: boolean) {
 }
 
 export function TripStopsMap({ stops }: { stops: TripStopPoint[] }) {
+  const { t, te } = useLanguage();
   // visibleCount: how many stops are shown; drives the "progress over time" animation
   const [visibleCount, setVisibleCount] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -83,7 +85,7 @@ export function TripStopsMap({ stops }: { stops: TripStopPoint[] }) {
   if (points.length === 0) {
     return (
       <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-        <p className="text-gray-500">No stop locations for this trip.</p>
+        <p className="text-gray-500">{t("location.noStopLocations")}</p>
       </div>
     );
   }
@@ -109,18 +111,18 @@ export function TripStopsMap({ stops }: { stops: TripStopPoint[] }) {
       <div className="flex items-center gap-4">
         {playing ? (
           <Button variant="outline" size="sm" onClick={() => setPlaying(false)} data-testid="button-stops-pause">
-            <Pause className="h-4 w-4 me-2" /> Pause
+            <Pause className="h-4 w-4 me-2" /> {t("location.pause")}
           </Button>
         ) : (
           <Button variant="outline" size="sm" onClick={play} data-testid="button-stops-play">
-            <Play className="h-4 w-4 me-2" /> Play
+            <Play className="h-4 w-4 me-2" /> {t("location.play")}
           </Button>
         )}
         <Button variant="ghost" size="sm" onClick={() => { setPlaying(false); setVisibleCount(points.length); }} data-testid="button-stops-reset">
-          <RotateCcw className="h-4 w-4 me-2" /> Show all
+          <RotateCcw className="h-4 w-4 me-2" /> {t("location.showAll")}
         </Button>
         <span className="text-sm text-gray-500 whitespace-nowrap" data-testid="stops-map-progress">
-          {Math.min(visibleCount, points.length)} / {points.length} stops
+          {t("location.stopsProgress", { shown: Math.min(visibleCount, points.length), total: points.length })}
         </span>
         <Slider
           value={[visibleCount]}
@@ -134,7 +136,7 @@ export function TripStopsMap({ stops }: { stops: TripStopPoint[] }) {
       </div>
 
       {/* map */}
-      <div className="h-96 w-full rounded-lg overflow-hidden border border-gray-200">
+      <div className="h-96 w-full rounded-lg overflow-hidden border border-gray-200" dir="ltr">
         <MapContainer center={allPoints[0]} zoom={13} style={{ height: "100%", width: "100%" }}>
           <FitBounds points={allPoints} />
           <TileLayer
@@ -146,9 +148,9 @@ export function TripStopsMap({ stops }: { stops: TripStopPoint[] }) {
             <Marker key={p.uuid} position={[p.lat, p.lon]} icon={numberedIcon(i + 1, p.status === "completed")}>
               <Popup>
                 <div className="text-sm">
-                  <div className="font-semibold">{i + 1}. {p.customer_name || "Unknown customer"}</div>
-                  {p.outcome && <div className="text-gray-600">{p.outcome}</div>}
-                  {p.completed_at && <div className="text-gray-500">Completed {fmtTime(p.completed_at)}</div>}
+                  <div className="font-semibold">{i + 1}. {p.customer_name || t("location.unknownCustomer")}</div>
+                  {p.outcome && <div className="text-gray-600">{te(p.outcome)}</div>}
+                  {p.completed_at && <div className="text-gray-500">{t("location.completedAt", { time: fmtTime(p.completed_at) ?? "" })}</div>}
                 </div>
               </Popup>
             </Marker>

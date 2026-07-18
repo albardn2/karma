@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ExpenseFilters } from "@/components/expenses/ExpenseFilters";
 import { format } from "date-fns";
@@ -51,6 +52,7 @@ interface ExpenseFiltersType {
 export default function Expenses() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const [filters, setFilters] = useState<ExpenseFiltersType>({
     page: 1,
     per_page: 20,
@@ -74,14 +76,14 @@ export default function Expenses() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/expense/"] });
       toast({
-        title: "Success",
-        description: "Expense deleted successfully",
+        title: t('common.success'),
+        description: t('expenses.deleteSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete expense",
+        title: t('common.error'),
+        description: error.message || t('expenses.deleteFailed'),
         variant: "destructive",
       });
     },
@@ -101,7 +103,7 @@ export default function Expenses() {
   };
 
   const handleDelete = (uuid: string) => {
-    if (window.confirm("Are you sure you want to delete this expense?")) {
+    if (window.confirm(t('expenses.confirmDelete'))) {
       deleteMutation.mutate(uuid);
     }
   };
@@ -156,7 +158,7 @@ export default function Expenses() {
       <AppLayout>
         <div className="p-8">
           <div className="text-center py-8">
-            <p className="text-red-600">Error loading expenses: {error.message}</p>
+            <p className="text-red-600">{t('expenses.loadError', { message: error.message })}</p>
           </div>
         </div>
       </AppLayout>
@@ -170,7 +172,7 @@ export default function Expenses() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100">
-              Expenses
+              {t('nav.expenses')}
             </h1>
           </div>
           <Button
@@ -178,7 +180,7 @@ export default function Expenses() {
             className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
           >
             <Plus className="h-4 w-4 me-2" />
-            Create Expense
+            {t('expenses.create')}
           </Button>
         </div>
 
@@ -196,20 +198,20 @@ export default function Expenses() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Receipt className="h-5 w-5" />
-              Expenses
+              {t('nav.expenses')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {expenses.length === 0 ? (
               <div className="text-center py-8">
                 <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 dark:text-gray-400">No expenses found</p>
+                <p className="text-gray-500 dark:text-gray-400">{t('expenses.noExpenses')}</p>
                 <Button
                   onClick={() => setLocation("/expenses/create")}
                   className="mt-4 bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 >
                   <Plus className="h-4 w-4 me-2" />
-                  Create First Expense
+                  {t('expenses.createFirst')}
                 </Button>
               </div>
             ) : (
@@ -217,14 +219,14 @@ export default function Expenses() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Payment Status</TableHead>
-                      <TableHead>Vendor</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="w-[70px]">Actions</TableHead>
+                      <TableHead>{t('common.amount')}</TableHead>
+                      <TableHead>{t('common.category')}</TableHead>
+                      <TableHead>{t('common.status')}</TableHead>
+                      <TableHead>{t('expenses.paymentStatus')}</TableHead>
+                      <TableHead>{t('expenses.vendor')}</TableHead>
+                      <TableHead>{t('expenses.created')}</TableHead>
+                      <TableHead>{t('common.description')}</TableHead>
+                      <TableHead className="w-[70px]">{t('common.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -237,12 +239,12 @@ export default function Expenses() {
                         </TableCell>
                         <TableCell onClick={() => setLocation(`/expenses/${expense.uuid}`)}>
                           <Badge variant="outline" className={`text-xs ${getCategoryBadgeColor(expense.category)}`}>
-                            {expense.category}
+                            {te(expense.category)}
                           </Badge>
                         </TableCell>
                         <TableCell onClick={() => setLocation(`/expenses/${expense.uuid}`)}>
                           <Badge variant="outline" className="text-xs">
-                            {expense.status}
+                            {te(expense.status)}
                           </Badge>
                         </TableCell>
                         <TableCell onClick={() => setLocation(`/expenses/${expense.uuid}`)}>
@@ -253,7 +255,7 @@ export default function Expenses() {
                                 : 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300'
                             }`}
                           >
-                            {expense.is_paid ? 'Paid' : 'Unpaid'}
+                            {te(expense.is_paid ? 'paid' : 'unpaid')}
                           </Badge>
                         </TableCell>
                         <TableCell onClick={() => setLocation(`/expenses/${expense.uuid}`)}>
@@ -279,13 +281,13 @@ export default function Expenses() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setLocation(`/expenses/${expense.uuid}`)}>
                                 <Eye className="h-4 w-4 me-2" />
-                                View Details
+                                {t('common.viewDetails')}
                               </DropdownMenuItem>
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={() => handleDelete(expense.uuid)}
                                 className="text-red-600"
                               >
-                                Delete
+                                {t('common.delete')}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -299,7 +301,11 @@ export default function Expenses() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between mt-4">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Showing {(currentPage - 1) * filters.per_page + 1} to {Math.min(currentPage * filters.per_page, totalCount)} of {totalCount} expenses
+                      {t('expenses.pagination', {
+                        from: (currentPage - 1) * filters.per_page + 1,
+                        to: Math.min(currentPage * filters.per_page, totalCount),
+                        total: totalCount,
+                      })}
                     </p>
                     <div className="flex items-center gap-2">
                       <Button
@@ -308,10 +314,10 @@ export default function Expenses() {
                         onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage === 1}
                       >
-                        Previous
+                        {t('common.previous')}
                       </Button>
                       <span className="text-sm px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded">
-                        Page {currentPage} of {totalPages}
+                        {t('common.page')} {currentPage} {t('common.of')} {totalPages}
                       </span>
                       <Button
                         variant="outline"
@@ -319,7 +325,7 @@ export default function Expenses() {
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
                       >
-                        Next
+                        {t('common.next')}
                       </Button>
                     </div>
                   </div>

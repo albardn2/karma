@@ -20,6 +20,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AddItemDialog } from "@/components/purchase-orders/AddItemDialog";
 import { EditItemDialog } from "@/components/purchase-orders/EditItemDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PurchaseOrderItem {
   temp_id?: string;
@@ -63,6 +64,7 @@ export default function PurchaseOrderCreate() {
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   // Fetch vendors
   const { data: vendorsData } = useQuery({
@@ -136,18 +138,18 @@ export default function PurchaseOrderCreate() {
       }
       
       toast({
-        title: "Success",
-        description: "Purchase order created successfully",
+        title: t('common.success'),
+        description: t('purchaseOrders.createSuccess'),
       });
-      
+
       // Clear referrer from localStorage and redirect
       localStorage.removeItem('purchase_order_create_referrer');
       setLocation(referrer);
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create purchase order",
+        title: t('common.error'),
+        description: error.message || t('purchaseOrders.createError'),
         variant: "destructive",
       });
     },
@@ -156,8 +158,8 @@ export default function PurchaseOrderCreate() {
   const onSubmit = (data: CreatePurchaseOrderForm) => {
     if (items.length === 0) {
       toast({
-        title: "Error",
-        description: "Please add at least one item to the purchase order",
+        title: t('common.error'),
+        description: t('purchaseOrders.addAtLeastOneItem'),
         variant: "destructive",
       });
       return;
@@ -202,14 +204,14 @@ export default function PurchaseOrderCreate() {
               onClick={() => setLocation("/purchase-orders")}
             >
               <ArrowLeft className="h-4 w-4 me-2" />
-              Back
+              {t('common.back')}
             </Button>
             <div>
               <h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
-                Create Purchase Order
+                {t('purchaseOrders.createTitle')}
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Add a new purchase order with items
+                {t('purchaseOrders.createSubtitle')}
               </p>
             </div>
           </div>
@@ -220,14 +222,14 @@ export default function PurchaseOrderCreate() {
               onClick={() => setLocation("/purchase-orders")}
               disabled={createMutation.isPending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
-            <Button 
+            <Button
               onClick={form.handleSubmit(onSubmit)}
               disabled={createMutation.isPending || items.length === 0}
               className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
             >
-              {createMutation.isPending ? "Creating..." : "Create Purchase Order"}
+              {createMutation.isPending ? t('common.creating') : t('purchaseOrders.createTitle')}
             </Button>
           </div>
         </div>
@@ -236,7 +238,7 @@ export default function PurchaseOrderCreate() {
           {/* Purchase Order Details */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Purchase Order Details</CardTitle>
+              <CardTitle className="text-lg">{t('purchaseOrders.detailsCardTitle')}</CardTitle>
             </CardHeader>
             <CardContent className="p-8">
               {/* Creative asymmetric layout */}
@@ -249,12 +251,12 @@ export default function PurchaseOrderCreate() {
                       <div className="w-2 h-8 bg-gradient-to-b from-[#5469D4] to-[#4356C7] rounded-full"></div>
                       <div>
                         <Label className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                          Vendor Selection * {prefilledVendorUuid && '(Pre-filled)'}
+                          {t('purchaseOrders.vendorSelection')} * {prefilledVendorUuid && t('purchaseOrders.preFilled')}
                         </Label>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                          {prefilledVendorUuid 
-                            ? 'Vendor UUID has been pre-filled from the vendor page'
-                            : 'Choose your vendor or enter UUID manually'
+                          {prefilledVendorUuid
+                            ? t('purchaseOrders.vendorPrefilledDesc')
+                            : t('purchaseOrders.vendorChooseDesc')
                           }
                         </p>
                       </div>
@@ -277,7 +279,7 @@ export default function PurchaseOrderCreate() {
                             form.setValue("vendor_uuid", "");
                           }}
                         >
-                          Browse
+                          {t('purchaseOrders.browse')}
                         </Button>
                         <Button
                           type="button"
@@ -294,14 +296,14 @@ export default function PurchaseOrderCreate() {
                             form.setValue("vendor_uuid", "");
                           }}
                         >
-                          Manual Entry
+                          {t('purchaseOrders.manualEntry')}
                         </Button>
                       </div>
 
                       <div className="lg:col-span-2">
                         {useManualVendorUuid ? (
                         <Input
-                          placeholder="Enter vendor UUID..."
+                          placeholder={t('purchaseOrders.enterVendorUuid')}
                           value={form.watch("vendor_uuid")}
                           onChange={(e) => {
                             form.setValue("vendor_uuid", e.target.value);
@@ -321,8 +323,8 @@ export default function PurchaseOrderCreate() {
                             onClick={() => setVendorOpen(!vendorOpen)}
                           >
                             {vendorValue
-                              ? vendors?.find((vendor: any) => vendor.uuid === vendorValue)?.company_name || "Vendor not found"
-                              : "Select vendor..."}
+                              ? vendors?.find((vendor: any) => vendor.uuid === vendorValue)?.company_name || t('purchaseOrders.vendorNotFound')
+                              : t('purchaseOrders.selectVendorEllipsis')}
                             <ChevronsUpDown className="ms-2 h-5 w-5 shrink-0 opacity-50" />
                           </Button>
                           
@@ -330,7 +332,7 @@ export default function PurchaseOrderCreate() {
                             <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg shadow-xl">
                               <div className="p-4">
                                 <Input
-                                  placeholder="Search vendors..."
+                                  placeholder={t('purchaseOrders.searchVendors')}
                                   value={vendorSearch}
                                   onChange={(e) => setVendorSearch(e.target.value)}
                                   className="mb-2"
@@ -359,7 +361,7 @@ export default function PurchaseOrderCreate() {
                                   ))
                                 ) : (
                                   <div className="px-4 py-3 text-gray-500 dark:text-gray-400 text-center">
-                                    {vendors === undefined ? "Loading..." : "No vendors found."}
+                                    {vendors === undefined ? t('common.loading') : t('purchaseOrders.noVendorsFound')}
                                   </div>
                                 )}
                               </div>
@@ -383,10 +385,10 @@ export default function PurchaseOrderCreate() {
                       <div className="w-1.5 h-6 bg-green-500 rounded-full"></div>
                       <div>
                         <Label className="text-base font-semibold text-gray-800 dark:text-gray-200">
-                          Currency *
+                          {t('common.currency')} *
                         </Label>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Transaction currency
+                          {t('purchaseOrders.transactionCurrency')}
                         </p>
                       </div>
                     </div>
@@ -396,7 +398,7 @@ export default function PurchaseOrderCreate() {
                       onValueChange={(value) => form.setValue("currency", value)}
                     >
                       <SelectTrigger className="h-12 text-lg border-2 border-gray-200 dark:border-gray-600 focus:border-green-500 transition-colors">
-                        <SelectValue placeholder="Select currency" />
+                        <SelectValue placeholder={t('purchaseOrders.selectCurrency')} />
                       </SelectTrigger>
                       <SelectContent>
                         {currencies.map((currency: string) => (
@@ -417,10 +419,10 @@ export default function PurchaseOrderCreate() {
                       <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
                       <div>
                         <Label className="text-base font-semibold text-gray-800 dark:text-gray-200">
-                          Payment Due Date
+                          {t('purchaseOrders.paymentDueDate')}
                         </Label>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Optional deadline for payment
+                          {t('purchaseOrders.paymentDueDateDesc')}
                         </p>
                       </div>
                     </div>
@@ -437,7 +439,7 @@ export default function PurchaseOrderCreate() {
                           {form.watch("payout_due_date") ? (
                             format(form.watch("payout_due_date"), "EEEE, MMMM do, yyyy")
                           ) : (
-                            <span>Choose a due date</span>
+                            <span>{t('purchaseOrders.chooseDueDate')}</span>
                           )}
                           <CalendarIcon className="ms-auto h-5 w-5 opacity-50" />
                         </Button>
@@ -465,16 +467,16 @@ export default function PurchaseOrderCreate() {
                       <div className="w-1.5 h-6 bg-slate-500 rounded-full"></div>
                       <div>
                         <Label className="text-base font-semibold text-gray-800 dark:text-gray-200">
-                          Additional Notes
+                          {t('purchaseOrders.additionalNotes')}
                         </Label>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Any special instructions or requirements
+                          {t('purchaseOrders.additionalNotesDesc')}
                         </p>
                       </div>
                     </div>
                     
                     <Textarea
-                      placeholder="Enter any additional notes, special instructions, or requirements for this purchase order..."
+                      placeholder={t('purchaseOrders.notesPlaceholderLong')}
                       value={form.watch("notes")}
                       onChange={(e) => form.setValue("notes", e.target.value)}
                       rows={4}
@@ -489,7 +491,7 @@ export default function PurchaseOrderCreate() {
           {/* Purchase Order Items */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Purchase Order Items</CardTitle>
+              <CardTitle className="text-lg">{t('purchaseOrders.itemsCardTitle')}</CardTitle>
               <Button
                 type="button"
                 onClick={() => setAddItemDialogOpen(true)}
@@ -498,7 +500,7 @@ export default function PurchaseOrderCreate() {
                 className="bg-[#5469D4] hover:bg-[#4356C7] text-white border-[#5469D4]"
               >
                 <Plus className="h-4 w-4 me-2" />
-                Add Item
+                {t('purchaseOrders.addItem')}
               </Button>
             </CardHeader>
             <CardContent>
@@ -508,10 +510,10 @@ export default function PurchaseOrderCreate() {
                     <Plus className="h-6 w-6 text-gray-400" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                    No items added yet
+                    {t('purchaseOrders.noItemsTitle')}
                   </h3>
                   <p className="text-gray-500 dark:text-gray-400 mb-6">
-                    Start by adding materials to your purchase order.
+                    {t('purchaseOrders.noItemsDesc')}
                   </p>
                   <Button
                     type="button"
@@ -519,7 +521,7 @@ export default function PurchaseOrderCreate() {
                     className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                   >
                     <Plus className="h-4 w-4 me-2" />
-                    Add First Item
+                    {t('purchaseOrders.addFirstItem')}
                   </Button>
                 </div>
               ) : (
@@ -528,11 +530,11 @@ export default function PurchaseOrderCreate() {
                     <table className="w-full">
                       <thead className="border-b border-gray-200 dark:border-gray-700">
                         <tr>
-                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Material</th>
-                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Quantity</th>
-                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Unit Price</th>
-                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Total</th>
-                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.material')}</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.quantity')}</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.unitPrice')}</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.total')}</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.actions')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -541,7 +543,7 @@ export default function PurchaseOrderCreate() {
                             <td className="py-4">
                               <div>
                                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                  {item.material_name || `Material ${item.material_uuid.substring(0, 8)}...`}
+                                  {item.material_name || t('purchaseOrders.materialFallback', { id: item.material_uuid.substring(0, 8) })}
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
                                   {item.material_uuid.substring(0, 8)}...
@@ -594,10 +596,10 @@ export default function PurchaseOrderCreate() {
                   <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
                     <div className="text-end space-y-2">
                       <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        Total: ${items.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0).toFixed(2)}
+                        {t('common.total')}: ${items.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0).toFixed(2)}
                       </div>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {items.length} item{items.length !== 1 ? 's' : ''}
+                        {items.length} {items.length !== 1 ? t('purchaseOrders.items') : t('purchaseOrders.item')}
                       </p>
                     </div>
                   </div>
@@ -615,14 +617,14 @@ export default function PurchaseOrderCreate() {
                 onClick={() => navigate("/purchase-orders")}
                 className="px-6"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 disabled={createMutation.isPending}
                 className="bg-[#5469D4] hover:bg-[#4356C7] text-white px-6"
               >
-                {createMutation.isPending ? "Creating..." : "Create Purchase Order"}
+                {createMutation.isPending ? t('common.creating') : t('purchaseOrders.createTitle')}
               </Button>
             </div>
           </div>

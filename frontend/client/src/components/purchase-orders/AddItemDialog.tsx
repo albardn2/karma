@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ChevronsUpDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const ItemSchema = z.object({
   material_uuid: z.string().min(1, "Material is required"),
@@ -27,6 +28,7 @@ interface AddItemDialogProps {
 }
 
 export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogProps) {
+  const { t } = useLanguage();
   const [materialOpen, setMaterialOpen] = useState(false);
   const [materialSearch, setMaterialSearch] = useState("");
   const [materialValue, setMaterialValue] = useState("");
@@ -115,7 +117,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Purchase Order Item</DialogTitle>
+          <DialogTitle>{t('purchaseOrders.addItemTitle')}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -124,7 +126,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
               name="material_uuid"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Material</FormLabel>
+                  <FormLabel>{t('purchaseOrders.material')}</FormLabel>
                   <div className="flex gap-2 mb-2">
                     <Button
                       type="button"
@@ -137,7 +139,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                         field.onChange("");
                       }}
                     >
-                      Select Material
+                      {t('purchaseOrders.selectMaterial')}
                     </Button>
                     <Button
                       type="button"
@@ -150,13 +152,13 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                         field.onChange("");
                       }}
                     >
-                      Enter UUID manually
+                      {t('purchaseOrders.enterUuidManually')}
                     </Button>
                   </div>
                   <FormControl>
                     {useManualMaterialUuid ? (
                       <Input
-                        placeholder="Enter material UUID..."
+                        placeholder={t('purchaseOrders.enterMaterialUuid')}
                         value={field.value}
                         onChange={(e) => {
                           const value = e.target.value;
@@ -180,8 +182,8 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                           }}
                         >
                           {materialValue
-                            ? materials?.find((material: any) => material.uuid === materialValue)?.name || "Material not found"
-                            : "Select material..."}
+                            ? materials?.find((material: any) => material.uuid === materialValue)?.name || t('purchaseOrders.materialNotFound')
+                            : t('purchaseOrders.selectMaterialEllipsis')}
                           <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                         
@@ -189,7 +191,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                           <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
                             <div className="p-2">
                               <Input
-                                placeholder="Search materials..."
+                                placeholder={t('purchaseOrders.searchMaterials')}
                                 value={materialSearch}
                                 onChange={(e) => setMaterialSearch(e.target.value)}
                                 className="mb-2"
@@ -225,7 +227,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                                 ))
                               ) : (
                                 <div className="px-3 py-2 text-gray-500">
-                                  {materials === undefined ? "Loading..." : "No materials found."}
+                                  {materials === undefined ? t('common.loading') : t('purchaseOrders.noMaterialsFound')}
                                 </div>
                               )}
                             </div>
@@ -244,13 +246,13 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
               name="unit"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Unit</FormLabel>
+                  <FormLabel>{t('purchaseOrders.unit')}</FormLabel>
                   <FormControl>
-                    <Input 
-                      {...field} 
+                    <Input
+                      {...field}
                       value={materialUnit || ""}
                       readOnly
-                      placeholder="Unit will be fetched from material"
+                      placeholder={t('purchaseOrders.unitAutoPlaceholder')}
                       className="bg-gray-50"
                     />
                   </FormControl>
@@ -266,7 +268,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Quantity
+                      {t('common.quantity')}
                       {materialUnit && (
                         <span className="text-sm text-gray-500 ms-1">({materialUnit})</span>
                       )}
@@ -290,9 +292,9 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Price per Unit
+                      {t('purchaseOrders.pricePerUnitLabel')}
                       {materialUnit && (
-                        <span className="text-sm text-gray-500 ms-1">(per {materialUnit})</span>
+                        <span className="text-sm text-gray-500 ms-1">({t('purchaseOrders.perUnitSuffix', { unit: materialUnit })})</span>
                       )}
                     </FormLabel>
                     <FormControl>
@@ -314,10 +316,10 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
 
             <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
               <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" className="bg-[#5469D4] hover:bg-[#4356C7]">
-                Add Item
+                {t('purchaseOrders.addItem')}
               </Button>
             </div>
           </form>

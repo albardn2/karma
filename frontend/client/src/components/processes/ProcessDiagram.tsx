@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ProcessInputItem, ProcessOutputItem, ProcessType, ProcessTypeLabels } from "@/types/process";
+import { ProcessInputItem, ProcessOutputItem, ProcessType } from "@/types/process";
 import { apiRequest } from "@/lib/queryClient";
 import { ArrowRight, Package, Factory } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ProcessDiagramProps {
   inputs: ProcessInputItem[];
@@ -34,6 +35,7 @@ const outputColors = [
 ];
 
 export function ProcessDiagram({ inputs, outputs, processType }: ProcessDiagramProps) {
+  const { t, te } = useLanguage();
   // Fetch material names for display
   const { data: materials } = useQuery({
     queryKey: ["/material/"],
@@ -50,7 +52,7 @@ export function ProcessDiagram({ inputs, outputs, processType }: ProcessDiagramP
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Factory className="h-5 w-5" />
-          Process Flow Diagram
+          {t('processes.flowDiagram')}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -58,7 +60,7 @@ export function ProcessDiagram({ inputs, outputs, processType }: ProcessDiagramP
           {/* Title */}
           <div className="text-center">
             <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              Manufacturing Process System
+              {t('processes.systemTitle')}
             </h3>
           </div>
 
@@ -68,7 +70,7 @@ export function ProcessDiagram({ inputs, outputs, processType }: ProcessDiagramP
             <div className="flex-1 space-y-4">
               <div className="text-center">
                 <h4 className="text-sm font-medium text-gray-600 uppercase tracking-wider mb-4">
-                  INPUTS
+                  {t('processes.inputs')}
                 </h4>
               </div>
               <div className="space-y-3">
@@ -79,11 +81,11 @@ export function ProcessDiagram({ inputs, outputs, processType }: ProcessDiagramP
                         {getMaterialName(input.material_uuid)}
                       </div>
                       <div className="text-xs opacity-75">
-                        Qty: {input.quantity.toLocaleString()}
+                        {t('processes.qty', { qty: input.quantity.toLocaleString() })}
                       </div>
                       {input.cost_per_unit && (
                         <div className="text-xs opacity-75">
-                          Cost: {input.cost_per_unit.toLocaleString()} SYP/unit
+                          {t('processes.costDiagram', { cost: input.cost_per_unit.toLocaleString(), currency: te('SYP') })}
                         </div>
                       )}
                     </div>
@@ -97,7 +99,7 @@ export function ProcessDiagram({ inputs, outputs, processType }: ProcessDiagramP
             <div className="flex-1 flex justify-center px-8">
               <div className="bg-white border-4 border-gray-800 rounded-2xl p-6 text-center min-w-[250px] shadow-lg">
                 <div className="text-lg font-bold text-gray-800 mb-4">
-                  {ProcessTypeLabels[processType] || processType}
+                  {te(processType)}
                 </div>
                 <div className="flex justify-center space-x-2 rtl:space-x-reverse mb-4">
                   <div className="w-4 h-4 bg-green-400 rounded-full"></div>
@@ -107,7 +109,7 @@ export function ProcessDiagram({ inputs, outputs, processType }: ProcessDiagramP
                   <div className="w-4 h-4 bg-purple-400 rounded-full"></div>
                 </div>
                 <div className="text-sm text-gray-600 font-medium">
-                  Blend • Mix • Combine
+                  {t('processes.blendMixCombine')}
                 </div>
               </div>
             </div>
@@ -116,7 +118,7 @@ export function ProcessDiagram({ inputs, outputs, processType }: ProcessDiagramP
             <div className="flex-1 space-y-4">
               <div className="text-center">
                 <h4 className="text-sm font-medium text-gray-600 uppercase tracking-wider mb-4">
-                  OUTPUTS
+                  {t('processes.outputs')}
                 </h4>
               </div>
               <div className="space-y-3">
@@ -128,16 +130,16 @@ export function ProcessDiagram({ inputs, outputs, processType }: ProcessDiagramP
                         {getMaterialName(output.material_uuid)}
                       </div>
                       <div className="text-xs opacity-75">
-                        Qty: {output.quantity.toLocaleString()}
+                        {t('processes.qty', { qty: output.quantity.toLocaleString() })}
                       </div>
                       {output.cost_per_unit && (
                         <div className="text-xs opacity-75">
-                          Cost: {output.cost_per_unit.toLocaleString()} SYP/unit
+                          {t('processes.costDiagram', { cost: output.cost_per_unit.toLocaleString(), currency: te('SYP') })}
                         </div>
                       )}
                       {output.total_cost && (
                         <div className="text-xs opacity-75">
-                          Total: {output.total_cost.toLocaleString()} SYP
+                          {t('processes.totalDiagram', { total: output.total_cost.toLocaleString(), currency: te('SYP') })}
                         </div>
                       )}
                     </div>
@@ -150,11 +152,11 @@ export function ProcessDiagram({ inputs, outputs, processType }: ProcessDiagramP
           {/* Process Summary */}
           <div className="text-center text-sm text-gray-500 mt-6">
             <div className="flex items-center justify-center space-x-2 rtl:space-x-reverse">
-              <span>Multiple inputs</span>
+              <span>{t('processes.multipleInputs')}</span>
               <ArrowRight className="h-3 w-3" />
-              <span>Single process</span>
+              <span>{t('processes.singleProcess')}</span>
               <ArrowRight className="h-3 w-3" />
-              <span>Multiple outputs</span>
+              <span>{t('processes.multipleOutputs')}</span>
             </div>
           </div>
 
@@ -162,23 +164,23 @@ export function ProcessDiagram({ inputs, outputs, processType }: ProcessDiagramP
           <div className="flex justify-center space-x-8 rtl:space-x-reverse mt-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{inputs.length}</div>
-              <div className="text-xs text-gray-500">Input Materials</div>
+              <div className="text-xs text-gray-500">{t('processes.inputMaterials')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{outputs.length}</div>
-              <div className="text-xs text-gray-500">Output Products</div>
+              <div className="text-xs text-gray-500">{t('processes.outputProducts')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">
                 {inputs.reduce((sum, input) => sum + input.quantity, 0).toLocaleString()}
               </div>
-              <div className="text-xs text-gray-500">Total Input Qty</div>
+              <div className="text-xs text-gray-500">{t('processes.totalInputQty')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
                 {outputs.reduce((sum, output) => sum + output.quantity, 0).toLocaleString()}
               </div>
-              <div className="text-xs text-gray-500">Total Output Qty</div>
+              <div className="text-xs text-gray-500">{t('processes.totalOutputQty')}</div>
             </div>
           </div>
         </div>

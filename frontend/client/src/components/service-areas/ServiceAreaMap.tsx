@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo, memo } from "react";
 import { MapContainer, TileLayer, Polygon, Popup, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // Fix for default markers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -99,6 +100,7 @@ let globalPolygonLayer: L.LayerGroup | null = null;
 let globalContainer: HTMLDivElement | null = null;
 
 const ServiceAreaMapComponent = ({ serviceAreas, filters, onFiltersChange }: ServiceAreaMapProps) => {
+  const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
   const callbackRef = useRef(onFiltersChange);
@@ -190,10 +192,10 @@ const ServiceAreaMapComponent = ({ serviceAreas, filters, onFiltersChange }: Ser
             <h3 class="font-semibold">${area.name}</h3>
             ${area.description ? `<p class="text-sm">${area.description}</p>` : ''}
             <p class="text-xs text-gray-500">
-              Created: ${new Date(area.created_at).toLocaleDateString()}
+              ${t('serviceAreas.popupCreated', { date: new Date(area.created_at).toLocaleDateString() })}
             </p>
             <p class="text-xs text-gray-500">
-              ID: ${area.uuid}
+              ${t('serviceAreas.popupId', { id: area.uuid })}
             </p>
           </div>
         `);
@@ -201,7 +203,7 @@ const ServiceAreaMapComponent = ({ serviceAreas, filters, onFiltersChange }: Ser
         globalPolygonLayer?.addLayer(polygon);
       });
     }
-  }, [serviceAreas]);
+  }, [serviceAreas, t]);
 
   // Cleanup timeout only (not map)
   useEffect(() => {
@@ -212,7 +214,7 @@ const ServiceAreaMapComponent = ({ serviceAreas, filters, onFiltersChange }: Ser
     };
   }, []);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return <div dir="ltr" ref={containerRef} className="h-full w-full" />;
 };
 
 // Memoize the component to prevent unnecessary re-renders that cause position resets

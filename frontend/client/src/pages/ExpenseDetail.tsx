@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 
@@ -36,6 +37,7 @@ export default function ExpenseDetail() {
   const params = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
   const [editedVendorUuid, setEditedVendorUuid] = useState("");
   const [editedCategory, setEditedCategory] = useState("");
@@ -63,14 +65,14 @@ export default function ExpenseDetail() {
       queryClient.invalidateQueries({ queryKey: ["/expense/"] });
       setIsEditing(false);
       toast({
-        title: "Success",
-        description: "Expense updated successfully",
+        title: t('common.success'),
+        description: t('expenses.updateSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update expense",
+        title: t('common.error'),
+        description: error.message || t('expenses.updateFailed'),
         variant: "destructive",
       });
     },
@@ -81,15 +83,15 @@ export default function ExpenseDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/expense/"] });
       toast({
-        title: "Success",
-        description: "Expense deleted successfully",
+        title: t('common.success'),
+        description: t('expenses.deleteSuccess'),
       });
       setLocation("/expenses");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete expense",
+        title: t('common.error'),
+        description: error.message || t('expenses.deleteFailed'),
         variant: "destructive",
       });
     },
@@ -99,9 +101,19 @@ export default function ExpenseDetail() {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
+    const fieldLabels: Record<string, string> = {
+      "Expense UUID": t('expenses.expenseUuid'),
+      "Amount": t('common.amount'),
+      "Vendor UUID": t('expenses.vendorUuid'),
+      "Amount Due": t('expenses.amountDue'),
+      "Amount Paid": t('expenses.amountPaid'),
+      "Created Date": t('expenses.createdDate'),
+      "Paid Date": t('expenses.paidDate'),
+      "Description": t('common.description'),
+    };
     toast({
-      title: "Copied",
-      description: `${fieldName} copied to clipboard`,
+      title: t('expenses.copied'),
+      description: t('expenses.copiedToClipboard', { field: fieldLabels[fieldName] ?? fieldName }),
     });
   };
 
@@ -187,9 +199,9 @@ export default function ExpenseDetail() {
       <AppLayout>
         <div className="p-8">
           <div className="text-center py-8">
-            <p className="text-red-600">Error loading expense: {error?.message || "Expense not found"}</p>
+            <p className="text-red-600">{t('expenses.detailLoadError', { message: error?.message || t('expenses.notFound') })}</p>
             <Button onClick={() => setLocation("/expenses")} className="mt-4">
-              Back to Expenses
+              {t('expenses.backToExpenses')}
             </Button>
           </div>
         </div>
@@ -209,14 +221,14 @@ export default function ExpenseDetail() {
               size="sm"
             >
               <ArrowLeft className="h-4 w-4 me-2" />
-              Back to Expenses
+              {t('expenses.backToExpenses')}
             </Button>
             <div>
               <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100">
-                Expense Details
+                {t('expenses.details')}
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
-                {formatCurrency(expense.amount, expense.currency)} • {expense.category}
+                {formatCurrency(expense.amount, expense.currency)} • {te(expense.category)}
               </p>
             </div>
           </div>
@@ -228,47 +240,47 @@ export default function ExpenseDetail() {
                 className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 size="sm"
               >
-                Create Payout
+                {t('expenses.createPayout')}
               </Button>
             )}
 
             {isEditing ? (
               <>
                 <Button onClick={handleCancel} variant="outline">
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button onClick={handleSave} disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? "Saving..." : "Save"}
+                  {updateMutation.isPending ? t('common.saving') : t('common.save')}
                 </Button>
               </>
             ) : (
               <>
                 <Button onClick={handleEdit} variant="outline">
                   <Edit className="h-4 w-4 me-2" />
-                  Edit
+                  {t('common.edit')}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" className="text-red-600 hover:text-red-700">
                       <Trash2 className="h-4 w-4 me-2" />
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+                      <AlertDialogTitle>{t('expenses.deleteTitle')}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete this expense? This action cannot be undone.
+                        {t('expenses.deleteConfirmDesc')}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteMutation.mutate()}
                         disabled={deleteMutation.isPending}
                         className="bg-red-600 hover:bg-red-700"
                       >
-                        {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                        {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -283,14 +295,14 @@ export default function ExpenseDetail() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Receipt className="h-5 w-5" />
-              Expense Information
+              {t('expenses.information')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* UUID */}
               <div className="group cursor-pointer" onClick={() => copyToClipboard(expense.uuid, "Expense UUID")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Expense UUID</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('expenses.expenseUuid')}</Label>
                 <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1">
                   <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
                     {expense.uuid}
@@ -303,7 +315,7 @@ export default function ExpenseDetail() {
 
               {/* Amount */}
               <div className="group cursor-pointer" onClick={() => copyToClipboard(expense.amount.toString(), "Amount")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.amount')}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                     {formatCurrency(expense.amount, expense.currency)}
@@ -316,23 +328,23 @@ export default function ExpenseDetail() {
 
               {/* Category */}
               <div>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Category</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.category')}</Label>
                 {isEditing ? (
                   <Select value={editedCategory} onValueChange={setEditedCategory}>
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select category" />
+                      <SelectValue placeholder={t('expenses.selectCategory')} />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((category: string) => (
                         <SelectItem key={category} value={category}>
-                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                          {te(category)}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 ) : (
                   <Badge variant="outline" className={`mt-1 ${getCategoryBadgeColor(expense.category)}`}>
-                    {expense.category}
+                    {te(expense.category)}
                   </Badge>
                 )}
               </div>
@@ -340,40 +352,40 @@ export default function ExpenseDetail() {
               {/* Status & Payment Status */}
               <div className="space-y-4">
                 <div>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.status')}</Label>
                   <Badge variant="outline" className="mt-1 block w-fit">
-                    {expense.status}
+                    {te(expense.status)}
                   </Badge>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Status</Label>
-                  <Badge 
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('expenses.paymentStatus')}</Label>
+                  <Badge
                     className={`mt-1 block w-fit ${
                       expense.is_paid
                         ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300'
                         : 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300'
                     }`}
                   >
-                    {expense.is_paid ? 'Paid' : 'Unpaid'}
+                    {te(expense.is_paid ? 'paid' : 'unpaid')}
                   </Badge>
                 </div>
               </div>
 
               {/* Vendor UUID */}
               <div>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Vendor UUID</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('expenses.vendorUuid')}</Label>
                 {isEditing ? (
                   <Input
                     value={editedVendorUuid}
                     onChange={(e) => setEditedVendorUuid(e.target.value)}
-                    placeholder="Enter vendor UUID"
+                    placeholder={t('expenses.vendorUuidPlaceholder')}
                     className="mt-1"
                   />
                 ) : (
                   <div className="group cursor-pointer" onClick={() => copyToClipboard(expense.vendor_uuid || "", "Vendor UUID")}>
                     <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1">
                       <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                        {expense.vendor_uuid || "No vendor assigned"}
+                        {expense.vendor_uuid || t('expenses.noVendor')}
                       </p>
                       <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
                         {copiedField === "Vendor UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -386,7 +398,7 @@ export default function ExpenseDetail() {
               {/* Financial Details */}
               <div className="space-y-4">
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(expense.amount_due.toString(), "Amount Due")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount Due</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('expenses.amountDue')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-lg font-semibold text-red-600 dark:text-red-400">
                       {formatCurrency(expense.amount_due, expense.currency)}
@@ -398,7 +410,7 @@ export default function ExpenseDetail() {
                 </div>
                 
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(expense.amount_paid.toString(), "Amount Paid")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount Paid</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('expenses.amountPaid')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-lg font-semibold text-green-600 dark:text-green-400">
                       {formatCurrency(expense.amount_paid, expense.currency)}
@@ -413,7 +425,7 @@ export default function ExpenseDetail() {
               {/* Dates */}
               <div className="space-y-4">
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(expense.created_at, "Created Date")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created Date</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('expenses.createdDate')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
                       {format(new Date(expense.created_at), 'PPP p')}
@@ -426,7 +438,7 @@ export default function ExpenseDetail() {
                 
                 {expense.paid_at && (
                   <div className="group cursor-pointer" onClick={() => copyToClipboard(expense.paid_at!, "Paid Date")}>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Paid Date</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('expenses.paidDate')}</Label>
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
                         {format(new Date(expense.paid_at), 'PPP p')}
@@ -442,19 +454,19 @@ export default function ExpenseDetail() {
 
             {/* Description */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</Label>
+              <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.description')}</Label>
               {isEditing ? (
                 <Textarea
                   value={editedDescription}
                   onChange={(e) => setEditedDescription(e.target.value)}
-                  placeholder="Enter expense description..."
+                  placeholder={t('expenses.descriptionPlaceholder')}
                   rows={3}
                 />
               ) : (
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(expense.description || "", "Description")}>
                   <div className="flex items-start justify-between bg-gray-50 dark:bg-gray-800 rounded p-3 min-h-[80px]">
                     <p className="text-sm text-gray-900 dark:text-gray-100">
-                      {expense.description || "No description provided"}
+                      {expense.description || t('expenses.noDescription')}
                     </p>
                     <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
                       {copiedField === "Description" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}

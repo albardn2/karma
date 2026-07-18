@@ -162,7 +162,7 @@ export function CustomerMap({ customers, onBoundsChange, center = [33.5138, 36.2
   }, [isInitialized, onBoundsChange]);
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full" dir="ltr">
       <MapContainer
         {...mapConfig}
         ref={mapRef}

@@ -11,27 +11,30 @@ import { z } from "zod";
 import { Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
-const fixedAssetSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
-  purchase_date: z.string().optional(),
-  annual_depreciation_rate: z.string().min(1, "Annual depreciation rate is required"),
-  purchase_order_item_uuid: z.string().optional(),
-  material_uuid: z.string().optional(),
-  quantity: z.string().optional(),
-  price_per_unit: z.string().optional(),
-});
+const buildFixedAssetSchema = (t: (key: string) => string) =>
+  z.object({
+    name: z.string().min(1, t('fixedAssets.nameRequired')),
+    description: z.string().optional(),
+    purchase_date: z.string().optional(),
+    annual_depreciation_rate: z.string().min(1, t('fixedAssets.rateRequired')),
+    purchase_order_item_uuid: z.string().optional(),
+    material_uuid: z.string().optional(),
+    quantity: z.string().optional(),
+    price_per_unit: z.string().optional(),
+  });
 
-type FixedAssetFormData = z.infer<typeof fixedAssetSchema>;
+type FixedAssetFormData = z.infer<ReturnType<typeof buildFixedAssetSchema>>;
 
 export function AddFixedAssetDialog() {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const form = useForm<FixedAssetFormData>({
-    resolver: zodResolver(fixedAssetSchema),
+    resolver: zodResolver(buildFixedAssetSchema(t)),
     defaultValues: {
       name: "",
       description: "",
@@ -65,8 +68,8 @@ export function AddFixedAssetDialog() {
       queryClient.refetchQueries({ queryKey: ["/fixed-asset/"] });
       
       toast({
-        title: "Success",
-        description: "Fixed asset created successfully",
+        title: t('common.success'),
+        description: t('fixedAssets.createSuccess'),
       });
 
       form.reset();
@@ -74,7 +77,7 @@ export function AddFixedAssetDialog() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('common.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -90,12 +93,12 @@ export function AddFixedAssetDialog() {
       <DialogTrigger asChild>
         <Button className="bg-[#5469D4] hover:bg-[#4356C7] text-white">
           <Plus className="h-4 w-4 me-2" />
-          Add Fixed Asset
+          {t('fixedAssets.addFixedAsset')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add New Fixed Asset</DialogTitle>
+          <DialogTitle>{t('fixedAssets.addNewFixedAsset')}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -104,9 +107,9 @@ export function AddFixedAssetDialog() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel>{t('common.name')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter asset name" {...field} />
+                    <Input placeholder={t('fixedAssets.enterAssetName')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -118,10 +121,10 @@ export function AddFixedAssetDialog() {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormLabel>{t('fixedAssets.descriptionOptional')}</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Enter asset description"
+                    <Textarea
+                      placeholder={t('fixedAssets.enterDescription')}
                       className="resize-none"
                       rows={3}
                       {...field}
@@ -138,7 +141,7 @@ export function AddFixedAssetDialog() {
                 name="purchase_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Purchase Date (Optional)</FormLabel>
+                    <FormLabel>{t('fixedAssets.purchaseDateOptional')}</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
                     </FormControl>
@@ -152,12 +155,12 @@ export function AddFixedAssetDialog() {
                 name="annual_depreciation_rate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Depreciation Rate (%)</FormLabel>
+                    <FormLabel>{t('fixedAssets.depreciationRatePercent')}</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Enter rate"
+                        placeholder={t('fixedAssets.enterRate')}
                         {...field}
                       />
                     </FormControl>
@@ -173,12 +176,12 @@ export function AddFixedAssetDialog() {
                 name="quantity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quantity (Optional)</FormLabel>
+                    <FormLabel>{t('fixedAssets.quantityOptional')}</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Enter quantity"
+                        placeholder={t('fixedAssets.enterQuantity')}
                         {...field}
                       />
                     </FormControl>
@@ -192,12 +195,12 @@ export function AddFixedAssetDialog() {
                 name="price_per_unit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Price per Unit (Optional)</FormLabel>
+                    <FormLabel>{t('fixedAssets.pricePerUnitOptional')}</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Enter price"
+                        placeholder={t('fixedAssets.enterPrice')}
                         {...field}
                       />
                     </FormControl>
@@ -212,9 +215,9 @@ export function AddFixedAssetDialog() {
               name="purchase_order_item_uuid"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Purchase Order Item UUID (Optional)</FormLabel>
+                  <FormLabel>{t('fixedAssets.purchaseOrderItemUuidOptional')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter purchase order item UUID" {...field} />
+                    <Input placeholder={t('fixedAssets.enterPurchaseOrderItemUuid')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -226,9 +229,9 @@ export function AddFixedAssetDialog() {
               name="material_uuid"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Material UUID (Optional)</FormLabel>
+                  <FormLabel>{t('fixedAssets.materialUuidOptional')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter material UUID" {...field} />
+                    <Input placeholder={t('fixedAssets.enterMaterialUuid')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -241,14 +244,14 @@ export function AddFixedAssetDialog() {
                 disabled={createFixedAssetMutation.isPending}
                 className="flex-1 bg-[#5469D4] hover:bg-[#4356C7] text-white"
               >
-                {createFixedAssetMutation.isPending ? "Creating..." : "Create Fixed Asset"}
+                {createFixedAssetMutation.isPending ? t('common.creating') : t('fixedAssets.createFixedAsset')}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsOpen(false)}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </form>

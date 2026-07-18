@@ -34,6 +34,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CreditNoteItem {
   uuid: string;
@@ -95,11 +96,11 @@ const getReferenceIcon = (item: CreditNoteItem) => {
 };
 
 const getReferenceType = (item: CreditNoteItem) => {
-  if (item.invoice_item_uuid) return "Invoice Item";
-  if (item.customer_uuid) return "Customer";
-  if (item.vendor_uuid) return "Vendor";
-  if (item.purchase_order_item_uuid) return "Purchase Order Item";
-  return "Unknown";
+  if (item.invoice_item_uuid) return "notes.refInvoiceItem";
+  if (item.customer_uuid) return "notes.refCustomer";
+  if (item.vendor_uuid) return "notes.refVendor";
+  if (item.purchase_order_item_uuid) return "notes.refPurchaseOrderItem";
+  return "common.unknown";
 };
 
 const getReferenceUuid = (item: CreditNoteItem) => {
@@ -110,6 +111,7 @@ export default function CreditNoteItemDetail() {
   const [, params] = useRoute("/credit-note-items/:uuid");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
 
   const creditNoteItemUuid = params?.uuid;
@@ -150,15 +152,15 @@ export default function CreditNoteItemDetail() {
       queryClient.invalidateQueries({ queryKey: ["/credit-note-item/"] });
       setIsEditing(false);
       toast({
-        title: "Success",
-        description: "Credit note item updated successfully",
+        title: t('common.success'),
+        description: t('notes.creditUpdated'),
       });
     },
     onError: (error: any) => {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to update credit note item",
+        title: t('common.error'),
+        description: error.message || t('notes.creditUpdateFailed'),
       });
     }
   });
@@ -173,16 +175,16 @@ export default function CreditNoteItemDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/credit-note-item/"] });
       toast({
-        title: "Success",
-        description: "Credit note item deleted successfully",
+        title: t('common.success'),
+        description: t('notes.creditDeleted'),
       });
       setLocation("/credit-note-items");
     },
     onError: (error: any) => {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to delete credit note item",
+        title: t('common.error'),
+        description: error.message || t('notes.creditDeleteFailed'),
       });
     }
   });
@@ -190,8 +192,8 @@ export default function CreditNoteItemDetail() {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({
-      title: "Copied to clipboard",
-      description: `${label} has been copied to your clipboard.`,
+      title: t('notes.copiedToClipboard'),
+      description: t('notes.copiedDescription', { label }),
     });
   };
 
@@ -212,15 +214,15 @@ export default function CreditNoteItemDetail() {
         <div className="p-8">
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Credit Note Item</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('notes.creditErrorLoadingTitle')}</h3>
             <p className="text-red-600">{(error as Error).message}</p>
-            <Button 
-              onClick={() => setLocation("/credit-note-items")} 
+            <Button
+              onClick={() => setLocation("/credit-note-items")}
               className="mt-4"
               variant="outline"
             >
               <ArrowLeft className="h-4 w-4 me-2" />
-              Back to Credit Note Items
+              {t('notes.backToCreditItems')}
             </Button>
           </div>
         </div>
@@ -279,15 +281,15 @@ export default function CreditNoteItemDetail() {
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <FileText className="h-6 w-6 text-purple-600" />
-                  <h1 className="text-2xl font-bold text-gray-900">Credit Note Item</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">{t('notes.creditItemSingular')}</h1>
                 </div>
                 <Badge className={getStatusColor(creditNoteItem.status)}>
-                  {creditNoteItem.status}
+                  {te(creditNoteItem.status)}
                 </Badge>
                 {creditNoteItem.is_paid && (
                   <Badge className="bg-green-100 text-green-800">
                     <CheckCircle className="h-3 w-3 me-1" />
-                    Paid
+                    {te('paid')}
                   </Badge>
                 )}
               </div>
@@ -297,7 +299,7 @@ export default function CreditNoteItemDetail() {
                   variant="ghost"
                   size="sm"
                   className="h-6 w-6 p-0"
-                  onClick={() => copyToClipboard(creditNoteItem.uuid, "Credit Note Item ID")}
+                  onClick={() => copyToClipboard(creditNoteItem.uuid, t('notes.creditItemId'))}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>
@@ -314,30 +316,30 @@ export default function CreditNoteItemDetail() {
                   className="flex items-center gap-2"
                 >
                   <Edit3 className="h-4 w-4" />
-                  Edit
+                  {t('common.edit')}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
                       <Trash2 className="h-4 w-4 me-2" />
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Credit Note Item</AlertDialogTitle>
+                      <AlertDialogTitle>{t('notes.deleteCreditTitle')}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete this credit note item? This action cannot be undone.
+                        {t('notes.deleteCreditConfirm')}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteMutation.mutate()}
                         className="bg-red-600 hover:bg-red-700"
                         disabled={deleteMutation.isPending}
                       >
-                        {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                        {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -351,7 +353,7 @@ export default function CreditNoteItemDetail() {
                   disabled={updateMutation.isPending}
                 >
                   <X className="h-4 w-4 me-2" />
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={form.handleSubmit(onSubmit)}
@@ -359,7 +361,7 @@ export default function CreditNoteItemDetail() {
                   className="bg-purple-600 hover:bg-purple-700"
                 >
                   <Save className="h-4 w-4 me-2" />
-                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                  {updateMutation.isPending ? t('common.saving') : t('notes.saveChanges')}
                 </Button>
               </>
             )}
@@ -374,16 +376,16 @@ export default function CreditNoteItemDetail() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5 text-green-600" />
-                  Financial Information
+                  {t('notes.financialInfo')}
                 </CardTitle>
                 <CardDescription>
-                  Credit note amount and payment details
+                  {t('notes.creditFinancialDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Credit Amount</Label>
+                    <Label className="text-sm font-medium text-gray-500">{t('notes.creditAmount')}</Label>
                     <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border">
                       <span className="text-lg font-semibold text-green-700">
                         {formatCurrency(creditNoteItem?.amount || 0, creditNoteItem?.currency || 'USD')}
@@ -392,7 +394,7 @@ export default function CreditNoteItemDetail() {
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0"
-                        onClick={() => copyToClipboard((creditNoteItem?.amount || 0).toString(), "Amount")}
+                        onClick={() => copyToClipboard((creditNoteItem?.amount || 0).toString(), t('common.amount'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -400,14 +402,14 @@ export default function CreditNoteItemDetail() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Currency</Label>
+                    <Label className="text-sm font-medium text-gray-500">{t('common.currency')}</Label>
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                      <span className="font-medium">{creditNoteItem?.currency || 'USD'}</span>
+                      <span className="font-medium">{te(creditNoteItem?.currency || 'USD')}</span>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0"
-                        onClick={() => copyToClipboard(creditNoteItem?.currency || 'USD', "Currency")}
+                        onClick={() => copyToClipboard(creditNoteItem?.currency || 'USD', t('common.currency'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -415,7 +417,7 @@ export default function CreditNoteItemDetail() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Amount Paid</Label>
+                    <Label className="text-sm font-medium text-gray-500">{t('notes.amountPaid')}</Label>
                     <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border">
                       <span className="font-medium text-blue-700">
                         {formatCurrency(creditNoteItem?.amount_paid || 0, creditNoteItem?.currency || 'USD')}
@@ -424,7 +426,7 @@ export default function CreditNoteItemDetail() {
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0"
-                        onClick={() => copyToClipboard((creditNoteItem?.amount_paid || 0).toString(), "Amount Paid")}
+                        onClick={() => copyToClipboard((creditNoteItem?.amount_paid || 0).toString(), t('notes.amountPaid'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -432,7 +434,7 @@ export default function CreditNoteItemDetail() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Amount Due</Label>
+                    <Label className="text-sm font-medium text-gray-500">{t('notes.amountDue')}</Label>
                     <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border">
                       <span className="font-medium text-orange-700">
                         {formatCurrency(creditNoteItem?.amount_due || 0, creditNoteItem?.currency || 'USD')}
@@ -441,7 +443,7 @@ export default function CreditNoteItemDetail() {
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0"
-                        onClick={() => copyToClipboard((creditNoteItem?.amount_due || 0).toString(), "Amount Due")}
+                        onClick={() => copyToClipboard((creditNoteItem?.amount_due || 0).toString(), t('notes.amountDue'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -451,16 +453,16 @@ export default function CreditNoteItemDetail() {
 
                 {creditNoteItem?.paid_at && (
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Paid Date</Label>
+                    <Label className="text-sm font-medium text-gray-500">{t('notes.paidDate')}</Label>
                     <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border">
                       <span className="font-medium text-green-700">
-                        {new Date(creditNoteItem.paid_at).toLocaleDateString()} at {new Date(creditNoteItem.paid_at).toLocaleTimeString()}
+                        {t('notes.dateAtTime', { date: new Date(creditNoteItem.paid_at).toLocaleDateString(), time: new Date(creditNoteItem.paid_at).toLocaleTimeString() })}
                       </span>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0"
-                        onClick={() => copyToClipboard(creditNoteItem?.paid_at || '', "Paid Date")}
+                        onClick={() => copyToClipboard(creditNoteItem?.paid_at || '', t('notes.paidDate'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -476,40 +478,40 @@ export default function CreditNoteItemDetail() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Edit3 className="h-5 w-5 text-purple-600" />
-                    Editable Information
+                    {t('notes.editableInfo')}
                   </CardTitle>
                   <CardDescription>
-                    Fields that can be modified
+                    {t('notes.editableInfoDesc')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Notes */}
                   <div className="space-y-2">
-                    <Label htmlFor="notes">Notes</Label>
+                    <Label htmlFor="notes">{t('common.notes')}</Label>
                     {isEditing ? (
                       <Textarea
                         {...form.register("notes")}
-                        placeholder="Enter any additional notes..."
+                        placeholder={t('notes.notesPlaceholder')}
                         rows={4}
                         className="resize-none"
                       />
                     ) : (
                       <div className="flex items-start justify-between p-3 bg-gray-50 rounded-lg border min-h-[100px]">
                         <span className="text-gray-700 whitespace-pre-wrap">
-                          {creditNoteItem?.notes || "No notes provided"}
+                          {creditNoteItem?.notes || t('notes.noNotesProvided')}
                         </span>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 flex-shrink-0 ms-2"
-                          onClick={() => copyToClipboard(creditNoteItem?.notes || "", "Notes")}
+                          onClick={() => copyToClipboard(creditNoteItem?.notes || "", t('common.notes'))}
                         >
                           <Copy className="h-3 w-3" />
                         </Button>
                       </div>
                     )}
                     {form.formState.errors.notes && (
-                      <p className="text-sm text-red-600">{form.formState.errors.notes.message}</p>
+                      <p className="text-sm text-red-600">{t(form.formState.errors.notes.message || '')}</p>
                     )}
                   </div>
 
@@ -526,24 +528,24 @@ export default function CreditNoteItemDetail() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   {creditNoteItem ? getReferenceIcon(creditNoteItem) : <FileText className="h-4 w-4 text-gray-600" />}
-                  Reference Information
+                  {t('notes.referenceInformation')}
                 </CardTitle>
                 <CardDescription>
-                  Related entity details
+                  {t('notes.relatedEntityDetails')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-500">Reference Type</Label>
+                  <Label className="text-sm font-medium text-gray-500">{t('notes.referenceType')}</Label>
                   <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border">
                     <span className="font-medium text-purple-700">
-                      {creditNoteItem ? getReferenceType(creditNoteItem) : "Unknown"}
+                      {creditNoteItem ? t(getReferenceType(creditNoteItem)) : t('common.unknown')}
                     </span>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0"
-                      onClick={() => copyToClipboard(creditNoteItem ? getReferenceType(creditNoteItem) : "Unknown", "Reference Type")}
+                      onClick={() => copyToClipboard(creditNoteItem ? t(getReferenceType(creditNoteItem)) : t('common.unknown'), t('notes.referenceType'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -551,7 +553,7 @@ export default function CreditNoteItemDetail() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-500">Reference UUID</Label>
+                  <Label className="text-sm font-medium text-gray-500">{t('notes.referenceUuid')}</Label>
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                     <span className="font-mono text-sm break-all">
                       {creditNoteItem ? getReferenceUuid(creditNoteItem) : ""}
@@ -560,7 +562,7 @@ export default function CreditNoteItemDetail() {
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0 flex-shrink-0 ms-2"
-                      onClick={() => copyToClipboard(creditNoteItem ? getReferenceUuid(creditNoteItem) : "", "Reference UUID")}
+                      onClick={() => copyToClipboard(creditNoteItem ? getReferenceUuid(creditNoteItem) : "", t('notes.referenceUuid'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -574,24 +576,24 @@ export default function CreditNoteItemDetail() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-blue-600" />
-                  System Information
+                  {t('notes.systemInfo')}
                 </CardTitle>
                 <CardDescription>
-                  Creation and audit details
+                  {t('notes.systemInfoDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-500">Created Date</Label>
+                  <Label className="text-sm font-medium text-gray-500">{t('notes.createdDate')}</Label>
                   <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border">
                     <span className="font-medium text-blue-700">
-                      {creditNoteItem?.created_at ? new Date(creditNoteItem.created_at).toLocaleDateString() : ''} at {creditNoteItem?.created_at ? new Date(creditNoteItem.created_at).toLocaleTimeString() : ''}
+                      {t('notes.dateAtTime', { date: creditNoteItem?.created_at ? new Date(creditNoteItem.created_at).toLocaleDateString() : '', time: creditNoteItem?.created_at ? new Date(creditNoteItem.created_at).toLocaleTimeString() : '' })}
                     </span>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0"
-                      onClick={() => copyToClipboard(creditNoteItem?.created_at || '', "Created Date")}
+                      onClick={() => copyToClipboard(creditNoteItem?.created_at || '', t('notes.createdDate'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -600,7 +602,7 @@ export default function CreditNoteItemDetail() {
 
                 {creditNoteItem?.created_by_uuid && (
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Created By</Label>
+                    <Label className="text-sm font-medium text-gray-500">{t('notes.createdBy')}</Label>
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                       <span className="font-mono text-sm break-all">
                         {creditNoteItem?.created_by_uuid}
@@ -609,7 +611,7 @@ export default function CreditNoteItemDetail() {
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0 flex-shrink-0 ms-2"
-                        onClick={() => copyToClipboard(creditNoteItem?.created_by_uuid || '', "Created By UUID")}
+                        onClick={() => copyToClipboard(creditNoteItem?.created_by_uuid || '', t('notes.createdByUuid'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -618,16 +620,16 @@ export default function CreditNoteItemDetail() {
                 )}
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-500">Status</Label>
+                  <Label className="text-sm font-medium text-gray-500">{t('common.status')}</Label>
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                     <Badge className={getStatusColor(creditNoteItem?.status || 'draft')}>
-                      {creditNoteItem?.status || 'draft'}
+                      {te(creditNoteItem?.status || 'draft')}
                     </Badge>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0"
-                      onClick={() => copyToClipboard(creditNoteItem?.status || 'draft', "Status")}
+                      onClick={() => copyToClipboard(creditNoteItem?.status || 'draft', t('common.status'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -635,7 +637,7 @@ export default function CreditNoteItemDetail() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-500">Inventory Change</Label>
+                  <Label className="text-sm font-medium text-gray-500">{t('notes.inventoryChange')}</Label>
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                     <span className="font-medium">
                       {creditNoteItem?.inventory_change || 0}
@@ -644,7 +646,7 @@ export default function CreditNoteItemDetail() {
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0"
-                      onClick={() => copyToClipboard((creditNoteItem?.inventory_change || 0).toString(), "Inventory Change")}
+                      onClick={() => copyToClipboard((creditNoteItem?.inventory_change || 0).toString(), t('notes.inventoryChange'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>

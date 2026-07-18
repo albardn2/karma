@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Workflow } from "@shared/schema";
 
 interface WorkflowsResponse {
@@ -13,6 +14,7 @@ interface WorkflowsResponse {
 }
 
 export default function WorkflowExecution() {
+  const { t } = useLanguage();
   const { data: workflowsData, isLoading } = useQuery<WorkflowsResponse>({
     queryKey: ["/workflow/"],
   });
@@ -25,10 +27,10 @@ export default function WorkflowExecution() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Workflow Execution
+            {t('nav.workflowExecution')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Execute and monitor your workflows
+            {t('workflows.executionSubtitle')}
           </p>
         </div>
 
@@ -52,15 +54,15 @@ export default function WorkflowExecution() {
           <div className="text-center py-16">
             <GitBranch className="h-16 w-16 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              No workflows available
+              {t('workflows.noWorkflowsAvailable')}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Create your first workflow to get started
+              {t('workflows.createFirstWorkflow')}
             </p>
             <Link href="/workflows/new">
               <Button data-testid="button-create-first-workflow">
                 <GitBranch className="h-4 w-4 me-2" />
-                Create Workflow
+                {t('workflows.createWorkflow')}
               </Button>
             </Link>
           </div>
@@ -117,10 +119,11 @@ export default function WorkflowExecution() {
                       <div className="flex items-center">
                         <Calendar className="h-3 w-3 me-1.5" />
                         <span>
-                          Created{" "}
-                          {workflow.createdAt
-                            ? new Date(workflow.createdAt).toLocaleDateString()
-                            : "N/A"}
+                          {t('workflows.createdWithDate', {
+                            date: workflow.createdAt
+                              ? new Date(workflow.createdAt).toLocaleDateString()
+                              : t('workflows.na'),
+                          })}
                         </span>
                       </div>
                     </div>

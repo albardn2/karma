@@ -18,8 +18,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { FinancialAccountCreate, Currency } from "@/lib/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function AddFinancialAccountDialog() {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState<FinancialAccountCreate>({
     account_name: "",
@@ -67,8 +69,8 @@ export function AddFinancialAccountDialog() {
       });
       
       toast({
-        title: "Success",
-        description: "Financial account created successfully",
+        title: t('common.success'),
+        description: t('financial.accountCreated'),
       });
       setOpen(false);
       setFormData({
@@ -80,8 +82,8 @@ export function AddFinancialAccountDialog() {
     },
     onError: (error) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create account",
+        title: t('common.error'),
+        description: error.message || t('financial.failedCreateAccount'),
         variant: "destructive",
       });
     },
@@ -89,11 +91,11 @@ export function AddFinancialAccountDialog() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.account_name.trim()) {
       toast({
-        title: "Validation Error",
-        description: "Account name is required",
+        title: t('financial.validationError'),
+        description: t('financial.accountNameRequired'),
         variant: "destructive",
       });
       return;
@@ -114,36 +116,36 @@ export function AddFinancialAccountDialog() {
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 me-2" />
-          Add Account
+          {t('financial.addAccount')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Financial Account</DialogTitle>
+          <DialogTitle>{t('financial.addAccountTitle')}</DialogTitle>
           <DialogDescription>
-            Create a new financial account to track balances and transactions.
+            {t('financial.addAccountDesc')}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="account_name">Account Name *</Label>
+            <Label htmlFor="account_name">{t('financial.accountName')} *</Label>
             <Input
               id="account_name"
               value={formData.account_name}
               onChange={(e) => handleInputChange("account_name", e.target.value)}
-              placeholder="e.g. Main Business Account"
+              placeholder={t('financial.accountNamePlaceholder')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="currency">Currency *</Label>
+            <Label htmlFor="currency">{t('common.currency')} *</Label>
             <Select
               value={formData.currency}
               onValueChange={(value: Currency) => handleInputChange("currency", value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select currency" />
+                <SelectValue placeholder={t('financial.selectCurrency')} />
               </SelectTrigger>
               <SelectContent>
                 {currencies?.map((currency: string) => (
@@ -156,21 +158,21 @@ export function AddFinancialAccountDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t('common.notes')}</Label>
             <Textarea
               id="notes"
               value={formData.notes}
               onChange={(e) => handleInputChange("notes", e.target.value)}
-              placeholder="Optional notes about this account..."
+              placeholder={t('financial.notesPlaceholder')}
               rows={3}
             />
           </div>
 
           <div className="flex items-center justify-between rounded-lg border p-4">
             <div className="space-y-0.5">
-              <Label className="text-base">External Account</Label>
+              <Label className="text-base">{t('financial.externalAccount')}</Label>
               <p className="text-sm text-muted-foreground">
-                Mark this as an external account (e.g., bank, client account)
+                {t('financial.externalAccountDesc')}
               </p>
             </div>
             <Switch
@@ -186,13 +188,13 @@ export function AddFinancialAccountDialog() {
               onClick={() => setOpen(false)}
               disabled={createAccountMutation.isPending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               disabled={createAccountMutation.isPending}
             >
-              {createAccountMutation.isPending ? "Creating..." : "Create Account"}
+              {createAccountMutation.isPending ? t('common.creating') : t('financial.createAccount')}
             </Button>
           </div>
         </form>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
 import { LatLngBounds, Map as LeafletMap } from "leaflet";
 import { Vendor } from "@/lib/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 import "leaflet/dist/leaflet.css";
 
 // Fix for default markers in react-leaflet
@@ -31,13 +32,6 @@ const DefaultIcon = L.divIcon({
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
 });
-
-const VENDOR_CATEGORY_LABELS = {
-  raw_materials: "Raw Materials",
-  equipment: "Equipment", 
-  services: "Services",
-  other: "Other"
-};
 
 const VENDOR_CATEGORY_COLORS = {
   raw_materials: "bg-green-100 text-green-800",
@@ -85,6 +79,7 @@ function parseCoordinates(coordinates?: string): [number, number] | null {
 
 // Separate markers component to prevent map re-rendering
 function VendorMarkers({ vendors }: { vendors: Vendor[] }) {
+  const { te } = useLanguage();
   const vendorsWithCoordinates = useMemo(() => {
     return vendors.filter(vendor => {
       const coords = parseCoordinates(vendor.coordinates);
@@ -110,7 +105,7 @@ function VendorMarkers({ vendors }: { vendors: Vendor[] }) {
                 )}
                 {vendor.category && (
                   <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${VENDOR_CATEGORY_COLORS[vendor.category]}`}>
-                    {VENDOR_CATEGORY_LABELS[vendor.category]}
+                    {te(vendor.category)}
                   </span>
                 )}
                 <p className="text-xs text-gray-500 mt-1">{vendor.full_address}</p>
@@ -179,7 +174,7 @@ export function VendorMap({ vendors, onBoundsChange, center = [33.5138, 36.2765]
   }, [isInitialized, onBoundsChange]);
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full" dir="ltr">
       <MapContainer
         {...mapConfig}
         ref={mapRef}

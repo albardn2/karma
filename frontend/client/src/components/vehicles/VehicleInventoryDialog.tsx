@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Boxes, Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -17,9 +18,9 @@ interface VehicleInventory {
 }
 
 const EVENT_TYPES = [
-  { value: "manual", label: "Add (manual)" },
-  { value: "adjustment", label: "Adjust (+/-)" },
-  { value: "unload", label: "Unload" },
+  { value: "manual", labelKey: "vehicles.eventAddManual" },
+  { value: "adjustment", labelKey: "vehicles.eventAdjust" },
+  { value: "unload", labelKey: "vehicles.eventUnload" },
 ];
 
 function InventoryRow({
@@ -31,6 +32,7 @@ function InventoryRow({
   onApply: (eventType: string, quantity: number) => void;
   isPending: boolean;
 }) {
+  const { t } = useLanguage();
   const [eventType, setEventType] = useState("manual");
   const [qty, setQty] = useState("");
 
@@ -49,7 +51,7 @@ function InventoryRow({
           {inv.material_name || inv.material_uuid}
         </div>
         <div className="text-sm text-gray-500">
-          On hand: <span className="font-semibold">{inv.current_quantity ?? 0}</span> {inv.unit || ""}
+          {t("vehicles.onHand")}: <span className="font-semibold">{inv.current_quantity ?? 0}</span> {inv.unit || ""}
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -58,9 +60,9 @@ function InventoryRow({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {EVENT_TYPES.map((t) => (
-              <SelectItem key={t.value} value={t.value}>
-                {t.label}
+            {EVENT_TYPES.map((et) => (
+              <SelectItem key={et.value} value={et.value}>
+                {t(et.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -68,13 +70,13 @@ function InventoryRow({
         <Input
           type="number"
           step="any"
-          placeholder="Qty"
+          placeholder={t("vehicles.qty")}
           className="w-24"
           value={qty}
           onChange={(e) => setQty(e.target.value)}
         />
         <Button size="sm" disabled={isPending || !qty} onClick={apply}>
-          Apply
+          {t("common.apply")}
         </Button>
       </div>
     </div>
@@ -82,6 +84,7 @@ function InventoryRow({
 }
 
 export function VehicleInventoryDialog({ vehicleUuid }: { vehicleUuid: string }) {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [materialUuid, setMaterialUuid] = useState("");
   const { toast } = useToast();
@@ -121,21 +124,21 @@ export function VehicleInventoryDialog({ vehicleUuid }: { vehicleUuid: string })
         body: { vehicle_uuid: vehicleUuid, material_uuid: materialUuid },
       }),
     onSuccess: () => {
-      toast({ title: "Added", description: "Material added to vehicle." });
+      toast({ title: t("vehicles.materialAddedTitle"), description: t("vehicles.materialAddedDesc") });
       setMaterialUuid("");
       refresh();
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   const createEvent = useMutation({
     mutationFn: async (vars: { vehicle_inventory_uuid: string; event_type: string; quantity: number }) =>
       apiRequest("/vehicle-inventory-event/", { method: "POST", body: vars }),
     onSuccess: () => {
-      toast({ title: "Updated", description: "Vehicle stock updated." });
+      toast({ title: t("vehicles.stockUpdatedTitle"), description: t("vehicles.stockUpdatedDesc") });
       refresh();
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -143,21 +146,21 @@ export function VehicleInventoryDialog({ vehicleUuid }: { vehicleUuid: string })
       <DialogTrigger asChild>
         <Button variant="outline" data-testid="button-vehicle-inventory">
           <Boxes className="h-4 w-4 me-2" />
-          Inventory
+          {t("nav.inventory")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Vehicle Inventory</DialogTitle>
+          <DialogTitle>{t("vehicles.vehicleInventory")}</DialogTitle>
         </DialogHeader>
 
         {/* Add a material to this vehicle */}
         <div className="flex items-end gap-2 border-b pb-4">
           <div className="flex-1">
-            <label className="text-sm font-medium mb-1 block">Add material</label>
+            <label className="text-sm font-medium mb-1 block">{t("vehicles.addMaterial")}</label>
             <Select value={materialUuid} onValueChange={setMaterialUuid}>
               <SelectTrigger data-testid="select-vinv-material">
-                <SelectValue placeholder="Select material..." />
+                <SelectValue placeholder={t("vehicles.selectMaterial")} />
               </SelectTrigger>
               <SelectContent>
                 {materials.map((m: any) => (
@@ -175,17 +178,17 @@ export function VehicleInventoryDialog({ vehicleUuid }: { vehicleUuid: string })
             data-testid="button-add-vinv"
           >
             <Plus className="h-4 w-4 me-1" />
-            Add
+            {t("common.add")}
           </Button>
         </div>
 
         {/* Current stock + add/adjust/unload */}
         <div className="space-y-2 max-h-[50vh] overflow-y-auto">
           {isLoading ? (
-            <div className="text-sm text-gray-500 py-6 text-center">Loading...</div>
+            <div className="text-sm text-gray-500 py-6 text-center">{t("common.loading")}</div>
           ) : inventories.length === 0 ? (
             <div className="text-sm text-gray-500 py-6 text-center">
-              No inventory on this vehicle yet. Add a material above to get started.
+              {t("vehicles.noInventoryAddHint")}
             </div>
           ) : (
             inventories.map((inv) => (

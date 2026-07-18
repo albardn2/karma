@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PayoutFilters } from "@/components/payouts/PayoutFilters";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { format } from "date-fns";
 
 interface Payout {
@@ -49,6 +50,7 @@ interface PayoutFiltersType {
 export default function Payouts() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [filters, setFilters] = useState<PayoutFiltersType>({
     page: 1,
     per_page: 20,
@@ -72,14 +74,14 @@ export default function Payouts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/payout/"] });
       toast({
-        title: "Success",
-        description: "Payout deleted successfully",
+        title: t("common.success"),
+        description: t("payouts.deleteSuccess"),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete payout",
+        title: t("common.error"),
+        description: error.message || t("payouts.deleteFailed"),
         variant: "destructive",
       });
     },
@@ -99,7 +101,7 @@ export default function Payouts() {
   };
 
   const handleDelete = (uuid: string) => {
-    if (window.confirm("Are you sure you want to delete this payout?")) {
+    if (window.confirm(t("payouts.confirmDelete"))) {
       deleteMutation.mutate(uuid);
     }
   };
@@ -139,7 +141,7 @@ export default function Payouts() {
       <AppLayout>
         <div className="p-8">
           <div className="text-center py-8">
-            <p className="text-red-600">Error loading payouts: {error.message}</p>
+            <p className="text-red-600">{t("payouts.errorLoading", { message: error.message })}</p>
           </div>
         </div>
       </AppLayout>
@@ -153,7 +155,7 @@ export default function Payouts() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100">
-              Payouts
+              {t("nav.payouts")}
             </h1>
           </div>
           <Button
@@ -161,7 +163,7 @@ export default function Payouts() {
             className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
           >
             <Plus className="h-4 w-4 me-2" />
-            Create Payout
+            {t("payouts.create")}
           </Button>
         </div>
 
@@ -179,20 +181,20 @@ export default function Payouts() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Payouts
+              {t("nav.payouts")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {payouts.length === 0 ? (
               <div className="text-center py-8">
                 <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 dark:text-gray-400">No payouts found</p>
+                <p className="text-gray-500 dark:text-gray-400">{t("payouts.noPayouts")}</p>
                 <Button
                   onClick={() => setLocation("/payouts/create")}
                   className="mt-4 bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 >
                   <Plus className="h-4 w-4 me-2" />
-                  Create First Payout
+                  {t("payouts.createFirst")}
                 </Button>
               </div>
             ) : (
@@ -200,22 +202,22 @@ export default function Payouts() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Reference UUID</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Notes</TableHead>
-                      <TableHead className="w-[70px]">Actions</TableHead>
+                      <TableHead>{t("common.amount")}</TableHead>
+                      <TableHead>{t("common.type")}</TableHead>
+                      <TableHead>{t("payouts.referenceUuid")}</TableHead>
+                      <TableHead>{t("payouts.createdColumn")}</TableHead>
+                      <TableHead>{t("common.notes")}</TableHead>
+                      <TableHead className="w-[70px]">{t("common.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {payouts.map((payout) => {
                       const getPayoutType = () => {
-                        if (payout.purchase_order_uuid) return { type: "Purchase Order", uuid: payout.purchase_order_uuid };
-                        if (payout.expense_uuid) return { type: "Expense", uuid: payout.expense_uuid };
-                        if (payout.employee_uuid) return { type: "Employee", uuid: payout.employee_uuid };
-                        if (payout.credit_note_item_uuid) return { type: "Credit Note", uuid: payout.credit_note_item_uuid };
-                        return { type: "Unknown", uuid: "" };
+                        if (payout.purchase_order_uuid) return { type: t("payouts.typePurchaseOrder"), uuid: payout.purchase_order_uuid };
+                        if (payout.expense_uuid) return { type: t("payouts.typeExpense"), uuid: payout.expense_uuid };
+                        if (payout.employee_uuid) return { type: t("payouts.typeEmployee"), uuid: payout.employee_uuid };
+                        if (payout.credit_note_item_uuid) return { type: t("payouts.typeCreditNote"), uuid: payout.credit_note_item_uuid };
+                        return { type: t("common.unknown"), uuid: "" };
                       };
 
                       const payoutType = getPayoutType();
@@ -255,13 +257,13 @@ export default function Payouts() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={() => setLocation(`/payouts/${payout.uuid}`)}>
                                   <Eye className="h-4 w-4 me-2" />
-                                  View Details
+                                  {t("common.viewDetails")}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   onClick={() => handleDelete(payout.uuid)}
                                   className="text-red-600"
                                 >
-                                  Delete
+                                  {t("common.delete")}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -276,7 +278,7 @@ export default function Payouts() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between mt-4">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Showing {(currentPage - 1) * filters.per_page + 1} to {Math.min(currentPage * filters.per_page, totalCount)} of {totalCount} payouts
+                      {t("payouts.pagination", { from: (currentPage - 1) * filters.per_page + 1, to: Math.min(currentPage * filters.per_page, totalCount), total: totalCount })}
                     </p>
                     <div className="flex items-center gap-2">
                       <Button
@@ -285,10 +287,10 @@ export default function Payouts() {
                         onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage === 1}
                       >
-                        Previous
+                        {t("common.previous")}
                       </Button>
                       <span className="text-sm px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded">
-                        Page {currentPage} of {totalPages}
+                        {t("payouts.pageInfo", { page: currentPage, pages: totalPages })}
                       </span>
                       <Button
                         variant="outline"
@@ -296,7 +298,7 @@ export default function Payouts() {
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
                       >
-                        Next
+                        {t("common.next")}
                       </Button>
                     </div>
                   </div>

@@ -1,5 +1,146 @@
-// Filled by the i18n conversion of this domain.
+// Pricing domain UI strings. Terminology kept consistent with the mobile app
+// (Material=المادة, Price=السعر, Currency=العملة). Shared keys live in common.*.
 
-export const en: Record<string, string> = {};
+export const en: Record<string, string> = {
+  // list page
+  'pricing.entryOnPage': '{count} pricing entry on this page',
+  'pricing.entriesOnPage': '{count} pricing entries on this page',
+  'pricing.materialWithId': 'Material: {id}',
+  'pricing.createdOn': 'Created: {date}',
+  'pricing.effectiveOn': 'Effective: {date}',
+  'pricing.noPricingFound': 'No pricing found',
+  'pricing.noPricingYet': 'No pricing entries yet',
+  'pricing.emptyFilteredDesc': 'No pricing entries match your current filters. Try adjusting your search criteria.',
+  'pricing.emptyDesc': 'Get started by creating your first pricing entry to track material costs and pricing information.',
+  'pricing.showingEntries': 'Showing {from} to {to} of {total} pricing entries',
+  'pricing.first': 'First',
+  'pricing.last': 'Last',
 
-export const ar: Record<string, string> = {};
+  // detail page
+  'pricing.notFound': 'Pricing Not Found',
+  'pricing.backToPricing': 'Back to Pricing',
+  'pricing.deleteTitle': 'Delete Pricing',
+  'pricing.deleteConfirm': 'Are you sure you want to delete this pricing entry? This action cannot be undone.',
+  'pricing.pricingInfo': 'Pricing Information',
+  'pricing.pricePerUnit': 'Price per Unit',
+  'pricing.pricePerUnitPlaceholder': 'Enter price per unit',
+  'pricing.selectCurrency': 'Select currency',
+  'pricing.unitOfMeasure': 'Unit of Measure',
+  'pricing.additionalInfo': 'Additional Information',
+  'pricing.material': 'Material',
+  'pricing.materialId': 'Material ID',
+  'pricing.createdDate': 'Created Date',
+  'pricing.pricingId': 'Pricing ID',
+
+  // toasts
+  'pricing.updatedSuccess': 'Pricing updated successfully',
+  'pricing.updateFailed': 'Failed to update pricing',
+  'pricing.deletedSuccess': 'Pricing deleted successfully',
+  'pricing.deleteFailed': 'Failed to delete pricing',
+  'pricing.createdSuccess': 'Pricing created successfully',
+  'pricing.copied': 'Copied!',
+  'pricing.copiedToClipboard': '{label} copied to clipboard',
+  'pricing.copyFailed': 'Failed to copy to clipboard',
+
+  // add dialog
+  'pricing.addPricing': 'Add Pricing',
+  'pricing.addNewPricing': 'Add New Pricing',
+  'pricing.materialRequired': 'Material is required',
+  'pricing.priceRequired': 'Price is required',
+  'pricing.currencyRequired': 'Currency is required',
+  'pricing.selectFromList': 'Select from list',
+  'pricing.enterUuidManually': 'Enter UUID manually',
+  'pricing.enterMaterialUuid': 'Enter material UUID...',
+  'pricing.materialNotFound': 'Material not found',
+  'pricing.selectMaterial': 'Select material...',
+  'pricing.searchMaterials': 'Search materials...',
+  'pricing.noMaterialsFound': 'No materials found.',
+  'pricing.enterPrice': 'Enter price',
+  'pricing.selectCurrencyPlaceholder': 'Select currency...',
+  'pricing.createPricing': 'Create Pricing',
+
+  // filters
+  'pricing.filterTitle': 'Filter Pricing',
+  'pricing.uuid': 'UUID',
+  'pricing.filterByUuid': 'Filter by UUID',
+  'pricing.materialUuid': 'Material UUID',
+  'pricing.filterByMaterialUuid': 'Filter by material UUID',
+  'pricing.allCurrencies': 'All Currencies',
+  'pricing.itemsPerPage': 'Items per Page',
+  'pricing.selectItemsPerPage': 'Select items per page',
+  'pricing.perPageOption': '{count} per page',
+  'pricing.applyFilters': 'Apply Filters',
+  'pricing.clearAll': 'Clear All',
+};
+
+export const ar: Record<string, string> = {
+  // list page
+  'pricing.entryOnPage': 'إدخال تسعير واحد في هذه الصفحة',
+  'pricing.entriesOnPage': '{count} إدخال تسعير في هذه الصفحة',
+  'pricing.materialWithId': 'المادة: {id}',
+  'pricing.createdOn': 'تاريخ الإنشاء: {date}',
+  'pricing.effectiveOn': 'تاريخ السريان: {date}',
+  'pricing.noPricingFound': 'لم يُعثر على تسعير',
+  'pricing.noPricingYet': 'لا توجد إدخالات تسعير بعد',
+  'pricing.emptyFilteredDesc': 'لا توجد إدخالات تسعير مطابقة لعوامل التصفية الحالية. جرّب تعديل معايير البحث.',
+  'pricing.emptyDesc': 'ابدأ بإنشاء أول إدخال تسعير لتتبّع تكاليف المواد ومعلومات التسعير.',
+  'pricing.showingEntries': 'عرض {from} إلى {to} من {total} إدخال تسعير',
+  'pricing.first': 'الأول',
+  'pricing.last': 'الأخير',
+
+  // detail page
+  'pricing.notFound': 'التسعير غير موجود',
+  'pricing.backToPricing': 'العودة إلى التسعير',
+  'pricing.deleteTitle': 'حذف التسعير',
+  'pricing.deleteConfirm': 'هل أنت متأكد من حذف إدخال التسعير هذا؟ لا يمكن التراجع عن هذا الإجراء.',
+  'pricing.pricingInfo': 'معلومات التسعير',
+  'pricing.pricePerUnit': 'السعر لكل وحدة',
+  'pricing.pricePerUnitPlaceholder': 'أدخل السعر لكل وحدة',
+  'pricing.selectCurrency': 'اختر العملة',
+  'pricing.unitOfMeasure': 'وحدة القياس',
+  'pricing.additionalInfo': 'معلومات إضافية',
+  'pricing.material': 'المادة',
+  'pricing.materialId': 'معرّف المادة',
+  'pricing.createdDate': 'تاريخ الإنشاء',
+  'pricing.pricingId': 'معرّف التسعير',
+
+  // toasts
+  'pricing.updatedSuccess': 'تم تحديث التسعير بنجاح',
+  'pricing.updateFailed': 'فشل تحديث التسعير',
+  'pricing.deletedSuccess': 'تم حذف التسعير بنجاح',
+  'pricing.deleteFailed': 'فشل حذف التسعير',
+  'pricing.createdSuccess': 'تم إنشاء التسعير بنجاح',
+  'pricing.copied': 'تم النسخ!',
+  'pricing.copiedToClipboard': 'تم نسخ {label} إلى الحافظة',
+  'pricing.copyFailed': 'فشل النسخ إلى الحافظة',
+
+  // add dialog
+  'pricing.addPricing': 'إضافة تسعير',
+  'pricing.addNewPricing': 'إضافة تسعير جديد',
+  'pricing.materialRequired': 'المادة مطلوبة',
+  'pricing.priceRequired': 'السعر مطلوب',
+  'pricing.currencyRequired': 'العملة مطلوبة',
+  'pricing.selectFromList': 'اختر من القائمة',
+  'pricing.enterUuidManually': 'إدخال المعرّف يدوياً',
+  'pricing.enterMaterialUuid': 'أدخل معرّف المادة...',
+  'pricing.materialNotFound': 'المادة غير موجودة',
+  'pricing.selectMaterial': 'اختر المادة...',
+  'pricing.searchMaterials': 'البحث عن المواد...',
+  'pricing.noMaterialsFound': 'لم يُعثر على مواد.',
+  'pricing.enterPrice': 'أدخل السعر',
+  'pricing.selectCurrencyPlaceholder': 'اختر العملة...',
+  'pricing.createPricing': 'إنشاء التسعير',
+
+  // filters
+  'pricing.filterTitle': 'تصفية التسعير',
+  'pricing.uuid': 'المعرّف الفريد',
+  'pricing.filterByUuid': 'التصفية حسب المعرّف الفريد',
+  'pricing.materialUuid': 'معرّف المادة الفريد',
+  'pricing.filterByMaterialUuid': 'التصفية حسب معرّف المادة',
+  'pricing.allCurrencies': 'جميع العملات',
+  'pricing.itemsPerPage': 'عدد العناصر في الصفحة',
+  'pricing.selectItemsPerPage': 'اختر عدد العناصر في الصفحة',
+  'pricing.perPageOption': '{count} لكل صفحة',
+  'pricing.applyFilters': 'تطبيق عوامل التصفية',
+  'pricing.clearAll': 'مسح الكل',
+};

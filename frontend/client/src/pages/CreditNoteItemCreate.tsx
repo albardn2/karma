@@ -16,12 +16,13 @@ import { useToast } from "@/hooks/use-toast";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const createSchema = z.object({
-  amount: z.number().positive("Amount must be greater than 0"),
-  currency: z.string().min(1, "Currency is required"),
+  amount: z.number().positive("notes.validationAmount"),
+  currency: z.string().min(1, "notes.validationCurrency"),
   notes: z.string().optional(),
-  reference_uuid: z.string().uuid("Please enter a valid UUID"),
+  reference_uuid: z.string().uuid("notes.validationUuid"),
   inventory_change: z.number().optional(),
   create_payout: z.boolean().default(false)
 });
@@ -31,6 +32,7 @@ type CreateFormData = z.infer<typeof createSchema>;
 export default function CreditNoteItemCreate() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t, te } = useLanguage();
 
   // Get URL params for pre-filling
   const urlParams = new URLSearchParams(window.location.search);
@@ -110,16 +112,16 @@ export default function CreditNoteItemCreate() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/credit-note-item/"] });
       toast({
-        title: "Success",
-        description: "Credit note item created successfully",
+        title: t('common.success'),
+        description: t('notes.creditCreated'),
       });
       setLocation("/credit-note-items");
     },
     onError: (error: any) => {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to create credit note item",
+        title: t('common.error'),
+        description: error.message || t('notes.creditCreateFailed'),
       });
     }
   });
@@ -152,18 +154,18 @@ export default function CreditNoteItemCreate() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Create Credit Note Item</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{t('notes.createCreditItem')}</h1>
             <p className="text-gray-600 mt-1">
-              Add a new credit note item for customer refunds or adjustments
+              {t('notes.createCreditSubtitle')}
             </p>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Credit Note Item Information</CardTitle>
+            <CardTitle>{t('notes.creditItemInfo')}</CardTitle>
             <CardDescription>
-              Fill in the information below to create a new credit note item
+              {t('notes.creditItemInfoDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -171,7 +173,7 @@ export default function CreditNoteItemCreate() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Amount */}
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount *</Label>
+                  <Label htmlFor="amount">{t('common.amount')} *</Label>
                   <Input
                     type="number"
                     step="0.01"
@@ -180,136 +182,136 @@ export default function CreditNoteItemCreate() {
                     className={prefilledData.amount ? "border-blue-300 bg-blue-50" : ""}
                   />
                   {prefilledData.amount && (
-                    <p className="text-xs text-blue-600">Pre-filled from referring page</p>
+                    <p className="text-xs text-blue-600">{t('notes.prefilledReferring')}</p>
                   )}
                   {form.formState.errors.amount && (
-                    <p className="text-sm text-red-600">{form.formState.errors.amount.message}</p>
+                    <p className="text-sm text-red-600">{t(form.formState.errors.amount.message || '')}</p>
                   )}
                 </div>
 
                 {/* Currency */}
                 <div className="space-y-2">
-                  <Label htmlFor="currency">Currency *</Label>
+                  <Label htmlFor="currency">{t('common.currency')} *</Label>
                   <Select
                     value={form.watch("currency") || ""}
                     onValueChange={(value) => form.setValue("currency", value)}
                     disabled={currenciesLoading}
                   >
                     <SelectTrigger className={prefilledData.currency ? "border-blue-300 bg-blue-50" : ""}>
-                      <SelectValue placeholder={currenciesLoading ? "Loading currencies..." : "Select currency..."} />
+                      <SelectValue placeholder={currenciesLoading ? t('notes.loadingCurrencies') : t('notes.selectCurrencyDots')} />
                     </SelectTrigger>
                     <SelectContent>
                       {currencies && Array.isArray(currencies) ? currencies.map((currency: string) => (
                         <SelectItem key={currency} value={currency}>
-                          {currency}
+                          {te(currency)}
                         </SelectItem>
                       )) : (
-                        <SelectItem value="loading" disabled>Loading currencies...</SelectItem>
+                        <SelectItem value="loading" disabled>{t('notes.loadingCurrencies')}</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
                   {prefilledData.currency && (
-                    <p className="text-xs text-blue-600">Pre-filled from referring page</p>
+                    <p className="text-xs text-blue-600">{t('notes.prefilledReferring')}</p>
                   )}
                   {form.formState.errors.currency && (
-                    <p className="text-sm text-red-600">{form.formState.errors.currency.message}</p>
+                    <p className="text-sm text-red-600">{t(form.formState.errors.currency.message || '')}</p>
                   )}
                 </div>
               </div>
 
               {/* Reference Information with Tabs */}
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Reference Information</h3>
-                <p className="text-sm text-gray-600">Select the reference type and provide the UUID:</p>
-                
+                <h3 className="text-lg font-medium">{t('notes.referenceInformation')}</h3>
+                <p className="text-sm text-gray-600">{t('notes.selectReferenceProvideUuid')}</p>
+
                 <Tabs value={referenceType} onValueChange={handleTabChange} className="w-full">
                   <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="invoice_item">Invoice Item</TabsTrigger>
-                    <TabsTrigger value="customer">Customer</TabsTrigger>
-                    <TabsTrigger value="vendor">Vendor</TabsTrigger>
-                    <TabsTrigger value="purchase_order_item">Purchase Order Item</TabsTrigger>
+                    <TabsTrigger value="invoice_item">{t('notes.refInvoiceItem')}</TabsTrigger>
+                    <TabsTrigger value="customer">{t('notes.refCustomer')}</TabsTrigger>
+                    <TabsTrigger value="vendor">{t('notes.refVendor')}</TabsTrigger>
+                    <TabsTrigger value="purchase_order_item">{t('notes.refPurchaseOrderItem')}</TabsTrigger>
                   </TabsList>
-                  
+
                   <TabsContent value="invoice_item" className="space-y-2">
-                    <Label htmlFor="reference_uuid">Invoice Item UUID *</Label>
+                    <Label htmlFor="reference_uuid">{t('notes.invoiceItemUuid')} *</Label>
                     <Input
                       {...form.register("reference_uuid")}
-                      placeholder="Enter invoice item UUID..."
+                      placeholder={t('notes.enterInvoiceItemUuid')}
                       className={isReferenceUuidPrefilled() && referenceType === "invoice_item" ? "border-blue-300 bg-blue-50" : ""}
                     />
                     {isReferenceUuidPrefilled() && referenceType === "invoice_item" && (
-                      <p className="text-xs text-blue-600">Pre-filled from referring page</p>
+                      <p className="text-xs text-blue-600">{t('notes.prefilledReferring')}</p>
                     )}
                   </TabsContent>
-                  
+
                   <TabsContent value="customer" className="space-y-2">
-                    <Label htmlFor="reference_uuid">Customer UUID *</Label>
+                    <Label htmlFor="reference_uuid">{t('notes.customerUuid')} *</Label>
                     <Input
                       {...form.register("reference_uuid")}
-                      placeholder="Enter customer UUID..."
+                      placeholder={t('notes.enterCustomerUuid')}
                       className={isReferenceUuidPrefilled() && referenceType === "customer" ? "border-blue-300 bg-blue-50" : ""}
                     />
                     {isReferenceUuidPrefilled() && referenceType === "customer" && (
-                      <p className="text-xs text-blue-600">Pre-filled from referring page</p>
+                      <p className="text-xs text-blue-600">{t('notes.prefilledReferring')}</p>
                     )}
                   </TabsContent>
-                  
+
                   <TabsContent value="vendor" className="space-y-2">
-                    <Label htmlFor="reference_uuid">Vendor UUID *</Label>
+                    <Label htmlFor="reference_uuid">{t('notes.vendorUuid')} *</Label>
                     <Input
                       {...form.register("reference_uuid")}
-                      placeholder="Enter vendor UUID..."
+                      placeholder={t('notes.enterVendorUuid')}
                       className={isReferenceUuidPrefilled() && referenceType === "vendor" ? "border-blue-300 bg-blue-50" : ""}
                     />
                     {isReferenceUuidPrefilled() && referenceType === "vendor" && (
-                      <p className="text-xs text-blue-600">Pre-filled from referring page</p>
+                      <p className="text-xs text-blue-600">{t('notes.prefilledReferring')}</p>
                     )}
                   </TabsContent>
-                  
+
                   <TabsContent value="purchase_order_item" className="space-y-2">
-                    <Label htmlFor="reference_uuid">Purchase Order Item UUID *</Label>
+                    <Label htmlFor="reference_uuid">{t('notes.purchaseOrderItemUuid')} *</Label>
                     <Input
                       {...form.register("reference_uuid")}
-                      placeholder="Enter purchase order item UUID..."
+                      placeholder={t('notes.enterPurchaseOrderItemUuid')}
                       className={isReferenceUuidPrefilled() && referenceType === "purchase_order_item" ? "border-blue-300 bg-blue-50" : ""}
                     />
                     {isReferenceUuidPrefilled() && referenceType === "purchase_order_item" && (
-                      <p className="text-xs text-blue-600">Pre-filled from referring page</p>
+                      <p className="text-xs text-blue-600">{t('notes.prefilledReferring')}</p>
                     )}
                   </TabsContent>
                 </Tabs>
 
                 {form.formState.errors.reference_uuid && (
-                  <p className="text-sm text-red-600">{form.formState.errors.reference_uuid.message}</p>
+                  <p className="text-sm text-red-600">{t(form.formState.errors.reference_uuid.message || '')}</p>
                 )}
               </div>
 
               {/* Inventory Change */}
               <div className="space-y-2">
-                <Label htmlFor="inventory_change">Inventory Change</Label>
+                <Label htmlFor="inventory_change">{t('notes.inventoryChange')}</Label>
                 <Input
                   type="number"
                   {...form.register("inventory_change", { valueAsNumber: true })}
                   placeholder="0"
                 />
                 <p className="text-xs text-gray-500">
-                  Optional: Only set if related to purchase order or invoice item
+                  {t('notes.inventoryChangeHint')}
                 </p>
                 {form.formState.errors.inventory_change && (
-                  <p className="text-sm text-red-600">{form.formState.errors.inventory_change.message}</p>
+                  <p className="text-sm text-red-600">{t(form.formState.errors.inventory_change.message || '')}</p>
                 )}
               </div>
 
               {/* Notes */}
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes">{t('common.notes')}</Label>
                 <Textarea
                   {...form.register("notes")}
-                  placeholder="Enter any additional notes..."
+                  placeholder={t('notes.notesPlaceholder')}
                   rows={3}
                 />
                 {form.formState.errors.notes && (
-                  <p className="text-sm text-red-600">{form.formState.errors.notes.message}</p>
+                  <p className="text-sm text-red-600">{t(form.formState.errors.notes.message || '')}</p>
                 )}
               </div>
 
@@ -321,7 +323,7 @@ export default function CreditNoteItemCreate() {
                   onCheckedChange={(checked) => form.setValue("create_payout", checked as boolean)}
                 />
                 <Label htmlFor="create_payout" className="text-sm font-medium">
-                  Auto Pay (Create automatic payout for this credit note item)
+                  {t('notes.autoPayCredit')}
                 </Label>
               </div>
 
@@ -333,14 +335,14 @@ export default function CreditNoteItemCreate() {
                   onClick={() => setLocation("/credit-note-items")}
                   disabled={createMutation.isPending}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   type="submit"
                   disabled={createMutation.isPending}
                   className="bg-purple-600 hover:bg-purple-700"
                 >
-                  {createMutation.isPending ? "Creating..." : "Create Credit Note Item"}
+                  {createMutation.isPending ? t('common.creating') : t('notes.createCreditItem')}
                 </Button>
               </div>
             </form>

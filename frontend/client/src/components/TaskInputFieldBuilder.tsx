@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Trash2, Edit2, Check, X } from "lucide-react";
 import { FieldType, TaskInputField } from "@/types/taskInputs";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface TaskInputFieldBuilderProps {
   fields: TaskInputField[];
@@ -15,6 +16,8 @@ interface TaskInputFieldBuilderProps {
 }
 
 export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilderProps) {
+  const { t } = useLanguage();
+  const fieldTypeLabel = (type: FieldType | string) => t(`workflows.fieldType_${type}`);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [currentField, setCurrentField] = useState<TaskInputField>({
@@ -102,7 +105,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <Label className="text-sm font-medium">Task Input Fields</Label>
+        <Label className="text-sm font-medium">{t('workflows.taskInputFields')}</Label>
         {!isAddingNew && editingIndex === null && (
           <Button
             type="button"
@@ -112,14 +115,14 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
             data-testid="button-add-input-field"
           >
             <Plus className="h-4 w-4 me-2" />
-            Add Field
+            {t('workflows.addField')}
           </Button>
         )}
       </div>
 
       {fields.length === 0 && !isAddingNew && (
         <div className="text-center py-8 text-sm text-gray-500 border rounded-md">
-          No input fields defined. Click "Add Field" to create one.
+          {t('workflows.noInputFieldsDefined')}
         </div>
       )}
 
@@ -135,20 +138,20 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                     <span className="font-medium" data-testid={`field-name-${field.name}`}>
                       {field.label}
                     </span>
-                    <Badge variant="secondary">{field.type}</Badge>
-                    {field.required && <Badge variant="outline">Required</Badge>}
+                    <Badge variant="secondary">{fieldTypeLabel(field.type)}</Badge>
+                    {field.required && <Badge variant="outline">{t('common.required')}</Badge>}
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Field name: <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">{field.name}</code>
+                    {t('workflows.fieldNameColon')} <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">{field.name}</code>
                   </div>
                   {field.placeholder && (
                     <div className="text-sm text-gray-500 mt-1">
-                      Placeholder: {field.placeholder}
+                      {t('workflows.placeholderColon')} {field.placeholder}
                     </div>
                   )}
                   {field.options && field.options.length > 0 && (
                     <div className="text-sm text-gray-500 mt-1">
-                      Options: {field.options.join(", ")}
+                      {t('workflows.optionsColon')} {field.options.join(", ")}
                     </div>
                   )}
                 </div>
@@ -183,35 +186,35 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
         <Card className="border-2 border-primary">
           <CardHeader>
             <CardTitle className="text-base">
-              {editingIndex !== null ? "Edit Field" : "Add New Field"}
+              {editingIndex !== null ? t('workflows.editField') : t('workflows.addNewField')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="field-name">Field Name *</Label>
+                <Label htmlFor="field-name">{t('workflows.fieldName')} *</Label>
                 <Input
                   id="field-name"
                   value={currentField.name}
                   onChange={(e) => updateCurrentField({ name: e.target.value })}
-                  placeholder="e.g., email"
+                  placeholder={t('workflows.fieldNamePlaceholder')}
                   data-testid="input-field-name"
                 />
               </div>
               <div>
-                <Label htmlFor="field-label">Field Label *</Label>
+                <Label htmlFor="field-label">{t('workflows.fieldLabel')} *</Label>
                 <Input
                   id="field-label"
                   value={currentField.label}
                   onChange={(e) => updateCurrentField({ label: e.target.value })}
-                  placeholder="e.g., Email Address"
+                  placeholder={t('workflows.fieldLabelPlaceholder')}
                   data-testid="input-field-label"
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="field-type">Field Type *</Label>
+              <Label htmlFor="field-type">{t('workflows.fieldType')} *</Label>
               <Select
                 value={currentField.type}
                 onValueChange={(value) => updateCurrentField({ type: value as FieldType })}
@@ -220,17 +223,17 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={FieldType.TEXT}>Text</SelectItem>
-                  <SelectItem value={FieldType.NUMBER}>Number</SelectItem>
-                  <SelectItem value={FieldType.EMAIL}>Email</SelectItem>
-                  <SelectItem value={FieldType.PASSWORD}>Password</SelectItem>
-                  <SelectItem value={FieldType.DATE}>Date</SelectItem>
-                  <SelectItem value={FieldType.TIME}>Time</SelectItem>
-                  <SelectItem value={FieldType.SELECT}>Select (Dropdown)</SelectItem>
-                  <SelectItem value={FieldType.CHECKLIST}>Checklist</SelectItem>
-                  <SelectItem value={FieldType.RADIO}>Radio Buttons</SelectItem>
-                  <SelectItem value={FieldType.FILE_UPLOAD}>File Upload</SelectItem>
-                  <SelectItem value={FieldType.BUTTON}>Button</SelectItem>
+                  <SelectItem value={FieldType.TEXT}>{t('workflows.fieldType_text')}</SelectItem>
+                  <SelectItem value={FieldType.NUMBER}>{t('workflows.fieldType_number')}</SelectItem>
+                  <SelectItem value={FieldType.EMAIL}>{t('workflows.fieldType_email')}</SelectItem>
+                  <SelectItem value={FieldType.PASSWORD}>{t('workflows.fieldType_password')}</SelectItem>
+                  <SelectItem value={FieldType.DATE}>{t('workflows.fieldType_date')}</SelectItem>
+                  <SelectItem value={FieldType.TIME}>{t('workflows.fieldType_time')}</SelectItem>
+                  <SelectItem value={FieldType.SELECT}>{t('workflows.fieldType_select')}</SelectItem>
+                  <SelectItem value={FieldType.CHECKLIST}>{t('workflows.fieldType_checklist')}</SelectItem>
+                  <SelectItem value={FieldType.RADIO}>{t('workflows.fieldType_radio')}</SelectItem>
+                  <SelectItem value={FieldType.FILE_UPLOAD}>{t('workflows.fieldType_file_upload')}</SelectItem>
+                  <SelectItem value={FieldType.BUTTON}>{t('workflows.fieldType_button')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -243,17 +246,17 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                 data-testid="checkbox-field-required"
               />
               <Label htmlFor="field-required" className="cursor-pointer">
-                Required field
+                {t('workflows.requiredField')}
               </Label>
             </div>
 
             <div>
-              <Label htmlFor="field-placeholder">Placeholder</Label>
+              <Label htmlFor="field-placeholder">{t('workflows.placeholder')}</Label>
               <Input
                 id="field-placeholder"
                 value={currentField.placeholder || ""}
                 onChange={(e) => updateCurrentField({ placeholder: e.target.value })}
-                placeholder="Placeholder text"
+                placeholder={t('workflows.placeholderTextPlaceholder')}
                 data-testid="input-field-placeholder"
               />
             </div>
@@ -261,7 +264,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
             {showsOptions && (
               <div>
                 <Label htmlFor="field-options">
-                  Options * (comma-separated)
+                  {t('workflows.optionsCommaSeparated')}
                 </Label>
                 <Input
                   id="field-options"
@@ -271,7 +274,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                       options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
                     })
                   }
-                  placeholder="Option 1, Option 2, Option 3"
+                  placeholder={t('workflows.optionsPlaceholder')}
                   data-testid="input-field-options"
                 />
               </div>
@@ -280,7 +283,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
             {showsMinMax && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="field-min">Minimum Value</Label>
+                  <Label htmlFor="field-min">{t('workflows.minValue')}</Label>
                   <Input
                     id="field-min"
                     type="number"
@@ -290,7 +293,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                   />
                 </div>
                 <div>
-                  <Label htmlFor="field-max">Maximum Value</Label>
+                  <Label htmlFor="field-max">{t('workflows.maxValue')}</Label>
                   <Input
                     id="field-max"
                     type="number"
@@ -305,7 +308,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
             {showsTextConstraints && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="field-min-length">Min Length</Label>
+                  <Label htmlFor="field-min-length">{t('workflows.minLength')}</Label>
                   <Input
                     id="field-min-length"
                     type="number"
@@ -315,7 +318,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                   />
                 </div>
                 <div>
-                  <Label htmlFor="field-max-length">Max Length</Label>
+                  <Label htmlFor="field-max-length">{t('workflows.maxLength')}</Label>
                   <Input
                     id="field-max-length"
                     type="number"
@@ -330,12 +333,12 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
             {showsFileUpload && (
               <>
                 <div>
-                  <Label htmlFor="field-accept">Accepted File Types</Label>
+                  <Label htmlFor="field-accept">{t('workflows.acceptedFileTypes')}</Label>
                   <Input
                     id="field-accept"
                     value={currentField.accept || ""}
                     onChange={(e) => updateCurrentField({ accept: e.target.value })}
-                    placeholder="e.g., .pdf,.doc,.docx"
+                    placeholder={t('workflows.acceptedFileTypesPlaceholder')}
                     data-testid="input-field-accept"
                   />
                 </div>
@@ -347,7 +350,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                     data-testid="checkbox-field-multiple"
                   />
                   <Label htmlFor="field-multiple" className="cursor-pointer">
-                    Allow multiple files
+                    {t('workflows.allowMultipleFiles')}
                   </Label>
                 </div>
               </>
@@ -355,12 +358,12 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
 
             {showsButton && (
               <div>
-                <Label htmlFor="field-button-text">Button Text</Label>
+                <Label htmlFor="field-button-text">{t('workflows.buttonText')}</Label>
                 <Input
                   id="field-button-text"
                   value={currentField.button_text || ""}
                   onChange={(e) => updateCurrentField({ button_text: e.target.value })}
-                  placeholder="Click Me"
+                  placeholder={t('workflows.buttonTextPlaceholder')}
                   data-testid="input-field-button-text"
                 />
               </div>
@@ -374,7 +377,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                 data-testid="button-cancel-field"
               >
                 <X className="h-4 w-4 me-2" />
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="button"
@@ -382,7 +385,7 @@ export function TaskInputFieldBuilder({ fields, onChange }: TaskInputFieldBuilde
                 data-testid="button-save-field"
               >
                 <Check className="h-4 w-4 me-2" />
-                {editingIndex !== null ? "Update" : "Add"} Field
+                {editingIndex !== null ? t('workflows.updateField') : t('workflows.addField')}
               </Button>
             </div>
           </CardContent>

@@ -29,6 +29,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Edit2, Trash2, Copy, Check, Save, X, Calendar } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface InventoryEvent {
   uuid: string;
@@ -44,17 +45,18 @@ interface InventoryEvent {
   is_deleted: boolean;
 }
 
-const inventoryEventUpdateSchema = z.object({
-  quantity: z.string().min(1, "Quantity is required"),
+const makeInventoryEventUpdateSchema = (t: (key: string) => string) => z.object({
+  quantity: z.string().min(1, t('inventoryEvents.quantityRequired')),
   notes: z.string().optional(),
   cost_per_unit: z.string().optional(),
   currency: z.string().optional(),
   affect_original: z.boolean(),
 });
 
-type InventoryEventUpdateData = z.infer<typeof inventoryEventUpdateSchema>;
+type InventoryEventUpdateData = z.infer<ReturnType<typeof makeInventoryEventUpdateSchema>>;
 
 export default function InventoryEventDetail() {
+  const { t, te } = useLanguage();
   const [, params] = useRoute("/inventory-events/:uuid");
   const [, setLocation] = useLocation();
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -63,7 +65,7 @@ export default function InventoryEventDetail() {
   const queryClient = useQueryClient();
 
   const form = useForm<InventoryEventUpdateData>({
-    resolver: zodResolver(inventoryEventUpdateSchema),
+    resolver: zodResolver(makeInventoryEventUpdateSchema(t)),
   });
 
   // Fetch inventory event data
@@ -119,14 +121,14 @@ export default function InventoryEventDetail() {
       queryClient.refetchQueries({ queryKey: ["/inventory-event/"] });
       
       toast({
-        title: "Success",
-        description: "Inventory event updated successfully",
+        title: t('common.success'),
+        description: t('common.updated'),
       });
       setIsEditing(false);
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('common.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -146,19 +148,29 @@ export default function InventoryEventDetail() {
       queryClient.removeQueries({ queryKey: ["/inventory-event/", params?.uuid] });
       
       toast({
-        title: "Success",
-        description: "Inventory event deleted successfully",
+        title: t('common.success'),
+        description: t('common.deleted'),
       });
       setLocation("/inventory-events");
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('common.error'),
         description: error.message,
         variant: "destructive",
       });
     },
   });
+
+  const fieldLabels: Record<string, string> = {
+    "UUID": t('inventoryEvents.uuid'),
+    "Inventory UUID": t('inventoryEvents.inventoryUuid'),
+    "Material UUID": t('inventoryEvents.materialUuid'),
+    "Quantity": t('common.quantity'),
+    "Cost per Unit": t('inventoryEvents.costPerUnit'),
+    "Created At": t('common.createdAt'),
+    "Notes": t('common.notes'),
+  };
 
   const handleSave = (data: InventoryEventUpdateData) => {
     updateInventoryEventMutation.mutate(data);
@@ -170,13 +182,13 @@ export default function InventoryEventDetail() {
       setCopiedField(field);
       setTimeout(() => setCopiedField(null), 2000);
       toast({
-        title: "Copied",
-        description: `${field} copied to clipboard`,
+        title: t('inventoryEvents.copied'),
+        description: t('inventoryEvents.copiedToClipboard', { field: fieldLabels[field] ?? field }),
       });
     } catch (err) {
       toast({
-        title: "Error",
-        description: "Failed to copy to clipboard",
+        title: t('common.error'),
+        description: t('inventoryEvents.copyFailed'),
         variant: "destructive",
       });
     }
@@ -198,11 +210,11 @@ export default function InventoryEventDetail() {
       <AppLayout>
         <div className="space-y-6 p-6">
           <div className="text-center">
-            <h1 className="text-2xl font-bold">Inventory Event Not Found</h1>
+            <h1 className="text-2xl font-bold">{t('inventoryEvents.notFoundTitle')}</h1>
             <Link href="/inventory-events">
               <Button className="mt-4">
                 <ArrowLeft className="h-4 w-4 me-2" />
-                Back to Inventory Events
+                {t('inventoryEvents.backToList')}
               </Button>
             </Link>
           </div>
@@ -222,8 +234,8 @@ export default function InventoryEventDetail() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold">Inventory Event Details</h1>
-              <p className="text-muted-foreground">{inventoryEvent.event_type.replace('_', ' ').toUpperCase()}</p>
+              <h1 className="text-2xl font-bold">{t('inventoryEvents.detailsTitle')}</h1>
+              <p className="text-muted-foreground">{te(inventoryEvent.event_type)}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -235,29 +247,29 @@ export default function InventoryEventDetail() {
                   disabled={inventoryEvent.event_type !== 'manual'}
                 >
                   <Edit2 className="h-4 w-4 me-2" />
-                  Edit
+                  {t('common.edit')}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive">
                       <Trash2 className="h-4 w-4 me-2" />
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogTitle>{t('common.areYouSure')}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the inventory event.
+                        {t('inventoryEvents.deleteConfirm')}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteInventoryEventMutation.mutate()}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
-                        Delete
+                        {t('common.delete')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -282,7 +294,7 @@ export default function InventoryEventDetail() {
                   }}
                 >
                   <X className="h-4 w-4 me-2" />
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={form.handleSubmit(handleSave)}
@@ -290,7 +302,7 @@ export default function InventoryEventDetail() {
                   className="bg-[#5469D4] hover:bg-[#4356C7]"
                 >
                   <Save className="h-4 w-4 me-2" />
-                  {updateInventoryEventMutation.isPending ? "Saving..." : "Save"}
+                  {updateInventoryEventMutation.isPending ? t('common.saving') : t('common.save')}
                 </Button>
               </>
             )}
@@ -303,7 +315,7 @@ export default function InventoryEventDetail() {
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[#5469D4] via-[#6B73E0] to-[#8B5CF6]">
                 <Calendar className="h-4 w-4 text-white" />
               </div>
-              Inventory Event Information
+              {t('inventoryEvents.infoTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -312,7 +324,7 @@ export default function InventoryEventDetail() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">UUID</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('inventoryEvents.uuid')}</p>
                       <p className="text-sm">{inventoryEvent.uuid}</p>
                     </div>
                     <Button
@@ -327,7 +339,7 @@ export default function InventoryEventDetail() {
 
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Inventory UUID</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('inventoryEvents.inventoryUuid')}</p>
                       <p className="text-sm">{inventoryEvent.inventory_uuid}</p>
                     </div>
                     <Button
@@ -342,7 +354,7 @@ export default function InventoryEventDetail() {
 
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Material UUID</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('inventoryEvents.materialUuid')}</p>
                       <p className="text-sm">{inventoryEvent.material_uuid}</p>
                     </div>
                     <Button
@@ -356,9 +368,9 @@ export default function InventoryEventDetail() {
                   </div>
 
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Event Type</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t('inventoryEvents.eventType')}</p>
                     <Badge variant="outline" className="mt-1">
-                      {inventoryEvent.event_type.replace('_', ' ').toUpperCase()}
+                      {te(inventoryEvent.event_type)}
                     </Badge>
                   </div>
                 </div>
@@ -366,7 +378,7 @@ export default function InventoryEventDetail() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Quantity</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('common.quantity')}</p>
                       <p className="text-sm">{inventoryEvent.quantity}</p>
                     </div>
                     <Button
@@ -381,8 +393,8 @@ export default function InventoryEventDetail() {
 
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Cost per Unit</p>
-                      <p className="text-sm">{inventoryEvent.cost_per_unit ? `${inventoryEvent.cost_per_unit} ${inventoryEvent.currency || ''}` : 'N/A'}</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('inventoryEvents.costPerUnit')}</p>
+                      <p className="text-sm">{inventoryEvent.cost_per_unit ? `${inventoryEvent.cost_per_unit} ${inventoryEvent.currency || ''}` : t('inventoryEvents.notAvailable')}</p>
                     </div>
                     {inventoryEvent.cost_per_unit && (
                       <Button
@@ -397,15 +409,15 @@ export default function InventoryEventDetail() {
                   </div>
 
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Affects Original</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t('inventoryEvents.affectsOriginal')}</p>
                     <Badge variant={inventoryEvent.affect_original ? "default" : "secondary"} className="mt-1">
-                      {inventoryEvent.affect_original ? "Yes" : "No"}
+                      {inventoryEvent.affect_original ? t('common.yes') : t('common.no')}
                     </Badge>
                   </div>
 
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('common.createdAt')}</p>
                       <p className="text-sm">{new Date(inventoryEvent.created_at).toLocaleString()}</p>
                     </div>
                     <Button
@@ -423,7 +435,7 @@ export default function InventoryEventDetail() {
                   <div className="md:col-span-2">
                     <div className="flex items-start justify-between group">
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-muted-foreground">Notes</p>
+                        <p className="text-sm font-medium text-muted-foreground">{t('common.notes')}</p>
                         <p className="text-sm mt-1">{inventoryEvent.notes}</p>
                       </div>
                       <Button
@@ -447,7 +459,7 @@ export default function InventoryEventDetail() {
                       name="quantity"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Quantity</FormLabel>
+                          <FormLabel>{t('common.quantity')}</FormLabel>
                           <FormControl>
                             <Input type="number" step="0.01" {...field} />
                           </FormControl>
@@ -461,7 +473,7 @@ export default function InventoryEventDetail() {
                       name="cost_per_unit"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Cost per Unit</FormLabel>
+                          <FormLabel>{t('inventoryEvents.costPerUnit')}</FormLabel>
                           <FormControl>
                             <Input type="number" step="0.01" {...field} />
                           </FormControl>
@@ -475,11 +487,11 @@ export default function InventoryEventDetail() {
                       name="currency"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Currency</FormLabel>
+                          <FormLabel>{t('common.currency')}</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select currency" />
+                                <SelectValue placeholder={t('inventoryEvents.selectCurrency')} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -501,9 +513,9 @@ export default function InventoryEventDetail() {
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                           <div className="space-y-0.5">
-                            <FormLabel className="text-base">Affect Original Quantity</FormLabel>
+                            <FormLabel className="text-base">{t('inventoryEvents.affectOriginalQuantity')}</FormLabel>
                             <div className="text-sm text-muted-foreground">
-                              Whether this event affects the original inventory quantity
+                              {t('inventoryEvents.affectOriginalHint')}
                             </div>
                           </div>
                           <FormControl>
@@ -522,9 +534,9 @@ export default function InventoryEventDetail() {
                     name="notes"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Notes</FormLabel>
+                        <FormLabel>{t('common.notes')}</FormLabel>
                         <FormControl>
-                          <Textarea 
+                          <Textarea
                             className="resize-none"
                             rows={3}
                             {...field}

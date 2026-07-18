@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CustomerOrderItem {
   uuid: string;
@@ -84,6 +85,7 @@ interface CustomerOrder {
 }
 
 export default function CustomerOrderDetail() {
+  const { t, te } = useLanguage();
   const params = useParams();
   const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
@@ -136,14 +138,14 @@ export default function CustomerOrderDetail() {
       queryClient.invalidateQueries({ queryKey: ["/customer-order/with-items-and-invoice", params?.id] });
       setIsEditing(false);
       toast({
-        title: "Success",
-        description: "Customer order updated successfully",
+        title: t('common.success'),
+        description: t('customerOrders.updateSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update customer order",
+        title: t('common.error'),
+        description: error.message || t('customerOrders.updateFailed'),
         variant: "destructive",
       });
     },
@@ -158,15 +160,15 @@ export default function CustomerOrderDetail() {
       queryClient.invalidateQueries({ queryKey: ["/customer-order"] });
       queryClient.invalidateQueries({ queryKey: ["/customer-order/with-items-and-invoice"] });
       toast({
-        title: "Success",
-        description: "Customer order deleted successfully",
+        title: t('common.success'),
+        description: t('customerOrders.deleteSuccess'),
       });
       setLocation("/customer-orders");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete customer order",
+        title: t('common.error'),
+        description: error.message || t('customerOrders.deleteFailed'),
         variant: "destructive",
       });
     },
@@ -183,14 +185,14 @@ export default function CustomerOrderDetail() {
       setFulfillModalOpen(false);
       setInventoryUuid("");
       toast({
-        title: "Success",
-        description: "Item fulfilled successfully",
+        title: t('common.success'),
+        description: t('customerOrders.itemFulfilledSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to fulfill item",
+        title: t('common.error'),
+        description: error.message || t('customerOrders.fulfillFailed'),
         variant: "destructive",
       });
     },
@@ -205,14 +207,14 @@ export default function CustomerOrderDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/customer-order/with-items-and-invoice", params?.id] });
       toast({
-        title: "Success",
-        description: "Item unfulfilled successfully",
+        title: t('common.success'),
+        description: t('customerOrders.itemUnfulfilledSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to unfulfill item",
+        title: t('common.error'),
+        description: error.message || t('customerOrders.unfulfillFailed'),
         variant: "destructive",
       });
     },
@@ -248,7 +250,7 @@ export default function CustomerOrderDetail() {
   };
 
   const handleDelete = () => {
-    if (window.confirm("Are you sure you want to delete this customer order?")) {
+    if (window.confirm(t('customerOrders.confirmDelete'))) {
       deleteMutation.mutate();
     }
   };
@@ -258,8 +260,8 @@ export default function CustomerOrderDetail() {
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
     toast({
-      title: "Copied",
-      description: `${fieldName} copied to clipboard`,
+      title: t('customerOrders.copied'),
+      description: t('customerOrders.copiedToClipboard'),
     });
   };
 
@@ -312,14 +314,14 @@ export default function CustomerOrderDetail() {
       <AppLayout>
         <div className="p-8 text-center">
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            Error Loading Customer Order
+            {t('customerOrders.errorLoadingTitle')}
           </h1>
           <p className="text-red-600 dark:text-red-400">
-            Failed to load customer order: {error?.message}
+            {t('customerOrders.failedLoadOrder', { message: error?.message })}
           </p>
           <Button onClick={() => setLocation("/customer-orders")} variant="outline">
             <ArrowLeft className="h-4 w-4 me-2" />
-            Back to Customer Orders
+            {t('customerOrders.backToOrders')}
           </Button>
         </div>
       </AppLayout>
@@ -331,11 +333,11 @@ export default function CustomerOrderDetail() {
       <AppLayout>
         <div className="p-8 text-center">
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            Customer Order Not Found
+            {t('customerOrders.orderNotFound')}
           </h1>
           <Button onClick={() => setLocation("/customer-orders")} variant="outline">
             <ArrowLeft className="h-4 w-4 me-2" />
-            Back to Customer Orders
+            {t('customerOrders.backToOrders')}
           </Button>
         </div>
       </AppLayout>
@@ -356,10 +358,10 @@ export default function CustomerOrderDetail() {
               </div>
               <div className="ms-3">
                 <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
-                  Order Overdue
+                  {t('customerOrders.orderOverdue')}
                 </h3>
                 <p className="mt-1 text-sm text-red-700 dark:text-red-300">
-                  This customer order is past due. Please review and process payment immediately.
+                  {t('customerOrders.overdueBanner')}
                 </p>
               </div>
             </div>
@@ -375,11 +377,11 @@ export default function CustomerOrderDetail() {
               onClick={() => setLocation("/customer-orders")}
             >
               <ArrowLeft className="h-4 w-4 me-2" />
-              Back
+              {t('common.back')}
             </Button>
             <div>
               <h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
-                Customer Order
+                {t('customerOrders.orderTitle')}
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {customerOrder.uuid}
@@ -392,7 +394,7 @@ export default function CustomerOrderDetail() {
               <>
                 <Button onClick={handleEdit} variant="outline" size="sm">
                   <Edit3 className="h-4 w-4 me-2" />
-                  Edit
+                  {t('common.edit')}
                 </Button>
                 <Button 
                   onClick={handleDelete}
@@ -402,14 +404,14 @@ export default function CustomerOrderDetail() {
                   disabled={deleteMutation.isPending}
                 >
                   <Trash2 className="h-4 w-4 me-2" />
-                  Delete
+                  {t('common.delete')}
                 </Button>
               </>
             ) : (
               <>
                 <Button onClick={handleCancel} variant="outline" size="sm">
                   <X className="h-4 w-4 me-2" />
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button 
                   onClick={handleSave} 
@@ -418,7 +420,7 @@ export default function CustomerOrderDetail() {
                   className="bg-[#5469D4] hover:bg-[#4356C7]"
                 >
                   <Save className="h-4 w-4 me-2" />
-                  Save
+                  {t('common.save')}
                 </Button>
               </>
             )}
@@ -428,7 +430,7 @@ export default function CustomerOrderDetail() {
         {/* Order Information - Single Card */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Order Information</CardTitle>
+            <CardTitle className="text-lg">{t('customerOrders.orderInformation')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Status Badges */}
@@ -440,12 +442,12 @@ export default function CustomerOrderDetail() {
                     : 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300'
                 }`}
               >
-                {customerOrder.is_fulfilled ? "Fulfilled" : "Unfulfilled"}
+                {customerOrder.is_fulfilled ? t('customerOrders.fulfilled') : t('customerOrders.unfulfilled')}
               </Badge>
 
               {customerOrder.is_overdue && (
                 <Badge className="text-xs bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300">
-                  Overdue
+                  {t('customerOrders.overdue')}
                 </Badge>
               )}
 
@@ -456,14 +458,14 @@ export default function CustomerOrderDetail() {
                     : 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300'
                 }`}
               >
-                {customerOrder.is_paid ? "Paid" : "Unpaid"}
+                {customerOrder.is_paid ? t('customerOrders.paid') : t('customerOrders.unpaid')}
               </Badge>
             </div>
 
             {/* Order Details Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.uuid, "Order UUID")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Order UUID</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.orderUuid')}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                     {customerOrder.uuid}
@@ -475,7 +477,7 @@ export default function CustomerOrderDetail() {
               </div>
 
               <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.customer_uuid, "Customer UUID")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Customer UUID</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.customerUuid')}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                     {customerOrder.customer_uuid}
@@ -487,7 +489,7 @@ export default function CustomerOrderDetail() {
               </div>
 
               <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.created_at, "Created Date")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created At</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.createdAt')}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-900 dark:text-gray-100">
                     {format(new Date(customerOrder.created_at), 'MMM d, yyyy h:mm a')}
@@ -498,11 +500,11 @@ export default function CustomerOrderDetail() {
                 </div>
               </div>
 
-              <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.trip_stop_uuid || "Not set", "Trip Stop UUID")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Trip Stop UUID</Label>
+              <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.trip_stop_uuid || t('customerOrders.notSet'), "Trip Stop UUID")}>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.tripStopUuid')}</Label>
                 <div className="flex items-center justify-between">
                   <p className={`text-sm font-mono break-all ${customerOrder.trip_stop_uuid ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 italic'}`}>
-                    {customerOrder.trip_stop_uuid || "Not set"}
+                    {customerOrder.trip_stop_uuid || t('customerOrders.notSet')}
                   </p>
                   <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Trip Stop UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -510,11 +512,11 @@ export default function CustomerOrderDetail() {
                 </div>
               </div>
 
-              <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.fulfilled_at ? format(new Date(customerOrder.fulfilled_at), 'MMM d, yyyy h:mm a') : "Not fulfilled", "Fulfilled At")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Fulfilled At</Label>
+              <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.fulfilled_at ? format(new Date(customerOrder.fulfilled_at), 'MMM d, yyyy h:mm a') : t('customerOrders.notFulfilled'), "Fulfilled At")}>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.fulfilledAt')}</Label>
                 <div className="flex items-center justify-between">
                   <p className={`text-sm ${customerOrder.fulfilled_at ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 italic'}`}>
-                    {customerOrder.fulfilled_at ? format(new Date(customerOrder.fulfilled_at), 'MMM d, yyyy h:mm a') : "Not fulfilled"}
+                    {customerOrder.fulfilled_at ? format(new Date(customerOrder.fulfilled_at), 'MMM d, yyyy h:mm a') : t('customerOrders.notFulfilled')}
                   </p>
                   <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Fulfilled At" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -525,19 +527,19 @@ export default function CustomerOrderDetail() {
 
             {/* Notes Section */}
             <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-              <Label className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 block">Notes</Label>
+              <Label className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 block">{t('common.notes')}</Label>
               {isEditing ? (
                 <Textarea
                   value={editedNotes}
                   onChange={(e) => setEditedNotes(e.target.value)}
-                  placeholder="Add notes..."
+                  placeholder={t('customerOrders.addNotes')}
                   rows={4}
                 />
               ) : (
-                <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.notes || "No notes", "Notes")}>
+                <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.notes || t('customerOrders.noNotesAdded'), "Notes")}>
                   <div className="flex items-start justify-between">
                     <p className="text-gray-900 dark:text-gray-100">
-                      {customerOrder.notes || "No notes added"}
+                      {customerOrder.notes || t('customerOrders.noNotesAdded')}
                     </p>
                     <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
                       {copiedField === "Notes" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -554,24 +556,24 @@ export default function CustomerOrderDetail() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Package className="h-5 w-5" />
-              Order Items ({customerOrderItems.length})
+              {t('customerOrders.orderItemsCount', { count: customerOrderItems.length })}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {customerOrderItems.length === 0 ? (
               <div className="text-center py-8">
                 <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 dark:text-gray-400">No items in this order</p>
+                <p className="text-gray-500 dark:text-gray-400">{t('customerOrders.noItemsInOrder')}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="border-b border-gray-200 dark:border-gray-700">
                     <tr>
-                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Material</th>
-                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Quantity</th>
-                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
-                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.material')}</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.quantity')}</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.status')}</th>
+                      <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -584,10 +586,10 @@ export default function CustomerOrderDetail() {
                         <td className="py-4">
                           <div className="group cursor-pointer" onClick={() => copyToClipboard(item.material_uuid || '', "Material UUID")}>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                              {item.material_name || 'Unknown Material'}
+                              {item.material_name || t('customerOrders.unknownMaterial')}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                              {item.material_uuid?.substring(0, 8) || 'N/A'}... • Click to copy full UUID
+                              {item.material_uuid?.substring(0, 8) || t('customerOrders.na')}... • {t('customerOrders.clickToCopyUuid')}
                             </p>
                           </div>
                         </td>
@@ -605,7 +607,7 @@ export default function CustomerOrderDetail() {
                                 : 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300'
                             )}
                           >
-                            {item.is_fulfilled ? "Fulfilled" : "Pending"}
+                            {item.is_fulfilled ? t('customerOrders.fulfilled') : t('customerOrders.pending')}
                           </Badge>
                         </td>
                         <td className="py-4">
@@ -619,7 +621,7 @@ export default function CustomerOrderDetail() {
                               !item.is_fulfilled && "bg-[#5469D4] hover:bg-[#4356C7] text-white"
                             )}
                           >
-                            {item.is_fulfilled ? "Unfulfill" : "Fulfill"}
+                            {item.is_fulfilled ? t('customerOrders.unfulfill') : t('customerOrders.fulfill')}
                           </Button>
                         </td>
                       </tr>
@@ -636,16 +638,16 @@ export default function CustomerOrderDetail() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Receipt className="h-5 w-5" />
-              Invoices & Financial Summary ({invoices.length})
+              {t('customerOrders.invoicesFinancialSummary', { count: invoices.length })}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {/* Financial Summary */}
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Financial Summary</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{t('customerOrders.financialSummary')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.total_adjusted_amount?.toFixed(2) || '0.00', "Total Amount")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Amount</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.totalAmount')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                       {formatCurrency(customerOrder.total_adjusted_amount, invoices[0]?.currency || 'USD')}
@@ -657,7 +659,7 @@ export default function CustomerOrderDetail() {
                 </div>
                 
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.net_amount_paid?.toFixed(2) || '0.00', "Amount Paid")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount Paid</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.amountPaid')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
                       {formatCurrency(customerOrder.net_amount_paid, invoices[0]?.currency || 'USD')}
@@ -669,7 +671,7 @@ export default function CustomerOrderDetail() {
                 </div>
 
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(customerOrder.net_amount_due?.toFixed(2) || '0.00', "Amount Due")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount Due</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.amountDue')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-2xl font-semibold text-red-600 dark:text-red-400">
                       {formatCurrency(customerOrder.net_amount_due, invoices[0]?.currency || 'USD')}
@@ -686,7 +688,7 @@ export default function CustomerOrderDetail() {
             {invoices.length === 0 ? (
               <div className="text-center py-8">
                 <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 dark:text-gray-400">No invoices for this order</p>
+                <p className="text-gray-500 dark:text-gray-400">{t('customerOrders.noInvoices')}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -696,14 +698,14 @@ export default function CustomerOrderDetail() {
                       <div>
                         <div className="flex items-center gap-3 mb-2">
                           <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                            Invoice
+                            {t('customerOrders.invoice')}
                           </h4>
                           <Button
                             size="sm"
                             onClick={() => setLocation(`/payments/create?referrer=/customer-orders/${params?.id}&invoice_uuid=${invoice.uuid}&amount=${invoice.net_amount_due}&currency=${invoice.currency}`)}
                             className="bg-[#5469D4] hover:bg-[#4356C7] text-white text-xs"
                           >
-                            Pay Invoice
+                            {t('customerOrders.payInvoice')}
                           </Button>
                         </div>
                         
@@ -730,17 +732,17 @@ export default function CustomerOrderDetail() {
                                 : 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300'
                             )}
                           >
-                            {invoice.status}
+                            {te(invoice.status)}
                           </Badge>
                           {invoice.is_overdue && (
                             <Badge className="text-xs bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300">
-                              Overdue
+                              {t('customerOrders.overdue')}
                             </Badge>
                           )}
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                          Created {format(new Date(invoice.created_at), 'MMM d, yyyy')}
-                          {invoice.due_date && ` • Due ${format(new Date(invoice.due_date), 'MMM d, yyyy')}`}
+                          {t('customerOrders.createdOn', { date: format(new Date(invoice.created_at), 'MMM d, yyyy') })}
+                          {invoice.due_date && ` • ${t('customerOrders.dueDatePrefix', { date: format(new Date(invoice.due_date), 'MMM d, yyyy') })}`}
                         </p>
                       </div>
                       <div className="text-end">
@@ -748,10 +750,10 @@ export default function CustomerOrderDetail() {
                           {formatCurrency(invoice.total_adjusted_amount, invoice.currency)}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Paid: {formatCurrency(invoice.net_amount_paid, invoice.currency)}
+                          {t('customerOrders.paid')}: {formatCurrency(invoice.net_amount_paid, invoice.currency)}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Due: {formatCurrency(invoice.net_amount_due, invoice.currency)}
+                          {t('customerOrders.due')}: {formatCurrency(invoice.net_amount_due, invoice.currency)}
                         </p>
                       </div>
                     </div>
@@ -759,7 +761,7 @@ export default function CustomerOrderDetail() {
                     {/* Invoice Items */}
                     {invoice.invoice_items && invoice.invoice_items.length > 0 && (
                       <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                        <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Invoice Items</h5>
+                        <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('customerOrders.invoiceItems')}</h5>
                         <div className="space-y-2">
                           {invoice.invoice_items.map((item: InvoiceItem) => (
                             <div key={item.uuid} className="flex items-center justify-between text-sm">
@@ -778,7 +780,7 @@ export default function CustomerOrderDetail() {
                     {invoice.notes && (
                       <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          <strong>Notes:</strong> {invoice.notes}
+                          <strong>{t('common.notes')}:</strong> {invoice.notes}
                         </p>
                       </div>
                     )}
@@ -795,7 +797,7 @@ export default function CustomerOrderDetail() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
-                Order Item Details
+                {t('customerOrders.orderItemDetails')}
               </DialogTitle>
             </DialogHeader>
             {selectedItem && (
@@ -810,11 +812,11 @@ export default function CustomerOrderDetail() {
                         : 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300'
                     )}
                   >
-                    {selectedItem.is_fulfilled ? "Fulfilled" : "Pending"}
+                    {selectedItem.is_fulfilled ? t('customerOrders.fulfilled') : t('customerOrders.pending')}
                   </Badge>
                   {selectedItem.fulfilled_at && (
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Fulfilled {format(new Date(selectedItem.fulfilled_at), 'MMM d, yyyy h:mm a')}
+                      {t('customerOrders.fulfilledOn', { date: format(new Date(selectedItem.fulfilled_at), 'MMM d, yyyy h:mm a') })}
                     </span>
                   )}
                 </div>
@@ -822,7 +824,7 @@ export default function CustomerOrderDetail() {
                 {/* Item Details Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.uuid, "Item UUID")}>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Item UUID</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.itemUuid')}</Label>
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                         {selectedItem.uuid}
@@ -834,7 +836,7 @@ export default function CustomerOrderDetail() {
                   </div>
 
                   <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.material_uuid, "Material UUID")}>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Material UUID</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.materialUuid')}</Label>
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                         {selectedItem.material_uuid}
@@ -845,11 +847,11 @@ export default function CustomerOrderDetail() {
                     </div>
                   </div>
 
-                  <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.material_name || 'Unknown Material', "Material Name")}>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Material Name</Label>
+                  <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.material_name || t('customerOrders.unknownMaterial'), "Material Name")}>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.materialName')}</Label>
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-900 dark:text-gray-100">
-                        {selectedItem.material_name || 'Unknown Material'}
+                        {selectedItem.material_name || t('customerOrders.unknownMaterial')}
                       </p>
                       <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Material Name" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -858,7 +860,7 @@ export default function CustomerOrderDetail() {
                   </div>
 
                   <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.customer_order_uuid, "Customer Order UUID")}>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Customer Order UUID</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.customerOrderUuid')}</Label>
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                         {selectedItem.customer_order_uuid}
@@ -870,10 +872,10 @@ export default function CustomerOrderDetail() {
                   </div>
 
                   <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.quantity?.toString() || '0', "Quantity")}>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Quantity</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.quantity')}</Label>
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-900 dark:text-gray-100">
-                        {selectedItem.quantity || 0} {selectedItem.unit || 'N/A'}
+                        {selectedItem.quantity || 0} {selectedItem.unit || t('customerOrders.na')}
                       </p>
                       <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Quantity" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -882,7 +884,7 @@ export default function CustomerOrderDetail() {
                   </div>
 
                   <div className="group cursor-pointer" onClick={() => copyToClipboard(format(new Date(selectedItem.created_at), 'MMM d, yyyy h:mm a'), "Created At")}>
-                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created At</Label>
+                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.createdAt')}</Label>
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-900 dark:text-gray-100">
                         {format(new Date(selectedItem.created_at), 'MMM d, yyyy h:mm a')}
@@ -895,7 +897,7 @@ export default function CustomerOrderDetail() {
 
                   {selectedItem.created_by_uuid && (
                     <div className="group cursor-pointer" onClick={() => copyToClipboard(selectedItem.created_by_uuid, "Created By UUID")}>
-                      <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created By UUID</Label>
+                      <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.createdByUuid')}</Label>
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">
                           {selectedItem.created_by_uuid}
@@ -930,14 +932,14 @@ export default function CustomerOrderDetail() {
                       !selectedItem.is_fulfilled && "bg-[#5469D4] hover:bg-[#4356C7] text-white"
                     )}
                   >
-                    {selectedItem.is_fulfilled ? "Unfulfill Item" : "Fulfill Item"}
+                    {selectedItem.is_fulfilled ? t('customerOrders.unfulfillItem') : t('customerOrders.fulfillItem')}
                   </Button>
-                  
-                  <Button 
+
+                  <Button
                     variant="outline"
                     onClick={() => setItemModalOpen(false)}
                   >
-                    Close
+                    {t('common.close')}
                   </Button>
                 </div>
               </div>
@@ -951,36 +953,36 @@ export default function CustomerOrderDetail() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Warehouse className="h-5 w-5" />
-                Fulfill Order Item
+                {t('customerOrders.fulfillOrderItem')}
               </DialogTitle>
             </DialogHeader>
             {fulfillItem && (
               <div className="space-y-4">
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                   <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
-                    {fulfillItem.material_name || 'Unknown Material'}
+                    {fulfillItem.material_name || t('customerOrders.unknownMaterial')}
                   </h4>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Quantity: {fulfillItem.quantity || 0} {fulfillItem.unit || ''}
+                    {t('common.quantity')}: {fulfillItem.quantity || 0} {fulfillItem.unit || ''}
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Item UUID: {fulfillItem.uuid}
+                    {t('customerOrders.itemUuid')}: {fulfillItem.uuid}
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="inventory-uuid" className="text-sm font-medium">
-                    Inventory UUID (Optional)
+                    {t('customerOrders.inventoryUuid')} ({t('common.optional')})
                   </Label>
                   <Input
                     id="inventory-uuid"
                     value={inventoryUuid}
                     onChange={(e) => setInventoryUuid(e.target.value)}
-                    placeholder="Enter inventory UUID to link to specific inventory"
+                    placeholder={t('customerOrders.inventoryUuidPlaceholder')}
                     className="w-full"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Link this fulfillment to a specific inventory item (optional)
+                    {t('customerOrders.inventoryUuidHint')}
                   </p>
                 </div>
 
@@ -993,14 +995,14 @@ export default function CustomerOrderDetail() {
                     }}
                     disabled={fulfillItemMutation.isPending}
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     onClick={handleFulfillSubmit}
                     disabled={fulfillItemMutation.isPending}
                     className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                   >
-                    {fulfillItemMutation.isPending ? "Fulfilling..." : "Fulfill Item"}
+                    {fulfillItemMutation.isPending ? t('customerOrders.fulfilling') : t('customerOrders.fulfillItem')}
                   </Button>
                 </div>
               </div>

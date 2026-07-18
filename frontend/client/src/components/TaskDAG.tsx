@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Task } from "@shared/schema";
 
 interface TaskDAGProps {
@@ -125,14 +126,15 @@ function calculateDAGLayout(tasks: Task[]): { nodes: TaskNode[]; edges: Edge[] }
 }
 
 export function TaskDAG({ tasks, onEditTask, onDeleteTask }: TaskDAGProps) {
+  const { t } = useLanguage();
   const { nodes, edges } = calculateDAGLayout(tasks);
 
   if (tasks.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 mb-4">No tasks yet</p>
+        <p className="text-gray-500 mb-4">{t('workflows.noTasksYet')}</p>
         <p className="text-sm text-gray-400">
-          Create your first task to get started
+          {t('workflows.createFirstTask')}
         </p>
       </div>
     );
@@ -143,7 +145,7 @@ export function TaskDAG({ tasks, onEditTask, onDeleteTask }: TaskDAGProps) {
   const maxY = Math.max(...nodes.map((n) => n.y)) + CARD_HEIGHT + PADDING;
 
   return (
-    <div className="w-full overflow-auto border rounded-lg bg-gray-50 dark:bg-gray-900">
+    <div className="w-full overflow-auto border rounded-lg bg-gray-50 dark:bg-gray-900" dir="ltr">
       <svg
         width={Math.max(maxX, 800)}
         height={Math.max(maxY, 400)}
@@ -236,20 +238,19 @@ export function TaskDAG({ tasks, onEditTask, onDeleteTask }: TaskDAGProps) {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                          <AlertDialogTitle>{t('workflows.deleteTask')}</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete "{node.task.name}"? This
-                            action cannot be undone.
+                            {t('workflows.deleteTaskConfirm', { name: node.task.name })}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => onDeleteTask(node.task.uuid)}
                             className="bg-red-600 hover:bg-red-700"
                             data-testid={`dag-confirm-delete-${node.task.name}`}
                           >
-                            Delete
+                            {t('common.delete')}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>

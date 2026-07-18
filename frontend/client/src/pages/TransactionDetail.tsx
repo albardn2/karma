@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Transaction {
   uuid: string;
@@ -29,6 +30,7 @@ interface Transaction {
 }
 
 export default function TransactionDetail() {
+  const { t } = useLanguage();
   const params = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -51,14 +53,14 @@ export default function TransactionDetail() {
       queryClient.invalidateQueries({ queryKey: ["/transaction/"] });
       setIsEditing(false);
       toast({
-        title: "Success",
-        description: "Transaction updated successfully",
+        title: t('common.success'),
+        description: t('financial.transactionUpdated'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update transaction",
+        title: t('common.error'),
+        description: error.message || t('financial.failedUpdateTransaction'),
         variant: "destructive",
       });
     },
@@ -69,27 +71,40 @@ export default function TransactionDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/transaction/"] });
       toast({
-        title: "Success",
-        description: "Transaction deleted successfully",
+        title: t('common.success'),
+        description: t('financial.transactionDeleted'),
       });
       setLocation("/transactions");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete transaction",
+        title: t('common.error'),
+        description: error.message || t('financial.failedDeleteTransaction'),
         variant: "destructive",
       });
     },
   });
+
+  // Translated display labels for copyable fields; the raw fieldName stays the
+  // state/comparison key so the copied-check icons keep working.
+  const fieldLabels: Record<string, string> = {
+    "From Account UUID": t('financial.fromAccountUuid'),
+    "From Amount": t('financial.fromAmount'),
+    "To Account UUID": t('financial.toAccountUuid'),
+    "To Amount": t('financial.toAmount'),
+    "Exchange Rate": t('financial.exchangeRate'),
+    "Transaction UUID": t('financial.transactionUuid'),
+    "Created Date": t('financial.createdDate'),
+    "Notes": t('common.notes'),
+  };
 
   const copyToClipboard = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
     toast({
-      title: "Copied",
-      description: `${fieldName} copied to clipboard`,
+      title: t('financial.copied'),
+      description: t('financial.copiedToClipboard', { label: fieldLabels[fieldName] ?? fieldName }),
     });
   };
 
@@ -150,9 +165,9 @@ export default function TransactionDetail() {
       <AppLayout>
         <div className="p-8">
           <div className="text-center py-8">
-            <p className="text-red-600">Error loading transaction: {error?.message || "Transaction not found"}</p>
+            <p className="text-red-600">{t('financial.errorLoadingTransaction', { message: error?.message || t('financial.transactionNotFound') })}</p>
             <Button onClick={() => setLocation("/transactions")} className="mt-4">
-              Back to Transactions
+              {t('financial.backToTransactions')}
             </Button>
           </div>
         </div>
@@ -172,11 +187,11 @@ export default function TransactionDetail() {
               size="sm"
             >
               <ArrowLeft className="h-4 w-4 me-2" />
-              Back to Transactions
+              {t('financial.backToTransactions')}
             </Button>
             <div>
               <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100">
-                Transaction Details
+                {t('financial.transactionDetails')}
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
                 {formatCurrency(transaction.from_amount, transaction.from_currency)} → {formatCurrency(transaction.to_amount, transaction.to_currency)}
@@ -187,40 +202,40 @@ export default function TransactionDetail() {
             {isEditing ? (
               <>
                 <Button onClick={handleCancel} variant="outline">
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button onClick={handleSave} disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? "Saving..." : "Save"}
+                  {updateMutation.isPending ? t('common.saving') : t('common.save')}
                 </Button>
               </>
             ) : (
               <>
                 <Button onClick={handleEdit} variant="outline">
                   <Edit className="h-4 w-4 me-2" />
-                  Edit
+                  {t('common.edit')}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" className="text-red-600 hover:text-red-700">
                       <Trash2 className="h-4 w-4 me-2" />
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+                      <AlertDialogTitle>{t('financial.deleteTransactionTitle')}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete this transaction? This action cannot be undone.
+                        {t('financial.deleteTransactionConfirm')}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteMutation.mutate()}
                         disabled={deleteMutation.isPending}
                         className="bg-red-600 hover:bg-red-700"
                       >
-                        {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                        {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -237,15 +252,15 @@ export default function TransactionDetail() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                From Account
+                {t('financial.fromAccount')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="group cursor-pointer" onClick={() => copyToClipboard(transaction.from_account_uuid || "", "From Account UUID")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Account UUID</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('financial.accountUuid')}</Label>
                 <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 rounded p-2 mt-1">
                   <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                    {transaction.from_account_uuid || "Not specified"}
+                    {transaction.from_account_uuid || t('financial.notSpecified')}
                   </p>
                   <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
                     {copiedField === "From Account UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -254,7 +269,7 @@ export default function TransactionDetail() {
               </div>
 
               <div className="group cursor-pointer" onClick={() => copyToClipboard(transaction.from_amount?.toString() || "", "From Amount")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.amount')}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-2xl font-semibold text-green-600">
                     {formatCurrency(transaction.from_amount, transaction.from_currency)}
@@ -266,9 +281,9 @@ export default function TransactionDetail() {
               </div>
 
               <div>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Currency</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.currency')}</Label>
                 <Badge variant="outline" className="mt-1 bg-green-100 text-green-800 border-green-200">
-                  {transaction.from_currency || "N/A"}
+                  {transaction.from_currency || t('financial.na')}
                 </Badge>
               </div>
             </CardContent>
@@ -281,7 +296,7 @@ export default function TransactionDetail() {
               
               {transaction.usd_to_syp_exchange_rate ? (
                 <div className="text-center">
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Exchange Rate</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('financial.exchangeRate')}</Label>
                   <div className="group cursor-pointer" onClick={() => copyToClipboard(transaction.usd_to_syp_exchange_rate?.toString() || "", "Exchange Rate")}>
                     <div className="flex items-center justify-center gap-2 mt-2">
                       <Badge variant="outline" className="text-lg px-4 py-2 bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 border-blue-200">
@@ -292,12 +307,12 @@ export default function TransactionDetail() {
                       </Button>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">USD to SYP</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">{t('financial.usdToSyp')}</p>
                 </div>
               ) : (
                 <div className="text-center">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Direct Transfer</p>
-                  <p className="text-xs text-gray-400">No exchange rate</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{t('financial.directTransferTitle')}</p>
+                  <p className="text-xs text-gray-400">{t('financial.noExchangeRate')}</p>
                 </div>
               )}
             </CardContent>
@@ -308,15 +323,15 @@ export default function TransactionDetail() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                To Account
+                {t('financial.toAccount')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="group cursor-pointer" onClick={() => copyToClipboard(transaction.to_account_uuid || "", "To Account UUID")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Account UUID</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('financial.accountUuid')}</Label>
                 <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 rounded p-2 mt-1">
                   <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                    {transaction.to_account_uuid || "Not specified"}
+                    {transaction.to_account_uuid || t('financial.notSpecified')}
                   </p>
                   <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
                     {copiedField === "To Account UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -325,7 +340,7 @@ export default function TransactionDetail() {
               </div>
 
               <div className="group cursor-pointer" onClick={() => copyToClipboard(transaction.to_amount?.toString() || "", "To Amount")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.amount')}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-2xl font-semibold text-blue-600">
                     {formatCurrency(transaction.to_amount, transaction.to_currency)}
@@ -337,9 +352,9 @@ export default function TransactionDetail() {
               </div>
 
               <div>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Currency</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.currency')}</Label>
                 <Badge variant="outline" className="mt-1 bg-blue-100 text-blue-800 border-blue-200">
-                  {transaction.to_currency || "N/A"}
+                  {transaction.to_currency || t('financial.na')}
                 </Badge>
               </div>
             </CardContent>
@@ -351,14 +366,14 @@ export default function TransactionDetail() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <ArrowRightLeft className="h-5 w-5" />
-              Transaction Information
+              {t('financial.transactionInformation')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* UUID */}
               <div className="group cursor-pointer" onClick={() => copyToClipboard(transaction.uuid, "Transaction UUID")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Transaction UUID</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('financial.transactionUuid')}</Label>
                 <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1">
                   <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
                     {transaction.uuid}
@@ -371,7 +386,7 @@ export default function TransactionDetail() {
 
               {/* Created Date */}
               <div className="group cursor-pointer" onClick={() => copyToClipboard(transaction.created_at, "Created Date")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created Date</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('financial.createdDate')}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
                     {format(new Date(transaction.created_at), 'PPP p')}
@@ -385,19 +400,19 @@ export default function TransactionDetail() {
 
             {/* Notes */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Notes</Label>
+              <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.notes')}</Label>
               {isEditing ? (
                 <Textarea
                   value={editedNotes}
                   onChange={(e) => setEditedNotes(e.target.value)}
-                  placeholder="Enter transaction notes..."
+                  placeholder={t('financial.enterTransactionNotes')}
                   rows={3}
                 />
               ) : (
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(transaction.notes || "", "Notes")}>
                   <div className="flex items-start justify-between bg-gray-50 dark:bg-gray-800 rounded p-3 min-h-[80px]">
                     <p className="text-sm text-gray-900 dark:text-gray-100">
-                      {transaction.notes || "No notes provided"}
+                      {transaction.notes || t('financial.noNotesProvided')}
                     </p>
                     <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
                       {copiedField === "Notes" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}

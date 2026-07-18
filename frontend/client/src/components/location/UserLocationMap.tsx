@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { LocationPlayback, type PlaybackPoint } from "@/components/location/LocationPlayback";
 import { LiveLocationMap } from "@/components/location/TripLocationMap";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 /**
  * "Location Tracking" card for a specific user: follow them live (when their
@@ -21,6 +22,7 @@ export function UserLocationMap({
   username?: string;
   trackLocation?: boolean;
 }) {
+  const { t } = useLanguage();
   const liveAvailable = !!trackLocation;
   const [mode, setMode] = useState<"live" | "playback">(liveAvailable ? "live" : "playback");
 
@@ -45,7 +47,7 @@ export function UserLocationMap({
   return (
     <Card className="mt-6" data-testid="user-location-tracking">
       <CardHeader>
-        <CardTitle>Location Tracking</CardTitle>
+        <CardTitle>{t("nav.locationTracking")}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-2 mb-4">
@@ -56,7 +58,7 @@ export function UserLocationMap({
               onClick={() => setMode("live")}
               data-testid="user-location-mode-live"
             >
-              Live
+              {t("location.live")}
             </Button>
           )}
           <Button
@@ -65,13 +67,13 @@ export function UserLocationMap({
             onClick={() => setMode("playback")}
             data-testid="user-location-mode-playback"
           >
-            Playback
+            {t("location.playback")}
           </Button>
           <span className="text-xs text-gray-500 ms-auto">
-            {liveAvailable ? "" : "Live is off — location tracking is disabled for this user. "}
-            Playback shows the last 7 days ·{" "}
+            {liveAvailable ? "" : t("location.liveOffNote")}
+            {t("location.playbackLast7Days")} ·{" "}
             <Link href={`/users/${userUuid}/location-history`} className="underline">
-              custom range
+              {t("location.customRange")}
             </Link>
           </span>
         </div>
@@ -82,7 +84,7 @@ export function UserLocationMap({
           <LocationPlayback points={series.points} />
         ) : (
           <p className="text-sm text-gray-500" data-testid="user-location-empty">
-            No location points in the last 7 days.
+            {t("location.noPointsLast7Days")}
           </p>
         )}
       </CardContent>

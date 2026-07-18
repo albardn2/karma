@@ -16,20 +16,22 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest } from "@/lib/queryClient";
 import { TripStatus, type TripFormData } from "@/lib/types";
 
-const tripFormSchema = z.object({
-  vehicle_uuid: z.string().min(1, "Vehicle is required"),
-  status: z.nativeEnum(TripStatus),
-  start_warehouse_uuid: z.string().optional().or(z.literal("")),
-  end_warehouse_uuid: z.string().optional().or(z.literal("")),
-  start_time: z.string().optional().or(z.literal("")),
-  end_time: z.string().optional().or(z.literal("")),
-  notes: z.string().optional().or(z.literal("")),
-});
+const makeTripFormSchema = (t: (key: string) => string) =>
+  z.object({
+    vehicle_uuid: z.string().min(1, t("trips.vehicleRequired")),
+    status: z.nativeEnum(TripStatus),
+    start_warehouse_uuid: z.string().optional().or(z.literal("")),
+    end_warehouse_uuid: z.string().optional().or(z.literal("")),
+    start_time: z.string().optional().or(z.literal("")),
+    end_time: z.string().optional().or(z.literal("")),
+    notes: z.string().optional().or(z.literal("")),
+  });
 
-type TripFormValues = z.infer<typeof tripFormSchema>;
+type TripFormValues = z.infer<ReturnType<typeof makeTripFormSchema>>;
 
 interface AddTripDialogProps {
   open: boolean;
@@ -39,6 +41,8 @@ interface AddTripDialogProps {
 
 export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogProps) {
   const { toast } = useToast();
+  const { t, te } = useLanguage();
+  const tripFormSchema = makeTripFormSchema(t);
   const queryClient = useQueryClient();
 
   // Fetch vehicles for dropdown
@@ -98,15 +102,15 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
       form.reset();
       onOpenChange(false);
       toast({
-        title: "Success",
-        description: "Trip created successfully",
+        title: t("common.success"),
+        description: t("trips.createdSuccess"),
       });
       if (onSuccess) onSuccess();
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create trip",
+        title: t("common.error"),
+        description: error.message || t("trips.failedCreate"),
         variant: "destructive",
       });
     },
@@ -120,9 +124,9 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create New Trip</DialogTitle>
+          <DialogTitle>{t("trips.createDialogTitle")}</DialogTitle>
           <DialogDescription>
-            Create a new delivery or distribution trip.
+            {t("trips.createDialogDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -134,11 +138,11 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
                 name="vehicle_uuid"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Vehicle*</FormLabel>
+                    <FormLabel>{t("trips.formVehicle")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-vehicle">
-                          <SelectValue placeholder="Select a vehicle" />
+                          <SelectValue placeholder={t("trips.selectVehicle")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -159,18 +163,18 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
                 name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Status*</FormLabel>
+                    <FormLabel>{t("trips.formStatus")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-status">
-                          <SelectValue placeholder="Select status" />
+                          <SelectValue placeholder={t("trips.selectStatus")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value={TripStatus.PLANNED}>Planned</SelectItem>
-                        <SelectItem value={TripStatus.IN_PROGRESS}>In Progress</SelectItem>
-                        <SelectItem value={TripStatus.COMPLETED}>Completed</SelectItem>
-                        <SelectItem value={TripStatus.CANCELLED}>Cancelled</SelectItem>
+                        <SelectItem value={TripStatus.PLANNED}>{te(TripStatus.PLANNED)}</SelectItem>
+                        <SelectItem value={TripStatus.IN_PROGRESS}>{te(TripStatus.IN_PROGRESS)}</SelectItem>
+                        <SelectItem value={TripStatus.COMPLETED}>{te(TripStatus.COMPLETED)}</SelectItem>
+                        <SelectItem value={TripStatus.CANCELLED}>{te(TripStatus.CANCELLED)}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -183,14 +187,14 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
                 name="start_warehouse_uuid"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Start Warehouse (Optional)</FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(value || undefined)} 
+                    <FormLabel>{t("trips.formStartWarehouse")}</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value || undefined)}
                       value={field.value || undefined}
                     >
                       <FormControl>
                         <SelectTrigger data-testid="select-start-warehouse">
-                          <SelectValue placeholder="Select start warehouse (optional)" />
+                          <SelectValue placeholder={t("trips.selectStartWarehouse")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -211,14 +215,14 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
                 name="end_warehouse_uuid"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>End Warehouse (Optional)</FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(value || undefined)} 
+                    <FormLabel>{t("trips.formEndWarehouse")}</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value || undefined)}
                       value={field.value || undefined}
                     >
                       <FormControl>
                         <SelectTrigger data-testid="select-end-warehouse">
-                          <SelectValue placeholder="Select end warehouse (optional)" />
+                          <SelectValue placeholder={t("trips.selectEndWarehouse")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -239,7 +243,7 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
                 name="start_time"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Start Time</FormLabel>
+                    <FormLabel>{t("trips.startTime")}</FormLabel>
                     <FormControl>
                       <Input
                         type="datetime-local"
@@ -257,7 +261,7 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
                 name="end_time"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>End Time</FormLabel>
+                    <FormLabel>{t("trips.endTime")}</FormLabel>
                     <FormControl>
                       <Input
                         type="datetime-local"
@@ -275,11 +279,11 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notes</FormLabel>
+                    <FormLabel>{t("common.notes")}</FormLabel>
                     <FormControl>
                       <Textarea
                         {...field}
-                        placeholder="Enter trip notes or instructions"
+                        placeholder={t("trips.notesInstructionsPlaceholder")}
                         rows={3}
                         data-testid="input-notes"
                       />
@@ -298,7 +302,7 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
                 onClick={() => onOpenChange(false)}
                 data-testid="button-cancel"
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
@@ -306,7 +310,7 @@ export function AddTripDialog({ open, onOpenChange, onSuccess }: AddTripDialogPr
                 disabled={createTripMutation.isPending}
                 data-testid="button-submit"
               >
-                {createTripMutation.isPending ? "Creating..." : "Create trip"}
+                {createTripMutation.isPending ? t("common.creating") : t("trips.createTrip")}
               </Button>
             </div>
           </form>

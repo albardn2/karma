@@ -33,22 +33,29 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { apiRequest } from "@/lib/queryClient";
 import type { FinancialAccount, FinancialAccountUpdate, Currency } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
-const accountUpdateSchema = z.object({
-  account_name: z.string().min(1, "Account name is required").optional(),
-  currency: z.string().min(1, "Currency is required").optional(),
-  notes: z.string().optional(),
-  is_external: z.boolean().optional(),
-});
-
-type AccountUpdateFormValues = z.infer<typeof accountUpdateSchema>;
+type AccountUpdateFormValues = {
+  account_name?: string;
+  currency?: string;
+  notes?: string;
+  is_external?: boolean;
+};
 
 export default function FinancialAccountDetail() {
+  const { t } = useLanguage();
   const [, params] = useRoute("/financial-accounts/:uuid");
   const uuid = params?.uuid;
   const [isEditing, setIsEditing] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const accountUpdateSchema = z.object({
+    account_name: z.string().min(1, t('financial.accountNameRequired')).optional(),
+    currency: z.string().min(1, t('financial.currencyRequired')).optional(),
+    notes: z.string().optional(),
+    is_external: z.boolean().optional(),
+  });
 
   // Fetch account details
   const { data: account, isLoading } = useQuery<FinancialAccount>({
@@ -99,15 +106,15 @@ export default function FinancialAccountDetail() {
       queryClient.invalidateQueries({ queryKey: ["/financial-account", uuid] });
       queryClient.invalidateQueries({ queryKey: ["/financial-account"] });
       toast({
-        title: "Success",
-        description: "Financial account updated successfully",
+        title: t('common.success'),
+        description: t('financial.accountUpdated'),
       });
       setIsEditing(false);
     },
     onError: (error) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update account",
+        title: t('common.error'),
+        description: error.message || t('financial.failedUpdateAccount'),
         variant: "destructive",
       });
     },
@@ -136,16 +143,16 @@ export default function FinancialAccountDetail() {
       });
       
       toast({
-        title: "Success",
-        description: "Financial account deleted successfully",
+        title: t('common.success'),
+        description: t('financial.accountDeleted'),
       });
       // Navigate back to the list page
       history.back();
     },
     onError: (error) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete account",
+        title: t('common.error'),
+        description: error.message || t('financial.failedDeleteAccount'),
         variant: "destructive",
       });
     },
@@ -166,13 +173,13 @@ export default function FinancialAccountDetail() {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: "Copied!",
-        description: `${label} copied to clipboard`,
+        title: t('financial.copiedTitle'),
+        description: t('financial.copiedToClipboard', { label }),
       });
     } catch (err) {
       toast({
-        title: "Error",
-        description: "Failed to copy to clipboard",
+        title: t('common.error'),
+        description: t('financial.failedCopy'),
         variant: "destructive",
       });
     }
@@ -198,12 +205,12 @@ export default function FinancialAccountDetail() {
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => history.back()}>
                 <ArrowLeft className="h-4 w-4 me-2" />
-                Back
+                {t('common.back')}
               </Button>
             </div>
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-              <p className="text-gray-600 mt-4">Loading account details...</p>
+              <p className="text-gray-600 mt-4">{t('financial.loadingAccountDetails')}</p>
             </div>
           </div>
         </div>
@@ -219,12 +226,12 @@ export default function FinancialAccountDetail() {
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => history.back()}>
                 <ArrowLeft className="h-4 w-4 me-2" />
-                Back
+                {t('common.back')}
               </Button>
             </div>
             <div className="text-center py-12">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Account not found</h3>
-              <p className="text-gray-600">The financial account you're looking for doesn't exist or has been deleted.</p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('financial.accountNotFound')}</h3>
+              <p className="text-gray-600">{t('financial.accountNotFoundDesc')}</p>
             </div>
           </div>
         </div>
@@ -241,11 +248,11 @@ export default function FinancialAccountDetail() {
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => history.back()}>
                 <ArrowLeft className="h-4 w-4 me-2" />
-                Back
+                {t('common.back')}
               </Button>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{account.account_name}</h1>
-                <p className="text-gray-600">Financial Account Details</p>
+                <p className="text-gray-600">{t('financial.accountDetails')}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -255,31 +262,31 @@ export default function FinancialAccountDetail() {
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" size="sm">
                         <Trash2 className="h-4 w-4 me-2" />
-                        Delete
+                        {t('common.delete')}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Financial Account</AlertDialogTitle>
+                        <AlertDialogTitle>{t('financial.deleteAccountTitle')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Are you sure you want to delete "{account.account_name}"? This action cannot be undone and will permanently remove the account and all associated data.
+                          {t('financial.deleteAccountConfirm', { name: account.account_name })}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => deleteAccountMutation.mutate()}
                           disabled={deleteAccountMutation.isPending}
                           className="bg-red-600 hover:bg-red-700"
                         >
-                          {deleteAccountMutation.isPending ? "Deleting..." : "Delete Account"}
+                          {deleteAccountMutation.isPending ? t('common.deleting') : t('financial.deleteAccount')}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
                   <Button onClick={() => setIsEditing(true)}>
                     <Edit className="h-4 w-4 me-2" />
-                    Edit
+                    {t('common.edit')}
                   </Button>
                 </>
               ) : (
@@ -290,14 +297,14 @@ export default function FinancialAccountDetail() {
                     disabled={updateAccountMutation.isPending}
                   >
                     <X className="h-4 w-4 me-2" />
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     onClick={form.handleSubmit(onSubmit)}
                     disabled={updateAccountMutation.isPending}
                   >
                     <Save className="h-4 w-4 me-2" />
-                    {updateAccountMutation.isPending ? "Saving..." : "Save"}
+                    {updateAccountMutation.isPending ? t('common.saving') : t('common.save')}
                   </Button>
                 </div>
               )}
@@ -311,7 +318,7 @@ export default function FinancialAccountDetail() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Wallet className="h-5 w-5" />
-                  Account Information
+                  {t('financial.accountInformation')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -319,11 +326,11 @@ export default function FinancialAccountDetail() {
                   <>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium text-gray-600">Account Name</Label>
+                        <Label className="text-sm font-medium text-gray-600">{t('financial.accountName')}</Label>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => copyToClipboard(account.account_name, "Account name")}
+                          onClick={() => copyToClipboard(account.account_name, t('financial.accountName'))}
                         >
                           <Copy className="h-3 w-3" />
                         </Button>
@@ -333,11 +340,11 @@ export default function FinancialAccountDetail() {
                     <Separator />
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium text-gray-600">Currency</Label>
+                        <Label className="text-sm font-medium text-gray-600">{t('common.currency')}</Label>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => copyToClipboard(account.currency, "Currency")}
+                          onClick={() => copyToClipboard(account.currency, t('common.currency'))}
                         >
                           <Copy className="h-3 w-3" />
                         </Button>
@@ -347,17 +354,17 @@ export default function FinancialAccountDetail() {
                     <Separator />
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium text-gray-600">External Account</Label>
+                        <Label className="text-sm font-medium text-gray-600">{t('financial.externalAccount')}</Label>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => copyToClipboard(account.is_external ? "Yes" : "No", "External account status")}
+                          onClick={() => copyToClipboard(account.is_external ? t('common.yes') : t('common.no'), t('financial.externalAccountStatus'))}
                         >
                           <Copy className="h-3 w-3" />
                         </Button>
                       </div>
                       <Badge variant={account.is_external ? "default" : "secondary"}>
-                        {account.is_external ? "External" : "Internal"}
+                        {account.is_external ? t('financial.external') : t('financial.internal')}
                       </Badge>
                     </div>
                   </>
@@ -369,9 +376,9 @@ export default function FinancialAccountDetail() {
                         name="account_name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Account Name</FormLabel>
+                            <FormLabel>{t('financial.accountName')}</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="Enter account name" />
+                              <Input {...field} placeholder={t('financial.enterAccountName')} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -382,14 +389,14 @@ export default function FinancialAccountDetail() {
                         name="currency"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Currency</FormLabel>
+                            <FormLabel>{t('common.currency')}</FormLabel>
                             <Select
                               onValueChange={(value: Currency) => field.onChange(value)}
                               value={field.value}
                             >
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select currency" />
+                                  <SelectValue placeholder={t('financial.selectCurrency')} />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -411,10 +418,10 @@ export default function FinancialAccountDetail() {
                           <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
                               <FormLabel className="text-base">
-                                External Account
+                                {t('financial.externalAccount')}
                               </FormLabel>
                               <div className="text-sm text-muted-foreground">
-                                Mark this as an external account (e.g., bank, client account)
+                                {t('financial.externalAccountDesc')}
                               </div>
                             </div>
                             <FormControl>
@@ -437,17 +444,17 @@ export default function FinancialAccountDetail() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Key className="h-5 w-5" />
-                  System Information
+                  {t('financial.systemInformation')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-gray-600">Account ID</Label>
+                    <Label className="text-sm font-medium text-gray-600">{t('financial.accountId')}</Label>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(account.uuid, "Account ID")}
+                      onClick={() => copyToClipboard(account.uuid, t('financial.accountId'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -457,11 +464,11 @@ export default function FinancialAccountDetail() {
                 <Separator />
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-gray-600">Created</Label>
+                    <Label className="text-sm font-medium text-gray-600">{t('financial.created')}</Label>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(formatDate(account.created_at), "Created date")}
+                      onClick={() => copyToClipboard(formatDate(account.created_at), t('financial.createdDate'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -471,11 +478,11 @@ export default function FinancialAccountDetail() {
                 <Separator />
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-gray-600">Balance</Label>
+                    <Label className="text-sm font-medium text-gray-600">{t('financial.balance')}</Label>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(account.balance.toString(), "Balance")}
+                      onClick={() => copyToClipboard(account.balance.toString(), t('financial.balance'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -491,26 +498,26 @@ export default function FinancialAccountDetail() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Notes
+                {t('common.notes')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {!isEditing ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-gray-600">Account Notes</Label>
+                    <Label className="text-sm font-medium text-gray-600">{t('financial.accountNotes')}</Label>
                     {account.notes && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(account.notes || "", "Notes")}
+                        onClick={() => copyToClipboard(account.notes || "", t('common.notes'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
                     )}
                   </div>
                   <p className="text-sm text-gray-900">
-                    {account.notes || "No notes available"}
+                    {account.notes || t('financial.noNotesAvailable')}
                   </p>
                 </div>
               ) : (
@@ -520,11 +527,11 @@ export default function FinancialAccountDetail() {
                     name="notes"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Notes</FormLabel>
+                        <FormLabel>{t('common.notes')}</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            {...field} 
-                            placeholder="Add any notes about this financial account..."
+                          <Textarea
+                            {...field}
+                            placeholder={t('financial.accountNotesPlaceholder')}
                             rows={4}
                           />
                         </FormControl>

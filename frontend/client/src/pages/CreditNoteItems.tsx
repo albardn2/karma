@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { CreditNoteItemFilters } from "@/components/credit-note-items/CreditNoteItemFilters";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CreditNoteItem {
   uuid: string;
@@ -73,6 +74,7 @@ const formatCurrency = (amount: number, currency: string) => {
 
 export default function CreditNoteItems() {
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("all");
 
@@ -141,7 +143,7 @@ export default function CreditNoteItems() {
       <AppLayout>
         <div className="p-8">
           <div className="text-center">
-            <p className="text-red-600">Error loading credit note items: {(error as Error).message}</p>
+            <p className="text-red-600">{t('notes.creditErrorLoading', { message: (error as Error).message })}</p>
           </div>
         </div>
       </AppLayout>
@@ -153,9 +155,9 @@ export default function CreditNoteItems() {
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Credit Note Items</h1>
+            <h1 className="text-3xl font-bold">{t('nav.creditNoteItems')}</h1>
             <p className="text-muted-foreground">
-              Manage credit note items and refunds ({totalCount} total)
+              {t('notes.creditSubtitle', { count: totalCount })}
             </p>
           </div>
           <div className="flex gap-2">
@@ -168,17 +170,17 @@ export default function CreditNoteItems() {
             />
             <Button onClick={() => setLocation("/credit-note-items/create")} className="bg-purple-600 hover:bg-purple-700">
               <Plus className="h-4 w-4 me-2" />
-              Add Credit Note Item
+              {t('notes.addCreditItem')}
             </Button>
           </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="all">All ({getTabCount('all')})</TabsTrigger>
-            <TabsTrigger value="unpaid">Unpaid ({getTabCount('unpaid')})</TabsTrigger>
-            <TabsTrigger value="paid">Paid ({getTabCount('paid')})</TabsTrigger>
-            <TabsTrigger value="overdue">Overdue ({getTabCount('overdue')})</TabsTrigger>
+            <TabsTrigger value="all">{t('notes.tabAll', { count: getTabCount('all') })}</TabsTrigger>
+            <TabsTrigger value="unpaid">{t('notes.tabUnpaid', { count: getTabCount('unpaid') })}</TabsTrigger>
+            <TabsTrigger value="paid">{t('notes.tabPaid', { count: getTabCount('paid') })}</TabsTrigger>
+            <TabsTrigger value="overdue">{t('notes.tabOverdue', { count: getTabCount('overdue') })}</TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4">
@@ -189,22 +191,22 @@ export default function CreditNoteItems() {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Amount
+                        {t('common.amount')}
                       </th>
                       <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Amount Due
+                        {t('notes.amountDue')}
                       </th>
                       <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Reference
+                        {t('notes.reference')}
                       </th>
                       <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Status
+                        {t('common.status')}
                       </th>
                       <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Created
+                        {t('notes.created')}
                       </th>
                       <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Notes
+                        {t('common.notes')}
                       </th>
                     </tr>
                   </thead>
@@ -249,17 +251,17 @@ export default function CreditNoteItems() {
                         <td colSpan={6} className="px-6 py-16 text-center">
                           <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                            No credit note items found
+                            {t('notes.creditNoneFound')}
                           </h3>
                           <p className="text-gray-500 dark:text-gray-400 mb-6">
-                            Get started by creating your first credit note item to track refunds and adjustments.
+                            {t('notes.creditEmptyHint')}
                           </p>
-                          <Button 
+                          <Button
                             onClick={() => setLocation("/credit-note-items/create")}
                             className="bg-purple-600 hover:bg-purple-700"
                           >
                             <Plus className="h-4 w-4 me-2" />
-                            Create Credit Note Item
+                            {t('notes.createCreditItem')}
                           </Button>
                         </td>
                       </tr>
@@ -283,7 +285,7 @@ export default function CreditNoteItems() {
                                   ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
                                   : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300'
                               }`}>
-                                {item.is_paid ? 'Paid' : 'Unpaid'}
+                                {te(item.is_paid ? 'paid' : 'unpaid')}
                               </span>
                             </div>
                           </td>
@@ -295,16 +297,16 @@ export default function CreditNoteItems() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col">
                               {item.invoice_item_uuid && (
-                                <span className="text-xs text-purple-600 font-medium">Invoice Item</span>
+                                <span className="text-xs text-purple-600 font-medium">{t('notes.refInvoiceItem')}</span>
                               )}
                               {item.customer_uuid && (
-                                <span className="text-xs text-blue-600 font-medium">Customer</span>
+                                <span className="text-xs text-blue-600 font-medium">{t('notes.refCustomer')}</span>
                               )}
                               {item.vendor_uuid && (
-                                <span className="text-xs text-green-600 font-medium">Vendor</span>
+                                <span className="text-xs text-green-600 font-medium">{t('notes.refVendor')}</span>
                               )}
                               {item.purchase_order_item_uuid && (
-                                <span className="text-xs text-orange-600 font-medium">Purchase Order Item</span>
+                                <span className="text-xs text-orange-600 font-medium">{t('notes.refPurchaseOrderItem')}</span>
                               )}
                               <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
                                 {(item.invoice_item_uuid || item.customer_uuid || item.vendor_uuid || item.purchase_order_item_uuid || '').slice(0, 8)}...
@@ -313,7 +315,7 @@ export default function CreditNoteItems() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
-                              {item.status}
+                              {te(item.status)}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -342,17 +344,17 @@ export default function CreditNoteItems() {
                   onClick={() => setFilters(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
                   disabled={filters.page <= 1}
                 >
-                  Previous
+                  {t('common.previous')}
                 </Button>
                 <span className="text-sm text-muted-foreground">
-                  Page {filters.page} of {totalPages}
+                  {t('notes.pageInfo', { page: filters.page, pages: totalPages })}
                 </span>
                 <Button
                   variant="outline"
                   onClick={() => setFilters(prev => ({ ...prev, page: Math.min(totalPages, prev.page + 1) }))}
                   disabled={filters.page >= totalPages}
                 >
-                  Next
+                  {t('common.next')}
                 </Button>
               </div>
             )}

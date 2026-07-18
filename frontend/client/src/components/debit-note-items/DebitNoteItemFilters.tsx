@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface DebitNoteItemFiltersProps {
   filters: {
@@ -32,6 +33,7 @@ export function DebitNoteItemFilters({
   perPage, 
   onPerPageChange 
 }: DebitNoteItemFiltersProps) {
+  const { t, te } = useLanguage();
   const [localFilters, setLocalFilters] = useState({
     uuid: filters.uuid || "",
     invoice_item_uuid: filters.invoice_item_uuid || "",
@@ -123,7 +125,7 @@ export function DebitNoteItemFilters({
         <SheetTrigger asChild>
           <Button variant="outline" className="relative">
             <Filter className="h-4 w-4 me-2" />
-            Filters
+            {t('common.filters')}
             {activeFilterCount > 0 && (
               <Badge variant="secondary" className="ms-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
                 {activeFilterCount}
@@ -133,88 +135,88 @@ export function DebitNoteItemFilters({
         </SheetTrigger>
         <SheetContent className="w-[400px] sm:w-[540px] z-[9999]">
           <SheetHeader>
-            <SheetTitle>Filter Debit Note Items</SheetTitle>
+            <SheetTitle>{t('notes.filterDebitTitle')}</SheetTitle>
             <SheetDescription>
-              Apply filters to find specific debit note items. Showing {totalCount} total items.
+              {t('notes.filterDebitDesc', { count: totalCount })}
             </SheetDescription>
           </SheetHeader>
           
           <div className="space-y-6 py-6">
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="uuid">UUID</Label>
+                <Label htmlFor="uuid">{t('notes.uuid')}</Label>
                 <Input
                   id="uuid"
-                  placeholder="Filter by UUID..."
+                  placeholder={t('notes.filterByUuid')}
                   value={localFilters.uuid}
                   onChange={(e) => setLocalFilters({ ...localFilters, uuid: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="invoice_item_uuid">Invoice Item UUID</Label>
+                <Label htmlFor="invoice_item_uuid">{t('notes.invoiceItemUuid')}</Label>
                 <Input
                   id="invoice_item_uuid"
-                  placeholder="Filter by invoice item UUID..."
+                  placeholder={t('notes.filterByInvoiceItemUuid')}
                   value={localFilters.invoice_item_uuid}
                   onChange={(e) => setLocalFilters({ ...localFilters, invoice_item_uuid: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="customer_order_item_uuid">Customer Order Item UUID</Label>
+                <Label htmlFor="customer_order_item_uuid">{t('notes.customerOrderItemUuid')}</Label>
                 <Input
                   id="customer_order_item_uuid"
-                  placeholder="Filter by customer order item UUID..."
+                  placeholder={t('notes.filterByCustomerOrderItemUuid')}
                   value={localFilters.customer_order_item_uuid}
                   onChange={(e) => setLocalFilters({ ...localFilters, customer_order_item_uuid: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="purchase_order_item_uuid">Purchase Order Item UUID</Label>
+                <Label htmlFor="purchase_order_item_uuid">{t('notes.purchaseOrderItemUuid')}</Label>
                 <Input
                   id="purchase_order_item_uuid"
-                  placeholder="Filter by purchase order item UUID..."
+                  placeholder={t('notes.filterByPurchaseOrderItemUuid')}
                   value={localFilters.purchase_order_item_uuid}
                   onChange={(e) => setLocalFilters({ ...localFilters, purchase_order_item_uuid: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="customer_uuid">Customer UUID</Label>
+                <Label htmlFor="customer_uuid">{t('notes.customerUuid')}</Label>
                 <Input
                   id="customer_uuid"
-                  placeholder="Filter by customer UUID..."
+                  placeholder={t('notes.filterByCustomerUuid')}
                   value={localFilters.customer_uuid}
                   onChange={(e) => setLocalFilters({ ...localFilters, customer_uuid: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="vendor_uuid">Vendor UUID</Label>
+                <Label htmlFor="vendor_uuid">{t('notes.vendorUuid')}</Label>
                 <Input
                   id="vendor_uuid"
-                  placeholder="Filter by vendor UUID..."
+                  placeholder={t('notes.filterByVendorUuid')}
                   value={localFilters.vendor_uuid}
                   onChange={(e) => setLocalFilters({ ...localFilters, vendor_uuid: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select 
-                  value={localFilters.status} 
+                <Label htmlFor="status">{t('common.status')}</Label>
+                <Select
+                  value={localFilters.status}
                   onValueChange={(value) => setLocalFilters({ ...localFilters, status: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
+                    <SelectValue placeholder={t('notes.selectStatus')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="all">{t('notes.allStatusesTitle')}</SelectItem>
                     {statusOptions?.map((status) => (
                       <SelectItem key={status} value={status}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                        {te(status)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -222,21 +224,21 @@ export function DebitNoteItemFilters({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="is_paid">Payment Status</Label>
-                <Select 
-                  value={localFilters.is_paid === undefined ? "all" : localFilters.is_paid.toString()} 
-                  onValueChange={(value) => setLocalFilters({ 
-                    ...localFilters, 
-                    is_paid: value === "all" ? undefined : value === "true" 
+                <Label htmlFor="is_paid">{t('notes.paymentStatus')}</Label>
+                <Select
+                  value={localFilters.is_paid === undefined ? "all" : localFilters.is_paid.toString()}
+                  onValueChange={(value) => setLocalFilters({
+                    ...localFilters,
+                    is_paid: value === "all" ? undefined : value === "true"
                   })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select payment status" />
+                    <SelectValue placeholder={t('notes.selectPaymentStatus')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="true">Paid</SelectItem>
-                    <SelectItem value="false">Unpaid</SelectItem>
+                    <SelectItem value="all">{t('common.all')}</SelectItem>
+                    <SelectItem value="true">{te('paid')}</SelectItem>
+                    <SelectItem value="false">{te('unpaid')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -244,10 +246,10 @@ export function DebitNoteItemFilters({
 
             <div className="flex gap-2 pt-4">
               <Button onClick={handleApplyFilters} className="flex-1">
-                Apply Filters
+                {t('notes.applyFilters')}
               </Button>
               <Button onClick={handleClearFilters} variant="outline" className="flex-1">
-                Clear All
+                {t('notes.clearAll')}
               </Button>
             </div>
           </div>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { MqttClient } from "@/lib/mqttClient";
 import { LocationPlayback, type PlaybackPoint } from "@/components/location/LocationPlayback";
+import { useLanguage } from "@/contexts/LanguageContext";
 import "leaflet/dist/leaflet.css";
 
 // leaflet default icon fix (repo convention)
@@ -61,6 +62,7 @@ export function TripLocationMap({
   workflowExecutionUuid?: string | null;
   points: PlaybackPoint[];
 }) {
+  const { t } = useLanguage();
   const liveAvailable = tripStatus === "in_progress";
   const [mode, setMode] = useState<"live" | "playback">(liveAvailable ? "live" : "playback");
 
@@ -74,7 +76,7 @@ export function TripLocationMap({
             onClick={() => setMode("live")}
             data-testid="trip-location-mode-live"
           >
-            Live
+            {t("location.live")}
           </Button>
         )}
         <Button
@@ -83,7 +85,7 @@ export function TripLocationMap({
           onClick={() => setMode("playback")}
           data-testid="trip-location-mode-playback"
         >
-          Playback
+          {t("location.playback")}
         </Button>
       </div>
 
@@ -93,7 +95,7 @@ export function TripLocationMap({
         <LocationPlayback points={points} />
       ) : (
         <p className="text-sm text-gray-500" data-testid="trip-location-empty">
-          No location points recorded for this trip.
+          {t("location.noTripPoints")}
         </p>
       )}
     </div>
@@ -107,6 +109,7 @@ function LiveTripMap({
   workflowExecutionUuid?: string | null;
   points: PlaybackPoint[];
 }) {
+  const { t } = useLanguage();
   const { data: execution } = useQuery<{ task_executions?: TaskExecution[] }>({
     queryKey: ["/workflow-execution", workflowExecutionUuid],
     queryFn: () => apiRequest(`/workflow-execution/${workflowExecutionUuid}`),
@@ -130,12 +133,12 @@ function LiveTripMap({
   if (execution && usersData && !driver) {
     return (
       <p className="text-sm text-gray-500" data-testid="trip-live-no-driver">
-        Live tracking is unavailable: this trip has no assigned driver.
+        {t("location.liveUnavailableNoDriver")}
       </p>
     );
   }
   if (!driver) {
-    return <p className="text-sm text-gray-500">Resolving the assigned driver…</p>;
+    return <p className="text-sm text-gray-500">{t("location.resolvingDriver")}</p>;
   }
   return <LiveLocationMap userUuid={driver.uuid} username={driver.username} points={points} />;
 }
@@ -149,6 +152,7 @@ export function LiveLocationMap({
   username?: string;
   points: PlaybackPoint[];
 }) {
+  const { t } = useLanguage();
   const [status, setStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const [live, setLive] = useState<LivePosition | null>(null);
   const [liveTrail, setLiveTrail] = useState<[number, number][]>([]);
@@ -269,18 +273,25 @@ export function LiveLocationMap({
           }`}
           data-testid="trip-live-status"
         >
-          {status === "connected" ? "Live" : status === "disconnected" ? "Disconnected" : "Connecting…"}
+          {status === "connected"
+            ? t("location.live")
+            : status === "disconnected"
+            ? t("location.disconnected")
+            : t("location.connectingEllipsis")}
         </span>
         {live ? (
           <span className="text-gray-600">
-            {live.username ?? username ?? "Driver"} · last seen {lastSeenSec}s ago
-            {typeof live.speed === "number" ? ` · ${(live.speed * 3.6).toFixed(1)} km/h` : ""}
+            {live.username ?? username ?? t("location.driver")} ·{" "}
+            {t("location.lastSeenSeconds", { sec: lastSeenSec ?? 0 })}
+            {typeof live.speed === "number"
+              ? ` · ${t("location.kmh", { speed: (live.speed * 3.6).toFixed(1) })}`
+              : ""}
           </span>
         ) : (
-          <span className="text-gray-500">Waiting for the driver's app to report…</span>
+          <span className="text-gray-500">{t("location.waitingDriver")}</span>
         )}
       </div>
-      <div className="h-[420px] rounded-md overflow-hidden border">
+      <div className="h-[420px] rounded-md overflow-hidden border" dir="ltr">
         <MapContainer
           center={center}
           zoom={13}
@@ -301,11 +312,11 @@ export function LiveLocationMap({
             <Marker position={[live.lat, live.lon]}>
               <Popup>
                 <div className="text-sm">
-                  <div className="font-semibold">{live.username ?? username ?? "Driver"}</div>
+                  <div className="font-semibold">{live.username ?? username ?? t("location.driver")}</div>
                   <div>
                     {live.lat.toFixed(5)}, {live.lon.toFixed(5)}
                   </div>
-                  <div>last seen {lastSeenSec}s ago</div>
+                  <div>{t("location.lastSeenSeconds", { sec: lastSeenSec ?? 0 })}</div>
                 </div>
               </Popup>
             </Marker>
@@ -313,7 +324,7 @@ export function LiveLocationMap({
         </MapContainer>
       </div>
       <p className="mt-2 text-xs text-gray-500">
-        Grey line: stored trip path · Green line: live movement since this page opened
+        {t("location.trailLegend")}
       </p>
     </div>
   );

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { insertWorkflowSchema } from "@shared/schema";
 
 interface WorkflowFormData {
@@ -22,6 +23,7 @@ interface WorkflowFormData {
 export default function WorkflowCreate() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState<WorkflowFormData>({
@@ -40,7 +42,7 @@ export default function WorkflowCreate() {
         try {
           parsedParameters = JSON.parse(data.parameters.trim());
         } catch (e) {
-          throw new Error("Invalid JSON in parameters field");
+          throw new Error(t('workflows.invalidJsonParameters'));
         }
       }
 
@@ -70,16 +72,16 @@ export default function WorkflowCreate() {
       });
 
       toast({
-        title: "Success",
-        description: "Workflow created successfully",
+        title: t('common.success'),
+        description: t('workflows.createdSuccess'),
       });
 
       setLocation(`/workflows/${data.uuid}`);
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create workflow",
+        title: t('common.error'),
+        description: error.message || t('workflows.createFailed'),
         variant: "destructive",
       });
     },
@@ -90,8 +92,8 @@ export default function WorkflowCreate() {
 
     if (!formData.name.trim()) {
       toast({
-        title: "Validation Error",
-        description: "Workflow name is required",
+        title: t('workflows.validationError'),
+        description: t('workflows.nameRequired'),
         variant: "destructive",
       });
       return;
@@ -108,15 +110,15 @@ export default function WorkflowCreate() {
           <Link href="/workflows">
             <Button variant="ghost" size="sm" data-testid="button-back">
               <ArrowLeft className="h-4 w-4 me-2" />
-              Back
+              {t('common.back')}
             </Button>
           </Link>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Create Workflow
+              {t('workflows.createWorkflow')}
             </h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1">
-              Add a new workflow to your system
+              {t('workflows.createSubtitle')}
             </p>
           </div>
         </div>
@@ -124,12 +126,12 @@ export default function WorkflowCreate() {
         {/* Workflow Form */}
         <Card>
           <CardHeader>
-            <CardTitle>Workflow Information</CardTitle>
+            <CardTitle>{t('workflows.workflowInformation')}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="name">Name *</Label>
+                <Label htmlFor="name">{t('common.name')} *</Label>
                 <Input
                   id="name"
                   data-testid="input-name"
@@ -137,13 +139,13 @@ export default function WorkflowCreate() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  placeholder="Enter workflow name"
+                  placeholder={t('workflows.namePlaceholder')}
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">{t('common.description')}</Label>
                 <Textarea
                   id="description"
                   data-testid="input-description"
@@ -151,13 +153,13 @@ export default function WorkflowCreate() {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  placeholder="Enter workflow description"
+                  placeholder={t('workflows.descriptionPlaceholder')}
                   rows={4}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="tags">Tags (comma-separated)</Label>
+                <Label htmlFor="tags">{t('workflows.tagsCommaSeparated')}</Label>
                 <Input
                   id="tags"
                   data-testid="input-tags"
@@ -165,15 +167,15 @@ export default function WorkflowCreate() {
                   onChange={(e) =>
                     setFormData({ ...formData, tags: e.target.value })
                   }
-                  placeholder="e.g., coated_peanuts, distribution"
+                  placeholder={t('workflows.tagsPlaceholder')}
                 />
                 <p className="text-sm text-gray-500">
-                  Available tags: coated_peanuts, distribution
+                  {t('workflows.availableTags')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="parameters">Parameters (JSON)</Label>
+                <Label htmlFor="parameters">{t('workflows.parametersJson')}</Label>
                 <Textarea
                   id="parameters"
                   data-testid="input-parameters"
@@ -188,7 +190,7 @@ export default function WorkflowCreate() {
 
               <div className="space-y-2">
                 <Label htmlFor="callbacks">
-                  Callback Functions (comma-separated)
+                  {t('workflows.callbackFunctionsCommaSeparated')}
                 </Label>
                 <Input
                   id="callbacks"
@@ -197,7 +199,7 @@ export default function WorkflowCreate() {
                   onChange={(e) =>
                     setFormData({ ...formData, callbackFns: e.target.value })
                   }
-                  placeholder="e.g., function1, function2"
+                  placeholder={t('workflows.callbacksPlaceholder')}
                 />
               </div>
 
@@ -208,11 +210,11 @@ export default function WorkflowCreate() {
                   data-testid="button-submit"
                 >
                   <Save className="h-4 w-4 me-2" />
-                  {createMutation.isPending ? "Creating..." : "Create Workflow"}
+                  {createMutation.isPending ? t('common.creating') : t('workflows.createWorkflow')}
                 </Button>
                 <Link href="/workflows">
                   <Button variant="outline" type="button" data-testid="button-cancel">
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                 </Link>
               </div>

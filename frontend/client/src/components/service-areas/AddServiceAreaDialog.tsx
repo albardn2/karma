@@ -12,20 +12,26 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { ServiceAreaDrawMap } from "./ServiceAreaDrawMap";
+import { useLanguage } from "@/contexts/LanguageContext";
 
-const serviceAreaSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
-  geometry: z.string().min(1, "Geometry is required"),
-});
-
-type ServiceAreaFormData = z.infer<typeof serviceAreaSchema>;
+type ServiceAreaFormData = {
+  name: string;
+  description?: string;
+  geometry: string;
+};
 
 export function AddServiceAreaDialog() {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [geometry, setGeometry] = useState<string>("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const serviceAreaSchema = z.object({
+    name: z.string().min(1, t("serviceAreas.nameRequired")),
+    description: z.string().optional(),
+    geometry: z.string().min(1, t("serviceAreas.geometryRequired")),
+  });
 
   const form = useForm<ServiceAreaFormData>({
     resolver: zodResolver(serviceAreaSchema),
@@ -51,8 +57,8 @@ export function AddServiceAreaDialog() {
       queryClient.refetchQueries({ queryKey: ["/service-area/"] });
       
       toast({
-        title: "Success",
-        description: "Service area created successfully",
+        title: t('common.success'),
+        description: t('serviceAreas.createSuccess'),
       });
 
       form.reset();
@@ -61,7 +67,7 @@ export function AddServiceAreaDialog() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('common.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -71,8 +77,8 @@ export function AddServiceAreaDialog() {
   const onSubmit = (data: ServiceAreaFormData) => {
     if (!geometry) {
       toast({
-        title: "Error",
-        description: "Please draw a polygon on the map",
+        title: t('common.error'),
+        description: t('serviceAreas.drawPolygonError'),
         variant: "destructive",
       });
       return;
@@ -95,12 +101,12 @@ export function AddServiceAreaDialog() {
       <DialogTrigger asChild>
         <Button className="bg-[#5469D4] hover:bg-[#4356C7] text-white">
           <Plus className="h-4 w-4 me-2" />
-          Add Service Area
+          {t('serviceAreas.addServiceArea')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Service Area</DialogTitle>
+          <DialogTitle>{t('serviceAreas.addNew')}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -111,9 +117,9 @@ export function AddServiceAreaDialog() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Name</FormLabel>
+                      <FormLabel>{t('common.name')}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter service area name" {...field} />
+                        <Input placeholder={t('serviceAreas.enterName')} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -125,10 +131,10 @@ export function AddServiceAreaDialog() {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormLabel>{t('serviceAreas.descriptionOptional')}</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Enter service area description"
+                        <Textarea
+                          placeholder={t('serviceAreas.enterDescription')}
                           className="resize-none"
                           rows={3}
                           {...field}
@@ -140,9 +146,9 @@ export function AddServiceAreaDialog() {
                 />
 
                 <div>
-                  <FormLabel>Geometry</FormLabel>
+                  <FormLabel>{t('serviceAreas.geometry')}</FormLabel>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Draw a polygon on the map to define the service area
+                    {t('serviceAreas.drawPolygonHint')}
                   </p>
                   {geometry && (
                     <div className="mt-2 p-2 bg-gray-50 rounded text-xs font-mono break-all">
@@ -153,8 +159,8 @@ export function AddServiceAreaDialog() {
               </div>
 
               <div className="space-y-4">
-                <FormLabel>Service Area Map</FormLabel>
-                <div className="h-[400px] border rounded-lg overflow-hidden">
+                <FormLabel>{t('serviceAreas.map')}</FormLabel>
+                <div dir="ltr" className="h-[400px] border rounded-lg overflow-hidden">
                   <ServiceAreaDrawMap
                     onGeometryChange={handleGeometryChange}
                     initialGeometry=""
@@ -164,19 +170,19 @@ export function AddServiceAreaDialog() {
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => setIsOpen(false)}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={createServiceAreaMutation.isPending || !geometry}
                 className="bg-[#5469D4] hover:bg-[#4356C7]"
               >
-                {createServiceAreaMutation.isPending ? "Creating..." : "Create Service Area"}
+                {createServiceAreaMutation.isPending ? t('common.creating') : t('serviceAreas.createServiceArea')}
               </Button>
             </div>
           </form>

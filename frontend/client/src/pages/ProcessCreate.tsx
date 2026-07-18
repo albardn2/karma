@@ -29,8 +29,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProcessDiagram } from "@/components/processes/ProcessDiagram";
-import { ProcessType, ProcessTypeLabels } from "@/types/process";
+import { ProcessType } from "@/types/process";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const processSchema = z.object({
   type: z.nativeEnum(ProcessType),
@@ -53,6 +54,7 @@ type ProcessFormData = z.infer<typeof processSchema>;
 export default function ProcessCreate() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const [selectedMaterials, setSelectedMaterials] = useState<{[key: string]: any}>({});
 
   const form = useForm<ProcessFormData>({
@@ -128,7 +130,7 @@ export default function ProcessCreate() {
         output_warehouse_uuid: preset.data?.output_warehouse_uuid || "",
       },
     });
-    toast({ title: "Form pre-filled", description: "Review and adjust before submitting." });
+    toast({ title: t('processes.formPrefilled'), description: t('processes.formPrefilledDesc') });
   };
 
   const saveTemplateMutation = useMutation({
@@ -141,12 +143,12 @@ export default function ProcessCreate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/process-template/"] });
-      toast({ title: "Template saved", description: `"${templateName.trim()}" can now pre-fill new processes.` });
+      toast({ title: t('processes.templateSaved'), description: t('processes.templateSavedDesc', { name: templateName.trim() }) });
       setShowSaveTemplate(false);
       setTemplateName("");
     },
     onError: (e: Error) =>
-      toast({ title: "Failed to save template", description: e.message, variant: "destructive" }),
+      toast({ title: t('processes.templateSaveFailed'), description: e.message, variant: "destructive" }),
   });
 
 
@@ -162,16 +164,16 @@ export default function ProcessCreate() {
     },
     onSuccess: () => {
       toast({
-        title: "Process created successfully",
-        description: "The manufacturing process has been created.",
+        title: t('processes.createdSuccess'),
+        description: t('processes.createdSuccessDesc'),
       });
       queryClient.invalidateQueries({ queryKey: ["/process/"] });
       setLocation("/processes");
     },
     onError: (error: any) => {
       toast({
-        title: "Error creating process",
-        description: error.message || "Failed to create process",
+        title: t('processes.createError'),
+        description: error.message || t('processes.createErrorDesc'),
         variant: "destructive",
       });
     },
@@ -195,12 +197,12 @@ export default function ProcessCreate() {
 
   const getMaterialName = (materialUuid: string) => {
     const material = materials?.items?.find((m: any) => m.uuid === materialUuid);
-    return material?.name || "Unknown Material";
+    return material?.name || t('processes.unknownMaterial');
   };
 
   const getWarehouseName = (warehouseUuid: string) => {
     const warehouse = warehouses?.items?.find((w: any) => w.uuid === warehouseUuid);
-    return warehouse?.name || "Unknown Warehouse";
+    return warehouse?.name || t('processes.unknownWarehouse');
   };
 
   // Watch form values for live diagram updates
@@ -223,15 +225,15 @@ export default function ProcessCreate() {
             className="flex items-center gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Processes
+            {t('processes.backToProcesses')}
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
               <Factory className="h-8 w-8" />
-              Create Process
+              {t('processes.create')}
             </h1>
             <p className="text-gray-600 mt-1">
-              Define a new manufacturing process with inputs and outputs
+              {t('processes.createSubtitle')}
             </p>
           </div>
         </div>
@@ -240,15 +242,14 @@ export default function ProcessCreate() {
           {/* Start from a template or an existing process */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Start From (optional)</CardTitle>
+              <CardTitle className="text-base">{t('processes.startFrom')}</CardTitle>
               <CardDescription>
-                Pre-fill the form from a saved template or a previous process — you can
-                still edit everything before submitting.
+                {t('processes.startFromDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap items-end gap-4">
               <div className="min-w-[260px]">
-                <Label className="mb-1 block">Template</Label>
+                <Label className="mb-1 block">{t('processes.template')}</Label>
                 <Select
                   value=""
                   onValueChange={(uuid) => {
@@ -257,11 +258,11 @@ export default function ProcessCreate() {
                   }}
                 >
                   <SelectTrigger data-testid="select-process-template">
-                    <SelectValue placeholder="Load a template..." />
+                    <SelectValue placeholder={t('processes.loadTemplate')} />
                   </SelectTrigger>
                   <SelectContent>
                     {(templates?.items || []).length === 0 ? (
-                      <SelectItem value="__none" disabled>No templates saved yet</SelectItem>
+                      <SelectItem value="__none" disabled>{t('processes.noTemplates')}</SelectItem>
                     ) : (
                       (templates?.items || []).map((t: any) => (
                         <SelectItem key={t.uuid} value={t.uuid}>
@@ -273,7 +274,7 @@ export default function ProcessCreate() {
                 </Select>
               </div>
               <div className="min-w-[260px]">
-                <Label className="mb-1 block">Clone a recent process</Label>
+                <Label className="mb-1 block">{t('processes.cloneRecent')}</Label>
                 <Select
                   value=""
                   onValueChange={(uuid) => {
@@ -282,12 +283,12 @@ export default function ProcessCreate() {
                   }}
                 >
                   <SelectTrigger data-testid="select-process-clone">
-                    <SelectValue placeholder="Clone from recent..." />
+                    <SelectValue placeholder={t('processes.cloneFromRecent')} />
                   </SelectTrigger>
                   <SelectContent>
                     {(recentProcesses?.items || []).map((p: any) => (
                       <SelectItem key={p.uuid} value={p.uuid}>
-                        {(ProcessTypeLabels as any)[p.type] || p.type} · {new Date(p.created_at).toLocaleDateString()}
+                        {te(p.type)} · {new Date(p.created_at).toLocaleDateString()}
                         {p.notes ? ` · ${String(p.notes).slice(0, 30)}` : ""}
                       </SelectItem>
                     ))}
@@ -301,7 +302,7 @@ export default function ProcessCreate() {
                 data-testid="button-save-template"
               >
                 <BookmarkPlus className="h-4 w-4 me-2" />
-                Save current as template
+                {t('processes.saveAsTemplate')}
               </Button>
             </CardContent>
           </Card>
@@ -309,26 +310,26 @@ export default function ProcessCreate() {
           {/* Process Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Process Information</CardTitle>
+              <CardTitle>{t('processes.processInfo')}</CardTitle>
               <CardDescription>
-                Basic information about the manufacturing process
+                {t('processes.processInfoDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="type">Process Type</Label>
+                  <Label htmlFor="type">{t('processes.processType')}</Label>
                   <Select
                     value={form.watch("type")}
                     onValueChange={(value) => form.setValue("type", value as ProcessType)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select process type" />
+                      <SelectValue placeholder={t('processes.selectType')} />
                     </SelectTrigger>
                     <SelectContent>
                       {processTypes?.map((type: string) => (
                         <SelectItem key={type} value={type}>
-                          {ProcessTypeLabels[type as ProcessType] || type}
+                          {te(type)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -339,16 +340,16 @@ export default function ProcessCreate() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="warehouse">Output Warehouse (Optional)</Label>
+                  <Label htmlFor="warehouse">{t('processes.outputWarehouseOptional')}</Label>
                   <Select
                     value={form.watch("data.output_warehouse_uuid") || "none"}
                     onValueChange={(value) => form.setValue("data.output_warehouse_uuid", value === "none" ? undefined : value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select warehouse" />
+                      <SelectValue placeholder={t('processes.selectWarehouse')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">No warehouse selected</SelectItem>
+                      <SelectItem value="none">{t('processes.noWarehouse')}</SelectItem>
                       {warehouses?.warehouses?.map((warehouse: any) => (
                         <SelectItem key={warehouse.uuid} value={warehouse.uuid}>
                           {warehouse.name}
@@ -360,10 +361,10 @@ export default function ProcessCreate() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes">{t('common.notes')}</Label>
                 <Textarea
                   id="notes"
-                  placeholder="Optional notes about this process..."
+                  placeholder={t('processes.notesPlaceholder')}
                   {...form.register("notes")}
                 />
               </div>
@@ -375,19 +376,19 @@ export default function ProcessCreate() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
-                Input Materials
+                {t('processes.inputMaterials')}
               </CardTitle>
               <CardDescription>
-                Materials that will be consumed in this process
+                {t('processes.inputMaterialsDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Material</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>{t('processes.material')}</TableHead>
+                    <TableHead>{t('common.quantity')}</TableHead>
+                    <TableHead>{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -399,7 +400,7 @@ export default function ProcessCreate() {
                           onValueChange={(value) => form.setValue(`data.inputs.${index}.material_uuid`, value)}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select material" />
+                            <SelectValue placeholder={t('processes.selectMaterial')} />
                           </SelectTrigger>
                           <SelectContent>
                             {materials?.materials?.map((material: any) => (
@@ -440,7 +441,7 @@ export default function ProcessCreate() {
                 className="mt-4"
               >
                 <Plus className="h-4 w-4 me-2" />
-                Add Input Material
+                {t('processes.addInput')}
               </Button>
             </CardContent>
           </Card>
@@ -450,19 +451,19 @@ export default function ProcessCreate() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ArrowRight className="h-5 w-5" />
-                Output Products
+                {t('processes.outputProducts')}
               </CardTitle>
               <CardDescription>
-                Products that will be produced by this process
+                {t('processes.outputProductsDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Material</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>{t('processes.material')}</TableHead>
+                    <TableHead>{t('common.quantity')}</TableHead>
+                    <TableHead>{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -474,7 +475,7 @@ export default function ProcessCreate() {
                           onValueChange={(value) => form.setValue(`data.outputs.${index}.material_uuid`, value)}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select material" />
+                            <SelectValue placeholder={t('processes.selectMaterial')} />
                           </SelectTrigger>
                           <SelectContent>
                             {materials?.materials?.map((material: any) => (
@@ -515,7 +516,7 @@ export default function ProcessCreate() {
                 className="mt-4"
               >
                 <Plus className="h-4 w-4 me-2" />
-                Add Output Product
+                {t('processes.addOutput')}
               </Button>
             </CardContent>
           </Card>
@@ -536,7 +537,7 @@ export default function ProcessCreate() {
               disabled={createMutation.isPending}
               className="bg-purple-600 hover:bg-purple-700"
             >
-              {createMutation.isPending ? "Creating..." : "Create Process"}
+              {createMutation.isPending ? t('common.creating') : t('processes.create')}
             </Button>
           </div>
         </form>
@@ -545,27 +546,27 @@ export default function ProcessCreate() {
       <Dialog open={showSaveTemplate} onOpenChange={setShowSaveTemplate}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Save as template</DialogTitle>
+            <DialogTitle>{t('processes.saveTemplateTitle')}</DialogTitle>
           </DialogHeader>
           <div>
-            <Label className="mb-1 block">Template name</Label>
+            <Label className="mb-1 block">{t('processes.templateName')}</Label>
             <Input
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="e.g. Standard coated peanut batch"
+              placeholder={t('processes.templateNamePlaceholder')}
               data-testid="input-template-name"
             />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               disabled={!templateName.trim() || saveTemplateMutation.isPending}
               onClick={() => saveTemplateMutation.mutate()}
               data-testid="button-confirm-save-template"
             >
-              {saveTemplateMutation.isPending ? "Saving..." : "Save template"}
+              {saveTemplateMutation.isPending ? t('common.saving') : t('processes.saveTemplate')}
             </Button>
           </DialogFooter>
         </DialogContent>

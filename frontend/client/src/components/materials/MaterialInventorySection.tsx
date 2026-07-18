@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface SeriesEvent {
   t: string | null;
@@ -42,6 +43,7 @@ const fmt = (n: number) =>
 const DAY = 24 * 60 * 60 * 1000;
 
 export function MaterialInventorySection({ materialUuid }: { materialUuid: string }) {
+  const { t } = useLanguage();
   const { data: summary } = useQuery<{ events: SeriesEvent[]; lots: InventoryLot[] }>({
     queryKey: ["/material/", materialUuid, "inventory-summary"],
     queryFn: () => apiRequest(`/material/${materialUuid}/inventory-summary`),
@@ -89,39 +91,41 @@ export function MaterialInventorySection({ materialUuid }: { materialUuid: strin
       {/* total stock over time */}
       <Card>
         <CardHeader>
-          <CardTitle>Total Inventory Over Time</CardTitle>
+          <CardTitle>{t('materials.totalInventoryOverTime')}</CardTitle>
         </CardHeader>
         <CardContent>
           {chartRows.length === 0 ? (
             <p className="text-sm text-gray-500 py-8 text-center" data-testid="material-series-empty">
-              No inventory events for this material yet.
+              {t('materials.noInventoryEvents')}
             </p>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartRows} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="t"
-                  type="number"
-                  scale="time"
-                  domain={["dataMin", "dataMax"]}
-                  tickFormatter={tickFmt}
-                  fontSize={12}
-                />
-                <YAxis allowDecimals fontSize={12} />
-                <Tooltip
-                  labelFormatter={(t) => new Date(t as number).toLocaleString()}
-                  formatter={(v: any) => [fmt(v as number), "Total stock"]}
-                />
-                <Line
-                  type="stepAfter"
-                  dataKey="total"
-                  stroke="#5469D4"
-                  dot={false}
-                  strokeWidth={2}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <div dir="ltr">
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartRows} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="t"
+                    type="number"
+                    scale="time"
+                    domain={["dataMin", "dataMax"]}
+                    tickFormatter={tickFmt}
+                    fontSize={12}
+                  />
+                  <YAxis allowDecimals fontSize={12} />
+                  <Tooltip
+                    labelFormatter={(t) => new Date(t as number).toLocaleString()}
+                    formatter={(v: any) => [fmt(v as number), t('materials.totalStock')]}
+                  />
+                  <Line
+                    type="stepAfter"
+                    dataKey="total"
+                    stroke="#5469D4"
+                    dot={false}
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -129,12 +133,12 @@ export function MaterialInventorySection({ materialUuid }: { materialUuid: strin
       {/* cost per lot */}
       <Card>
         <CardHeader>
-          <CardTitle>Inventory Lots &amp; Cost</CardTitle>
+          <CardTitle>{t('materials.inventoryLotsCost')}</CardTitle>
         </CardHeader>
         <CardContent>
           {lots.length === 0 ? (
             <p className="text-sm text-gray-500 py-8 text-center" data-testid="material-lots-empty">
-              No lots with remaining stock.
+              {t('materials.noLotsRemaining')}
             </p>
           ) : (
             <>
@@ -142,14 +146,14 @@ export function MaterialInventorySection({ materialUuid }: { materialUuid: strin
                 <table className="w-full text-sm" data-testid="table-material-lots">
                   <thead>
                     <tr className="text-start text-gray-500 border-b">
-                      <th className="py-2 pe-4 font-medium">Lot</th>
-                      <th className="py-2 pe-4 font-medium">Warehouse</th>
-                      <th className="py-2 pe-4 font-medium text-end">On hand</th>
-                      <th className="py-2 pe-4 font-medium">Unit</th>
-                      <th className="py-2 pe-4 font-medium text-end">Cost / unit</th>
-                      <th className="py-2 pe-4 font-medium text-end">Stock value</th>
-                      <th className="py-2 pe-4 font-medium">Received</th>
-                      <th className="py-2 font-medium">Expires</th>
+                      <th className="py-2 pe-4 font-medium">{t('materials.lot')}</th>
+                      <th className="py-2 pe-4 font-medium">{t('materials.warehouse')}</th>
+                      <th className="py-2 pe-4 font-medium text-end">{t('materials.onHand')}</th>
+                      <th className="py-2 pe-4 font-medium">{t('materials.unit')}</th>
+                      <th className="py-2 pe-4 font-medium text-end">{t('materials.costPerUnit')}</th>
+                      <th className="py-2 pe-4 font-medium text-end">{t('materials.stockValue')}</th>
+                      <th className="py-2 pe-4 font-medium">{t('materials.received')}</th>
+                      <th className="py-2 font-medium">{t('materials.expires')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -180,13 +184,13 @@ export function MaterialInventorySection({ materialUuid }: { materialUuid: strin
               {/* weighted average cost of remaining stock */}
               <div className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm" data-testid="material-avg-cost">
                 {avgCost.length === 0 ? (
-                  <span className="text-gray-500">No cost data on remaining lots.</span>
+                  <span className="text-gray-500">{t('materials.noCostData')}</span>
                 ) : (
                   avgCost.map((a) => (
                     <span key={a.currency} className="text-gray-600">
-                      Avg cost ({a.currency}):{" "}
+                      {t('materials.avgCost', { currency: a.currency })}{" "}
                       <b data-testid={`avg-cost-${a.currency}`}>{fmt(a.avg)}</b>
-                      <span className="text-gray-400"> · {fmt(a.qty)} on hand · value {fmt(a.value)}</span>
+                      <span className="text-gray-400"> {t('materials.onHandValue', { qty: fmt(a.qty), value: fmt(a.value) })}</span>
                     </span>
                   ))
                 )}

@@ -5,6 +5,7 @@ import L from "leaflet";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { apiRequest } from "@/lib/queryClient";
 import { MqttClient, type MqttMessage } from "@/lib/mqttClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // Fix default marker icons in react-leaflet
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -77,13 +78,17 @@ function parsePosition(payload: string): Omit<DriverPosition, "receivedAt"> | nu
   }
 }
 
-function lastSeenLabel(ts: number, now: number): string {
+function lastSeenLabel(
+  ts: number,
+  now: number,
+  t: (key: string, vars?: Record<string, string | number>) => string
+): string {
   const seconds = Math.max(0, Math.floor((now - ts) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60) return t("location.lastSeenSecondsAgo", { n: seconds });
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t("location.lastSeenMinutesAgo", { n: minutes });
   const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
+  return t("location.lastSeenHoursAgo", { n: hours });
 }
 
 // Fit the map to the markers once, when the first positions arrive;
@@ -100,22 +105,23 @@ function FitBoundsOnce({ points }: { points: [number, number][] }) {
   return null;
 }
 
-const STATUS_BADGE: Record<ConnectionStatus, { label: string; className: string }> = {
+const STATUS_BADGE: Record<ConnectionStatus, { labelKey: string; className: string }> = {
   connecting: {
-    label: "Connecting",
+    labelKey: "location.connecting",
     className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300",
   },
   connected: {
-    label: "Connected",
+    labelKey: "location.connected",
     className: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300",
   },
   disconnected: {
-    label: "Disconnected",
+    labelKey: "location.disconnected",
     className: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300",
   },
 };
 
 export default function LiveMap() {
+  const { t } = useLanguage();
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [error, setError] = useState<string | null>(null);
   const [drivers, setDrivers] = useState<Map<string, DriverPosition>>(new Map());
@@ -197,14 +203,14 @@ export default function LiveMap() {
         const topicPrefix = config?.topic_prefix;
         if (typeof brokerUrl !== "string" || !brokerUrl || typeof topicPrefix !== "string" || !topicPrefix) {
           setStatus("disconnected");
-          setError("Location tracking is not configured (missing broker settings).");
+          setError(t("location.notConfigured"));
           return;
         }
         await connect(brokerUrl, topicPrefix);
       } catch (err) {
         if (disposed) return;
         setStatus("disconnected");
-        setError(err instanceof Error ? err.message : "Failed to load location tracking configuration");
+        setError(err instanceof Error ? err.message : t("location.failedLoadConfig"));
       }
     })();
 
@@ -229,18 +235,20 @@ export default function LiveMap() {
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Live Map</h1>
-            <p className="text-muted-foreground">Live positions of location-tracked drivers</p>
+            <h1 className="text-2xl font-bold">{t("nav.liveMap")}</h1>
+            <p className="text-muted-foreground">{t("location.liveSubtitle")}</p>
           </div>
           <div className="flex items-center gap-3">
             <span
               className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${badge.className}`}
               data-testid="badge-connection-status"
             >
-              {badge.label}
+              {t(badge.labelKey)}
             </span>
             <span className="text-sm text-gray-500 dark:text-gray-400" data-testid="text-driver-count">
-              {positions.length} {positions.length === 1 ? "driver" : "drivers"} visible
+              {positions.length === 1
+                ? t("location.driverVisible", { count: positions.length })
+                : t("location.driversVisible", { count: positions.length })}
             </span>
           </div>
         </div>
@@ -252,7 +260,7 @@ export default function LiveMap() {
         )}
 
         {/* Map */}
-        <div className="flex-1 min-h-[400px] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="flex-1 min-h-[400px] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden" dir="ltr">
           <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} style={{ height: "100%", width: "100%" }}>
             <FitBoundsOnce points={points} />
             <TileLayer
@@ -268,10 +276,12 @@ export default function LiveMap() {
                       {driver.lat.toFixed(5)}, {driver.lon.toFixed(5)}
                     </div>
                     <div className="text-gray-500">
-                      Last seen {lastSeenLabel(driver.recordedAt ?? driver.receivedAt, now)}
+                      {lastSeenLabel(driver.recordedAt ?? driver.receivedAt, now, t)}
                     </div>
                     {driver.speed !== undefined && (
-                      <div className="text-gray-500">{(driver.speed * 3.6).toFixed(1)} km/h</div>
+                      <div className="text-gray-500">
+                        {t("location.kmh", { speed: (driver.speed * 3.6).toFixed(1) })}
+                      </div>
                     )}
                   </div>
                 </Popup>

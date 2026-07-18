@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Filter } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface TransactionFiltersType {
   uuid?: string;
@@ -28,8 +29,9 @@ export function TransactionFilters({
   onFilterChange, 
   totalCount, 
   perPage, 
-  onPerPageChange 
+  onPerPageChange
 }: TransactionFiltersProps) {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<Partial<TransactionFiltersType>>(filters);
 
@@ -72,14 +74,14 @@ export function TransactionFilters({
       <div className="flex items-center gap-4">
         {/* Results Count */}
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          {totalCount} transactions
+          {t('financial.transactionsCount', { count: totalCount })}
         </p>
 
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" className="relative">
               <Filter className="h-4 w-4 me-2" />
-              Filters
+              {t('common.filters')}
               {hasActiveFilters && (
                 <span className="absolute -top-2 -end-2 bg-[#5469D4] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {activeFilterCount}
@@ -89,43 +91,43 @@ export function TransactionFilters({
           </SheetTrigger>
           <SheetContent className="w-[400px] sm:w-[540px]" style={{ zIndex: 9999 }}>
             <SheetHeader>
-              <SheetTitle>Filter Transactions</SheetTitle>
+              <SheetTitle>{t('financial.filterTransactions')}</SheetTitle>
             </SheetHeader>
-            
+
             <div className="space-y-6 mt-6">
               <div className="space-y-2">
-                <Label htmlFor="uuid">Transaction UUID</Label>
+                <Label htmlFor="uuid">{t('financial.transactionUuid')}</Label>
                 <Input
                   id="uuid"
                   value={localFilters.uuid || ""}
                   onChange={(e) => setLocalFilters(prev => ({ ...prev, uuid: e.target.value || undefined }))}
-                  placeholder="Search by transaction UUID"
+                  placeholder={t('financial.searchByTransactionUuid')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="from_account_uuid">From Account UUID</Label>
+                <Label htmlFor="from_account_uuid">{t('financial.fromAccountUuid')}</Label>
                 <Input
                   id="from_account_uuid"
                   value={localFilters.from_account_uuid || ""}
                   onChange={(e) => setLocalFilters(prev => ({ ...prev, from_account_uuid: e.target.value || undefined }))}
-                  placeholder="Search by from account UUID"
+                  placeholder={t('financial.searchByFromAccountUuid')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="to_account_uuid">To Account UUID</Label>
+                <Label htmlFor="to_account_uuid">{t('financial.toAccountUuid')}</Label>
                 <Input
                   id="to_account_uuid"
                   value={localFilters.to_account_uuid || ""}
                   onChange={(e) => setLocalFilters(prev => ({ ...prev, to_account_uuid: e.target.value || undefined }))}
-                  placeholder="Search by to account UUID"
+                  placeholder={t('financial.searchByToAccountUuid')}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="start_date">Start Date</Label>
+                  <Label htmlFor="start_date">{t('financial.startDate')}</Label>
                   <Input
                     id="start_date"
                     type="datetime-local"
@@ -135,7 +137,7 @@ export function TransactionFilters({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="end_date">End Date</Label>
+                  <Label htmlFor="end_date">{t('financial.endDate')}</Label>
                   <Input
                     id="end_date"
                     type="datetime-local"
@@ -147,11 +149,11 @@ export function TransactionFilters({
 
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleApplyFilters} className="flex-1 bg-[#5469D4] hover:bg-[#4356C7]">
-                  Apply Filters
+                  {t('financial.applyFilters')}
                 </Button>
                 {hasActiveFilters && (
                   <Button onClick={handleClearFilters} variant="outline" className="flex-1">
-                    Clear All
+                    {t('financial.clearAll')}
                   </Button>
                 )}
               </div>
@@ -162,7 +164,7 @@ export function TransactionFilters({
 
       {/* Per Page Selection */}
       <div className="flex items-center gap-2">
-        <Label htmlFor="perPage" className="text-sm">Show:</Label>
+        <Label htmlFor="perPage" className="text-sm">{t('financial.show')}</Label>
         <select
           id="perPage"
           value={perPage}
@@ -174,7 +176,7 @@ export function TransactionFilters({
           <option value={50}>50</option>
           <option value={100}>100</option>
         </select>
-        <span className="text-sm text-gray-600 dark:text-gray-400">per page</span>
+        <span className="text-sm text-gray-600 dark:text-gray-400">{t('financial.perPageSuffix')}</span>
       </div>
     </div>
   );

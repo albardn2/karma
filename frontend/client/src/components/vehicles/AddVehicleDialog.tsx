@@ -18,29 +18,32 @@ import {
 } from "@/components/ui/form";
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest } from "@/lib/queryClient";
 import { VehicleStatus, type VehicleFormData } from "@/lib/types";
 
-const vehicleFormSchema = z.object({
-  plate_number: z.string().min(1, "Plate number is required"),
-  make: z.string().min(1, "Make is required"),
-  model: z.string().min(1, "Model is required"),
-  year: z.coerce.number().int().min(1900, "Year must be 1900 or later").max(new Date().getFullYear() + 1, "Year cannot be in the future"),
-  color: z.string().min(1, "Color is required"),
-  status: z.nativeEnum(VehicleStatus),
-  vin: z.string().optional().or(z.literal("")),
-  notes: z.string().optional().or(z.literal("")),
-});
+const makeVehicleFormSchema = (t: (key: string) => string) =>
+  z.object({
+    plate_number: z.string().min(1, t("vehicles.plateRequired")),
+    make: z.string().min(1, t("vehicles.makeRequired")),
+    model: z.string().min(1, t("vehicles.modelRequired")),
+    year: z.coerce.number().int().min(1900, t("vehicles.yearMin")).max(new Date().getFullYear() + 1, t("vehicles.yearFuture")),
+    color: z.string().min(1, t("vehicles.colorRequired")),
+    status: z.nativeEnum(VehicleStatus),
+    vin: z.string().optional().or(z.literal("")),
+    notes: z.string().optional().or(z.literal("")),
+  });
 
-type VehicleFormValues = z.infer<typeof vehicleFormSchema>;
+type VehicleFormValues = z.infer<ReturnType<typeof makeVehicleFormSchema>>;
 
 export function AddVehicleDialog() {
   const [open, setOpen] = useState(false);
+  const { t, te } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const form = useForm<VehicleFormValues>({
-    resolver: zodResolver(vehicleFormSchema),
+    resolver: zodResolver(makeVehicleFormSchema(t)),
     defaultValues: {
       plate_number: "",
       model: "",
@@ -68,14 +71,14 @@ export function AddVehicleDialog() {
       form.reset();
       setOpen(false);
       toast({
-        title: "Success",
-        description: "Vehicle created successfully",
+        title: t("common.success"),
+        description: t("vehicles.createSuccess"),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create vehicle",
+        title: t("common.error"),
+        description: error.message || t("vehicles.createFailed"),
         variant: "destructive",
       });
     },
@@ -90,14 +93,14 @@ export function AddVehicleDialog() {
       <DialogTrigger asChild>
         <Button data-testid="button-add-vehicle">
           <Plus className="h-4 w-4 me-2" />
-          Add Vehicle
+          {t("vehicles.addVehicle")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Vehicle</DialogTitle>
+          <DialogTitle>{t("vehicles.addNewVehicle")}</DialogTitle>
           <DialogDescription>
-            Create a new vehicle entry for your fleet.
+            {t("vehicles.addDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -109,11 +112,11 @@ export function AddVehicleDialog() {
                 name="plate_number"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Plate Number*</FormLabel>
+                    <FormLabel>{t("vehicles.plateNumber")}*</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="Enter plate number"
+                        placeholder={t("vehicles.platePlaceholder")}
                         data-testid="input-plate-number"
                       />
                     </FormControl>
@@ -127,11 +130,11 @@ export function AddVehicleDialog() {
                 name="make"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Make*</FormLabel>
+                    <FormLabel>{t("vehicles.make")}*</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="e.g., Toyota, Ford, Honda"
+                        placeholder={t("vehicles.makePlaceholder")}
                         data-testid="input-make"
                       />
                     </FormControl>
@@ -145,11 +148,11 @@ export function AddVehicleDialog() {
                 name="model"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Model*</FormLabel>
+                    <FormLabel>{t("vehicles.model")}*</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="e.g., Camry, F-150, Civic"
+                        placeholder={t("vehicles.modelPlaceholder")}
                         data-testid="input-model"
                       />
                     </FormControl>
@@ -163,12 +166,12 @@ export function AddVehicleDialog() {
                 name="year"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Year*</FormLabel>
+                    <FormLabel>{t("vehicles.year")}*</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         {...field}
-                        placeholder="Enter year"
+                        placeholder={t("vehicles.yearPlaceholder")}
                         data-testid="input-year"
                       />
                     </FormControl>
@@ -182,11 +185,11 @@ export function AddVehicleDialog() {
                 name="color"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Color*</FormLabel>
+                    <FormLabel>{t("vehicles.color")}*</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="Enter color"
+                        placeholder={t("vehicles.colorPlaceholder")}
                         data-testid="input-color"
                       />
                     </FormControl>
@@ -200,20 +203,20 @@ export function AddVehicleDialog() {
                 name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Status*</FormLabel>
+                    <FormLabel>{t("common.status")}*</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-status">
-                          <SelectValue placeholder="Select status" />
+                          <SelectValue placeholder={t("vehicles.selectStatus")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value={VehicleStatus.ACTIVE}>Active</SelectItem>
-                        <SelectItem value={VehicleStatus.INACTIVE}>Inactive</SelectItem>
-                        <SelectItem value={VehicleStatus.SOLD}>Sold</SelectItem>
-                        <SelectItem value={VehicleStatus.MAINTENANCE}>Maintenance</SelectItem>
-                        <SelectItem value={VehicleStatus.RETIRED}>Retired</SelectItem>
-                        <SelectItem value={VehicleStatus.UTILIZED}>Utilized</SelectItem>
+                        <SelectItem value={VehicleStatus.ACTIVE}>{te(VehicleStatus.ACTIVE)}</SelectItem>
+                        <SelectItem value={VehicleStatus.INACTIVE}>{te(VehicleStatus.INACTIVE)}</SelectItem>
+                        <SelectItem value={VehicleStatus.SOLD}>{te(VehicleStatus.SOLD)}</SelectItem>
+                        <SelectItem value={VehicleStatus.MAINTENANCE}>{te(VehicleStatus.MAINTENANCE)}</SelectItem>
+                        <SelectItem value={VehicleStatus.RETIRED}>{te(VehicleStatus.RETIRED)}</SelectItem>
+                        <SelectItem value={VehicleStatus.UTILIZED}>{te(VehicleStatus.UTILIZED)}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -226,11 +229,11 @@ export function AddVehicleDialog() {
                 name="vin"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>VIN (Optional)</FormLabel>
+                    <FormLabel>{t("vehicles.vinOptional")}</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="Enter vehicle identification number"
+                        placeholder={t("vehicles.vinPlaceholder")}
                         data-testid="input-vin"
                       />
                     </FormControl>
@@ -244,11 +247,11 @@ export function AddVehicleDialog() {
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormLabel>{t("vehicles.notesOptional")}</FormLabel>
                     <FormControl>
                       <Textarea
                         {...field}
-                        placeholder="Enter any additional notes"
+                        placeholder={t("vehicles.notesPlaceholder")}
                         rows={2}
                         data-testid="textarea-notes"
                       />
@@ -267,14 +270,14 @@ export function AddVehicleDialog() {
                 disabled={createVehicleMutation.isPending}
                 data-testid="button-cancel"
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
                 disabled={createVehicleMutation.isPending}
                 data-testid="button-submit"
               >
-                {createVehicleMutation.isPending ? "Creating..." : "Create Vehicle"}
+                {createVehicleMutation.isPending ? t("common.creating") : t("vehicles.createVehicle")}
               </Button>
             </div>
           </form>

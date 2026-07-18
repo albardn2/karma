@@ -36,6 +36,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { Material } from "@/lib/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface MaterialFormData {
   name: string;
@@ -46,6 +47,7 @@ interface MaterialFormData {
 }
 
 export default function MaterialDetail() {
+  const { t, te } = useLanguage();
   const { uuid } = useParams<{ uuid: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -98,16 +100,16 @@ export default function MaterialDetail() {
       });
       
       toast({
-        title: "Success",
-        description: "Material updated successfully",
+        title: t('common.success'),
+        description: t('materials.updateSuccess'),
       });
-      
+
       setIsEditing(false);
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to update material",
+        title: t('common.error'),
+        description: t('materials.updateFailed'),
         variant: "destructive",
       });
     },
@@ -125,16 +127,16 @@ export default function MaterialDetail() {
       queryClient.refetchQueries({ queryKey: ["/material/list"] });
       
       toast({
-        title: "Success",
-        description: "Material deleted successfully",
+        title: t('common.success'),
+        description: t('materials.deleteSuccess'),
       });
-      
+
       setLocation("/materials");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete material",
+        title: t('common.error'),
+        description: error.message || t('materials.deleteFailed'),
         variant: "destructive",
       });
     },
@@ -144,13 +146,13 @@ export default function MaterialDetail() {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: "Copied!",
-        description: `${label} copied to clipboard`,
+        title: t('materials.copied'),
+        description: t('materials.copiedToClipboard', { label }),
       });
     } catch (err) {
       toast({
-        title: "Error",
-        description: "Failed to copy to clipboard",
+        title: t('common.error'),
+        description: t('materials.copyFailed'),
         variant: "destructive",
       });
     }
@@ -214,9 +216,9 @@ export default function MaterialDetail() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Material Not Found</h1>
+          <h1 className="text-2xl font-bold mb-4">{t('materials.notFound')}</h1>
           <Link href="/materials">
-            <Button>Back to Materials</Button>
+            <Button>{t('materials.backToMaterials')}</Button>
           </Link>
         </div>
       </div>
@@ -231,7 +233,7 @@ export default function MaterialDetail() {
           <Link href="/materials">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4 me-2" />
-              Back to Materials
+              {t('materials.backToMaterials')}
             </Button>
           </Link>
           <div className="flex items-center gap-2">
@@ -245,30 +247,30 @@ export default function MaterialDetail() {
             <>
               <Button variant="outline" size="sm" onClick={handleEdit}>
                 <Edit className="h-4 w-4 me-2" />
-                Edit
+                {t('common.edit')}
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm">
                     <Trash2 className="h-4 w-4 me-2" />
-                    Delete
+                    {t('common.delete')}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Material</AlertDialogTitle>
+                    <AlertDialogTitle>{t('materials.deleteMaterial')}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete "{material.name}"? This action cannot be undone.
+                      {t('materials.deleteConfirmDescription', { name: material.name })}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={() => deleteMaterialMutation.mutate()}
                       disabled={deleteMaterialMutation.isPending}
                       className="bg-red-600 hover:bg-red-700"
                     >
-                      {deleteMaterialMutation.isPending ? "Deleting..." : "Delete"}
+                      {deleteMaterialMutation.isPending ? t('common.deleting') : t('common.delete')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -283,11 +285,11 @@ export default function MaterialDetail() {
                 className="bg-gradient-to-r from-[#5469D4] to-[#8B5CF6] hover:from-[#4F63D2] hover:to-[#8A5AF5]"
               >
                 <Save className="h-4 w-4 me-2" />
-                {updateMaterialMutation.isPending ? "Saving..." : "Save"}
+                {updateMaterialMutation.isPending ? t('common.saving') : t('common.save')}
               </Button>
               <Button variant="outline" size="sm" onClick={handleCancelEdit}>
                 <X className="h-4 w-4 me-2" />
-                Cancel
+                {t('common.cancel')}
               </Button>
             </>
           )}
@@ -299,19 +301,19 @@ export default function MaterialDetail() {
         {/* Basic Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Basic Information</CardTitle>
+            <CardTitle>{t('materials.basicInformation')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Material Name */}
             <div className="space-y-2">
               <div className="flex items-center justify-between group">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">Material Name</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('materials.materialName')}</p>
                   {isEditing ? (
                     <Input
                       value={formData.name}
                       onChange={(e) => handleInputChange("name", e.target.value)}
-                      placeholder="Enter material name"
+                      placeholder={t('materials.enterName')}
                       className="mt-1"
                     />
                   ) : (
@@ -323,7 +325,7 @@ export default function MaterialDetail() {
                     variant="ghost"
                     size="sm"
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => copyToClipboard(material.name, "Material Name")}
+                    onClick={() => copyToClipboard(material.name, t('materials.materialName'))}
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
@@ -337,12 +339,12 @@ export default function MaterialDetail() {
             <div className="space-y-2">
               <div className="flex items-center justify-between group">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">SKU</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('materials.sku')}</p>
                   {isEditing ? (
                     <Input
                       value={formData.sku}
                       onChange={(e) => handleInputChange("sku", e.target.value)}
-                      placeholder="Enter SKU"
+                      placeholder={t('materials.enterSku')}
                       className="mt-1"
                     />
                   ) : (
@@ -357,7 +359,7 @@ export default function MaterialDetail() {
                     variant="ghost"
                     size="sm"
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => copyToClipboard(material.sku, "SKU")}
+                    onClick={() => copyToClipboard(material.sku, t('materials.sku'))}
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
@@ -371,26 +373,26 @@ export default function MaterialDetail() {
             <div className="space-y-2">
               <div className="flex items-center justify-between group">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">Type</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('common.type')}</p>
                   {isEditing ? (
                     <Select
                       value={formData.type || ""}
                       onValueChange={(value) => handleInputChange("type", value)}
                     >
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select material type" />
+                        <SelectValue placeholder={t('materials.selectType')} />
                       </SelectTrigger>
                       <SelectContent>
                         {materialTypes?.map((type) => (
                           <SelectItem key={type} value={type}>
-                            {type}
+                            {te(type)}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   ) : (
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                      {material.type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                      {te(material.type)}
                     </Badge>
                   )}
                 </div>
@@ -399,7 +401,7 @@ export default function MaterialDetail() {
                     variant="ghost"
                     size="sm"
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => copyToClipboard(material.type, "Type")}
+                    onClick={() => copyToClipboard(material.type, t('common.type'))}
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
@@ -413,20 +415,20 @@ export default function MaterialDetail() {
             <div className="space-y-2">
               <div className="flex items-center justify-between group">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">Unit of Measure</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('materials.unitOfMeasure')}</p>
                   {isEditing ? (
                     <Select
                       value={formData.measure_unit || "none"}
                       onValueChange={(value) => handleInputChange("measure_unit", value === "none" ? null : value)}
                     >
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select unit of measure" />
+                        <SelectValue placeholder={t('materials.selectUnit')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="none">{t('common.none')}</SelectItem>
                         {unitOfMeasures?.map((unit) => (
                           <SelectItem key={unit} value={unit}>
-                            {unit}
+                            {te(unit)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -435,7 +437,7 @@ export default function MaterialDetail() {
                     <div className="flex items-center gap-2">
                       <Ruler className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
-                        {material.measure_unit || "Not specified"}
+                        {material.measure_unit ? te(material.measure_unit) : t('materials.notSpecified')}
                       </span>
                     </div>
                   )}
@@ -445,7 +447,7 @@ export default function MaterialDetail() {
                     variant="ghost"
                     size="sm"
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => copyToClipboard(material.measure_unit!, "Unit of Measure")}
+                    onClick={() => copyToClipboard(material.measure_unit!, t('materials.unitOfMeasure'))}
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
@@ -458,25 +460,25 @@ export default function MaterialDetail() {
         {/* Additional Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Additional Information</CardTitle>
+            <CardTitle>{t('materials.additionalInformation')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Description */}
             <div className="space-y-2">
               <div className="flex items-start justify-between group">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">Description</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('common.description')}</p>
                   {isEditing ? (
                     <Textarea
                       value={formData.description || ""}
                       onChange={(e) => handleInputChange("description", e.target.value || null)}
-                      placeholder="Enter material description"
+                      placeholder={t('materials.enterDescription')}
                       rows={4}
                       className="mt-1"
                     />
                   ) : (
                     <p className="text-sm mt-1">
-                      {material.description || "No description provided"}
+                      {material.description || t('materials.noDescription')}
                     </p>
                   )}
                 </div>
@@ -485,7 +487,7 @@ export default function MaterialDetail() {
                     variant="ghost"
                     size="sm"
                     className="opacity-0 group-hover:opacity-100 transition-opacity mt-6"
-                    onClick={() => copyToClipboard(material.description!, "Description")}
+                    onClick={() => copyToClipboard(material.description!, t('common.description'))}
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
@@ -499,7 +501,7 @@ export default function MaterialDetail() {
             <div className="space-y-2">
               <div className="flex items-center justify-between group">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Created Date</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('materials.createdDate')}</p>
                   <p className="text-sm">
                     {new Date(material.created_at).toLocaleDateString()}
                   </p>
@@ -508,7 +510,7 @@ export default function MaterialDetail() {
                   variant="ghost"
                   size="sm"
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => copyToClipboard(material.created_at, "Created Date")}
+                  onClick={() => copyToClipboard(material.created_at, t('materials.createdDate'))}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>
@@ -521,7 +523,7 @@ export default function MaterialDetail() {
             <div className="space-y-2">
               <div className="flex items-center justify-between group">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Material ID</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('materials.materialId')}</p>
                   <p className="text-xs font-mono text-muted-foreground">
                     {material.uuid}
                   </p>
@@ -530,7 +532,7 @@ export default function MaterialDetail() {
                   variant="ghost"
                   size="sm"
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => copyToClipboard(material.uuid, "Material ID")}
+                  onClick={() => copyToClipboard(material.uuid, t('materials.materialId'))}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>

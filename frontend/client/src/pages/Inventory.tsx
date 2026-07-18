@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { InventoryFilters } from "@/components/inventory/InventoryFilters";
 import { AddInventoryDialog } from "@/components/inventory/AddInventoryDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Package, Building } from "lucide-react";
 
 interface Inventory {
@@ -50,6 +51,7 @@ interface InventoryFilters {
 }
 
 export default function Inventory() {
+  const { t, te } = useLanguage();
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [filters, setFilters] = useState<Omit<InventoryFilters, 'page' | 'per_page'>>({});
@@ -120,9 +122,9 @@ export default function Inventory() {
       <div className="space-y-6 p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('nav.inventory')}</h1>
             <p className="text-muted-foreground mt-1">
-              Showing {inventories.length} of {totalCount} inventory items
+              {t('inventory.showingItems', { shown: inventories.length, total: totalCount })}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -143,11 +145,11 @@ export default function Inventory() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#5469D4] via-[#6B73E0] to-[#8B5CF6] mb-4">
                 <Package className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">No inventory items found</h3>
+              <h3 className="text-lg font-semibold mb-2">{t('inventory.noItemsFound')}</h3>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                 {Object.values(filters).some(value => value && value !== "")
-                  ? "No inventory items match your current filters. Try adjusting your search criteria." 
-                  : "Get started by adding your first inventory item to track materials and stock levels."}
+                  ? t('inventory.noMatchFilters')
+                  : t('inventory.emptyDescription')}
               </p>
               <AddInventoryDialog />
             </div>
@@ -167,39 +169,39 @@ export default function Inventory() {
                               <h3 className="font-semibold text-lg" data-testid={`text-inventory-material-${inventory.uuid}`}>
                                 {inventory.material_name || inventory.material_uuid}
                               </h3>
-                              <p className="text-sm text-muted-foreground">Lot: {inventory.lot_id || "—"}</p>
+                              <p className="text-sm text-muted-foreground">{t('inventory.lotLabel', { lot: inventory.lot_id || "—" })}</p>
                             </div>
                           </div>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Current Quantity</p>
-                              <p className="text-sm">{inventory.current_quantity || 'N/A'} {inventory.unit}</p>
+                              <p className="text-sm font-medium text-muted-foreground">{t('inventory.currentQuantity')}</p>
+                              <p className="text-sm">{inventory.current_quantity || t('inventory.na')} {te(inventory.unit)}</p>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Original Quantity</p>
-                              <p className="text-sm">{inventory.original_quantity || 'N/A'} {inventory.unit}</p>
+                              <p className="text-sm font-medium text-muted-foreground">{t('inventory.originalQuantity')}</p>
+                              <p className="text-sm">{inventory.original_quantity || t('inventory.na')} {te(inventory.unit)}</p>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Cost per Unit</p>
-                              <p className="text-sm">{inventory.cost_per_unit ? `${inventory.cost_per_unit} ${inventory.currency || ''}` : 'N/A'}</p>
+                              <p className="text-sm font-medium text-muted-foreground">{t('inventory.costPerUnit')}</p>
+                              <p className="text-sm">{inventory.cost_per_unit ? `${inventory.cost_per_unit} ${inventory.currency || ''}` : t('inventory.na')}</p>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Warehouse</p>
-                              <p className="text-sm">{inventory.warehouse_uuid || 'N/A'}</p>
+                              <p className="text-sm font-medium text-muted-foreground">{t('inventory.warehouse')}</p>
+                              <p className="text-sm">{inventory.warehouse_uuid || t('inventory.na')}</p>
                             </div>
                           </div>
 
                           {inventory.lot_id && (
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Lot ID</p>
+                              <p className="text-sm font-medium text-muted-foreground">{t('inventory.lotId')}</p>
                               <p className="text-sm">{inventory.lot_id}</p>
                             </div>
                           )}
 
                           {inventory.expiration_date && (
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Expiration Date</p>
+                              <p className="text-sm font-medium text-muted-foreground">{t('inventory.expirationDate')}</p>
                               <p className="text-sm">{new Date(inventory.expiration_date).toLocaleDateString()}</p>
                             </div>
                           )}
@@ -207,10 +209,10 @@ export default function Inventory() {
                         
                         <div className="flex flex-col items-end gap-2">
                           <Badge variant={inventory.is_active ? "default" : "secondary"}>
-                            {inventory.is_active ? 'Active' : 'Inactive'}
+                            {te(inventory.is_active ? 'active' : 'inactive')}
                           </Badge>
                           <p className="text-xs text-muted-foreground">
-                            Created: {new Date(inventory.created_at).toLocaleDateString()}
+                            {t('inventory.createdLabel', { date: new Date(inventory.created_at).toLocaleDateString() })}
                           </p>
                         </div>
                       </div>
@@ -225,7 +227,7 @@ export default function Inventory() {
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-sm text-muted-foreground">
-                Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, totalCount)} of {totalCount} inventory items
+                {t('inventory.showingRange', { from: ((currentPage - 1) * perPage) + 1, to: Math.min(currentPage * perPage, totalCount), total: totalCount })}
               </p>
               <div className="flex items-center space-x-2 rtl:space-x-reverse">
                 <Button
@@ -234,7 +236,7 @@ export default function Inventory() {
                   onClick={() => handlePageChange(1)}
                   disabled={currentPage <= 1}
                 >
-                  First
+                  {t('inventory.first')}
                 </Button>
                 <Button
                   variant="outline"
@@ -242,12 +244,12 @@ export default function Inventory() {
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage <= 1}
                 >
-                  Previous
+                  {t('common.previous')}
                 </Button>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">Page</span>
+                  <span className="text-sm">{t('common.page')}</span>
                   <span className="text-sm font-medium">{currentPage}</span>
-                  <span className="text-sm">of</span>
+                  <span className="text-sm">{t('common.of')}</span>
                   <span className="text-sm font-medium">{totalPages}</span>
                 </div>
                 <Button
@@ -256,7 +258,7 @@ export default function Inventory() {
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage >= totalPages}
                 >
-                  Next
+                  {t('common.next')}
                 </Button>
                 <Button
                   variant="outline"
@@ -264,7 +266,7 @@ export default function Inventory() {
                   onClick={() => handlePageChange(totalPages)}
                   disabled={currentPage >= totalPages}
                 >
-                  Last
+                  {t('inventory.last')}
                 </Button>
               </div>
             </div>

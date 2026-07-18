@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Filter } from "lucide-react";
 
 interface PurchaseOrderFilters {
@@ -25,6 +26,7 @@ interface PurchaseOrderFiltersProps {
 }
 
 export function PurchaseOrderFilters({ filters, onFiltersChange, totalCount, perPage, onPerPageChange }: PurchaseOrderFiltersProps) {
+  const { t } = useLanguage();
   const [localFilters, setLocalFilters] = useState<PurchaseOrderFilters>(filters);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -51,7 +53,7 @@ export function PurchaseOrderFilters({ filters, onFiltersChange, totalCount, per
       <SheetTrigger asChild>
         <Button variant="outline" className="relative">
           <Filter className="h-4 w-4 me-2" />
-          Filters
+          {t('common.filters')}
           {hasActiveFilters && (
             <div className="absolute -top-1 -end-1 h-2 w-2 bg-[#5469D4] rounded-full" />
           )}
@@ -59,25 +61,25 @@ export function PurchaseOrderFilters({ filters, onFiltersChange, totalCount, per
       </SheetTrigger>
       <SheetContent className="w-80 flex flex-col">
         <SheetHeader className="flex-shrink-0">
-          <SheetTitle>Filter Purchase Orders</SheetTitle>
+          <SheetTitle>{t('purchaseOrders.filterTitle')}</SheetTitle>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto space-y-6 mt-6 pe-2">
           <div className="space-y-4">
             <div>
-              <Label htmlFor="uuid">UUID</Label>
+              <Label htmlFor="uuid">{t('purchaseOrders.uuid')}</Label>
               <Input
                 id="uuid"
-                placeholder="Enter purchase order UUID"
+                placeholder={t('purchaseOrders.uuidPlaceholder')}
                 value={localFilters.uuid || ""}
                 onChange={(e) => setLocalFilters({ ...localFilters, uuid: e.target.value })}
               />
             </div>
 
             <div>
-              <Label htmlFor="vendor_uuid">Vendor UUID</Label>
+              <Label htmlFor="vendor_uuid">{t('purchaseOrders.vendorUuid')}</Label>
               <Input
                 id="vendor_uuid"
-                placeholder="Enter vendor UUID"
+                placeholder={t('purchaseOrders.vendorUuidPlaceholder')}
                 value={localFilters.vendor_uuid || ""}
                 onChange={(e) => setLocalFilters({ ...localFilters, vendor_uuid: e.target.value })}
               />
@@ -90,49 +92,49 @@ export function PurchaseOrderFilters({ filters, onFiltersChange, totalCount, per
 
 
             <div>
-              <Label htmlFor="is_paid">Payment Status</Label>
+              <Label htmlFor="is_paid">{t('purchaseOrders.paymentStatus')}</Label>
               <Select value={localFilters.is_paid || ""} onValueChange={(value) => setLocalFilters({ ...localFilters, is_paid: value })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select payment status" />
+                  <SelectValue placeholder={t('purchaseOrders.selectPaymentStatus')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="true">Paid</SelectItem>
-                  <SelectItem value="false">Unpaid</SelectItem>
+                  <SelectItem value="all">{t('common.all')}</SelectItem>
+                  <SelectItem value="true">{t('purchaseOrders.paid')}</SelectItem>
+                  <SelectItem value="false">{t('purchaseOrders.unpaid')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label htmlFor="is_overdue">Overdue Status</Label>
+              <Label htmlFor="is_overdue">{t('purchaseOrders.overdueStatus')}</Label>
               <Select value={localFilters.is_overdue?.toString() || "all"} onValueChange={(value) => setLocalFilters({ ...localFilters, is_overdue: value === "all" ? undefined : value === "true" })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select overdue status" />
+                  <SelectValue placeholder={t('purchaseOrders.selectOverdueStatus')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="true">Overdue</SelectItem>
-                  <SelectItem value="false">Not overdue</SelectItem>
+                  <SelectItem value="all">{t('common.all')}</SelectItem>
+                  <SelectItem value="true">{t('purchaseOrders.overdue')}</SelectItem>
+                  <SelectItem value="false">{t('purchaseOrders.notOverdue')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label htmlFor="is_fulfilled">Fulfillment Status</Label>
+              <Label htmlFor="is_fulfilled">{t('purchaseOrders.fulfillmentStatus')}</Label>
               <Select value={localFilters.is_fulfilled?.toString() || "all"} onValueChange={(value) => setLocalFilters({ ...localFilters, is_fulfilled: value === "all" ? undefined : value === "true" })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select fulfillment status" />
+                  <SelectValue placeholder={t('purchaseOrders.selectFulfillmentStatus')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="true">Fulfilled</SelectItem>
-                  <SelectItem value="false">Not fulfilled</SelectItem>
+                  <SelectItem value="all">{t('common.all')}</SelectItem>
+                  <SelectItem value="true">{t('purchaseOrders.fulfilled')}</SelectItem>
+                  <SelectItem value="false">{t('purchaseOrders.notFulfilled')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label htmlFor="start_date">Start Date</Label>
+              <Label htmlFor="start_date">{t('purchaseOrders.startDate')}</Label>
               <Input
                 id="start_date"
                 type="date"
@@ -142,7 +144,7 @@ export function PurchaseOrderFilters({ filters, onFiltersChange, totalCount, per
             </div>
 
             <div>
-              <Label htmlFor="end_date">End Date</Label>
+              <Label htmlFor="end_date">{t('purchaseOrders.endDate')}</Label>
               <Input
                 id="end_date"
                 type="date"
@@ -154,23 +156,23 @@ export function PurchaseOrderFilters({ filters, onFiltersChange, totalCount, per
 
           <div className="pt-4 border-t space-y-3">
             <div>
-              <Label htmlFor="per_page">Items per page</Label>
+              <Label htmlFor="per_page">{t('purchaseOrders.itemsPerPage')}</Label>
               <Select value={perPage.toString()} onValueChange={(value) => onPerPageChange(Number(value))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select items per page" />
+                  <SelectValue placeholder={t('purchaseOrders.selectItemsPerPage')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="10">10 per page</SelectItem>
-                  <SelectItem value="20">20 per page</SelectItem>
-                  <SelectItem value="50">50 per page</SelectItem>
-                  <SelectItem value="100">100 per page</SelectItem>
+                  <SelectItem value="10">{t('purchaseOrders.perPageOption', { count: 10 })}</SelectItem>
+                  <SelectItem value="20">{t('purchaseOrders.perPageOption', { count: 20 })}</SelectItem>
+                  <SelectItem value="50">{t('purchaseOrders.perPageOption', { count: 50 })}</SelectItem>
+                  <SelectItem value="100">{t('purchaseOrders.perPageOption', { count: 100 })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {totalCount} total orders
+                {t('purchaseOrders.totalOrders', { count: totalCount })}
               </p>
             </div>
           </div>
@@ -178,10 +180,10 @@ export function PurchaseOrderFilters({ filters, onFiltersChange, totalCount, per
         <div className="flex-shrink-0 border-t pt-4">
           <div className="flex gap-3">
             <Button onClick={handleApplyFilters} className="flex-1 bg-[#5469D4] hover:bg-[#4356C7]">
-              Apply Filters
+              {t('purchaseOrders.applyFilters')}
             </Button>
             <Button variant="outline" onClick={handleClearFilters}>
-              Clear
+              {t('purchaseOrders.clear')}
             </Button>
           </div>
         </div>

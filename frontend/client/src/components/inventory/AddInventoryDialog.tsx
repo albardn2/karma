@@ -10,22 +10,25 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Plus, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 
-const inventorySchema = z.object({
-  material_uuid: z.string().min(1, "Material UUID is required"),
-  warehouse_uuid: z.string().min(1, "Warehouse UUID is required"),
-  notes: z.string().optional(),
-  lot_id: z.string().optional(),
-  expiration_date: z.string().optional(),
-  is_active: z.boolean(),
-});
+const makeInventorySchema = (t: (key: string) => string) =>
+  z.object({
+    material_uuid: z.string().min(1, t("inventory.materialRequired")),
+    warehouse_uuid: z.string().min(1, t("inventory.warehouseRequired")),
+    notes: z.string().optional(),
+    lot_id: z.string().optional(),
+    expiration_date: z.string().optional(),
+    is_active: z.boolean(),
+  });
 
-type InventoryFormData = z.infer<typeof inventorySchema>;
+type InventoryFormData = z.infer<ReturnType<typeof makeInventorySchema>>;
 
 export function AddInventoryDialog() {
+  const { t, te } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [materialOpen, setMaterialOpen] = useState(false);
   const [warehouseOpen, setWarehouseOpen] = useState(false);
@@ -78,7 +81,7 @@ export function AddInventoryDialog() {
   const warehouses = warehousesData?.warehouses || [];
 
   const form = useForm<InventoryFormData>({
-    resolver: zodResolver(inventorySchema),
+    resolver: zodResolver(makeInventorySchema(t)),
     defaultValues: {
       material_uuid: "",
       warehouse_uuid: "",
@@ -107,8 +110,8 @@ export function AddInventoryDialog() {
       queryClient.refetchQueries({ queryKey: ["/inventory/"] });
       
       toast({
-        title: "Success",
-        description: "Inventory item created successfully",
+        title: t('common.success'),
+        description: t('inventory.createSuccess'),
       });
 
       form.reset();
@@ -122,7 +125,7 @@ export function AddInventoryDialog() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('common.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -138,12 +141,12 @@ export function AddInventoryDialog() {
       <DialogTrigger asChild>
         <Button className="bg-[#5469D4] hover:bg-[#5469D4]/90">
           <Plus className="h-4 w-4 me-2" />
-          Add Inventory
+          {t('inventory.addInventory')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add New Inventory Item</DialogTitle>
+          <DialogTitle>{t('inventory.addNewItem')}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -152,7 +155,7 @@ export function AddInventoryDialog() {
               name="material_uuid"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Material</FormLabel>
+                  <FormLabel>{t('inventory.material')}</FormLabel>
                   <div className="flex gap-2 mb-2">
                     <Button
                       type="button"
@@ -165,7 +168,7 @@ export function AddInventoryDialog() {
                         field.onChange("");
                       }}
                     >
-                      Select Material
+                      {t('inventory.selectMaterial')}
                     </Button>
                     <Button
                       type="button"
@@ -178,13 +181,13 @@ export function AddInventoryDialog() {
                         field.onChange("");
                       }}
                     >
-                      Enter UUID manually
+                      {t('inventory.enterUuidManually')}
                     </Button>
                   </div>
                   <FormControl>
                     {useManualMaterialUuid ? (
                       <Input
-                        placeholder="Enter material UUID..."
+                        placeholder={t('inventory.materialUuidPlaceholder')}
                         value={field.value}
                         onChange={(e) => {
                           field.onChange(e.target.value);
@@ -204,8 +207,8 @@ export function AddInventoryDialog() {
                           }}
                         >
                           {materialValue
-                            ? materials?.find((material) => material.uuid === materialValue)?.name || "Material not found"
-                            : "Select material..."}
+                            ? materials?.find((material) => material.uuid === materialValue)?.name || t('inventory.materialNotFound')
+                            : t('inventory.selectMaterialPlaceholder')}
                           <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                         
@@ -213,7 +216,7 @@ export function AddInventoryDialog() {
                           <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
                             <div className="p-2">
                               <Input
-                                placeholder="Search materials..."
+                                placeholder={t('inventory.searchMaterials')}
                                 value={materialSearch}
                                 onChange={(e) => setMaterialSearch(e.target.value)}
                                 className="mb-2"
@@ -241,7 +244,7 @@ export function AddInventoryDialog() {
                                   </div>
                                 ))
                               ) : (
-                                <div className="px-3 py-2 text-gray-500">No materials found.</div>
+                                <div className="px-3 py-2 text-gray-500">{t('inventory.noMaterialsFound')}</div>
                               )}
                             </div>
                           </div>
@@ -259,7 +262,7 @@ export function AddInventoryDialog() {
               name="warehouse_uuid"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Warehouse</FormLabel>
+                  <FormLabel>{t('inventory.warehouse')}</FormLabel>
                   <div className="flex gap-2 mb-2">
                     <Button
                       type="button"
@@ -272,7 +275,7 @@ export function AddInventoryDialog() {
                         field.onChange("");
                       }}
                     >
-                      Select Warehouse
+                      {t('inventory.selectWarehouse')}
                     </Button>
                     <Button
                       type="button"
@@ -285,13 +288,13 @@ export function AddInventoryDialog() {
                         field.onChange("");
                       }}
                     >
-                      Enter UUID manually
+                      {t('inventory.enterUuidManually')}
                     </Button>
                   </div>
                   <FormControl>
                     {useManualWarehouseUuid ? (
                       <Input
-                        placeholder="Enter warehouse UUID..."
+                        placeholder={t('inventory.warehouseUuidPlaceholder')}
                         value={field.value}
                         onChange={(e) => {
                           field.onChange(e.target.value);
@@ -311,8 +314,8 @@ export function AddInventoryDialog() {
                           }}
                         >
                           {warehouseValue
-                            ? warehouses?.find((warehouse) => warehouse.uuid === warehouseValue)?.name || "Warehouse not found"
-                            : "Select warehouse..."}
+                            ? warehouses?.find((warehouse) => warehouse.uuid === warehouseValue)?.name || t('inventory.warehouseNotFound')
+                            : t('inventory.selectWarehousePlaceholder')}
                           <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                         
@@ -320,7 +323,7 @@ export function AddInventoryDialog() {
                           <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
                             <div className="p-2">
                               <Input
-                                placeholder="Search warehouses..."
+                                placeholder={t('inventory.searchWarehouses')}
                                 value={warehouseSearch}
                                 onChange={(e) => setWarehouseSearch(e.target.value)}
                                 className="mb-2"
@@ -348,7 +351,7 @@ export function AddInventoryDialog() {
                                   </div>
                                 ))
                               ) : (
-                                <div className="px-3 py-2 text-gray-500">No warehouses found.</div>
+                                <div className="px-3 py-2 text-gray-500">{t('inventory.noWarehousesFound')}</div>
                               )}
                             </div>
                           </div>
@@ -366,10 +369,10 @@ export function AddInventoryDialog() {
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes (Optional)</FormLabel>
+                  <FormLabel>{t('inventory.notesOptional')}</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Enter notes"
+                    <Textarea
+                      placeholder={t('inventory.enterNotes')}
                       className="resize-none"
                       rows={3}
                       {...field}
@@ -386,9 +389,9 @@ export function AddInventoryDialog() {
                 name="lot_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Lot ID (Optional)</FormLabel>
+                    <FormLabel>{t('inventory.lotIdOptional')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter lot ID" {...field} />
+                      <Input placeholder={t('inventory.enterLotId')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -400,7 +403,7 @@ export function AddInventoryDialog() {
                 name="expiration_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Expiration Date (Optional)</FormLabel>
+                    <FormLabel>{t('inventory.expirationDateOptional')}</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
                     </FormControl>
@@ -415,16 +418,16 @@ export function AddInventoryDialog() {
               name="is_active"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Status</FormLabel>
+                  <FormLabel>{t('common.status')}</FormLabel>
                   <Select onValueChange={(value) => field.onChange(value === "true")} defaultValue="true">
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
+                        <SelectValue placeholder={t('inventory.selectStatus')} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="true">Active</SelectItem>
-                      <SelectItem value="false">Inactive</SelectItem>
+                      <SelectItem value="true">{te('active')}</SelectItem>
+                      <SelectItem value="false">{te('inactive')}</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -434,10 +437,10 @@ export function AddInventoryDialog() {
 
             <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={createInventoryMutation.isPending} className="bg-[#5469D4] hover:bg-[#5469D4]/90">
-                {createInventoryMutation.isPending ? "Creating..." : "Create Inventory"}
+                {createInventoryMutation.isPending ? t('common.creating') : t('inventory.createInventory')}
               </Button>
             </div>
           </form>

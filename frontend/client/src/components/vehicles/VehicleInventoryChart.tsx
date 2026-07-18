@@ -14,23 +14,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
-const PRESETS: { value: string; label: string; ms?: number }[] = [
-  { value: "all", label: "All time" },
-  { value: "15m", label: "Last 15 minutes", ms: 15 * MIN },
-  { value: "30m", label: "Last 30 minutes", ms: 30 * MIN },
-  { value: "1h", label: "Last 1 hour", ms: HOUR },
-  { value: "6h", label: "Last 6 hours", ms: 6 * HOUR },
-  { value: "12h", label: "Last 12 hours", ms: 12 * HOUR },
-  { value: "24h", label: "Last 24 hours", ms: DAY },
-  { value: "7d", label: "Last 7 days", ms: 7 * DAY },
-  { value: "30d", label: "Last 30 days", ms: 30 * DAY },
-  { value: "90d", label: "Last 90 days", ms: 90 * DAY },
-  { value: "custom", label: "Custom range" },
+const PRESETS: { value: string; labelKey: string; ms?: number }[] = [
+  { value: "all", labelKey: "vehicles.rangeAll" },
+  { value: "15m", labelKey: "vehicles.range15m", ms: 15 * MIN },
+  { value: "30m", labelKey: "vehicles.range30m", ms: 30 * MIN },
+  { value: "1h", labelKey: "vehicles.range1h", ms: HOUR },
+  { value: "6h", labelKey: "vehicles.range6h", ms: 6 * HOUR },
+  { value: "12h", labelKey: "vehicles.range12h", ms: 12 * HOUR },
+  { value: "24h", labelKey: "vehicles.range24h", ms: DAY },
+  { value: "7d", labelKey: "vehicles.range7d", ms: 7 * DAY },
+  { value: "30d", labelKey: "vehicles.range30d", ms: 30 * DAY },
+  { value: "90d", labelKey: "vehicles.range90d", ms: 90 * DAY },
+  { value: "custom", labelKey: "vehicles.rangeCustom" },
 ];
 const PRESET_MS: Record<string, number> = Object.fromEntries(
   PRESETS.filter((p) => p.ms).map((p) => [p.value, p.ms as number])
@@ -64,7 +65,7 @@ export function VehicleInventoryChart({
   vehicleUuid,
   windowStart,
   windowEnd,
-  title = "Inventory Over Time",
+  title,
 }: {
   vehicleUuid: string;
   // fixed time window (e.g. a trip): hides the range picker; windowEnd omitted/null
@@ -73,6 +74,8 @@ export function VehicleInventoryChart({
   windowEnd?: string | null;
   title?: string;
 }) {
+  const { t } = useLanguage();
+  const displayTitle = title ?? t("vehicles.inventoryOverTime");
   const [preset, setPreset] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -212,14 +215,14 @@ export function VehicleInventoryChart({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <CardTitle>{displayTitle}</CardTitle>
       </CardHeader>
       <CardContent>
         {/* Filters (hidden in fixed-window mode) */}
         {!windowStart && (
         <div className="flex flex-wrap items-end gap-4 mb-4">
           <div>
-            <label className="text-sm font-medium text-gray-500 mb-1 block">Range</label>
+            <label className="text-sm font-medium text-gray-500 mb-1 block">{t("vehicles.range")}</label>
             <Select value={preset} onValueChange={setPreset}>
               <SelectTrigger className="w-48" data-testid="select-vinv-chart-range">
                 <SelectValue />
@@ -227,7 +230,7 @@ export function VehicleInventoryChart({
               <SelectContent>
                 {PRESETS.map((p) => (
                   <SelectItem key={p.value} value={p.value}>
-                    {p.label}
+                    {t(p.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -236,7 +239,7 @@ export function VehicleInventoryChart({
           {preset === "custom" && (
             <>
               <div>
-                <label className="text-sm font-medium text-gray-500 mb-1 block">From</label>
+                <label className="text-sm font-medium text-gray-500 mb-1 block">{t("vehicles.from")}</label>
                 <Input
                   type="date"
                   className="w-44"
@@ -246,7 +249,7 @@ export function VehicleInventoryChart({
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-500 mb-1 block">To</label>
+                <label className="text-sm font-medium text-gray-500 mb-1 block">{t("vehicles.to")}</label>
                 <Input
                   type="date"
                   className="w-44"
@@ -283,13 +286,14 @@ export function VehicleInventoryChart({
         {/* Chart */}
         {inventories.length === 0 ? (
           <div className="text-sm text-gray-500 py-12 text-center">
-            No inventory on this vehicle yet.
+            {t("vehicles.noInventory")}
           </div>
         ) : rows.length === 0 ? (
           <div className="text-sm text-gray-500 py-12 text-center">
-            No inventory events in this range.
+            {t("vehicles.noInventoryEvents")}
           </div>
         ) : (
+          <div dir="ltr">
           <ResponsiveContainer width="100%" height={340}>
             <LineChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -321,6 +325,7 @@ export function VehicleInventoryChart({
               ))}
             </LineChart>
           </ResponsiveContainer>
+          </div>
         )}
       </CardContent>
     </Card>

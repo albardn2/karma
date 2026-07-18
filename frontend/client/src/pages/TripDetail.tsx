@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -40,17 +41,18 @@ export default function TripDetail() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { isAdmin } = useAuth();
+  const { t, te } = useLanguage();
 
   const deleteTripMutation = useMutation({
     mutationFn: () => apiRequest(`/trip/${params?.uuid}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/trip/"] });
       queryClient.invalidateQueries({ queryKey: ["/workflow-execution/"] });
-      toast({ title: "Trip deleted" });
+      toast({ title: t("trips.tripDeleted") });
       setLocation("/trips");
     },
     onError: (e: Error) => {
-      toast({ title: "Failed to delete trip", description: e.message, variant: "destructive" });
+      toast({ title: t("trips.failedDelete"), description: e.message, variant: "destructive" });
       setConfirmDelete(false);
     },
   });
@@ -113,14 +115,14 @@ export default function TripDetail() {
       queryClient.invalidateQueries({ queryKey: ["/trip/"] });
       setIsEditing(false);
       toast({
-        title: "Success",
-        description: "Trip updated successfully",
+        title: t("common.success"),
+        description: t("trips.updatedSuccess"),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update trip",
+        title: t("common.error"),
+        description: error.message || t("trips.failedUpdate"),
         variant: "destructive",
       });
     },
@@ -143,15 +145,18 @@ export default function TripDetail() {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(label);
+    // `label` stays the raw identifier used for the copiedField comparison;
+    // translate it only for the toast message.
+    const labelText = label === 'Vehicle UUID' ? t('trips.vehicleUuid') : t('trips.tripUuid');
     toast({
-      title: "Copied",
-      description: `${label} copied to clipboard`,
+      title: t("trips.copied"),
+      description: t("trips.copiedToClipboard", { label: labelText }),
     });
     setTimeout(() => setCopiedField(null), 2000);
   };
 
   const formatDateTime = (dateString?: string) => {
-    if (!dateString) return 'Not set';
+    if (!dateString) return t('trips.notSet');
     try {
       return format(new Date(dateString), 'PPpp');
     } catch {
@@ -172,12 +177,6 @@ export default function TripDetail() {
       default:
         return 'bg-gray-100 text-gray-800';
     }
-  };
-
-  const formatStatus = (status: string) => {
-    return status.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
   };
 
   if (isLoading) {
@@ -205,11 +204,11 @@ export default function TripDetail() {
             data-testid="button-back"
           >
             <ArrowLeft className="h-4 w-4 me-2" />
-            Back to trips
+            {t('trips.backToTrips')}
           </Button>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-red-600">Error loading trip: {error?.message || 'Trip not found'}</p>
+              <p className="text-red-600">{t('trips.errorLoadingTrip', { message: error?.message || t('trips.tripNotFound') })}</p>
             </CardContent>
           </Card>
         </div>
@@ -227,7 +226,7 @@ export default function TripDetail() {
           data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4 me-2" />
-          Back to trips
+          {t('trips.backToTrips')}
         </Button>
 
         {/* Trip Header */}
@@ -236,13 +235,13 @@ export default function TripDetail() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <Truck className="h-8 w-8 text-gray-600" />
-                <h1 className="text-3xl font-medium text-gray-900">Trip Details</h1>
+                <h1 className="text-3xl font-medium text-gray-900">{t('trips.detailsTitle')}</h1>
               </div>
-              <p className="text-gray-500" data-testid="text-header-trip-uuid">Trip UUID: {trip.uuid}</p>
+              <p className="text-gray-500" data-testid="text-header-trip-uuid">{t('trips.headerUuid', { uuid: trip.uuid })}</p>
             </div>
             <div className="flex items-center gap-3">
               <Badge className={getStatusBadgeClass(trip.status)} data-testid="badge-status">
-                {formatStatus(trip.status)}
+                {te(trip.status)}
               </Badge>
               {isAdmin && (
                 <Button
@@ -252,7 +251,7 @@ export default function TripDetail() {
                   data-testid="button-delete-trip"
                 >
                   <Trash2 className="h-4 w-4 me-2" />
-                  Delete Trip
+                  {t('trips.deleteTrip')}
                 </Button>
               )}
             </div>
@@ -262,21 +261,20 @@ export default function TripDetail() {
         <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete this trip?</AlertDialogTitle>
+              <AlertDialogTitle>{t('trips.deleteConfirmTitle')}</AlertDialogTitle>
               <AlertDialogDescription>
-                The trip and its workflow execution will be removed from all lists. This
-                cannot be undone from the app.
+                {t('trips.deleteConfirmDescription')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel data-testid="button-cancel-delete-trip">Cancel</AlertDialogCancel>
+              <AlertDialogCancel data-testid="button-cancel-delete-trip">{t('common.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 className="bg-red-600 hover:bg-red-700"
                 disabled={deleteTripMutation.isPending}
                 onClick={() => deleteTripMutation.mutate()}
                 data-testid="button-confirm-delete-trip"
               >
-                Delete
+                {t('common.delete')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -286,11 +284,11 @@ export default function TripDetail() {
           {/* General Information */}
           <Card>
             <CardHeader>
-              <CardTitle>General Information</CardTitle>
+              <CardTitle>{t('trips.generalInfo')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-gray-500">Trip UUID</label>
+                <label className="text-sm font-medium text-gray-500">{t('trips.tripUuid')}</label>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-mono text-gray-900 break-all" data-testid="text-trip-uuid">{trip.uuid}</p>
                   <button
@@ -308,7 +306,7 @@ export default function TripDetail() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-500">Vehicle UUID</label>
+                <label className="text-sm font-medium text-gray-500">{t('trips.vehicleUuid')}</label>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-mono text-gray-900 break-all" data-testid="text-vehicle-uuid">{trip.vehicle_uuid}</p>
                   <button
@@ -327,14 +325,14 @@ export default function TripDetail() {
 
               {trip.service_area_uuid && (
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Service Area UUID</label>
+                  <label className="text-sm font-medium text-gray-500">{t('trips.serviceAreaUuid')}</label>
                   <p className="text-sm font-mono text-gray-900 break-all" data-testid="text-service-area-uuid">{trip.service_area_uuid}</p>
                 </div>
               )}
 
               {trip.workflow_execution_uuid && (
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Workflow Execution</label>
+                  <label className="text-sm font-medium text-gray-500">{t('trips.workflowExecution')}</label>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-mono text-gray-900 break-all" data-testid="text-workflow-execution-uuid">{trip.workflow_execution_uuid}</p>
                     <Button
@@ -344,14 +342,14 @@ export default function TripDetail() {
                       className="p-0 h-auto"
                       data-testid="button-view-workflow"
                     >
-                      View
+                      {t('common.view')}
                     </Button>
                   </div>
                 </div>
               )}
 
               <div>
-                <label className="text-sm font-medium text-gray-500">Created At</label>
+                <label className="text-sm font-medium text-gray-500">{t('common.createdAt')}</label>
                 <p className="text-sm text-gray-900" data-testid="text-created-at">{formatDateTime(trip.created_at)}</p>
               </div>
             </CardContent>
@@ -360,29 +358,29 @@ export default function TripDetail() {
           {/* Timing Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Timing & Warehouses</CardTitle>
+              <CardTitle>{t('trips.timingWarehouses')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-gray-500">Start Time</label>
+                <label className="text-sm font-medium text-gray-500">{t('trips.startTime')}</label>
                 <p className="text-sm text-gray-900" data-testid="text-start-time">{formatDateTime(trip.start_time)}</p>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-500">End Time</label>
+                <label className="text-sm font-medium text-gray-500">{t('trips.endTime')}</label>
                 <p className="text-sm text-gray-900" data-testid="text-end-time">{formatDateTime(trip.end_time)}</p>
               </div>
 
               {trip.start_warehouse_uuid && (
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Start Warehouse</label>
+                  <label className="text-sm font-medium text-gray-500">{t('trips.startWarehouse')}</label>
                   <p className="text-sm font-mono text-gray-900 break-all" data-testid="text-start-warehouse-uuid">{trip.start_warehouse_uuid}</p>
                 </div>
               )}
 
               {trip.end_warehouse_uuid && (
                 <div>
-                  <label className="text-sm font-medium text-gray-500">End Warehouse</label>
+                  <label className="text-sm font-medium text-gray-500">{t('trips.endWarehouse')}</label>
                   <p className="text-sm font-mono text-gray-900 break-all" data-testid="text-end-warehouse-uuid">{trip.end_warehouse_uuid}</p>
                 </div>
               )}
@@ -395,7 +393,7 @@ export default function TripDetail() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Banknote className="h-5 w-5 text-gray-600" />
-              <CardTitle>Expected Cash</CardTitle>
+              <CardTitle>{t('trips.expectedCash')}</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -403,13 +401,13 @@ export default function TripDetail() {
               <div className="flex flex-wrap gap-3">
                 {Object.entries(trip.expected_cash).map(([cur, amt]) => (
                   <div key={cur} className="border rounded-md px-4 py-2" data-testid={`expected-cash-${cur}`}>
-                    <div className="text-xs text-gray-500">{cur}</div>
+                    <div className="text-xs text-gray-500">{te(cur)}</div>
                     <div className="text-lg font-semibold">{Number(amt).toFixed(2)}</div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500" data-testid="expected-cash-empty">No cash collected on this trip yet.</p>
+              <p className="text-sm text-gray-500" data-testid="expected-cash-empty">{t('trips.noCashCollected')}</p>
             )}
           </CardContent>
         </Card>
@@ -417,7 +415,7 @@ export default function TripDetail() {
         {/* Start/end inventory + reconciliation */}
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Trip Inventory</CardTitle>
+            <CardTitle>{t('trips.inventory')}</CardTitle>
           </CardHeader>
           <CardContent>
             {trip.inventory_reconciliation && Object.keys(trip.inventory_reconciliation).length > 0 ? (
@@ -425,12 +423,12 @@ export default function TripDetail() {
                 <table className="w-full text-sm" data-testid="table-trip-inventory">
                   <thead>
                     <tr className="text-start text-gray-500 border-b">
-                      <th className="py-2 pe-4 font-medium">Material</th>
-                      <th className="py-2 pe-4 font-medium text-end">Start</th>
-                      <th className="py-2 pe-4 font-medium text-end">Sold</th>
-                      <th className="py-2 pe-4 font-medium text-end">Expected End</th>
-                      <th className="py-2 pe-4 font-medium text-end">End</th>
-                      <th className="py-2 font-medium text-end">Variance</th>
+                      <th className="py-2 pe-4 font-medium">{t('trips.material')}</th>
+                      <th className="py-2 pe-4 font-medium text-end">{t('trips.reconStart')}</th>
+                      <th className="py-2 pe-4 font-medium text-end">{t('trips.reconSold')}</th>
+                      <th className="py-2 pe-4 font-medium text-end">{t('trips.reconExpectedEnd')}</th>
+                      <th className="py-2 pe-4 font-medium text-end">{t('trips.reconEnd')}</th>
+                      <th className="py-2 font-medium text-end">{t('trips.reconVariance')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -456,12 +454,12 @@ export default function TripDetail() {
                 </table>
                 {!trip.end_inventory || Object.keys(trip.end_inventory).length === 0 ? (
                   <p className="text-xs text-gray-500 mt-2">
-                    End inventory not snapshotted yet — End and Variance fill in when the trip completes.
+                    {t('trips.endInventoryNote')}
                   </p>
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm text-gray-500" data-testid="trip-inventory-empty">No inventory snapshot for this trip.</p>
+              <p className="text-sm text-gray-500" data-testid="trip-inventory-empty">{t('trips.noInventorySnapshot')}</p>
             )}
           </CardContent>
         </Card>
@@ -472,7 +470,7 @@ export default function TripDetail() {
             vehicleUuid={trip.vehicle_uuid}
             windowStart={trip.start_time || trip.created_at}
             windowEnd={trip.end_time}
-            title="Vehicle Inventory During Trip"
+            title={t('trips.vehicleInventoryDuringTrip')}
           />
         </div>
 
@@ -480,7 +478,7 @@ export default function TripDetail() {
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Trip Stops</CardTitle>
+              <CardTitle>{t('trips.stopsTitle')}</CardTitle>
               <div className="flex gap-2">
                 <Button
                   variant={stopsView === "table" ? "default" : "outline"}
@@ -488,7 +486,7 @@ export default function TripDetail() {
                   onClick={() => setStopsView("table")}
                   data-testid="button-stops-table"
                 >
-                  <TableIcon className="h-4 w-4 me-2" /> Table
+                  <TableIcon className="h-4 w-4 me-2" /> {t('trips.tableView')}
                 </Button>
                 <Button
                   variant={stopsView === "map" ? "default" : "outline"}
@@ -496,14 +494,14 @@ export default function TripDetail() {
                   onClick={() => setStopsView("map")}
                   data-testid="button-stops-map"
                 >
-                  <MapIcon className="h-4 w-4 me-2" /> Map
+                  <MapIcon className="h-4 w-4 me-2" /> {t('trips.mapView')}
                 </Button>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             {stops.length === 0 ? (
-              <p className="text-sm text-gray-500" data-testid="trip-stops-empty">No stops on this trip yet.</p>
+              <p className="text-sm text-gray-500" data-testid="trip-stops-empty">{t('trips.noStopsYet')}</p>
             ) : stopsView === "map" ? (
               <TripStopsMap stops={stops} />
             ) : (
@@ -512,10 +510,10 @@ export default function TripDetail() {
                   <thead>
                     <tr className="text-start text-gray-500 border-b">
                       <th className="py-2 pe-4 font-medium">#</th>
-                      <th className="py-2 pe-4 font-medium">Customer</th>
-                      <th className="py-2 pe-4 font-medium">Status</th>
-                      <th className="py-2 pe-4 font-medium">Outcome</th>
-                      <th className="py-2 font-medium">Completed</th>
+                      <th className="py-2 pe-4 font-medium">{t('trips.customer')}</th>
+                      <th className="py-2 pe-4 font-medium">{t('common.status')}</th>
+                      <th className="py-2 pe-4 font-medium">{t('trips.outcome')}</th>
+                      <th className="py-2 font-medium">{t('trips.colCompleted')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -525,10 +523,10 @@ export default function TripDetail() {
                         <td className="py-2 pe-4">{s.customer_name || "—"}</td>
                         <td className="py-2 pe-4">
                           <Badge variant={s.status === "completed" ? "secondary" : "outline"}>
-                            {s.status || "—"}
+                            {s.status ? te(s.status) : "—"}
                           </Badge>
                         </td>
-                        <td className="py-2 pe-4 max-w-[240px] truncate">{s.outcome || "—"}</td>
+                        <td className="py-2 pe-4 max-w-[240px] truncate">{s.outcome ? te(s.outcome) : "—"}</td>
                         <td className="py-2 whitespace-nowrap">{s.completed_at ? formatDateTime(s.completed_at) : "—"}</td>
                       </tr>
                     ))}
@@ -537,7 +535,11 @@ export default function TripDetail() {
                 {stops.length > PAGE_SIZE && (
                   <div className="flex items-center justify-end gap-3 mt-3">
                     <span className="text-xs text-gray-500" data-testid="trip-stops-page-info">
-                      {stopsPage * PAGE_SIZE + 1}–{Math.min((stopsPage + 1) * PAGE_SIZE, stops.length)} of {stops.length}
+                      {t('trips.pageRange', {
+                        from: stopsPage * PAGE_SIZE + 1,
+                        to: Math.min((stopsPage + 1) * PAGE_SIZE, stops.length),
+                        total: stops.length,
+                      })}
                     </span>
                     <Button
                       variant="outline"
@@ -568,7 +570,7 @@ export default function TripDetail() {
         {locationData && (
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Location Tracking</CardTitle>
+              <CardTitle>{t('nav.locationTracking')}</CardTitle>
             </CardHeader>
             <CardContent>
               <TripLocationMap
@@ -583,7 +585,7 @@ export default function TripDetail() {
         {/* Orders / fulfillments / payments at this trip's stops */}
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Trip Activity</CardTitle>
+            <CardTitle>{t('trips.activityTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs
@@ -592,16 +594,16 @@ export default function TripDetail() {
             >
               <TabsList data-testid="tabs-trip-activity">
                 <TabsTrigger value="orders" data-testid="tab-orders">
-                  Orders ({activity?.orders?.length ?? 0})
+                  {t('trips.tabOrders', { count: activity?.orders?.length ?? 0 })}
                 </TabsTrigger>
                 <TabsTrigger value="fulfillments" data-testid="tab-fulfillments">
-                  Fulfilled ({activity?.fulfillments?.length ?? 0})
+                  {t('trips.tabFulfilled', { count: activity?.fulfillments?.length ?? 0 })}
                 </TabsTrigger>
                 <TabsTrigger value="payments" data-testid="tab-payments">
-                  Paid ({activity?.payments?.length ?? 0})
+                  {t('trips.tabPaid', { count: activity?.payments?.length ?? 0 })}
                 </TabsTrigger>
                 <TabsTrigger value="analytics" data-testid="tab-analytics">
-                  Analytics
+                  {t('trips.tabAnalytics')}
                 </TabsTrigger>
               </TabsList>
 
@@ -610,29 +612,29 @@ export default function TripDetail() {
                   <TripAnalytics activity={activity} />
                 ) : pageRows.length === 0 ? (
                   <p className="text-sm text-gray-500 py-6 text-center" data-testid="trip-activity-empty">
-                    Nothing here for this trip yet.
+                    {t('trips.nothingHere')}
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm" data-testid="table-trip-activity">
                       <thead>
                         <tr className="text-start text-gray-500 border-b">
-                          <th className="py-2 pe-4 font-medium">Date</th>
-                          <th className="py-2 pe-4 font-medium">Customer</th>
+                          <th className="py-2 pe-4 font-medium">{t('common.date')}</th>
+                          <th className="py-2 pe-4 font-medium">{t('trips.customer')}</th>
                           {activityTab === "orders" && (
                             <>
-                              <th className="py-2 pe-4 font-medium text-end">Total</th>
-                              <th className="py-2 font-medium">Status</th>
+                              <th className="py-2 pe-4 font-medium text-end">{t('common.total')}</th>
+                              <th className="py-2 font-medium">{t('common.status')}</th>
                             </>
                           )}
                           {activityTab === "fulfillments" && (
                             <>
-                              <th className="py-2 pe-4 font-medium">Material</th>
-                              <th className="py-2 font-medium text-end">Qty</th>
+                              <th className="py-2 pe-4 font-medium">{t('trips.material')}</th>
+                              <th className="py-2 font-medium text-end">{t('trips.qty')}</th>
                             </>
                           )}
                           {activityTab === "payments" && (
-                            <th className="py-2 font-medium text-end">Amount</th>
+                            <th className="py-2 font-medium text-end">{t('common.amount')}</th>
                           )}
                         </tr>
                       </thead>
@@ -653,14 +655,14 @@ export default function TripDetail() {
                             <td className="py-2 pe-4">{r.customer_name || "—"}</td>
                             {activityTab === "orders" && (
                               <>
-                                <td className="py-2 pe-4 text-end">{r.total} {r.currency}</td>
+                                <td className="py-2 pe-4 text-end">{r.total} {te(r.currency)}</td>
                                 <td className="py-2">
                                   <div className="flex gap-2">
                                     <Badge variant={r.is_paid ? "secondary" : "destructive"}>
-                                      {r.is_paid ? "Paid" : "Unpaid"}
+                                      {r.is_paid ? te("paid") : te("unpaid")}
                                     </Badge>
                                     <Badge variant={r.is_fulfilled ? "secondary" : "outline"}>
-                                      {r.is_fulfilled ? "Fulfilled" : "Unfulfilled"}
+                                      {r.is_fulfilled ? te("fulfilled") : t("trips.unfulfilled")}
                                     </Badge>
                                   </div>
                                 </td>
@@ -673,7 +675,7 @@ export default function TripDetail() {
                               </>
                             )}
                             {activityTab === "payments" && (
-                              <td className="py-2 text-end">{r.amount} {r.currency}</td>
+                              <td className="py-2 text-end">{r.amount} {te(r.currency)}</td>
                             )}
                           </tr>
                         ))}
@@ -686,7 +688,11 @@ export default function TripDetail() {
                 {activityTab !== "analytics" && activityRows.length > PAGE_SIZE && (
                   <div className="flex items-center justify-end gap-3 mt-3">
                     <span className="text-xs text-gray-500" data-testid="trip-activity-page-info">
-                      {activityPage * PAGE_SIZE + 1}–{Math.min((activityPage + 1) * PAGE_SIZE, activityRows.length)} of {activityRows.length}
+                      {t('trips.pageRange', {
+                        from: activityPage * PAGE_SIZE + 1,
+                        to: Math.min((activityPage + 1) * PAGE_SIZE, activityRows.length),
+                        total: activityRows.length,
+                      })}
                     </span>
                     <Button
                       variant="outline"
@@ -717,7 +723,7 @@ export default function TripDetail() {
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Notes</CardTitle>
+              <CardTitle>{t('common.notes')}</CardTitle>
               {!isEditing && (
                 <Button
                   variant="outline"
@@ -726,7 +732,7 @@ export default function TripDetail() {
                   data-testid="button-edit-notes"
                 >
                   <Edit3 className="h-4 w-4 me-2" />
-                  Edit
+                  {t('common.edit')}
                 </Button>
               )}
             </div>
@@ -738,7 +744,7 @@ export default function TripDetail() {
                   value={editedNotes}
                   onChange={(e) => setEditedNotes(e.target.value)}
                   rows={4}
-                  placeholder="Enter trip notes..."
+                  placeholder={t('trips.notesPlaceholder')}
                   data-testid="input-edit-notes"
                 />
                 <div className="flex gap-2">
@@ -749,7 +755,7 @@ export default function TripDetail() {
                     data-testid="button-save-notes"
                   >
                     <Save className="h-4 w-4 me-2" />
-                    {updateTripMutation.isPending ? 'Saving...' : 'Save'}
+                    {updateTripMutation.isPending ? t('common.saving') : t('common.save')}
                   </Button>
                   <Button
                     variant="outline"
@@ -758,13 +764,13 @@ export default function TripDetail() {
                     data-testid="button-cancel-edit"
                   >
                     <X className="h-4 w-4 me-2" />
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                 </div>
               </div>
             ) : (
               <p className="text-sm text-gray-900 whitespace-pre-wrap" data-testid="text-notes">
-                {trip.notes || 'No notes available'}
+                {trip.notes || t('trips.noNotes')}
               </p>
             )}
           </CardContent>
@@ -774,7 +780,7 @@ export default function TripDetail() {
         {trip.data && (
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Trip Data</CardTitle>
+              <CardTitle>{t('trips.tripData')}</CardTitle>
             </CardHeader>
             <CardContent>
               <pre className="text-xs bg-gray-50 p-4 rounded overflow-auto" data-testid="text-trip-data">

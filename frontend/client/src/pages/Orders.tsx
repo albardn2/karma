@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Plus, Search, Eye, Edit } from "lucide-react";
 import type { CustomerOrder } from "@shared/schema";
 
 export default function Orders() {
+  const { t, te } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data: orders, isLoading } = useQuery<CustomerOrder[]>({
@@ -42,12 +44,12 @@ export default function Orders() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Orders</h2>
-            <p className="text-sm text-gray-600">Manage customer orders and fulfillment</p>
+            <h2 className="text-2xl font-bold text-gray-900">{t('misc.orders.title')}</h2>
+            <p className="text-sm text-gray-600">{t('misc.orders.subtitle')}</p>
           </div>
           <Button className="brand-gradient hover:opacity-90">
             <Plus className="w-4 h-4 me-2" />
-            Create Order
+            {t('misc.orders.create')}
           </Button>
         </div>
 
@@ -55,7 +57,7 @@ export default function Orders() {
         <div className="relative mb-6">
           <Search className="absolute start-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
-            placeholder="Search orders..."
+            placeholder={t('misc.orders.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="ps-10"
@@ -70,19 +72,19 @@ export default function Orders() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Order ID
+                      {t('misc.orders.orderId')}
                     </th>
                     <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Customer
+                      {t('misc.customer')}
                     </th>
                     <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      {t('common.status')}
                     </th>
                     <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Created
+                      {t('misc.orders.created')}
                     </th>
                     <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+                      {t('common.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -99,7 +101,7 @@ export default function Orders() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-                          In Progress
+                          {te('in_progress')}
                         </Badge>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -109,11 +111,11 @@ export default function Orders() {
                         <div className="flex space-x-2 rtl:space-x-reverse">
                           <Button variant="outline" size="sm">
                             <Eye className="w-4 h-4 me-1" />
-                            View
+                            {t('common.view')}
                           </Button>
                           <Button variant="outline" size="sm">
                             <Edit className="w-4 h-4 me-1" />
-                            Edit
+                            {t('common.edit')}
                           </Button>
                         </div>
                       </td>
@@ -128,13 +130,13 @@ export default function Orders() {
         {filteredOrders.length === 0 && (
           <div className="text-center py-12">
             <div className="text-gray-400 text-6xl mb-4">📋</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No orders found</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('misc.orders.noneFound')}</h3>
             <p className="text-gray-600 mb-4">
-              {searchTerm ? "Try adjusting your search terms" : "Get started by creating your first order"}
+              {searchTerm ? t('misc.searchAdjust') : t('misc.orders.emptyHint')}
             </p>
             <Button className="brand-gradient hover:opacity-90">
               <Plus className="w-4 h-4 me-2" />
-              Create Order
+              {t('misc.orders.create')}
             </Button>
           </div>
         )}

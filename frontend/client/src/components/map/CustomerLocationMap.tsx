@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CustomerLocationMapProps {
   coordinates: [number, number];
@@ -38,8 +39,9 @@ function createCustomerIcon() {
 }
 
 export function CustomerLocationMap({ coordinates, customerName }: CustomerLocationMapProps) {
+  const { t } = useLanguage();
   // Validate coordinates
-  if (!coordinates || 
+  if (!coordinates ||
       !Array.isArray(coordinates) || 
       coordinates.length < 2 ||
       typeof coordinates[0] !== 'number' || 
@@ -48,13 +50,13 @@ export function CustomerLocationMap({ coordinates, customerName }: CustomerLocat
       isNaN(coordinates[1])) {
     return (
       <div className="h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">Invalid customer coordinates</p>
+        <p className="text-gray-500 dark:text-gray-400">{t("location.invalidCustomerCoords")}</p>
       </div>
     );
   }
 
   return (
-    <div className="h-96 w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+    <div className="h-96 w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700" dir="ltr">
       <MapContainer
         center={coordinates}
         zoom={15}
@@ -74,13 +76,13 @@ export function CustomerLocationMap({ coordinates, customerName }: CustomerLocat
           <Popup>
             <div className="p-2">
               <h3 className="font-semibold text-gray-900">
-                {customerName || "Customer Location"}
+                {customerName || t("location.customerLocation")}
               </h3>
               <p className="text-xs text-gray-600 mt-1">
-                Latitude: {coordinates[0].toFixed(6)}
+                {t("location.latitudeLabel", { value: coordinates[0].toFixed(6) })}
               </p>
               <p className="text-xs text-gray-600">
-                Longitude: {coordinates[1].toFixed(6)}
+                {t("location.longitudeLabel", { value: coordinates[1].toFixed(6) })}
               </p>
             </div>
           </Popup>

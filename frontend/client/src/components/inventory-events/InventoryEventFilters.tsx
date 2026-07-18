@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Filter, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface InventoryEventFilters {
   uuid?: string;
@@ -25,6 +26,7 @@ interface InventoryEventFiltersProps {
 }
 
 export function InventoryEventFilters({ filters, onFiltersChange, totalCount, perPage, onPerPageChange }: InventoryEventFiltersProps) {
+  const { t, te } = useLanguage();
   const [localFilters, setLocalFilters] = useState<InventoryEventFilters>(filters);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -57,7 +59,7 @@ export function InventoryEventFilters({ filters, onFiltersChange, totalCount, pe
       <SheetTrigger asChild>
         <Button variant="outline" className="relative">
           <Filter className="h-4 w-4 me-2" />
-          Filters
+          {t('common.filters')}
           {hasActiveFilters && (
             <div className="absolute -top-1 -end-1 h-2 w-2 bg-[#5469D4] rounded-full" />
           )}
@@ -65,44 +67,44 @@ export function InventoryEventFilters({ filters, onFiltersChange, totalCount, pe
       </SheetTrigger>
       <SheetContent className="w-80">
         <SheetHeader>
-          <SheetTitle>Filter Inventory Events</SheetTitle>
+          <SheetTitle>{t('inventoryEvents.filterTitle')}</SheetTitle>
         </SheetHeader>
         <div className="space-y-6 mt-6">
           <div className="space-y-4">
             <div>
-              <Label htmlFor="uuid">UUID</Label>
+              <Label htmlFor="uuid">{t('inventoryEvents.uuid')}</Label>
               <Input
                 id="uuid"
-                placeholder="Enter event UUID"
+                placeholder={t('inventoryEvents.eventUuidPlaceholder')}
                 value={localFilters.uuid || ""}
                 onChange={(e) => setLocalFilters({ ...localFilters, uuid: e.target.value })}
               />
             </div>
 
             <div>
-              <Label htmlFor="inventory_uuid">Inventory UUID</Label>
+              <Label htmlFor="inventory_uuid">{t('inventoryEvents.inventoryUuid')}</Label>
               <Input
                 id="inventory_uuid"
-                placeholder="Enter inventory UUID"
+                placeholder={t('inventoryEvents.inventoryUuidPlaceholder')}
                 value={localFilters.inventory_uuid || ""}
                 onChange={(e) => setLocalFilters({ ...localFilters, inventory_uuid: e.target.value })}
               />
             </div>
 
             <div>
-              <Label htmlFor="event_type">Event Type</Label>
+              <Label htmlFor="event_type">{t('inventoryEvents.eventType')}</Label>
               <Select
                 value={localFilters.event_type || "all"}
                 onValueChange={(value) => setLocalFilters({ ...localFilters, event_type: value === "all" ? undefined : value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select event type" />
+                  <SelectValue placeholder={t('inventoryEvents.selectEventType')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="all">{t('inventoryEvents.allTypes')}</SelectItem>
                   {eventTypes?.map((type) => (
                     <SelectItem key={type} value={type}>
-                      {type.replace('_', ' ').toUpperCase()}
+                      {te(type)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -110,7 +112,7 @@ export function InventoryEventFilters({ filters, onFiltersChange, totalCount, pe
             </div>
 
             <div>
-              <Label htmlFor="start_date">Start Date</Label>
+              <Label htmlFor="start_date">{t('inventoryEvents.startDate')}</Label>
               <Input
                 id="start_date"
                 type="datetime-local"
@@ -120,7 +122,7 @@ export function InventoryEventFilters({ filters, onFiltersChange, totalCount, pe
             </div>
 
             <div>
-              <Label htmlFor="end_date">End Date</Label>
+              <Label htmlFor="end_date">{t('inventoryEvents.endDate')}</Label>
               <Input
                 id="end_date"
                 type="datetime-local"
@@ -130,7 +132,7 @@ export function InventoryEventFilters({ filters, onFiltersChange, totalCount, pe
             </div>
 
             <div>
-              <Label htmlFor="per_page">Items per page</Label>
+              <Label htmlFor="per_page">{t('inventoryEvents.itemsPerPage')}</Label>
               <Select value={String(perPage)} onValueChange={(value) => onPerPageChange(Number(value))}>
                 <SelectTrigger>
                   <SelectValue />
@@ -147,16 +149,16 @@ export function InventoryEventFilters({ filters, onFiltersChange, totalCount, pe
 
           <div className="flex items-center justify-between pt-4 border-t">
             <p className="text-sm text-muted-foreground">
-              {totalCount} total events
+              {t('inventoryEvents.totalEvents', { count: totalCount })}
             </p>
           </div>
 
           <div className="flex gap-3">
             <Button onClick={handleApplyFilters} className="flex-1 bg-[#5469D4] hover:bg-[#4356C7]">
-              Apply Filters
+              {t('inventoryEvents.applyFilters')}
             </Button>
             <Button variant="outline" onClick={handleClearFilters}>
-              Clear
+              {t('inventoryEvents.clear')}
             </Button>
           </div>
         </div>

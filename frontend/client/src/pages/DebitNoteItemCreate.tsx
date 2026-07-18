@@ -16,10 +16,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const createSchema = z.object({
-  amount: z.number().min(0.01, "Amount must be greater than 0"),
-  currency: z.string().min(1, "Currency is required"),
+  amount: z.number().min(0.01, "notes.validationAmount"),
+  currency: z.string().min(1, "notes.validationCurrency"),
   notes: z.string().optional(),
   invoice_item_uuid: z.string().optional(),
   customer_uuid: z.string().optional(),
@@ -34,6 +35,7 @@ type CreateFormData = z.infer<typeof createSchema>;
 export default function DebitNoteItemCreate() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const [activeTab, setActiveTab] = useState("invoice_item");
   
   // Get URL parameters for pre-filling
@@ -105,16 +107,16 @@ export default function DebitNoteItemCreate() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/debit-note-item/"] });
       toast({
-        title: "Success",
-        description: "Debit note item created successfully",
+        title: t('common.success'),
+        description: t('notes.debitCreated'),
       });
       setLocation("/debit-note-items");
     },
     onError: (error: any) => {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to create debit note item",
+        title: t('common.error'),
+        description: error.message || t('notes.debitCreateFailed'),
       });
     }
   });
@@ -156,8 +158,8 @@ export default function DebitNoteItemCreate() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Create Debit Note Item</h1>
-            <p className="text-gray-600">Add a new debit note item for charges and adjustments</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('notes.createDebitItem')}</h1>
+            <p className="text-gray-600">{t('notes.createDebitSubtitle')}</p>
           </div>
         </div>
 
@@ -166,16 +168,16 @@ export default function DebitNoteItemCreate() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-purple-600" />
-                Debit Note Information
+                {t('notes.debitInfo')}
               </CardTitle>
               <CardDescription>
-                Enter the basic information for the debit note item
+                {t('notes.debitInfoDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount *</Label>
+                  <Label htmlFor="amount">{t('common.amount')} *</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -185,44 +187,44 @@ export default function DebitNoteItemCreate() {
                     className={prefilledAmount ? "bg-blue-50 border-blue-200" : ""}
                   />
                   {prefilledAmount && (
-                    <p className="text-xs text-blue-600">Pre-filled from previous page</p>
+                    <p className="text-xs text-blue-600">{t('notes.prefilledPrevious')}</p>
                   )}
                   {form.formState.errors.amount && (
-                    <p className="text-sm text-red-600">{form.formState.errors.amount.message}</p>
+                    <p className="text-sm text-red-600">{t(form.formState.errors.amount.message || '')}</p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="currency">Currency *</Label>
-                  <Select 
-                    value={form.watch("currency")} 
+                  <Label htmlFor="currency">{t('common.currency')} *</Label>
+                  <Select
+                    value={form.watch("currency")}
                     onValueChange={(value) => form.setValue("currency", value)}
                   >
                     <SelectTrigger className={prefilledCurrency ? "bg-blue-50 border-blue-200" : ""}>
-                      <SelectValue placeholder="Select currency" />
+                      <SelectValue placeholder={t('notes.selectCurrency')} />
                     </SelectTrigger>
                     <SelectContent>
                       {currencies?.map((currency) => (
                         <SelectItem key={currency} value={currency}>
-                          {currency}
+                          {te(currency)}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   {prefilledCurrency && (
-                    <p className="text-xs text-blue-600">Pre-filled from previous page</p>
+                    <p className="text-xs text-blue-600">{t('notes.prefilledPrevious')}</p>
                   )}
                   {form.formState.errors.currency && (
-                    <p className="text-sm text-red-600">{form.formState.errors.currency.message}</p>
+                    <p className="text-sm text-red-600">{t(form.formState.errors.currency.message || '')}</p>
                   )}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes">{t('common.notes')}</Label>
                 <Textarea
                   id="notes"
-                  placeholder="Enter any additional notes..."
+                  placeholder={t('notes.notesPlaceholder')}
                   {...form.register("notes")}
                   rows={3}
                   className="resize-none"
@@ -230,7 +232,7 @@ export default function DebitNoteItemCreate() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="inventory_change">Inventory Change</Label>
+                <Label htmlFor="inventory_change">{t('notes.inventoryChange')}</Label>
                 <Input
                   id="inventory_change"
                   type="number"
@@ -247,7 +249,7 @@ export default function DebitNoteItemCreate() {
                   onCheckedChange={(checked) => form.setValue("create_payment", !!checked)}
                 />
                 <Label htmlFor="create_payment" className="text-sm font-medium">
-                  Auto Pay (automatically create payment record)
+                  {t('notes.autoPayDebit')}
                 </Label>
               </div>
             </CardContent>
@@ -255,9 +257,9 @@ export default function DebitNoteItemCreate() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Reference Selection</CardTitle>
+              <CardTitle>{t('notes.referenceSelection')}</CardTitle>
               <CardDescription>
-                Select the type of reference and provide the UUID
+                {t('notes.selectReferenceProvideUuidDebit')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -265,78 +267,78 @@ export default function DebitNoteItemCreate() {
                 <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="invoice_item" className="flex items-center gap-1">
                     <span className={getTabIcon("invoice_item").props.className + " " + getTabColor("invoice_item")}>{getTabIcon("invoice_item")}</span>
-                    Invoice Item
+                    {t('notes.refInvoiceItem')}
                   </TabsTrigger>
                   <TabsTrigger value="customer" className="flex items-center gap-1">
                     <span className={getTabIcon("customer").props.className + " " + getTabColor("customer")}>{getTabIcon("customer")}</span>
-                    Customer
+                    {t('notes.refCustomer')}
                   </TabsTrigger>
                   <TabsTrigger value="vendor" className="flex items-center gap-1">
                     <span className={getTabIcon("vendor").props.className + " " + getTabColor("vendor")}>{getTabIcon("vendor")}</span>
-                    Vendor
+                    {t('notes.refVendor')}
                   </TabsTrigger>
                   <TabsTrigger value="purchase_order_item" className="flex items-center gap-1">
                     <span className={getTabIcon("purchase_order_item").props.className + " " + getTabColor("purchase_order_item")}>{getTabIcon("purchase_order_item")}</span>
-                    Purchase Order Item
+                    {t('notes.refPurchaseOrderItem')}
                   </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="invoice_item" className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="invoice_item_uuid">Invoice Item UUID</Label>
+                    <Label htmlFor="invoice_item_uuid">{t('notes.invoiceItemUuid')}</Label>
                     <Input
                       id="invoice_item_uuid"
-                      placeholder="Enter invoice item UUID..."
+                      placeholder={t('notes.enterInvoiceItemUuid')}
                       {...form.register("invoice_item_uuid")}
                       className={prefilledInvoiceItemUuid ? "bg-purple-50 border-purple-200" : ""}
                     />
                     {prefilledInvoiceItemUuid && (
-                      <p className="text-xs text-purple-600">Pre-filled from previous page</p>
+                      <p className="text-xs text-purple-600">{t('notes.prefilledPrevious')}</p>
                     )}
                   </div>
                 </TabsContent>
 
                 <TabsContent value="customer" className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="customer_uuid">Customer UUID</Label>
+                    <Label htmlFor="customer_uuid">{t('notes.customerUuid')}</Label>
                     <Input
                       id="customer_uuid"
-                      placeholder="Enter customer UUID..."
+                      placeholder={t('notes.enterCustomerUuid')}
                       {...form.register("customer_uuid")}
                       className={prefilledCustomerUuid ? "bg-blue-50 border-blue-200" : ""}
                     />
                     {prefilledCustomerUuid && (
-                      <p className="text-xs text-blue-600">Pre-filled from previous page</p>
+                      <p className="text-xs text-blue-600">{t('notes.prefilledPrevious')}</p>
                     )}
                   </div>
                 </TabsContent>
 
                 <TabsContent value="vendor" className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="vendor_uuid">Vendor UUID</Label>
+                    <Label htmlFor="vendor_uuid">{t('notes.vendorUuid')}</Label>
                     <Input
                       id="vendor_uuid"
-                      placeholder="Enter vendor UUID..."
+                      placeholder={t('notes.enterVendorUuid')}
                       {...form.register("vendor_uuid")}
                       className={prefilledVendorUuid ? "bg-green-50 border-green-200" : ""}
                     />
                     {prefilledVendorUuid && (
-                      <p className="text-xs text-green-600">Pre-filled from previous page</p>
+                      <p className="text-xs text-green-600">{t('notes.prefilledPrevious')}</p>
                     )}
                   </div>
                 </TabsContent>
 
                 <TabsContent value="purchase_order_item" className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="purchase_order_item_uuid">Purchase Order Item UUID</Label>
+                    <Label htmlFor="purchase_order_item_uuid">{t('notes.purchaseOrderItemUuid')}</Label>
                     <Input
                       id="purchase_order_item_uuid"
-                      placeholder="Enter purchase order item UUID..."
+                      placeholder={t('notes.enterPurchaseOrderItemUuid')}
                       {...form.register("purchase_order_item_uuid")}
                       className={prefilledPurchaseOrderItemUuid ? "bg-orange-50 border-orange-200" : ""}
                     />
                     {prefilledPurchaseOrderItemUuid && (
-                      <p className="text-xs text-orange-600">Pre-filled from previous page</p>
+                      <p className="text-xs text-orange-600">{t('notes.prefilledPrevious')}</p>
                     )}
                   </div>
                 </TabsContent>
@@ -351,14 +353,14 @@ export default function DebitNoteItemCreate() {
               onClick={() => setLocation("/debit-note-items")}
               disabled={createMutation.isPending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="bg-purple-600 hover:bg-purple-700"
               disabled={createMutation.isPending}
             >
-              {createMutation.isPending ? "Creating..." : "Create Debit Note Item"}
+              {createMutation.isPending ? t('common.creating') : t('notes.createDebitItem')}
             </Button>
           </div>
         </form>

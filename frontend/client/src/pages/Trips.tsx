@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { Truck, Plus, Trash2 } from "lucide-react";
 import { TripFilters } from "@/components/trips/TripFilters";
@@ -31,6 +32,7 @@ export default function Trips() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [deleteTargetUuid, setDeleteTargetUuid] = useState<string | null>(null);
   const { isAdmin } = useAuth();
+  const { t, te } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -41,10 +43,10 @@ export default function Trips() {
       // the paired workflow execution is soft-deleted too
       queryClient.invalidateQueries({ queryKey: ["/workflow-execution/"] });
       if (trips.length === 1 && currentPage > 1) setCurrentPage(currentPage - 1);
-      toast({ title: "Trip deleted" });
+      toast({ title: t('trips.tripDeleted') });
     },
     onError: (e: Error) => {
-      toast({ title: "Failed to delete trip", description: e.message, variant: "destructive" });
+      toast({ title: t('trips.failedDelete'), description: e.message, variant: "destructive" });
     },
     onSettled: () => setDeleteTargetUuid(null),
   });
@@ -122,7 +124,7 @@ export default function Trips() {
   const totalPages = tripData?.pages || 0;
 
   const formatDateTime = (dateString?: string) => {
-    if (!dateString) return 'Not set';
+    if (!dateString) return t('trips.notSet');
     try {
       return format(new Date(dateString), 'MMM d, yyyy h:mm a');
     } catch {
@@ -145,19 +147,13 @@ export default function Trips() {
     }
   };
 
-  const formatStatus = (status: string) => {
-    return status.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
-  };
-
   return (
     <AppLayout>
       <div className="p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100 mb-2">Trips</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Manage delivery and distribution trips</p>
+          <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100 mb-2">{t('nav.trips')}</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{t('trips.subtitle')}</p>
         </div>
 
         {/* Tab Navigation and Actions */}
@@ -172,7 +168,7 @@ export default function Trips() {
               }`}
               data-testid="tab-all"
             >
-              All trips
+              {t('trips.tabAll')}
             </button>
             <button 
               onClick={() => handleTabChange('planned')}
@@ -183,7 +179,7 @@ export default function Trips() {
               }`}
               data-testid="tab-planned"
             >
-              Planned
+              {te('planned')}
             </button>
             <button 
               onClick={() => handleTabChange('in_progress')}
@@ -194,7 +190,7 @@ export default function Trips() {
               }`}
               data-testid="tab-in-progress"
             >
-              In Progress
+              {te('in_progress')}
             </button>
             <button 
               onClick={() => handleTabChange('completed')}
@@ -205,7 +201,7 @@ export default function Trips() {
               }`}
               data-testid="tab-completed"
             >
-              Completed
+              {te('completed')}
             </button>
             <button 
               onClick={() => handleTabChange('cancelled')}
@@ -216,7 +212,7 @@ export default function Trips() {
               }`}
               data-testid="tab-cancelled"
             >
-              Cancelled
+              {te('cancelled')}
             </button>
           </div>
           
@@ -234,7 +230,7 @@ export default function Trips() {
               data-testid="button-create-trip"
             >
               <Plus className="w-4 h-4 me-2" />
-              Create trip
+              {t('trips.createTrip')}
             </Button>
           </div>
         </div>
@@ -246,32 +242,32 @@ export default function Trips() {
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Trip ID
+                    {t('trips.colTripId')}
                   </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Vehicle
+                    {t('trips.colVehicle')}
                   </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Assigned To
+                    {t('trips.assignedTo')}
                   </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
+                    {t('common.status')}
                   </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Start Time
+                    {t('trips.startTime')}
                   </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    End Time
+                    {t('trips.endTime')}
                   </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Notes
+                    {t('common.notes')}
                   </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Created
+                    {t('trips.created')}
                   </th>
                   {isAdmin && (
                     <th className="px-6 py-3 text-end text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Actions
+                      {t('common.actions')}
                     </th>
                   )}
                 </tr>
@@ -285,7 +281,7 @@ export default function Trips() {
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-48 mx-auto"></div>
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-24 mx-auto"></div>
                       </div>
-                      <p className="mt-4 text-gray-500 dark:text-gray-400">Loading trips...</p>
+                      <p className="mt-4 text-gray-500 dark:text-gray-400">{t('trips.loading')}</p>
                     </td>
                   </tr>
                 ) : trips.length === 0 ? (
@@ -293,10 +289,10 @@ export default function Trips() {
                     <td colSpan={isAdmin ? 9 : 8} className="px-6 py-16 text-center">
                       <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                        {error ? "Error loading trips" : "No trips"}
+                        {error ? t('trips.errorLoading') : t('trips.noTrips')}
                       </h3>
                       <p className="text-gray-500 dark:text-gray-400 mb-6">
-                        {error ? `Error: ${error.message}` : "Get started by creating your first trip."}
+                        {error ? t('trips.errorMessage', { message: error.message }) : t('trips.emptyHint')}
                       </p>
                       {!error && (
                         <Button 
@@ -305,7 +301,7 @@ export default function Trips() {
                           data-testid="button-create-trip-empty"
                         >
                           <Plus className="w-4 h-4 me-2" />
-                          Create trip
+                          {t('trips.createTrip')}
                         </Button>
                       )}
                     </td>
@@ -335,7 +331,7 @@ export default function Trips() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadgeClass(trip.status)}`}>
-                          {formatStatus(trip.status)}
+                          {te(trip.status)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -386,9 +382,11 @@ export default function Trips() {
         {totalPages > 1 && (
           <div className="mt-6 flex items-center justify-between">
             <div className="text-sm text-gray-700 dark:text-gray-300">
-              Showing <span className="font-medium">{(currentPage - 1) * perPage + 1}</span> to{' '}
-              <span className="font-medium">{Math.min(currentPage * perPage, totalCount)}</span> of{' '}
-              <span className="font-medium">{totalCount}</span> results
+              {t('common.showing', {
+                from: (currentPage - 1) * perPage + 1,
+                to: Math.min(currentPage * perPage, totalCount),
+                total: totalCount,
+              })}
             </div>
             <div className="flex gap-2">
               <Button
@@ -397,7 +395,7 @@ export default function Trips() {
                 disabled={currentPage === 1}
                 data-testid="button-previous-page"
               >
-                Previous
+                {t('common.previous')}
               </Button>
               <Button
                 variant="outline"
@@ -405,7 +403,7 @@ export default function Trips() {
                 disabled={currentPage === totalPages}
                 data-testid="button-next-page"
               >
-                Next
+                {t('common.next')}
               </Button>
             </div>
           </div>
@@ -416,21 +414,20 @@ export default function Trips() {
       <AlertDialog open={!!deleteTargetUuid} onOpenChange={(open) => !open && setDeleteTargetUuid(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this trip?</AlertDialogTitle>
+            <AlertDialogTitle>{t('trips.deleteConfirmTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              The trip and its workflow execution will be removed from all lists. This
-              cannot be undone from the app.
+              {t('trips.deleteConfirmDescription')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete-trip">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-delete-trip">{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
               disabled={deleteTripMutation.isPending}
               onClick={() => deleteTargetUuid && deleteTripMutation.mutate(deleteTargetUuid)}
               data-testid="button-confirm-delete-trip"
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

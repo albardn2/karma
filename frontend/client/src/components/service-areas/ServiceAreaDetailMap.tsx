@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { MapContainer, TileLayer, Polygon, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // Fix for default markers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -62,15 +63,16 @@ function FitBounds({ coordinates }: { coordinates: [number, number][] }) {
 }
 
 export function ServiceAreaDetailMap({ geometry, name }: ServiceAreaDetailMapProps) {
+  const { t } = useLanguage();
   console.log('Received geometry:', geometry);
   const coordinates = parsePolygonWKT(geometry);
   console.log('Parsed coordinates:', coordinates);
-  
+
   if (coordinates.length === 0) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-100">
-        <p className="text-muted-foreground">Invalid geometry data</p>
-        <p className="text-xs text-gray-500 mt-2">Geometry: {geometry}</p>
+        <p className="text-muted-foreground">{t('serviceAreas.invalidGeometry')}</p>
+        <p className="text-xs text-gray-500 mt-2">{t('serviceAreas.geometryValue', { value: geometry })}</p>
       </div>
     );
   }
@@ -102,7 +104,7 @@ export function ServiceAreaDetailMap({ geometry, name }: ServiceAreaDetailMapPro
           <div className="space-y-2">
             <h3 className="font-semibold">{name}</h3>
             <p className="text-xs text-gray-500">
-              Service Area Boundary
+              {t('serviceAreas.boundary')}
             </p>
           </div>
         </Popup>

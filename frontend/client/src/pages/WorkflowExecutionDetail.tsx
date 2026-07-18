@@ -53,6 +53,7 @@ import {
 import { AppLayout } from "@/components/layout/AppLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import type { Workflow } from "@shared/schema";
 import type {
@@ -60,13 +61,13 @@ import type {
   WorkflowExecutionStatus,
   WorkflowExecutionCreate,
 } from "@/types/workflowExecution";
-import { WorkflowExecutionStatusLabels } from "@/types/workflowExecution";
 
 export default function WorkflowExecutionDetail() {
   const [, params] = useRoute("/workflow-execution/:uuid");
   const workflowUuid = params?.uuid || "";
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t, te } = useLanguage();
 
   const [filters, setFilters] = useState({
     uuid: "",
@@ -91,11 +92,11 @@ export default function WorkflowExecutionDetail() {
       queryClient.invalidateQueries({ queryKey: ["/workflow-execution/"] });
       // any trip the execution created is soft-deleted too
       queryClient.invalidateQueries({ queryKey: ["/trip/"] });
-      toast({ title: "Execution deleted" });
+      toast({ title: t('workflows.executionDeleted') });
     },
     onError: (error: any) => {
       toast({
-        title: "Failed to delete execution",
+        title: t('workflows.executionDeleteFailed'),
         description: error.message,
         variant: "destructive",
       });
@@ -152,8 +153,8 @@ export default function WorkflowExecutionDetail() {
       queryClient.invalidateQueries({ queryKey: ["/workflow-execution/"] });
       setShowExecuteDialog(false);
       toast({
-        title: "Execution started",
-        description: "Workflow execution has been initiated successfully.",
+        title: t('workflows.executionStarted'),
+        description: t('workflows.executionStartedDesc'),
       });
       // route straight to the new execution's detail page
       if (created?.uuid) {
@@ -162,8 +163,8 @@ export default function WorkflowExecutionDetail() {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to start workflow execution",
+        title: t('common.error'),
+        description: error.message || t('workflows.executionStartFailed'),
         variant: "destructive",
       });
     },
@@ -207,7 +208,7 @@ export default function WorkflowExecutionDetail() {
   };
 
   const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return "N/A";
+    if (!dateString) return t('workflows.na');
     return new Date(dateString).toLocaleString("en-US", {
       year: "numeric",
       month: "short",
@@ -218,7 +219,7 @@ export default function WorkflowExecutionDetail() {
   };
 
   const formatDuration = (start: string | null | undefined, end: string | null | undefined) => {
-    if (!start) return "N/A";
+    if (!start) return t('workflows.na');
     const startTime = new Date(start).getTime();
     const endTime = end ? new Date(end).getTime() : Date.now();
     const duration = Math.floor((endTime - startTime) / 1000);
@@ -288,12 +289,12 @@ export default function WorkflowExecutionDetail() {
               <Link href="/workflow-execution">
                 <Button variant="ghost" size="sm" data-testid="button-back">
                   <ArrowLeft className="h-4 w-4 me-2" />
-                  Back
+                  {t('common.back')}
                 </Button>
               </Link>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Workflow Executions
+                  {t('workflows.workflowExecutions')}
                 </h1>
                 {workflow && (
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -307,7 +308,7 @@ export default function WorkflowExecutionDetail() {
               data-testid="button-execute-workflow"
             >
               <Play className="h-4 w-4 me-2" />
-              Execute Workflow
+              {t('workflows.executeWorkflow')}
             </Button>
           </div>
 
@@ -321,7 +322,7 @@ export default function WorkflowExecutionDetail() {
                 data-testid="button-open-filters"
               >
                 <Filter className="h-4 w-4 me-2" />
-                Filters
+                {t('common.filters')}
                 {activeFiltersCount > 0 && (
                   <Badge variant="secondary" className="ms-2">
                     {activeFiltersCount}
@@ -337,14 +338,14 @@ export default function WorkflowExecutionDetail() {
               </div>
             ) : executions.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-500 dark:text-gray-400">No workflow executions found</p>
+                <p className="text-gray-500 dark:text-gray-400">{t('workflows.noExecutionsFound')}</p>
                 <Button
                   onClick={() => setShowExecuteDialog(true)}
                   className="mt-4"
                   data-testid="button-execute-first"
                 >
                   <Play className="h-4 w-4 me-2" />
-                  Execute Workflow
+                  {t('workflows.executeWorkflow')}
                 </Button>
               </div>
             ) : (
@@ -352,13 +353,13 @@ export default function WorkflowExecutionDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Started</TableHead>
-                      <TableHead>Ended</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Tags</TableHead>
-                      {isAdmin && <TableHead className="text-end">Actions</TableHead>}
+                      <TableHead>{t('common.name')}</TableHead>
+                      <TableHead>{t('common.status')}</TableHead>
+                      <TableHead>{t('workflows.started')}</TableHead>
+                      <TableHead>{t('workflows.ended')}</TableHead>
+                      <TableHead>{t('workflows.duration')}</TableHead>
+                      <TableHead>{t('workflows.tags')}</TableHead>
+                      {isAdmin && <TableHead className="text-end">{t('common.actions')}</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -379,7 +380,7 @@ export default function WorkflowExecutionDetail() {
                           <div className="flex items-center gap-2">
                             {getStatusIcon(execution.status)}
                             <Badge variant={getStatusBadgeVariant(execution.status)}>
-                              {WorkflowExecutionStatusLabels[execution.status]}
+                              {te(execution.status)}
                             </Badge>
                           </div>
                         </TableCell>
@@ -426,15 +427,14 @@ export default function WorkflowExecutionDetail() {
                 >
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete this execution?</AlertDialogTitle>
+                      <AlertDialogTitle>{t('workflows.deleteExecutionTitle')}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        The execution and any trip it created will be removed from all
-                        lists. This cannot be undone from the app.
+                        {t('workflows.deleteExecutionDesc')}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel data-testid="button-cancel-delete-execution">
-                        Cancel
+                        {t('common.cancel')}
                       </AlertDialogCancel>
                       <AlertDialogAction
                         className="bg-red-600 hover:bg-red-700"
@@ -442,7 +442,7 @@ export default function WorkflowExecutionDetail() {
                         onClick={() => deleteTargetUuid && deleteExecutionMutation.mutate(deleteTargetUuid)}
                         data-testid="button-confirm-delete-execution"
                       >
-                        Delete
+                        {t('common.delete')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -452,7 +452,7 @@ export default function WorkflowExecutionDetail() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between border-t p-4">
                     <div className="text-sm text-gray-500">
-                      Page {currentPage} of {totalPages}
+                      {t('common.page')} {currentPage} {t('common.of')} {totalPages}
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -462,7 +462,7 @@ export default function WorkflowExecutionDetail() {
                         disabled={currentPage === 1}
                         data-testid="button-previous-page"
                       >
-                        Previous
+                        {t('common.previous')}
                       </Button>
                       <Button
                         variant="outline"
@@ -471,7 +471,7 @@ export default function WorkflowExecutionDetail() {
                         disabled={currentPage === totalPages}
                         data-testid="button-next-page"
                       >
-                        Next
+                        {t('common.next')}
                       </Button>
                     </div>
                   </div>
@@ -484,17 +484,17 @@ export default function WorkflowExecutionDetail() {
           <Dialog open={showFiltersModal} onOpenChange={setShowFiltersModal}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Filter Workflow Executions</DialogTitle>
+                <DialogTitle>{t('workflows.filterExecutionsTitle')}</DialogTitle>
                 <DialogDescription>
-                  Apply filters to narrow down the executions list
+                  {t('workflows.filterExecutionsDesc')}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="grid grid-cols-2 gap-4 py-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">UUID</label>
+                  <label className="text-sm font-medium">{t('workflows.uuid')}</label>
                   <Input
-                    placeholder="Filter by UUID"
+                    placeholder={t('workflows.filterByUuid')}
                     value={tempFilters.uuid}
                     onChange={(e) => setTempFilters({ ...tempFilters, uuid: e.target.value })}
                     data-testid="input-filter-uuid"
@@ -502,9 +502,9 @@ export default function WorkflowExecutionDetail() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Name</label>
+                  <label className="text-sm font-medium">{t('common.name')}</label>
                   <Input
-                    placeholder="Filter by name"
+                    placeholder={t('workflows.filterByName')}
                     value={tempFilters.name}
                     onChange={(e) => setTempFilters({ ...tempFilters, name: e.target.value })}
                     data-testid="input-filter-name"
@@ -512,7 +512,7 @@ export default function WorkflowExecutionDetail() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Status</label>
+                  <label className="text-sm font-medium">{t('common.status')}</label>
                   <Select
                     value={tempFilters.status || ""}
                     onValueChange={(value) =>
@@ -523,23 +523,23 @@ export default function WorkflowExecutionDetail() {
                     }
                   >
                     <SelectTrigger data-testid="select-filter-status">
-                      <SelectValue placeholder="All statuses" />
+                      <SelectValue placeholder={t('workflows.allStatuses')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All statuses</SelectItem>
-                      <SelectItem value="not_started">Not Started</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="failed">Failed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="">{t('workflows.allStatuses')}</SelectItem>
+                      <SelectItem value="not_started">{te('not_started')}</SelectItem>
+                      <SelectItem value="in_progress">{te('in_progress')}</SelectItem>
+                      <SelectItem value="completed">{te('completed')}</SelectItem>
+                      <SelectItem value="failed">{te('failed')}</SelectItem>
+                      <SelectItem value="cancelled">{te('cancelled')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Created By UUID</label>
+                  <label className="text-sm font-medium">{t('workflows.createdByUuid')}</label>
                   <Input
-                    placeholder="Filter by creator UUID"
+                    placeholder={t('workflows.filterByCreator')}
                     value={tempFilters.created_by_uuid}
                     onChange={(e) =>
                       setTempFilters({ ...tempFilters, created_by_uuid: e.target.value })
@@ -549,7 +549,7 @@ export default function WorkflowExecutionDetail() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Start Time (From)</label>
+                  <label className="text-sm font-medium">{t('workflows.startTimeFrom')}</label>
                   <Input
                     type="datetime-local"
                     value={tempFilters.start_time}
@@ -561,7 +561,7 @@ export default function WorkflowExecutionDetail() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">End Time (To)</label>
+                  <label className="text-sm font-medium">{t('workflows.endTimeTo')}</label>
                   <Input
                     type="datetime-local"
                     value={tempFilters.end_time}
@@ -571,9 +571,9 @@ export default function WorkflowExecutionDetail() {
                 </div>
 
                 <div className="space-y-2 col-span-2">
-                  <label className="text-sm font-medium">Tags</label>
+                  <label className="text-sm font-medium">{t('workflows.tags')}</label>
                   <Input
-                    placeholder="Filter by tags (comma-separated)"
+                    placeholder={t('workflows.filterByTagsPlaceholder')}
                     value={tempFilters.tags}
                     onChange={(e) => setTempFilters({ ...tempFilters, tags: e.target.value })}
                     data-testid="input-filter-tags"
@@ -584,10 +584,10 @@ export default function WorkflowExecutionDetail() {
               <DialogFooter>
                 <Button variant="outline" onClick={clearFilters} data-testid="button-clear-filters">
                   <X className="h-4 w-4 me-2" />
-                  Clear Filters
+                  {t('common.clearFilters')}
                 </Button>
                 <Button onClick={handleApplyFilters} data-testid="button-apply-filters">
-                  Apply Filters
+                  {t('workflows.applyFilters')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -597,9 +597,9 @@ export default function WorkflowExecutionDetail() {
           <Dialog open={showExecuteDialog} onOpenChange={setShowExecuteDialog}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Execute Workflow</DialogTitle>
+                <DialogTitle>{t('workflows.executeWorkflow')}</DialogTitle>
                 <DialogDescription>
-                  Start a new execution of "{workflow?.name}"
+                  {t('workflows.startNewExecution', { name: workflow?.name || '' })}
                 </DialogDescription>
               </DialogHeader>
 
@@ -609,7 +609,7 @@ export default function WorkflowExecutionDetail() {
                   onClick={() => setShowExecuteDialog(false)}
                   data-testid="button-cancel-execute"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={handleExecuteWorkflow}
@@ -619,12 +619,12 @@ export default function WorkflowExecutionDetail() {
                   {createExecutionMutation.isPending ? (
                     <>
                       <Loader2 className="me-2 h-4 w-4 animate-spin" />
-                      Starting...
+                      {t('workflows.starting')}
                     </>
                   ) : (
                     <>
                       <Play className="h-4 w-4 me-2" />
-                      Execute
+                      {t('workflows.execute')}
                     </>
                   )}
                 </Button>
