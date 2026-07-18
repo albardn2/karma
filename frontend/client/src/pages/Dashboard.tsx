@@ -11,7 +11,6 @@ import {
 } from "recharts";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
-import { QuickActions } from "@/components/dashboard/QuickActions";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -401,11 +400,6 @@ export default function Dashboard() {
             </div>
           </>
         )}
-
-        {/* quick actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <QuickActions />
-        </div>
       </div>
     </AppLayout>
   );
