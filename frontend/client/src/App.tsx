@@ -81,11 +81,13 @@ import WorkflowExecution from "@/pages/WorkflowExecution";
 import WorkflowExecutionDetail from "@/pages/WorkflowExecutionDetail";
 import WorkflowExecutionTaskDetail from "@/pages/WorkflowExecutionTaskDetail";
 import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
 
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/signup" component={Signup} />
       <Route path="/" component={() => <ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/customers" component={() => <ProtectedRoute><Customers /></ProtectedRoute>} />
       <Route path="/customers/:uuid" component={() => <ProtectedRoute><CustomerDetail /></ProtectedRoute>} />

@@ -37,6 +37,25 @@ class RegisterRequest(BaseModel):
         return values
 
 
+class SignupRequest(BaseModel):
+    """Public signup: creates a company (account) plus its first admin user."""
+    model_config = ConfigDict(extra="forbid")
+    company_name: str = Field(min_length=1, max_length=256)
+    username: str
+    first_name: str
+    last_name: str
+    password: str = Field(min_length=6)
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    language: Optional[str] = None
+
+    @pydantic.model_validator(mode="after")
+    def username_not_email(cls, values):
+        if "@" in values.username:
+            raise ValueError("username must not be an email address")
+        return values
+
+
 class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     username: Optional[str] = None
@@ -100,6 +119,7 @@ class UserRead(BaseModel):
     created_at: datetime
     permission_scope: Optional[str]
     is_deleted: bool
+    account_uuid: Optional[str] = None
 
 
 class UserListParams(BaseModel):

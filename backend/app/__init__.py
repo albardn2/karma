@@ -77,6 +77,34 @@ def create_app(config_object=Config):
     app.config["JWT_COOKIE_CSRF_PROTECT"] = False # TESTING
     jwt.init_app(app)
 
+    @app.before_request
+    def _load_account_scope():
+        # Tenant scope for this request: read account_uuid from the JWT (if
+        # any) into flask.g. The UnitOfWork picks it up and every repository
+        # read/write is filtered/stamped with it. Invalid or absent tokens
+        # leave g.account_uuid unset — protected routes still reject them via
+        # their own decorators; unauthenticated routes (login/signup) run
+        # unscoped, which is correct since no tenant is known yet.
+        from flask import g
+        from flask_jwt_extended import verify_jwt_in_request, get_jwt
+        try:
+            verify_jwt_in_request(optional=True)
+            claims = get_jwt()
+            if claims:
+                account_uuid = claims.get("account_uuid")
+                if not account_uuid:
+                    # token minted before multi-tenancy — resolve the scope
+                    # from the user row instead of running unscoped
+                    from app.adapters.unit_of_work.sqlalchemy_unit_of_work import (
+                        SqlAlchemyUnitOfWork,
+                    )
+                    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+                        user = uow.user_repository.find_one(uuid=claims.get("sub"))
+                        account_uuid = user.account_uuid if user else None
+                g.account_uuid = account_uuid
+        except Exception:
+            pass
+
     # Register blueprints
     app.register_blueprint(customer_blueprint, url_prefix='/customer')
     app.register_blueprint(material_blueprint, url_prefix='/material')

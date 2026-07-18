@@ -222,12 +222,14 @@ class CustomerOrderDomain:
             # warehouse-side deductions
             for ev in uow.session.query(InventoryEventModel).filter(
                 InventoryEventModel.customer_order_item_uuid.in_(item_uuids),
+                InventoryEventModel.account_uuid == uow.account_uuid,
                 InventoryEventModel.is_deleted.is_(False),
             ):
                 ev.is_deleted = True
             # vehicle-side sale events (trip checkouts)
             for ev in uow.session.query(VehicleInventoryEventModel).filter(
                 VehicleInventoryEventModel.customer_order_item_uuid.in_(item_uuids),
+                VehicleInventoryEventModel.account_uuid == uow.account_uuid,
                 VehicleInventoryEventModel.is_deleted.is_(False),
             ):
                 ev.is_deleted = True

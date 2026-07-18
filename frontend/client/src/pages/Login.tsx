@@ -287,6 +287,19 @@ export default function Login() {
               </button>
             </div>
           )}
+
+          {/* Company signup */}
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => setLocation('/signup')}
+              className="text-sm text-gray-600 hover:text-gray-900 underline"
+              disabled={isLoading}
+              data-testid="login-signup-link"
+            >
+              {t('misc.login.createCompanyAccount')}
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>

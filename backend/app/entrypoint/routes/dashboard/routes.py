@@ -64,6 +64,7 @@ def overview():
             .filter(
                 CustomerOrderModel.is_deleted.is_(False),
                 CustomerOrderModel.created_at >= start,
+                CustomerOrderModel.account_uuid == uow.account_uuid,
             )
             .all()
         )
@@ -86,6 +87,7 @@ def overview():
             .filter(
                 PaymentModel.is_deleted.is_(False),
                 PaymentModel.created_at >= start,
+                PaymentModel.account_uuid == uow.account_uuid,
                 (InvoiceModel.uuid.is_(None)) | (InvoiceModel.is_deleted.is_(False)),
             )
             .all()
@@ -102,6 +104,7 @@ def overview():
             .filter(
                 CustomerModel.is_deleted.is_(False),
                 CustomerModel.created_at >= start,
+                CustomerModel.account_uuid == uow.account_uuid,
             )
             .group_by(func.date(CustomerModel.created_at))
             .all()
@@ -110,7 +113,11 @@ def overview():
 
         trips_rows = (
             s.query(func.date(TripModel.created_at), func.count())
-            .filter(TripModel.is_deleted.is_(False), TripModel.created_at >= start)
+            .filter(
+                TripModel.is_deleted.is_(False),
+                TripModel.created_at >= start,
+                TripModel.account_uuid == uow.account_uuid,
+            )
             .group_by(func.date(TripModel.created_at))
             .all()
         )

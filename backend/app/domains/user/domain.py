@@ -1,13 +1,42 @@
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
-from app.dto.auth import RegisterRequest
+from app.dto.auth import RegisterRequest, SignupRequest, PermissionScope
 from app.entrypoint.routes.common.errors import BadRequestError
 from models.common import User as UserModel
+from models.common import Account as AccountModel
 from app.dto.auth import UserRead
 from app.dto.auth import UserUpdate
 from app.entrypoint.routes.common.errors import NotFoundError
 
 
 class UserDomain:
+    @staticmethod
+    def signup(uow: SqlAlchemyUnitOfWork, payload: SignupRequest) -> UserModel:
+        """Create a company (account) and its first admin user atomically.
+        Runs unscoped — no tenant exists yet at signup time."""
+        UserDomain.validate_existing(uow=uow, payload=payload)
+
+        account = AccountModel(
+            company_name=payload.company_name,
+            email=payload.email,
+            phone_number=payload.phone_number,
+        )
+        uow.account_repository.save(model=account, commit=False)
+
+        user = UserModel(
+            username=payload.username,
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+            email=payload.email,
+            phone_number=payload.phone_number,
+            language=payload.language,
+            password=payload.password,  # replaced by the bcrypt hash below
+            permission_scope=PermissionScope.ADMIN.value,
+            account_uuid=account.uuid,
+        )
+        user.set_password(payload.password)
+        uow.user_repository.save(model=user, commit=False)
+        return user
+
     @staticmethod
     def create_user(uow: SqlAlchemyUnitOfWork, payload: RegisterRequest):
         """
@@ -85,7 +114,12 @@ class UserDomain:
             email_changed = payload.email != updated_user.email
 
 
-        if username_changed and uow.user_repository.find_one(username=payload.username):
+        # usernames/emails are globally unique (they identify the user at
+        # login, before any account is known) — check across ALL accounts,
+        # bypassing the tenant scope of the repositories
+        if username_changed and uow.session.query(UserModel).filter_by(
+                username=payload.username).first():
             raise BadRequestError(f"Username {payload.username!r} already taken")
-        if email_changed and payload.email and uow.user_repository.find_one(email=payload.email):
+        if email_changed and payload.email and uow.session.query(UserModel).filter_by(
+                email=payload.email).first():
             raise BadRequestError(f"Email {payload.email!r} already registered")

@@ -75,6 +75,7 @@ def _assigned_username_for_wfe(uow, wfe_uuid):
         .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
         .filter(
             TaskExecutionModel.workflow_execution_uuid == wfe_uuid,
+            TaskExecutionModel.account_uuid == uow.account_uuid,
             TaskModel.operator == "start_trip_operator",
         )
         .first()
@@ -84,7 +85,10 @@ def _assigned_username_for_wfe(uow, wfe_uuid):
         return None
     u = (
         uow.session.query(UserModel.username)
-        .filter((UserModel.uuid == v) | (UserModel.username == v))
+        .filter(
+            (UserModel.uuid == v) | (UserModel.username == v),
+            UserModel.account_uuid == uow.account_uuid,
+        )
         .first()
     )
     return u[0] if u else v
@@ -287,6 +291,7 @@ def list_trips():
                 .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
                 .filter(
                     TaskExecutionModel.workflow_execution_uuid.in_(wfe_uuids),
+                    TaskExecutionModel.account_uuid == uow.account_uuid,
                     TaskModel.operator == "start_trip_operator",
                 )
                 .all()
@@ -294,7 +299,10 @@ def list_trips():
             values = {v for _, v in rows if v}
             users = (
                 uow.session.query(UserModel.uuid, UserModel.username)
-                .filter(UserModel.uuid.in_(values) | UserModel.username.in_(values))
+                .filter(
+                    UserModel.uuid.in_(values) | UserModel.username.in_(values),
+                    UserModel.account_uuid == uow.account_uuid,
+                )
                 .all()
             ) if values else []
             uuid_to_name = {u[0]: u[1] for u in users}

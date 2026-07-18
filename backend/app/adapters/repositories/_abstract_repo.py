@@ -16,6 +16,11 @@ class NotAllowedQueryNonIndexedFields(Exception):
     pass
 
 
+class CrossAccountWrite(Exception):
+    """Raise when a write targets a row belonging to another account."""
+    pass
+
+
 class Pagination(Generic[BASE]):
     """
     Simple pagination result.
@@ -34,12 +39,43 @@ class AbstractRepository(Generic[BASE]):
     def __init__(
             self,
             session: scoped_session[Session],
-            query_only_by_indices: bool = False
+            query_only_by_indices: bool = False,
+            account_uuid: Optional[str] = None,
     ) -> None:
         self._session: Session = session
         self._type = Base  # should be overridden in subclass
         self._query_only_by_indices = query_only_by_indices
         self._indices: Optional[list[list[str]]] = None
+        # Tenant scope: when set (from the request JWT via the UnitOfWork),
+        # every read is filtered to this account and every write is stamped
+        # with it. None (workers/scripts) means unscoped.
+        self._account_uuid = account_uuid
+
+    def _is_scoped(self) -> bool:
+        return self._account_uuid is not None and hasattr(self._type, "account_uuid")
+
+    def _scope_kwargs(self, kwargs: dict) -> dict:
+        if self._is_scoped():
+            kwargs.setdefault("account_uuid", self._account_uuid)
+        return kwargs
+
+    def _scope_filters(self, filters: Optional[list]) -> list:
+        filters = list(filters) if filters else []
+        if self._is_scoped():
+            filters.append(self._type.account_uuid == self._account_uuid)
+        return filters
+
+    def _stamp_account(self, model: BASE) -> None:
+        if self._account_uuid is None or not hasattr(model, "account_uuid"):
+            return
+        current = getattr(model, "account_uuid", None)
+        if current is None:
+            model.account_uuid = self._account_uuid
+        elif current != self._account_uuid:
+            raise CrossAccountWrite(
+                f"{type(model).__name__} belongs to account {current}, "
+                f"but the current scope is {self._account_uuid}"
+            )
 
     def _is_allowed(self, column_names: Iterable[str]) -> bool:
         if not self._query_only_by_indices:
@@ -72,6 +108,7 @@ class AbstractRepository(Generic[BASE]):
 
     def save(self, model: BASE, commit: bool = False) -> None:
         try:
+            self._stamp_account(model)
             self._session.add(model)
             self._session.flush()
             if commit:
@@ -82,6 +119,7 @@ class AbstractRepository(Generic[BASE]):
 
     def merge(self, model: BASE, commit: bool = False) -> None:
         try:
+            self._stamp_account(model)
             self._session.merge(model)
             self._session.flush()
             if commit:
@@ -91,6 +129,8 @@ class AbstractRepository(Generic[BASE]):
             raise
 
     def batch_save(self, models: list[BASE], commit: bool = False) -> None:
+        for model in models:
+            self._stamp_account(model)
         self._session.add_all(models)
         self._session.flush()
         if commit:
@@ -109,15 +149,15 @@ class AbstractRepository(Generic[BASE]):
 
     def find_first(self, **kwargs) -> Optional[BASE]:
         self._is_allowed(kwargs.keys())
-        return self._session.query(self._type).filter_by(**kwargs).first()
+        return self._session.query(self._type).filter_by(**self._scope_kwargs(kwargs)).first()
 
     def find_one(self, **kwargs) -> Optional[BASE]:
         self._is_allowed(kwargs.keys())
-        return self._session.query(self._type).filter_by(**kwargs).one_or_none()
+        return self._session.query(self._type).filter_by(**self._scope_kwargs(kwargs)).one_or_none()
 
     def find_all(self, limit: Optional[int] = None, **kwargs) -> list[BASE]:
         self._is_allowed(kwargs.keys())
-        query = self._session.query(self._type).filter_by(**kwargs)
+        query = self._session.query(self._type).filter_by(**self._scope_kwargs(kwargs))
         if limit is not None:
             query = query.limit(limit)
         return query.all()
@@ -132,7 +172,7 @@ class AbstractRepository(Generic[BASE]):
         Paginate results of a simple filter_by query.
         """
         self._is_allowed(kwargs.keys())
-        query = self._session.query(self._type).filter_by(**kwargs)
+        query = self._session.query(self._type).filter_by(**self._scope_kwargs(kwargs))
         total = query.count()
         offset = (page - 1) * per_page
         items = query.offset(offset).limit(per_page).all()
@@ -149,6 +189,7 @@ class AbstractRepository(Generic[BASE]):
         Paginate results of a complex filtered query.
         """
         query: Query = self._session.query(self._type)
+        filters = self._scope_filters(filters)
         if filters:
             query = query.filter(*filters)
         if ordering:
@@ -190,6 +231,7 @@ class AbstractRepository(Generic[BASE]):
             filters: list[Any] = None,
             ordering: list[Any] = None
     ) -> Query:
+        filters = self._scope_filters(filters)
         if ordering:
             return self._session.query(self._type).filter(*filters).order_by(*ordering)
         if filters:

@@ -83,7 +83,9 @@ def _parse_recorded_at(raw) -> datetime:
 
 class Ingestor:
     def __init__(self):
-        self._config = {"trip_cadence_seconds": 30, "history_cadence_seconds": 120, "history_retention_days": 14}
+        # per-account configs (multi-tenant); accounts without a row use defaults
+        self._default_config = {"trip_cadence_seconds": 30, "history_cadence_seconds": 120, "history_retention_days": 14}
+        self._configs: dict[str, dict] = {}
         self._config_loaded_at = 0.0
         self._last_stored: dict[tuple[str, str], float] = {}  # (user_uuid, stream) -> monotonic ts
         self._trip_cache: dict[str, tuple[str | None, float]] = {}  # user_uuid -> (trip_uuid, expires)
@@ -92,14 +94,18 @@ class Ingestor:
     def _reload_config(self, uow) -> None:
         if time.monotonic() - self._config_loaded_at < CONFIG_RELOAD_SECONDS:
             return
-        config = uow.session.query(ConfigModel).first()
-        if config:
-            self._config = {
-                "trip_cadence_seconds": config.trip_cadence_seconds,
-                "history_cadence_seconds": config.history_cadence_seconds,
-                "history_retention_days": config.history_retention_days,
+        self._configs = {
+            c.account_uuid: {
+                "trip_cadence_seconds": c.trip_cadence_seconds,
+                "history_cadence_seconds": c.history_cadence_seconds,
+                "history_retention_days": c.history_retention_days,
             }
+            for c in uow.session.query(ConfigModel).all()
+        }
         self._config_loaded_at = time.monotonic()
+
+    def _config_for(self, account_uuid: "str | None") -> dict:
+        return self._configs.get(account_uuid, self._default_config)
 
     def _active_trip_uuid(self, uow, user) -> "str | None":
         cached = self._trip_cache.get(user.uuid)
@@ -113,6 +119,7 @@ class Ingestor:
             .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
             .filter(
                 TripModel.status == "in_progress",
+                TripModel.account_uuid == user.account_uuid,
                 TripModel.is_deleted.is_(False),
                 WFEModel.is_deleted.is_(False),
                 TaskModel.operator == "start_trip_operator",
@@ -127,15 +134,30 @@ class Ingestor:
     def _purge_history(self, uow) -> None:
         if time.monotonic() - self._last_purge < PURGE_INTERVAL_SECONDS:
             return
-        cutoff = datetime.utcnow() - timedelta(days=self._config["history_retention_days"])
-        deleted = (
-            uow.session.query(LocationPingModel)
-            .filter(LocationPingModel.trip_uuid.is_(None), LocationPingModel.recorded_at < cutoff)
-            .delete(synchronize_session=False)
+        # per-account retention: explicit config rows first, defaults for the rest
+        deleted = 0
+        for account_uuid, cfg in self._configs.items():
+            cutoff = datetime.utcnow() - timedelta(days=cfg["history_retention_days"])
+            deleted += (
+                uow.session.query(LocationPingModel)
+                .filter(
+                    LocationPingModel.trip_uuid.is_(None),
+                    LocationPingModel.account_uuid == account_uuid,
+                    LocationPingModel.recorded_at < cutoff,
+                )
+                .delete(synchronize_session=False)
+            )
+        default_cutoff = datetime.utcnow() - timedelta(days=self._default_config["history_retention_days"])
+        q = uow.session.query(LocationPingModel).filter(
+            LocationPingModel.trip_uuid.is_(None),
+            LocationPingModel.recorded_at < default_cutoff,
         )
+        if self._configs:
+            q = q.filter(LocationPingModel.account_uuid.notin_(list(self._configs.keys())))
+        deleted += q.delete(synchronize_session=False)
         uow.commit()
         if deleted:
-            log.info("purged %s history points older than %s days", deleted, self._config["history_retention_days"])
+            log.info("purged %s history points past retention", deleted)
         self._last_purge = time.monotonic()
 
     def handle(self, topic: str, payload: bytes) -> None:
@@ -164,7 +186,8 @@ class Ingestor:
 
             trip_uuid = self._active_trip_uuid(uow, user)
             stream = "trip" if trip_uuid else "hist"
-            cadence = self._config["trip_cadence_seconds"] if trip_uuid else self._config["history_cadence_seconds"]
+            cfg = self._config_for(user.account_uuid)
+            cadence = cfg["trip_cadence_seconds"] if trip_uuid else cfg["history_cadence_seconds"]
             last = self._last_stored.get((user.uuid, stream))
             now_mono = time.monotonic()
             if last is not None and (now_mono - last) < cadence:
@@ -176,6 +199,7 @@ class Ingestor:
 
             ping = LocationPingModel(
                 uuid=str(uuid_lib.uuid4()),
+                account_uuid=user.account_uuid,
                 user_uuid=user.uuid,
                 trip_uuid=trip_uuid,
                 coordinates=wkt,

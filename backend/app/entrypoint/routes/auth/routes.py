@@ -12,6 +12,7 @@ from flask_jwt_extended import (
 from app.entrypoint.routes.common.errors import NotFoundError
 from app.dto.auth import (
     RegisterRequest,
+    SignupRequest,
     LoginRequest,
     TokenResponse,
     UserRead
@@ -40,6 +41,31 @@ def register():
         uow.commit()
     return jsonify(result), 201
 
+@auth_blueprint.route("/signup", methods=["POST"])
+def signup():
+    """Public signup: create a company (account) + its first admin user,
+    then sign them in (same token/cookie shape as /auth/login)."""
+    payload = SignupRequest(**request.json)
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        user = UserDomain.signup(uow=uow, payload=payload)
+        scopes = user.permission_scope.split(",")
+        access_token = create_access_token(
+            identity=user.uuid,
+            additional_claims={"scopes": scopes, "account_uuid": user.account_uuid},
+            expires_delta=timedelta(days=1)
+        )
+        refresh_token = create_refresh_token(
+            identity=user.uuid,
+            expires_delta=timedelta(days=14)
+        )
+        uow.commit()
+    resp = jsonify(TokenResponse(access_token=access_token,
+                                 refresh_token=refresh_token).model_dump(mode="json"))
+    set_access_cookies(resp, access_token)
+    set_refresh_cookies(resp, refresh_token)
+    return resp, 201
+
+
 @auth_blueprint.route("/login", methods=["POST"])
 def login():
     req = LoginRequest(**request.json)
@@ -62,7 +88,7 @@ def login():
         scopes = user.permission_scope.split(",")  # e.g. "read,write,admin"
         access_token = create_access_token(
             identity=user.uuid,
-            additional_claims={"scopes": scopes},
+            additional_claims={"scopes": scopes, "account_uuid": user.account_uuid},
             expires_delta=timedelta(days=1)
         )
         # 14-day refresh token
@@ -90,7 +116,7 @@ def refresh():
         scopes = user.permission_scope.split(",")
         access_token = create_access_token(
             identity=user.uuid,
-            additional_claims={"scopes": scopes},
+            additional_claims={"scopes": scopes, "account_uuid": user.account_uuid},
             expires_delta=timedelta(days=1)
         )
     resp = jsonify({"access_token": access_token})

@@ -441,6 +441,7 @@ def list_workflow_executions():
             .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
             .where(
                 TaskExecutionModel.workflow_execution_uuid == WorkflowExecutionModel.uuid,
+                TaskExecutionModel.account_uuid == WorkflowExecutionModel.account_uuid,
                 TaskModel.operator == "start_trip_operator",
                 TaskExecutionModel.result["assigned_user_uuid"].astext.in_(values),
             )
