@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { AppLayout } from "@/components/layout/AppLayout";
 import type { Warehouse } from "@/lib/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface WarehouseFormData {
   name: string;
@@ -24,6 +25,7 @@ export default function WarehouseEdit() {
   const [, params] = useRoute("/warehouses/:id/edit");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const id = params?.id;
 
@@ -69,17 +71,17 @@ export default function WarehouseEdit() {
       });
       
       toast({
-        title: "Success",
-        description: "Warehouse updated successfully",
+        title: t('common.success'),
+        description: t('warehouses.updateSuccess'),
       });
-      
+
       // Navigate back to warehouse detail page
       setLocation(`/warehouses/${id}`);
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to update warehouse",
+        title: t('common.error'),
+        description: t('warehouses.updateFailed'),
         variant: "destructive",
       });
     },
@@ -114,7 +116,7 @@ export default function WarehouseEdit() {
               <Link href={`/warehouses/${id}`}>
                 <Button variant="outline" size="sm">
                   <ArrowLeft className="h-4 w-4 me-2" />
-                  Back
+                  {t('common.back')}
                 </Button>
               </Link>
             </div>
@@ -137,13 +139,13 @@ export default function WarehouseEdit() {
               <Link href="/warehouses">
                 <Button variant="outline" size="sm">
                   <ArrowLeft className="h-4 w-4 me-2" />
-                  Back to Warehouses
+                  {t('warehouses.backToWarehouses')}
                 </Button>
               </Link>
             </div>
             <Card>
               <CardContent className="p-6">
-                <p className="text-center text-muted-foreground">Warehouse not found</p>
+                <p className="text-center text-muted-foreground">{t('warehouses.notFound')}</p>
               </CardContent>
             </Card>
           </div>
@@ -161,66 +163,66 @@ export default function WarehouseEdit() {
             <Link href={`/warehouses/${id}`}>
               <Button variant="outline" size="sm">
                 <ArrowLeft className="h-4 w-4 me-2" />
-                Back
+                {t('common.back')}
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold">Edit Warehouse</h1>
-              <p className="text-muted-foreground">Update warehouse information</p>
+              <h1 className="text-2xl font-bold">{t('warehouses.editWarehouse')}</h1>
+              <p className="text-muted-foreground">{t('warehouses.editSubtitle')}</p>
             </div>
           </div>
 
           {/* Edit Form */}
           <Card>
             <CardHeader>
-              <CardTitle>Warehouse Information</CardTitle>
+              <CardTitle>{t('warehouses.warehouseInformation')}</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Name *</Label>
+                    <Label htmlFor="name">{t('common.name')} *</Label>
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => handleInputChange("name", e.target.value)}
-                      placeholder="Enter warehouse name"
+                      placeholder={t('warehouses.enterName')}
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address">Address *</Label>
+                    <Label htmlFor="address">{t('common.address')} *</Label>
                     <Input
                       id="address"
                       value={formData.address}
                       onChange={(e) => handleInputChange("address", e.target.value)}
-                      placeholder="Enter warehouse address"
+                      placeholder={t('warehouses.enterAddress')}
                       required
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="coordinates">Coordinates</Label>
+                  <Label htmlFor="coordinates">{t('warehouses.coordinates')}</Label>
                   <Input
                     id="coordinates"
                     value={formData.coordinates || ""}
                     onChange={(e) => handleInputChange("coordinates", e.target.value)}
-                    placeholder="e.g., 33.5138,36.2765"
+                    placeholder={t('warehouses.coordinatesExample')}
                   />
                   <p className="text-sm text-muted-foreground">
-                    Optional: Enter coordinates as latitude,longitude
+                    {t('warehouses.coordinatesHint')}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
+                  <Label htmlFor="notes">{t('common.notes')}</Label>
                   <Textarea
                     id="notes"
                     value={formData.notes || ""}
                     onChange={(e) => handleInputChange("notes", e.target.value)}
-                    placeholder="Enter any additional notes"
+                    placeholder={t('warehouses.enterNotes')}
                     rows={4}
                   />
                 </div>
@@ -231,11 +233,11 @@ export default function WarehouseEdit() {
                     disabled={updateWarehouseMutation.isPending}
                   >
                     <Save className="h-4 w-4 me-2" />
-                    {updateWarehouseMutation.isPending ? "Saving..." : "Save Changes"}
+                    {updateWarehouseMutation.isPending ? t('common.saving') : t('warehouses.saveChanges')}
                   </Button>
                   <Link href={`/warehouses/${id}`}>
                     <Button variant="outline" type="button">
-                      Cancel
+                      {t('common.cancel')}
                     </Button>
                   </Link>
                 </div>

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Customer, CustomerFormData } from "@/lib/types";
 
 interface EditCustomerDialogProps {
@@ -35,6 +36,7 @@ export function EditCustomerDialog({
   open,
   onOpenChange,
 }: EditCustomerDialogProps) {
+  const { t, te } = useLanguage();
   const [formData, setFormData] = useState<CustomerFormData>({
     company_name: customer.company_name,
     full_name: customer.full_name,
@@ -73,14 +75,14 @@ export function EditCustomerDialog({
       queryClient.invalidateQueries({ queryKey: ["/customer", customer.uuid] });
       onOpenChange(false);
       toast({
-        title: "Success",
-        description: "Customer updated successfully",
+        title: t('common.success'),
+        description: t('customers.updateSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update customer",
+        title: t('common.error'),
+        description: error.message || t('customers.updateFailed'),
         variant: "destructive",
       });
     },
@@ -96,8 +98,8 @@ export function EditCustomerDialog({
     // Basic validation
     if (!formData.company_name.trim() || !formData.full_name.trim() || !formData.phone_number.trim()) {
       toast({
-        title: "Validation Error",
-        description: "Company name, contact person, and phone number are required",
+        title: t('customers.validationError'),
+        description: t('customers.requiredFieldsError'),
         variant: "destructive",
       });
       return;
@@ -118,32 +120,32 @@ export function EditCustomerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Customer</DialogTitle>
+          <DialogTitle>{t('customers.editCustomer')}</DialogTitle>
           <DialogDescription>
-            Update customer information and contact details.
+            {t('customers.editDialogDesc')}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="company_name">Company Name *</Label>
+              <Label htmlFor="company_name">{t('common.companyName')} *</Label>
               <Input
                 id="company_name"
                 value={formData.company_name}
                 onChange={(e) => handleInputChange("company_name", e.target.value)}
-                placeholder="Enter company name"
+                placeholder={t('customers.enterCompanyName')}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="full_name">Contact Person *</Label>
+              <Label htmlFor="full_name">{t('customers.contactPerson')} *</Label>
               <Input
                 id="full_name"
                 value={formData.full_name}
                 onChange={(e) => handleInputChange("full_name", e.target.value)}
-                placeholder="Enter contact person name"
+                placeholder={t('customers.enterContactPerson')}
                 required
               />
             </div>
@@ -151,49 +153,49 @@ export function EditCustomerDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="phone_number">Phone Number *</Label>
+              <Label htmlFor="phone_number">{t('customers.phoneNumber')} *</Label>
               <Input
                 id="phone_number"
                 type="tel"
                 value={formData.phone_number}
                 onChange={(e) => handleInputChange("phone_number", e.target.value)}
-                placeholder="Enter phone number"
+                placeholder={t('customers.enterPhoneNumber')}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email_address">Email Address</Label>
+              <Label htmlFor="email_address">{t('customers.emailAddress')}</Label>
               <Input
                 id="email_address"
                 type="email"
                 value={formData.email_address || ""}
                 onChange={(e) => handleInputChange("email_address", e.target.value)}
-                placeholder="Enter email address"
+                placeholder={t('customers.enterEmailAddress')}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="full_address">Address</Label>
+            <Label htmlFor="full_address">{t('common.address')}</Label>
             <Input
               id="full_address"
               value={formData.full_address}
               onChange={(e) => handleInputChange("full_address", e.target.value)}
-              placeholder="Enter full address"
+              placeholder={t('customers.enterFullAddress')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
+            <Label htmlFor="category">{t('common.category')}</Label>
             <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select customer category" />
+                <SelectValue placeholder={t('customers.selectCustomerCategory')} />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((category) => (
                   <SelectItem key={category} value={category} className="capitalize">
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                    {te(category)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -201,22 +203,22 @@ export function EditCustomerDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="coordinates">Coordinates</Label>
+            <Label htmlFor="coordinates">{t('customers.coordinates')}</Label>
             <Input
               id="coordinates"
               value={formData.coordinates || ""}
               onChange={(e) => handleInputChange("coordinates", e.target.value)}
-              placeholder="latitude,longitude (e.g., 33.5138,36.2765)"
+              placeholder={t('customers.coordinatesPlaceholder')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t('common.notes')}</Label>
             <Textarea
               id="notes"
               value={formData.notes || ""}
               onChange={(e) => handleInputChange("notes", e.target.value)}
-              placeholder="Add any additional notes about this customer..."
+              placeholder={t('customers.editNotesPlaceholder')}
               rows={3}
             />
           </div>
@@ -228,14 +230,14 @@ export function EditCustomerDialog({
               onClick={() => onOpenChange(false)}
               disabled={updateCustomerMutation.isPending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               disabled={updateCustomerMutation.isPending}
               className="brand-gradient hover:opacity-90"
             >
-              {updateCustomerMutation.isPending ? "Updating..." : "Update Customer"}
+              {updateCustomerMutation.isPending ? t('common.updating') : t('customers.updateCustomer')}
             </Button>
           </div>
         </form>

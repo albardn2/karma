@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Filter, X } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface CustomerFilters {
   uuid?: string;
@@ -44,6 +45,7 @@ export function CustomerFiltersComponent({
   onFiltersChange,
   onClearFilters,
 }: CustomerFiltersProps) {
+  const { t, te } = useLanguage();
   const [localFilters, setLocalFilters] = useState<CustomerFilters>(filters);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -72,7 +74,7 @@ export function CustomerFiltersComponent({
       <SheetTrigger asChild>
         <Button variant="outline" className="relative">
           <Filter className="w-4 h-4 me-2" />
-          Filters
+          {t('common.filters')}
           {hasActiveFilters && (
             <span className="absolute -top-1 -end-1 w-3 h-3 bg-blue-600 rounded-full" />
           )}
@@ -80,19 +82,19 @@ export function CustomerFiltersComponent({
       </SheetTrigger>
       <SheetContent side="right" className="w-[400px] sm:w-[540px]">
         <SheetHeader>
-          <SheetTitle>Filter Customers</SheetTitle>
+          <SheetTitle>{t('customers.filterCustomers')}</SheetTitle>
           <SheetDescription>
-            Apply specific filters to find customers by their details
+            {t('customers.filterDesc')}
           </SheetDescription>
         </SheetHeader>
         
         <div className="space-y-6 py-6">
           {/* Company Name */}
           <div className="space-y-2">
-            <Label htmlFor="company_name">Company Name</Label>
+            <Label htmlFor="company_name">{t('common.companyName')}</Label>
             <Input
               id="company_name"
-              placeholder="Filter by company name..."
+              placeholder={t('customers.filterByCompanyName')}
               value={localFilters.company_name || ""}
               onChange={(e) => updateFilter("company_name", e.target.value)}
             />
@@ -100,10 +102,10 @@ export function CustomerFiltersComponent({
 
           {/* Contact Person */}
           <div className="space-y-2">
-            <Label htmlFor="full_name">Contact Person</Label>
+            <Label htmlFor="full_name">{t('customers.contactPerson')}</Label>
             <Input
               id="full_name"
-              placeholder="Filter by contact person..."
+              placeholder={t('customers.filterByContactPerson')}
               value={localFilters.full_name || ""}
               onChange={(e) => updateFilter("full_name", e.target.value)}
             />
@@ -111,10 +113,10 @@ export function CustomerFiltersComponent({
 
           {/* Phone Number */}
           <div className="space-y-2">
-            <Label htmlFor="phone_number">Phone Number</Label>
+            <Label htmlFor="phone_number">{t('customers.phoneNumber')}</Label>
             <Input
               id="phone_number"
-              placeholder="Filter by phone number..."
+              placeholder={t('customers.filterByPhoneNumber')}
               value={localFilters.phone_number || ""}
               onChange={(e) => updateFilter("phone_number", e.target.value)}
             />
@@ -122,11 +124,11 @@ export function CustomerFiltersComponent({
 
           {/* Email Address */}
           <div className="space-y-2">
-            <Label htmlFor="email_address">Email Address</Label>
+            <Label htmlFor="email_address">{t('customers.emailAddress')}</Label>
             <Input
               id="email_address"
               type="email"
-              placeholder="Filter by email address..."
+              placeholder={t('customers.filterByEmailAddress')}
               value={localFilters.email_address || ""}
               onChange={(e) => updateFilter("email_address", e.target.value)}
             />
@@ -134,19 +136,19 @@ export function CustomerFiltersComponent({
 
           {/* Category */}
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
+            <Label htmlFor="category">{t('common.category')}</Label>
             <Select
               value={localFilters.category || ""}
               onValueChange={(value) => updateFilter("category", value === "all" ? undefined : value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select category" />
+                <SelectValue placeholder={t('customers.selectCategory')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="all">{t('customers.allCategories')}</SelectItem>
                 {categories.map((category) => (
                   <SelectItem key={category} value={category} className="capitalize">
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                    {te(category)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -155,10 +157,10 @@ export function CustomerFiltersComponent({
 
           {/* Customer UUID */}
           <div className="space-y-2">
-            <Label htmlFor="uuid">Customer ID</Label>
+            <Label htmlFor="uuid">{t('customers.customerId')}</Label>
             <Input
               id="uuid"
-              placeholder="Filter by customer UUID..."
+              placeholder={t('customers.filterByUuid')}
               value={localFilters.uuid || ""}
               onChange={(e) => updateFilter("uuid", e.target.value)}
             />
@@ -166,7 +168,7 @@ export function CustomerFiltersComponent({
 
           {/* Results per page */}
           <div className="space-y-2">
-            <Label htmlFor="per_page">Results per page</Label>
+            <Label htmlFor="per_page">{t('customers.resultsPerPage')}</Label>
             <Select
               value={localFilters.per_page?.toString() || "20"}
               onValueChange={(value) => updateFilter("per_page", parseInt(value))}
@@ -187,11 +189,11 @@ export function CustomerFiltersComponent({
 
         <div className="flex gap-3 pt-6">
           <Button onClick={handleApplyFilters} className="flex-1 brand-gradient">
-            Apply Filters
+            {t('customers.applyFilters')}
           </Button>
           <Button onClick={handleClearFilters} variant="outline">
             <X className="w-4 h-4 me-2" />
-            Clear
+            {t('customers.clear')}
           </Button>
         </div>
       </SheetContent>

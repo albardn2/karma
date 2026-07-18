@@ -14,8 +14,10 @@ import { apiRequest } from "@/lib/queryClient";
 import type { WarehousePage, Warehouse } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function Warehouses() {
+  const { t } = useLanguage();
   const [filters, setFilters] = useState<WarehouseFilters>({
     page: 1,
     per_page: 20,
@@ -123,20 +125,20 @@ export default function Warehouses() {
       const listWarehouses = warehousePage?.warehouses || [];
       setDisplayWarehouses(listWarehouses);
       setDisplayCount(listWarehouses.length);
-      setDisplayText(isLoading ? "Loading warehouses..." : `${listWarehouses.length} warehouses on this page`);
+      setDisplayText(isLoading ? t('warehouses.loadingWarehouses') : t('warehouses.countOnPage', { count: listWarehouses.length }));
     } else if (activeTab === 'map') {
       const mapWarehouses = mapWarehousePage?.warehouses || [];
       setDisplayWarehouses(mapWarehouses);
       setDisplayCount(mapWarehouses.length);
-      setDisplayText(isLoadingMap ? "Loading warehouses in area..." : `${mapWarehouses.length} warehouses in current area`);
+      setDisplayText(isLoadingMap ? t('warehouses.loadingInArea') : t('warehouses.countInArea', { count: mapWarehouses.length }));
     }
-  }, [activeTab, warehousePage, mapWarehousePage, isLoading, isLoadingMap]);
+  }, [activeTab, warehousePage, mapWarehousePage, isLoading, isLoadingMap, t]);
 
   // Reset display immediately when view changes
   useEffect(() => {
     setDisplayWarehouses([]);
     setDisplayCount(0);
-    setDisplayText(activeTab === 'list' ? "Loading warehouses..." : "Loading warehouses in area...");
+    setDisplayText(activeTab === 'list' ? t('warehouses.loadingWarehouses') : t('warehouses.loadingInArea'));
   }, [activeTab]);
 
   const deleteWarehouseMutation = useMutation({
@@ -161,14 +163,14 @@ export default function Warehouses() {
       });
       
       toast({
-        title: "Success",
-        description: "Warehouse deleted successfully",
+        title: t('common.success'),
+        description: t('warehouses.deleteSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete warehouse",
+        title: t('common.error'),
+        description: error.message || t('warehouses.deleteFailed'),
         variant: "destructive",
       });
     },
@@ -197,7 +199,7 @@ export default function Warehouses() {
   };
 
   const handleDeleteWarehouse = (warehouse: Warehouse) => {
-    if (window.confirm(`Are you sure you want to delete warehouse "${warehouse.name}"?`)) {
+    if (window.confirm(t('warehouses.confirmDelete', { name: warehouse.name }))) {
       deleteWarehouseMutation.mutate(warehouse.uuid);
     }
   };
@@ -212,8 +214,8 @@ export default function Warehouses() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold">Warehouses</h1>
-                <p className="text-muted-foreground">Manage your warehouse locations</p>
+                <h1 className="text-2xl font-bold">{t('nav.warehouses')}</h1>
+                <p className="text-muted-foreground">{t('warehouses.subtitle')}</p>
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -244,7 +246,7 @@ export default function Warehouses() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">Warehouses</h1>
+              <h1 className="text-2xl font-bold">{t('nav.warehouses')}</h1>
               <p className="text-muted-foreground">
                 {displayText}
               </p>
@@ -259,11 +261,11 @@ export default function Warehouses() {
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="list" className="flex items-center gap-2">
                 <List className="h-4 w-4" />
-                List View
+                {t('warehouses.listView')}
               </TabsTrigger>
               <TabsTrigger value="map" className="flex items-center gap-2">
                 <MapIcon className="h-4 w-4" />
-                Map View
+                {t('warehouses.mapView')}
               </TabsTrigger>
             </TabsList>
 
@@ -272,11 +274,11 @@ export default function Warehouses() {
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <Building className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No warehouses found</h3>
+                    <h3 className="text-lg font-semibold mb-2">{t('warehouses.noWarehousesFound')}</h3>
                     <p className="text-muted-foreground text-center mb-4">
                       {Object.keys(filters).some(key => key !== 'page' && key !== 'per_page' && filters[key as keyof WarehouseFilters])
-                        ? "No warehouses match your current filters."
-                        : "You haven't added any warehouses yet."}
+                        ? t('warehouses.noMatchFilters')
+                        : t('warehouses.noneYet')}
                     </p>
                     <AddWarehouseDialog />
                   </CardContent>
@@ -300,13 +302,13 @@ export default function Warehouses() {
                               {warehouse.coordinates && (
                                 <div className="flex items-center gap-1">
                                   <MapPin className="h-3 w-3" />
-                                  <span className="text-green-600">Location available</span>
+                                  <span className="text-green-600">{t('warehouses.locationAvailable')}</span>
                                 </div>
                               )}
                               
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                <span>Created {formatDate(warehouse.created_at)}</span>
+                                <span>{t('warehouses.createdOn', { date: formatDate(warehouse.created_at) })}</span>
                               </div>
                               
                               {warehouse.notes && (
@@ -325,7 +327,7 @@ export default function Warehouses() {
                   {warehousePage && warehousePage.pages > 1 && (
                     <div className="flex items-center justify-between pt-4">
                       <p className="text-sm text-muted-foreground">
-                        Page {currentPage} of {totalPages}
+                        {t('warehouses.pageOf', { page: currentPage, pages: totalPages })}
                       </p>
                       <div className="flex gap-2">
                         <Button
@@ -334,7 +336,7 @@ export default function Warehouses() {
                           disabled={currentPage <= 1}
                           onClick={() => setFilters((prev: WarehouseFilters) => ({ ...prev, page: (prev.page || 1) - 1 }))}
                         >
-                          Previous
+                          {t('common.previous')}
                         </Button>
                         <Button
                           variant="outline"
@@ -342,7 +344,7 @@ export default function Warehouses() {
                           disabled={currentPage >= totalPages}
                           onClick={() => setFilters((prev: WarehouseFilters) => ({ ...prev, page: (prev.page || 1) + 1 }))}
                         >
-                          Next
+                          {t('common.next')}
                         </Button>
                       </div>
                     </div>
@@ -359,12 +361,12 @@ export default function Warehouses() {
                   </p>
                 </div>
                 
-                <div className="h-[600px] rounded-lg overflow-hidden border relative z-0">
+                <div dir="ltr" className="h-[600px] rounded-lg overflow-hidden border relative z-0">
                   {isLoadingMap && (
                     <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-20">
                       <div className="text-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto mb-2"></div>
-                        <p className="text-sm text-gray-600">Loading warehouses...</p>
+                        <p className="text-sm text-gray-600">{t('warehouses.loadingWarehouses')}</p>
                       </div>
                     </div>
                   )}

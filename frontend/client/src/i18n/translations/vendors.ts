@@ -1,5 +1,197 @@
-// Filled by the i18n conversion of this domain.
+// Vendors domain strings (Vendors list/map page, vendor detail, add dialog, filters).
 
-export const en: Record<string, string> = {};
+export const en: Record<string, string> = {
+  // list page
+  'vendors.subtitle': 'Manage your vendor relationships',
+  'vendors.loadingVendors': 'Loading vendors...',
+  'vendors.loadingVendorsInArea': 'Loading vendors in area...',
+  'vendors.countOnPage': '{count} vendors on this page',
+  'vendors.countInArea': '{count} vendors in current area',
+  'vendors.listView': 'List View',
+  'vendors.mapView': 'Map View',
+  'vendors.noVendorsFound': 'No vendors found',
+  'vendors.noVendorsMatchFilters': 'No vendors match your current filters.',
+  'vendors.noVendorsYet': "You haven't added any vendors yet.",
+  'vendors.balanceLabel': 'Balance:',
+  'vendors.pageOf': 'Page {current} of {total}',
+  'vendors.confirmDelete': 'Are you sure you want to delete vendor "{name}"?',
 
-export const ar: Record<string, string> = {};
+  // mutations / toasts
+  'vendors.createdSuccess': 'Vendor created successfully',
+  'vendors.createFailed': 'Failed to create vendor',
+  'vendors.updatedSuccess': 'Vendor updated successfully',
+  'vendors.updateFailed': 'Failed to update vendor',
+  'vendors.deletedSuccess': 'Vendor deleted successfully',
+  'vendors.deleteFailed': 'Failed to delete vendor',
+  'vendors.copied': 'Copied!',
+  'vendors.copiedToClipboard': '{label} copied to clipboard',
+  'vendors.copyFailed': 'Failed to copy',
+  'vendors.copyFailedDesc': 'Could not copy to clipboard',
+
+  // detail page
+  'vendors.notFoundTitle': 'Vendor not found',
+  'vendors.notFoundDesc': 'The requested vendor could not be found.',
+  'vendors.createPurchaseOrder': 'Create Purchase Order',
+  'vendors.deleteVendor': 'Delete Vendor',
+  'vendors.deleteConfirmDesc': 'Are you sure you want to delete "{name}"? This action cannot be undone.',
+  'vendors.companyInfo': 'Company Information',
+  'vendors.contactInfo': 'Contact Information',
+  'vendors.locationAddress': 'Location & Address',
+  'vendors.additionalInfo': 'Additional Information',
+  'vendors.balanceMetadata': 'Balance & Metadata',
+  'vendors.balancePerCurrency': 'Balance per Currency',
+  'vendors.balance': 'Balance',
+  'vendors.createdBy': 'Created By',
+  'vendors.locationMap': 'Location Map',
+  'vendors.noLocationInfo': 'No location information available',
+  'vendors.coordinatesValue': 'Coordinates: {lat}, {lng}',
+
+  // fields
+  'vendors.phoneNumber': 'Phone Number',
+  'vendors.emailAddress': 'Email Address',
+  'vendors.fullAddress': 'Full Address',
+  'vendors.coordinates': 'Coordinates',
+  'vendors.coordinatesPlaceholder': 'e.g., 33.5138,36.2765',
+  'vendors.uuid': 'UUID',
+  'vendors.businessCards': 'Business Cards',
+  'vendors.selectCategory': 'Select category',
+  'vendors.noCategory': 'No category',
+  'vendors.noCategorySet': 'No category set',
+  'vendors.allCategories': 'All Categories',
+
+  // form validation
+  'vendors.companyNameRequired': 'Company name is required',
+  'vendors.fullNameRequired': 'Full name is required',
+  'vendors.phoneRequired': 'Phone number is required',
+  'vendors.invalidEmail': 'Invalid email address',
+  'vendors.validationError': 'Validation Error',
+  'vendors.requiredFieldsError': 'Company name, full name, and phone number are required',
+
+  // add vendor dialog
+  'vendors.addVendor': 'Add Vendor',
+  'vendors.addNewVendor': 'Add New Vendor',
+  'vendors.addVendorDesc': 'Create a new vendor record with their contact information.',
+  'vendors.createVendor': 'Create Vendor',
+  'vendors.enterCompanyName': 'Enter company name',
+  'vendors.enterFullName': "Enter contact person's full name",
+  'vendors.enterPhoneNumber': 'Enter phone number',
+  'vendors.enterEmailAddress': 'Enter email address',
+  'vendors.enterFullAddress': 'Enter full address',
+  'vendors.businessCardsPlaceholder': 'Business card details or additional contact info',
+  'vendors.notesPlaceholder': 'Additional notes about the vendor',
+
+  // filters sheet
+  'vendors.filterVendors': 'Filter Vendors',
+  'vendors.filterVendorsDesc': 'Use the filters below to narrow down the vendor list.',
+  'vendors.searchByUuid': 'Search by UUID...',
+  'vendors.searchByCompanyName': 'Search by company name...',
+  'vendors.searchByFullName': 'Search by full name...',
+  'vendors.searchByEmail': 'Search by email...',
+  'vendors.searchByPhone': 'Search by phone...',
+  'vendors.applyFilters': 'Apply Filters',
+  'vendors.clearAll': 'Clear All',
+
+  // vendor category enum values (via te())
+  'enum.raw_materials': 'Raw Materials',
+  'enum.equipment': 'Equipment',
+  'enum.services': 'Services',
+  'enum.other': 'Other',
+};
+
+export const ar: Record<string, string> = {
+  // list page
+  'vendors.subtitle': 'إدارة علاقاتك مع المورّدين',
+  'vendors.loadingVendors': 'جارٍ تحميل المورّدين...',
+  'vendors.loadingVendorsInArea': 'جارٍ تحميل المورّدين في المنطقة...',
+  'vendors.countOnPage': '{count} مورّد في هذه الصفحة',
+  'vendors.countInArea': '{count} مورّد في المنطقة الحالية',
+  'vendors.listView': 'عرض القائمة',
+  'vendors.mapView': 'عرض الخريطة',
+  'vendors.noVendorsFound': 'لا يوجد مورّدون',
+  'vendors.noVendorsMatchFilters': 'لا يوجد مورّدون مطابقون لعوامل التصفية الحالية.',
+  'vendors.noVendorsYet': 'لم تقم بإضافة أي مورّدين بعد.',
+  'vendors.balanceLabel': 'الرصيد:',
+  'vendors.pageOf': 'صفحة {current} من {total}',
+  'vendors.confirmDelete': 'هل أنت متأكد أنك تريد حذف المورّد "{name}"؟',
+
+  // mutations / toasts
+  'vendors.createdSuccess': 'تم إنشاء المورّد بنجاح',
+  'vendors.createFailed': 'فشل إنشاء المورّد',
+  'vendors.updatedSuccess': 'تم تحديث المورّد بنجاح',
+  'vendors.updateFailed': 'فشل تحديث المورّد',
+  'vendors.deletedSuccess': 'تم حذف المورّد بنجاح',
+  'vendors.deleteFailed': 'فشل حذف المورّد',
+  'vendors.copied': 'تم النسخ!',
+  'vendors.copiedToClipboard': 'تم نسخ {label} إلى الحافظة',
+  'vendors.copyFailed': 'فشل النسخ',
+  'vendors.copyFailedDesc': 'تعذّر النسخ إلى الحافظة',
+
+  // detail page
+  'vendors.notFoundTitle': 'المورّد غير موجود',
+  'vendors.notFoundDesc': 'تعذّر العثور على المورّد المطلوب.',
+  'vendors.createPurchaseOrder': 'إنشاء طلب شراء',
+  'vendors.deleteVendor': 'حذف المورّد',
+  'vendors.deleteConfirmDesc': 'هل أنت متأكد أنك تريد حذف "{name}"؟ لا يمكن التراجع عن هذا الإجراء.',
+  'vendors.companyInfo': 'معلومات الشركة',
+  'vendors.contactInfo': 'معلومات الاتصال',
+  'vendors.locationAddress': 'الموقع والعنوان',
+  'vendors.additionalInfo': 'معلومات إضافية',
+  'vendors.balanceMetadata': 'الرصيد والبيانات الوصفية',
+  'vendors.balancePerCurrency': 'الرصيد حسب العملة',
+  'vendors.balance': 'الرصيد',
+  'vendors.createdBy': 'أُنشئ بواسطة',
+  'vendors.locationMap': 'خريطة الموقع',
+  'vendors.noLocationInfo': 'لا تتوفر معلومات عن الموقع',
+  'vendors.coordinatesValue': 'الإحداثيات: {lat}، {lng}',
+
+  // fields
+  'vendors.phoneNumber': 'رقم الهاتف',
+  'vendors.emailAddress': 'البريد الإلكتروني',
+  'vendors.fullAddress': 'العنوان الكامل',
+  'vendors.coordinates': 'الإحداثيات',
+  'vendors.coordinatesPlaceholder': 'مثال: 33.5138,36.2765',
+  'vendors.uuid': 'المعرّف (UUID)',
+  'vendors.businessCards': 'بطاقات العمل',
+  'vendors.selectCategory': 'اختر الفئة',
+  'vendors.noCategory': 'بدون فئة',
+  'vendors.noCategorySet': 'لم تُحدَّد فئة',
+  'vendors.allCategories': 'جميع الفئات',
+
+  // form validation
+  'vendors.companyNameRequired': 'اسم الشركة إلزامي',
+  'vendors.fullNameRequired': 'الاسم الكامل إلزامي',
+  'vendors.phoneRequired': 'رقم الهاتف إلزامي',
+  'vendors.invalidEmail': 'البريد الإلكتروني غير صالح',
+  'vendors.validationError': 'خطأ في التحقق',
+  'vendors.requiredFieldsError': 'اسم الشركة والاسم الكامل ورقم الهاتف حقول إلزامية',
+
+  // add vendor dialog
+  'vendors.addVendor': 'إضافة مورّد',
+  'vendors.addNewVendor': 'إضافة مورّد جديد',
+  'vendors.addVendorDesc': 'أنشئ سجل مورّد جديد مع معلومات الاتصال الخاصة به.',
+  'vendors.createVendor': 'إنشاء مورّد',
+  'vendors.enterCompanyName': 'أدخل اسم الشركة',
+  'vendors.enterFullName': 'أدخل الاسم الكامل لجهة الاتصال',
+  'vendors.enterPhoneNumber': 'أدخل رقم الهاتف',
+  'vendors.enterEmailAddress': 'أدخل البريد الإلكتروني',
+  'vendors.enterFullAddress': 'أدخل العنوان الكامل',
+  'vendors.businessCardsPlaceholder': 'تفاصيل بطاقة العمل أو معلومات اتصال إضافية',
+  'vendors.notesPlaceholder': 'ملاحظات إضافية حول المورّد',
+
+  // filters sheet
+  'vendors.filterVendors': 'تصفية المورّدين',
+  'vendors.filterVendorsDesc': 'استخدم عوامل التصفية أدناه لتضييق قائمة المورّدين.',
+  'vendors.searchByUuid': 'البحث بالمعرّف (UUID)...',
+  'vendors.searchByCompanyName': 'البحث باسم الشركة...',
+  'vendors.searchByFullName': 'البحث بالاسم الكامل...',
+  'vendors.searchByEmail': 'البحث بالبريد الإلكتروني...',
+  'vendors.searchByPhone': 'البحث برقم الهاتف...',
+  'vendors.applyFilters': 'تطبيق عوامل التصفية',
+  'vendors.clearAll': 'مسح الكل',
+
+  // vendor category enum values (via te())
+  'enum.raw_materials': 'مواد خام',
+  'enum.equipment': 'معدات',
+  'enum.services': 'خدمات',
+  'enum.other': 'أخرى',
+};

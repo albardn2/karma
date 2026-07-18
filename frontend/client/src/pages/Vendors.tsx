@@ -10,17 +10,11 @@ import { AddVendorDialog } from "@/components/vendors/AddVendorDialog";
 import { VendorFiltersComponent, type VendorFilters } from "@/components/vendors/VendorFilters";
 import { VendorMap } from "@/components/map/VendorMap";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest } from "@/lib/queryClient";
 import type { VendorPage, Vendor } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
-
-const VENDOR_CATEGORY_LABELS = {
-  raw_materials: "Raw Materials",
-  equipment: "Equipment", 
-  services: "Services",
-  other: "Other"
-};
 
 const VENDOR_CATEGORY_COLORS = {
   raw_materials: "bg-green-100 text-green-800",
@@ -43,6 +37,7 @@ export default function Vendors() {
   });
 
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const queryClient = useQueryClient();
   const boundsUpdateTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -139,21 +134,21 @@ export default function Vendors() {
       const listVendors = vendorPage?.vendors || [];
       setDisplayVendors(listVendors);
       setDisplayCount(listVendors.length);
-      setDisplayText(isLoading ? "Loading vendors..." : `${listVendors.length} vendors on this page`);
+      setDisplayText(isLoading ? t('vendors.loadingVendors') : t('vendors.countOnPage', { count: listVendors.length }));
     } else if (activeTab === 'map') {
       const mapVendors = mapVendorPage?.vendors || [];
       setDisplayVendors(mapVendors);
       setDisplayCount(mapVendors.length);
-      setDisplayText(isLoadingMap ? "Loading vendors in area..." : `${mapVendors.length} vendors in current area`);
+      setDisplayText(isLoadingMap ? t('vendors.loadingVendorsInArea') : t('vendors.countInArea', { count: mapVendors.length }));
     }
-  }, [activeTab, vendorPage, mapVendorPage, isLoading, isLoadingMap]);
+  }, [activeTab, vendorPage, mapVendorPage, isLoading, isLoadingMap, t]);
 
   // Reset display immediately when view changes
   useEffect(() => {
     setDisplayVendors([]);
     setDisplayCount(0);
-    setDisplayText(activeTab === 'list' ? "Loading vendors..." : "Loading vendors in area...");
-  }, [activeTab]);
+    setDisplayText(activeTab === 'list' ? t('vendors.loadingVendors') : t('vendors.loadingVendorsInArea'));
+  }, [activeTab, t]);
 
   // Direct bounds change handler for WKT polygon data
   const handleBoundsChange = useCallback((wktPolygon: string) => {
@@ -171,14 +166,14 @@ export default function Vendors() {
         query.queryKey[0] === "/vendor" 
       });
       toast({
-        title: "Success",
-        description: "Vendor deleted successfully",
+        title: t('common.success'),
+        description: t('vendors.deletedSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete vendor",
+        title: t('common.error'),
+        description: error.message || t('vendors.deleteFailed'),
         variant: "destructive",
       });
     },
@@ -206,7 +201,7 @@ export default function Vendors() {
   };
 
   const handleDeleteVendor = (vendor: Vendor) => {
-    if (window.confirm(`Are you sure you want to delete vendor "${vendor.company_name}"?`)) {
+    if (window.confirm(t('vendors.confirmDelete', { name: vendor.company_name }))) {
       deleteVendorMutation.mutate(vendor.uuid);
     }
   };
@@ -221,8 +216,8 @@ export default function Vendors() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold">Vendors</h1>
-                <p className="text-muted-foreground">Manage your vendor relationships</p>
+                <h1 className="text-2xl font-bold">{t('nav.vendors')}</h1>
+                <p className="text-muted-foreground">{t('vendors.subtitle')}</p>
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -253,7 +248,7 @@ export default function Vendors() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">Vendors</h1>
+              <h1 className="text-2xl font-bold">{t('nav.vendors')}</h1>
               <p className="text-muted-foreground">
                 {displayText}
               </p>
@@ -268,11 +263,11 @@ export default function Vendors() {
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="list" className="flex items-center gap-2">
                 <List className="h-4 w-4" />
-                List View
+                {t('vendors.listView')}
               </TabsTrigger>
               <TabsTrigger value="map" className="flex items-center gap-2">
                 <MapIcon className="h-4 w-4" />
-                Map View
+                {t('vendors.mapView')}
               </TabsTrigger>
             </TabsList>
 
@@ -281,11 +276,11 @@ export default function Vendors() {
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No vendors found</h3>
+                    <h3 className="text-lg font-semibold mb-2">{t('vendors.noVendorsFound')}</h3>
                     <p className="text-muted-foreground text-center mb-4">
                       {Object.keys(filters).some(key => key !== 'page' && key !== 'per_page' && filters[key as keyof VendorFilters])
-                        ? "No vendors match your current filters."
-                        : "You haven't added any vendors yet."}
+                        ? t('vendors.noVendorsMatchFilters')
+                        : t('vendors.noVendorsYet')}
                     </p>
                     <AddVendorDialog />
                   </CardContent>
@@ -308,7 +303,7 @@ export default function Vendors() {
                                     variant="secondary" 
                                     className={`text-xs px-1.5 py-0.5 ${VENDOR_CATEGORY_COLORS[vendor.category]}`}
                                   >
-                                    {VENDOR_CATEGORY_LABELS[vendor.category]}
+                                    {te(vendor.category)}
                                   </Badge>
                                 )}
                               </div>
@@ -342,7 +337,7 @@ export default function Vendors() {
 
                               {Object.keys(vendor.balance_per_currency).length > 0 && (
                                 <div className="pt-2 border-t">
-                                  <div className="text-xs text-muted-foreground mb-1">Balance:</div>
+                                  <div className="text-xs text-muted-foreground mb-1">{t('vendors.balanceLabel')}</div>
                                   {Object.entries(vendor.balance_per_currency).map(([currency, balance]) => (
                                     <div key={currency} className="text-xs">
                                       {currency}: {balance}
@@ -360,7 +355,7 @@ export default function Vendors() {
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-muted-foreground">
-                        Page {currentPage} of {totalPages}
+                        {t('vendors.pageOf', { current: currentPage, total: totalPages })}
                       </div>
                       <div className="flex gap-2">
                         <Button
@@ -369,7 +364,7 @@ export default function Vendors() {
                           disabled={currentPage <= 1}
                           onClick={() => setFilters((prev: VendorFilters) => ({ ...prev, page: (prev.page || 1) - 1 }))}
                         >
-                          Previous
+                          {t('common.previous')}
                         </Button>
                         <Button
                           variant="outline"
@@ -377,7 +372,7 @@ export default function Vendors() {
                           disabled={currentPage >= totalPages}
                           onClick={() => setFilters((prev: VendorFilters) => ({ ...prev, page: (prev.page || 1) + 1 }))}
                         >
-                          Next
+                          {t('common.next')}
                         </Button>
                       </div>
                     </div>
@@ -394,12 +389,12 @@ export default function Vendors() {
                   </p>
                 </div>
                 
-                <div className="h-[600px] rounded-lg overflow-hidden border relative z-0">
+                <div dir="ltr" className="h-[600px] rounded-lg overflow-hidden border relative z-0">
                   {isLoadingMap && (
                     <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-20">
                       <div className="text-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto mb-2"></div>
-                        <p className="text-sm text-gray-600">Loading vendors...</p>
+                        <p className="text-sm text-gray-600">{t('vendors.loadingVendors')}</p>
                       </div>
                     </div>
                   )}

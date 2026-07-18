@@ -49,20 +49,9 @@ import { apiRequest } from "@/lib/queryClient";
 import type { Vendor, VendorUpdateData, VendorCategory } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
-const VENDOR_CATEGORIES = [
-  { value: "raw_materials", label: "Raw Materials" },
-  { value: "equipment", label: "Equipment" },
-  { value: "services", label: "Services" },
-  { value: "other", label: "Other" }
-];
-
-const VENDOR_CATEGORY_LABELS = {
-  raw_materials: "Raw Materials",
-  equipment: "Equipment", 
-  services: "Services",
-  other: "Other"
-};
+const VENDOR_CATEGORIES = ["raw_materials", "equipment", "services", "other"] as const;
 
 const VENDOR_CATEGORY_COLORS = {
   raw_materials: "bg-green-100 text-green-800",
@@ -79,26 +68,29 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const vendorUpdateSchema = z.object({
-  company_name: z.string().min(1, "Company name is required").optional(),
-  full_name: z.string().min(1, "Full name is required").optional(),
-  phone_number: z.string().min(1, "Phone number is required").optional(),
-  email_address: z.string().email("Invalid email address").optional().or(z.literal("")),
-  full_address: z.string().optional(),
-  business_cards: z.string().optional(),
-  notes: z.string().optional(),
-  category: z.string().optional(),
-  coordinates: z.string().optional(),
-});
+const buildVendorUpdateSchema = (t: (key: string) => string) =>
+  z.object({
+    company_name: z.string().min(1, t('vendors.companyNameRequired')).optional(),
+    full_name: z.string().min(1, t('vendors.fullNameRequired')).optional(),
+    phone_number: z.string().min(1, t('vendors.phoneRequired')).optional(),
+    email_address: z.string().email(t('vendors.invalidEmail')).optional().or(z.literal("")),
+    full_address: z.string().optional(),
+    business_cards: z.string().optional(),
+    notes: z.string().optional(),
+    category: z.string().optional(),
+    coordinates: z.string().optional(),
+  });
 
-type VendorUpdateFormValues = z.infer<typeof vendorUpdateSchema>;
+type VendorUpdateFormValues = z.infer<ReturnType<typeof buildVendorUpdateSchema>>;
 
 export default function VendorDetail() {
   const { uuid } = useParams();
   const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const queryClient = useQueryClient();
+  const vendorUpdateSchema = useMemo(() => buildVendorUpdateSchema(t), [t]);
 
   // Fetch vendor details
   const { data: vendor, isLoading } = useQuery<Vendor>({
@@ -171,14 +163,14 @@ export default function VendorDetail() {
       });
       setIsEditing(false);
       toast({
-        title: "Success",
-        description: "Vendor updated successfully",
+        title: t('common.success'),
+        description: t('vendors.updatedSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update vendor",
+        title: t('common.error'),
+        description: error.message || t('vendors.updateFailed'),
         variant: "destructive",
       });
     },
@@ -194,14 +186,14 @@ export default function VendorDetail() {
       });
       setLocation("/vendors");
       toast({
-        title: "Success",
-        description: "Vendor deleted successfully",
+        title: t('common.success'),
+        description: t('vendors.deletedSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete vendor",
+        title: t('common.error'),
+        description: error.message || t('vendors.deleteFailed'),
         variant: "destructive",
       });
     },
@@ -251,13 +243,13 @@ export default function VendorDetail() {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: "Copied!",
-        description: `${label} copied to clipboard`,
+        title: t('vendors.copied'),
+        description: t('vendors.copiedToClipboard', { label }),
       });
     } catch (err) {
       toast({
-        title: "Failed to copy",
-        description: "Could not copy to clipboard",
+        title: t('vendors.copyFailed'),
+        description: t('vendors.copyFailedDesc'),
         variant: "destructive",
       });
     }
@@ -277,7 +269,7 @@ export default function VendorDetail() {
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => setLocation("/vendors")}>
                 <ArrowLeft className="h-4 w-4" />
-                Back
+                {t('common.back')}
               </Button>
             </div>
             <div className="grid gap-6 md:grid-cols-2">
@@ -306,14 +298,14 @@ export default function VendorDetail() {
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => setLocation("/vendors")}>
                 <ArrowLeft className="h-4 w-4" />
-                Back
+                {t('common.back')}
               </Button>
             </div>
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Vendor not found</h3>
-                <p className="text-muted-foreground">The requested vendor could not be found.</p>
+                <h3 className="text-lg font-semibold mb-2">{t('vendors.notFoundTitle')}</h3>
+                <p className="text-muted-foreground">{t('vendors.notFoundDesc')}</p>
               </CardContent>
             </Card>
           </div>
@@ -330,7 +322,7 @@ export default function VendorDetail() {
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => setLocation("/vendors")}>
                 <ArrowLeft className="h-4 w-4" />
-                Back
+                {t('common.back')}
               </Button>
               <div>
                 <h1 className="text-2xl font-bold">{vendor.company_name}</h1>
@@ -348,14 +340,14 @@ export default function VendorDetail() {
                     }}
                   >
                     <X className="h-4 w-4" />
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     onClick={form.handleSubmit(onSubmit)}
                     disabled={updateVendorMutation.isPending}
                   >
                     <Save className="h-4 w-4" />
-                    {updateVendorMutation.isPending ? "Saving..." : "Save"}
+                    {updateVendorMutation.isPending ? t('common.saving') : t('common.save')}
                   </Button>
                 </>
               ) : (
@@ -365,11 +357,11 @@ export default function VendorDetail() {
                     className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
                     <Plus className="h-4 w-4" />
-                    Create Purchase Order
+                    {t('vendors.createPurchaseOrder')}
                   </Button>
                   <Button variant="outline" onClick={() => setIsEditing(true)}>
                     <Edit className="h-4 w-4" />
-                    Edit
+                    {t('common.edit')}
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -379,19 +371,19 @@ export default function VendorDetail() {
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
+                        <AlertDialogTitle>{t('vendors.deleteVendor')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Are you sure you want to delete "{vendor.company_name}"? This action cannot be undone.
+                          {t('vendors.deleteConfirmDesc', { name: vendor.company_name })}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={handleDeleteVendor}
                           disabled={deleteVendorMutation.isPending}
                           className="bg-red-600 hover:bg-red-700"
                         >
-                          {deleteVendorMutation.isPending ? "Deleting..." : "Delete"}
+                          {deleteVendorMutation.isPending ? t('common.deleting') : t('common.delete')}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -409,7 +401,7 @@ export default function VendorDetail() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Building2 className="h-5 w-5" />
-                        Company Information
+                        {t('vendors.companyInfo')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -418,7 +410,7 @@ export default function VendorDetail() {
                         name="company_name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Company Name</FormLabel>
+                            <FormLabel>{t('common.companyName')}</FormLabel>
                             <FormControl>
                               <Input {...field} />
                             </FormControl>
@@ -431,21 +423,21 @@ export default function VendorDetail() {
                         name="category"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Category</FormLabel>
+                            <FormLabel>{t('common.category')}</FormLabel>
                             <Select
                               value={field.value || "none"}
                               onValueChange={(value: string) => field.onChange(value === "none" ? "" : value)}
                             >
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select category" />
+                                  <SelectValue placeholder={t('vendors.selectCategory')} />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="none">No category</SelectItem>
+                                <SelectItem value="none">{t('vendors.noCategory')}</SelectItem>
                                 {VENDOR_CATEGORIES.map((category) => (
-                                  <SelectItem key={category.value} value={category.value}>
-                                    {category.label}
+                                  <SelectItem key={category} value={category}>
+                                    {te(category)}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -461,7 +453,7 @@ export default function VendorDetail() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <UserIcon className="h-5 w-5" />
-                        Contact Information
+                        {t('vendors.contactInfo')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -470,7 +462,7 @@ export default function VendorDetail() {
                         name="full_name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Full Name</FormLabel>
+                            <FormLabel>{t('common.fullName')}</FormLabel>
                             <FormControl>
                               <Input {...field} />
                             </FormControl>
@@ -483,7 +475,7 @@ export default function VendorDetail() {
                         name="phone_number"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Phone Number</FormLabel>
+                            <FormLabel>{t('vendors.phoneNumber')}</FormLabel>
                             <FormControl>
                               <Input {...field} />
                             </FormControl>
@@ -496,7 +488,7 @@ export default function VendorDetail() {
                         name="email_address"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Email Address</FormLabel>
+                            <FormLabel>{t('vendors.emailAddress')}</FormLabel>
                             <FormControl>
                               <Input type="email" {...field} />
                             </FormControl>
@@ -511,7 +503,7 @@ export default function VendorDetail() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <MapPin className="h-5 w-5" />
-                        Location & Address
+                        {t('vendors.locationAddress')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -520,7 +512,7 @@ export default function VendorDetail() {
                         name="full_address"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Full Address</FormLabel>
+                            <FormLabel>{t('vendors.fullAddress')}</FormLabel>
                             <FormControl>
                               <Textarea {...field} rows={3} />
                             </FormControl>
@@ -533,9 +525,9 @@ export default function VendorDetail() {
                         name="coordinates"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Coordinates</FormLabel>
+                            <FormLabel>{t('vendors.coordinates')}</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="e.g., 33.5138,36.2765" />
+                              <Input {...field} placeholder={t('vendors.coordinatesPlaceholder')} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -546,7 +538,7 @@ export default function VendorDetail() {
 
                   <Card>
                     <CardHeader>
-                      <CardTitle>Additional Information</CardTitle>
+                      <CardTitle>{t('vendors.additionalInfo')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <FormField
@@ -554,7 +546,7 @@ export default function VendorDetail() {
                         name="business_cards"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Business Cards</FormLabel>
+                            <FormLabel>{t('vendors.businessCards')}</FormLabel>
                             <FormControl>
                               <Textarea {...field} rows={2} />
                             </FormControl>
@@ -567,7 +559,7 @@ export default function VendorDetail() {
                         name="notes"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Notes</FormLabel>
+                            <FormLabel>{t('common.notes')}</FormLabel>
                             <FormControl>
                               <Textarea {...field} rows={3} />
                             </FormControl>
@@ -586,19 +578,19 @@ export default function VendorDetail() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Building2 className="h-5 w-5" />
-                    Company Information
+                    {t('vendors.companyInfo')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-muted-foreground">Company Name</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">{t('common.companyName')}</Label>
                     <div className="flex items-center justify-between group">
                       <span className="font-medium">{vendor.company_name}</span>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(vendor.company_name, "Company name")}
+                        onClick={() => copyToClipboard(vendor.company_name, t('common.companyName'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -606,24 +598,24 @@ export default function VendorDetail() {
                   </div>
                   <Separator />
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-muted-foreground">Category</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">{t('common.category')}</Label>
                     <div className="flex items-center justify-between group">
                       {vendor.category ? (
-                        <Badge 
-                          variant="secondary" 
+                        <Badge
+                          variant="secondary"
                           className={vendor.category ? VENDOR_CATEGORY_COLORS[vendor.category] : "bg-gray-100 text-gray-800"}
                         >
-                          {vendor.category ? VENDOR_CATEGORY_LABELS[vendor.category] : "Unknown"}
+                          {vendor.category ? te(vendor.category) : t('common.unknown')}
                         </Badge>
                       ) : (
-                        <span className="text-muted-foreground">No category set</span>
+                        <span className="text-muted-foreground">{t('vendors.noCategorySet')}</span>
                       )}
                       {vendor.category && (
                         <Button
                           variant="ghost"
                           size="sm"
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => copyToClipboard(VENDOR_CATEGORY_LABELS[vendor.category!], "Category")}
+                          onClick={() => copyToClipboard(te(vendor.category), t('common.category'))}
                         >
                           <Copy className="h-3 w-3" />
                         </Button>
@@ -632,14 +624,14 @@ export default function VendorDetail() {
                   </div>
                   <Separator />
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-muted-foreground">UUID</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">{t('vendors.uuid')}</Label>
                     <div className="flex items-center justify-between group">
                       <span className="font-mono text-sm">{vendor.uuid}</span>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(vendor.uuid, "UUID")}
+                        onClick={() => copyToClipboard(vendor.uuid, t('vendors.uuid'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -652,19 +644,19 @@ export default function VendorDetail() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <UserIcon className="h-5 w-5" />
-                    Contact Information
+                    {t('vendors.contactInfo')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-muted-foreground">Full Name</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">{t('common.fullName')}</Label>
                     <div className="flex items-center justify-between group">
                       <span>{vendor.full_name}</span>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(vendor.full_name, "Full name")}
+                        onClick={() => copyToClipboard(vendor.full_name, t('common.fullName'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -674,7 +666,7 @@ export default function VendorDetail() {
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <Phone className="h-4 w-4" />
-                      Phone Number
+                      {t('vendors.phoneNumber')}
                     </Label>
                     <div className="flex items-center justify-between group">
                       <span>{vendor.phone_number}</span>
@@ -682,7 +674,7 @@ export default function VendorDetail() {
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(vendor.phone_number, "Phone number")}
+                        onClick={() => copyToClipboard(vendor.phone_number, t('vendors.phoneNumber'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -694,7 +686,7 @@ export default function VendorDetail() {
                       <div className="space-y-2">
                         <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                           <Mail className="h-4 w-4" />
-                          Email Address
+                          {t('vendors.emailAddress')}
                         </Label>
                         <div className="flex items-center justify-between group">
                           <span>{vendor.email_address}</span>
@@ -702,7 +694,7 @@ export default function VendorDetail() {
                             variant="ghost"
                             size="sm"
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => copyToClipboard(vendor.email_address!, "Email address")}
+                            onClick={() => copyToClipboard(vendor.email_address!, t('vendors.emailAddress'))}
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
@@ -717,21 +709,21 @@ export default function VendorDetail() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <MapPin className="h-5 w-5" />
-                    Location & Address
+                    {t('vendors.locationAddress')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {vendor.full_address && (
                     <>
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium text-muted-foreground">Full Address</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">{t('vendors.fullAddress')}</Label>
                         <div className="flex items-start justify-between group">
                           <span className="flex-1">{vendor.full_address}</span>
                           <Button
                             variant="ghost"
                             size="sm"
                             className="opacity-0 group-hover:opacity-100 transition-opacity ms-2"
-                            onClick={() => copyToClipboard(vendor.full_address!, "Address")}
+                            onClick={() => copyToClipboard(vendor.full_address!, t('common.address'))}
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
@@ -742,14 +734,14 @@ export default function VendorDetail() {
                   )}
                   {vendor.coordinates && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium text-muted-foreground">Coordinates</Label>
+                      <Label className="text-sm font-medium text-muted-foreground">{t('vendors.coordinates')}</Label>
                       <div className="flex items-center justify-between group">
                         <span className="font-mono text-sm">{vendor.coordinates}</span>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => copyToClipboard(vendor.coordinates!, "Coordinates")}
+                          onClick={() => copyToClipboard(vendor.coordinates!, t('vendors.coordinates'))}
                         >
                           <Copy className="h-3 w-3" />
                         </Button>
@@ -759,7 +751,7 @@ export default function VendorDetail() {
                   {!vendor.full_address && !vendor.coordinates && (
                     <div className="text-center py-8">
                       <MapPin className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">No location information available</p>
+                      <p className="text-sm text-muted-foreground">{t('vendors.noLocationInfo')}</p>
                     </div>
                   )}
                 </CardContent>
@@ -769,14 +761,14 @@ export default function VendorDetail() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5" />
-                    Balance & Metadata
+                    {t('vendors.balanceMetadata')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {Object.keys(vendor.balance_per_currency).length > 0 && (
                     <>
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium text-muted-foreground">Balance per Currency</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">{t('vendors.balancePerCurrency')}</Label>
                         <div className="space-y-1">
                           {Object.entries(vendor.balance_per_currency).map(([currency, balance]) => (
                             <div key={currency} className="flex items-center justify-between group">
@@ -787,7 +779,7 @@ export default function VendorDetail() {
                                 variant="ghost"
                                 size="sm"
                                 className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => copyToClipboard(`${currency}: ${balance}`, "Balance")}
+                                onClick={() => copyToClipboard(`${currency}: ${balance}`, t('vendors.balance'))}
                               >
                                 <Copy className="h-3 w-3" />
                               </Button>
@@ -801,7 +793,7 @@ export default function VendorDetail() {
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
-                      Created At
+                      {t('common.createdAt')}
                     </Label>
                     <div className="flex items-center justify-between group">
                       <span>{formatDate(vendor.created_at)}</span>
@@ -809,7 +801,7 @@ export default function VendorDetail() {
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(formatDate(vendor.created_at), "Created date")}
+                        onClick={() => copyToClipboard(formatDate(vendor.created_at), t('common.createdAt'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -819,14 +811,14 @@ export default function VendorDetail() {
                     <>
                       <Separator />
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium text-muted-foreground">Created By</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">{t('vendors.createdBy')}</Label>
                         <div className="flex items-center justify-between group">
                           <span className="font-mono text-sm">{vendor.created_by_uuid}</span>
                           <Button
                             variant="ghost"
                             size="sm"
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => copyToClipboard(vendor.created_by_uuid!, "Created by UUID")}
+                            onClick={() => copyToClipboard(vendor.created_by_uuid!, t('vendors.createdBy'))}
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
@@ -840,20 +832,20 @@ export default function VendorDetail() {
               {(vendor.business_cards || vendor.notes) && (
                 <Card className="md:col-span-2">
                   <CardHeader>
-                    <CardTitle>Additional Information</CardTitle>
+                    <CardTitle>{t('vendors.additionalInfo')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {vendor.business_cards && (
                       <>
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-muted-foreground">Business Cards</Label>
+                          <Label className="text-sm font-medium text-muted-foreground">{t('vendors.businessCards')}</Label>
                           <div className="flex items-start justify-between group">
                             <span className="flex-1 whitespace-pre-wrap">{vendor.business_cards}</span>
                             <Button
                               variant="ghost"
                               size="sm"
                               className="opacity-0 group-hover:opacity-100 transition-opacity ms-2"
-                              onClick={() => copyToClipboard(vendor.business_cards!, "Business cards")}
+                              onClick={() => copyToClipboard(vendor.business_cards!, t('vendors.businessCards'))}
                             >
                               <Copy className="h-3 w-3" />
                             </Button>
@@ -864,14 +856,14 @@ export default function VendorDetail() {
                     )}
                     {vendor.notes && (
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">{t('common.notes')}</Label>
                         <div className="flex items-start justify-between group">
                           <span className="flex-1 whitespace-pre-wrap">{vendor.notes}</span>
                           <Button
                             variant="ghost"
                             size="sm"
                             className="opacity-0 group-hover:opacity-100 transition-opacity ms-2"
-                            onClick={() => copyToClipboard(vendor.notes!, "Notes")}
+                            onClick={() => copyToClipboard(vendor.notes!, t('common.notes'))}
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
@@ -888,11 +880,11 @@ export default function VendorDetail() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <MapPin className="h-5 w-5" />
-                      Location Map
+                      {t('vendors.locationMap')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[400px] w-full rounded-lg overflow-hidden border">
+                    <div dir="ltr" className="h-[400px] w-full rounded-lg overflow-hidden border">
                       <MapContainer
                         center={[vendorLocation.lat, vendorLocation.lng]}
                         zoom={15}
@@ -913,7 +905,7 @@ export default function VendorDetail() {
                                   variant="secondary" 
                                   className={`text-xs mb-2 ${VENDOR_CATEGORY_COLORS[vendor.category]}`}
                                 >
-                                  {VENDOR_CATEGORY_LABELS[vendor.category]}
+                                  {te(vendor.category)}
                                 </Badge>
                               )}
                               
@@ -939,7 +931,7 @@ export default function VendorDetail() {
                               </div>
                               
                               <div className="mt-2 text-xs text-muted-foreground">
-                                Coordinates: {vendorLocation.lat}, {vendorLocation.lng}
+                                {t('vendors.coordinatesValue', { lat: vendorLocation.lat, lng: vendorLocation.lng })}
                               </div>
                             </div>
                           </Popup>

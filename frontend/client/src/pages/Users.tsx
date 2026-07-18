@@ -9,11 +9,13 @@ import { Trash2, User as UserIcon, Mail, Phone, Calendar, Shield, Globe2 as Glob
 import { AddUserDialog } from "@/components/users/AddUserDialog";
 import { UserFiltersComponent, type UserFilters } from "@/components/users/UserFilters";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest } from "@/lib/queryClient";
 import type { User, UserPage } from "@/lib/types";
 
 export default function Users() {
   const [, setLocation] = useLocation();
+  const { t, te } = useLanguage();
   const [filters, setFilters] = useState<UserFilters>({
     page: 1,
     per_page: 12,
@@ -57,21 +59,25 @@ export default function Users() {
   // Create isolated display state
   const [displayUsers, setDisplayUsers] = useState<User[]>([]);
   const [displayCount, setDisplayCount] = useState<number>(0);
-  const [displayText, setDisplayText] = useState<string>("Loading users...");
 
   // Update display data from fresh API data
   useEffect(() => {
     if (isError) {
       setDisplayUsers([]);
       setDisplayCount(0);
-      setDisplayText("Unable to load users - backend endpoint not available");
     } else {
       const users = usersData?.users || [];
       setDisplayUsers(users);
       setDisplayCount(users.length);
-      setDisplayText(isLoading ? "Loading users..." : `${users.length} users on this page`);
     }
   }, [usersData, isLoading, isError]);
+
+  // Derived at render so it follows language switches
+  const displayText = isError
+    ? t("users.unableToLoad")
+    : isLoading
+      ? t("users.loadingUsers")
+      : t("users.usersOnPage", { count: displayUsers.length });
 
   // Handle filter changes
   const handleFiltersChange = (newFilters: UserFilters) => {
@@ -94,21 +100,21 @@ export default function Users() {
         exact: false 
       });
       toast({
-        title: "Success",
-        description: "User deleted successfully",
+        title: t("common.success"),
+        description: t("users.deletedSuccess"),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error", 
-        description: error.message || "Failed to delete user",
+        title: t("common.error"),
+        description: error.message || t("users.deleteFailed"),
         variant: "destructive",
       });
     },
   });
 
   const handleDeleteUser = (uuid: string, username: string) => {
-    if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+    if (confirm(t("users.confirmDelete", { username }))) {
       deleteUserMutation.mutate(uuid);
     }
   };
@@ -118,8 +124,8 @@ export default function Users() {
   };
 
   const formatPermissionScope = (scope?: string) => {
-    if (!scope) return "No Permission";
-    return scope.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    if (!scope) return t("users.noPermission");
+    return te(scope);
   };
 
   const getPermissionBadgeColor = (scope?: string) => {
@@ -136,7 +142,7 @@ export default function Users() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Users</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{t("nav.users")}</h2>
           </div>
           <AddUserDialog permissionScopes={permissionScopes || []} />
         </div>
@@ -179,12 +185,12 @@ export default function Users() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
               <UserIcon className="w-8 h-8 text-red-600" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Backend Not Available</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{t("users.backendNotAvailable")}</h3>
             <p className="text-gray-600 mb-4">
-              The users endpoint is not configured in your Flask backend.
+              {t("users.backendNotConfigured")}
             </p>
             <p className="text-sm text-gray-500">
-              To enable user management, add the /users endpoint to your backend API.
+              {t("users.backendEnableHint")}
             </p>
           </div>
         ) : displayUsers.length === 0 && !isLoading ? (
@@ -192,9 +198,9 @@ export default function Users() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
               <UserIcon className="w-8 h-8 text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{t("users.noUsersFound")}</h3>
             <p className="text-gray-600">
-              No users match your current filters.
+              {t("users.noUsersMatch")}
             </p>
           </div>
         ) : (
@@ -262,10 +268,10 @@ export default function Users() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <Calendar className="h-3 w-3" />
-                      <span>Created: {formatDate(user.created_at)}</span>
+                      <span>{t("users.createdDate", { date: formatDate(user.created_at) })}</span>
                     </div>
                     <Badge variant={user.is_deleted ? "destructive" : "default"} className="text-xs">
-                      {user.is_deleted ? "Deleted" : "Active"}
+                      {user.is_deleted ? t("users.deleted") : t("users.active")}
                     </Badge>
                   </div>
                 </CardContent>
@@ -281,17 +287,17 @@ export default function Users() {
                   disabled={filters.page === 1}
                   onClick={() => setFilters((prev: UserFilters) => ({ ...prev, page: (prev.page || 1) - 1 }))}
                 >
-                  Previous
+                  {t("common.previous")}
                 </Button>
                 <span className="text-sm text-gray-600">
-                  Page {filters.page || 1} of {usersData.pages}
+                  {t("common.page")} {filters.page || 1} {t("common.of")} {usersData.pages}
                 </span>
                 <Button
                   variant="outline"
                   disabled={filters.page === usersData.pages}
                   onClick={() => setFilters((prev: UserFilters) => ({ ...prev, page: (prev.page || 1) + 1 }))}
                 >
-                  Next
+                  {t("common.next")}
                 </Button>
               </div>
             )}

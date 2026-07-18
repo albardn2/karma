@@ -14,16 +14,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { VendorFormData, VendorCategory } from "@/lib/types";
 
-const VENDOR_CATEGORIES = [
-  { value: "raw_materials", label: "Raw Materials" },
-  { value: "equipment", label: "Equipment" },
-  { value: "services", label: "Services" },
-  { value: "other", label: "Other" }
-];
+const VENDOR_CATEGORIES = ["raw_materials", "equipment", "services", "other"] as const;
 
 export function AddVendorDialog() {
   const [open, setOpen] = useState(false);
@@ -40,6 +36,7 @@ export function AddVendorDialog() {
   });
 
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const queryClient = useQueryClient();
 
   const createVendorMutation = useMutation({
@@ -76,14 +73,14 @@ export function AddVendorDialog() {
         coordinates: "",
       });
       toast({
-        title: "Success",
-        description: "Vendor created successfully",
+        title: t('common.success'),
+        description: t('vendors.createdSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create vendor",
+        title: t('common.error'),
+        description: error.message || t('vendors.createFailed'),
         variant: "destructive",
       });
     },
@@ -99,8 +96,8 @@ export function AddVendorDialog() {
     // Basic validation
     if (!formData.company_name || !formData.full_name || !formData.phone_number) {
       toast({
-        title: "Validation Error",
-        description: "Company name, full name, and phone number are required",
+        title: t('vendors.validationError'),
+        description: t('vendors.requiredFieldsError'),
         variant: "destructive",
       });
       return;
@@ -124,75 +121,75 @@ export function AddVendorDialog() {
       <DialogTrigger asChild>
         <Button className="gap-2">
           <Plus className="h-4 w-4" />
-          Add Vendor
+          {t('vendors.addVendor')}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Vendor</DialogTitle>
+          <DialogTitle>{t('vendors.addNewVendor')}</DialogTitle>
           <DialogDescription>
-            Create a new vendor record with their contact information.
+            {t('vendors.addVendorDesc')}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="company_name">Company Name *</Label>
+            <Label htmlFor="company_name">{t('common.companyName')} *</Label>
             <Input
               id="company_name"
               value={formData.company_name}
               onChange={(e) => handleInputChange("company_name", e.target.value)}
-              placeholder="Enter company name"
+              placeholder={t('vendors.enterCompanyName')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="full_name">Full Name *</Label>
+            <Label htmlFor="full_name">{t('common.fullName')} *</Label>
             <Input
               id="full_name"
               value={formData.full_name}
               onChange={(e) => handleInputChange("full_name", e.target.value)}
-              placeholder="Enter contact person's full name"
+              placeholder={t('vendors.enterFullName')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone_number">Phone Number *</Label>
+            <Label htmlFor="phone_number">{t('vendors.phoneNumber')} *</Label>
             <Input
               id="phone_number"
               value={formData.phone_number}
               onChange={(e) => handleInputChange("phone_number", e.target.value)}
-              placeholder="Enter phone number"
+              placeholder={t('vendors.enterPhoneNumber')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email_address">Email Address</Label>
+            <Label htmlFor="email_address">{t('vendors.emailAddress')}</Label>
             <Input
               id="email_address"
               type="email"
               value={formData.email_address || ""}
               onChange={(e) => handleInputChange("email_address", e.target.value)}
-              placeholder="Enter email address"
+              placeholder={t('vendors.enterEmailAddress')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
+            <Label htmlFor="category">{t('common.category')}</Label>
             <Select
               value={formData.category || "none"}
               onValueChange={(value: string) => handleInputChange("category", value === "none" ? undefined : value as VendorCategory)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select category" />
+                <SelectValue placeholder={t('vendors.selectCategory')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No category</SelectItem>
+                <SelectItem value="none">{t('vendors.noCategory')}</SelectItem>
                 {VENDOR_CATEGORIES.map(category => (
-                  <SelectItem key={category.value} value={category.value}>
-                    {category.label}
+                  <SelectItem key={category} value={category}>
+                    {te(category)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -200,45 +197,45 @@ export function AddVendorDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="full_address">Full Address</Label>
+            <Label htmlFor="full_address">{t('vendors.fullAddress')}</Label>
             <Textarea
               id="full_address"
               value={formData.full_address || ""}
               onChange={(e) => handleInputChange("full_address", e.target.value)}
-              placeholder="Enter full address"
+              placeholder={t('vendors.enterFullAddress')}
               rows={2}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="business_cards">Business Cards</Label>
+            <Label htmlFor="business_cards">{t('vendors.businessCards')}</Label>
             <Textarea
               id="business_cards"
               value={formData.business_cards || ""}
               onChange={(e) => handleInputChange("business_cards", e.target.value)}
-              placeholder="Business card details or additional contact info"
+              placeholder={t('vendors.businessCardsPlaceholder')}
               rows={2}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t('common.notes')}</Label>
             <Textarea
               id="notes"
               value={formData.notes || ""}
               onChange={(e) => handleInputChange("notes", e.target.value)}
-              placeholder="Additional notes about the vendor"
+              placeholder={t('vendors.notesPlaceholder')}
               rows={2}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="coordinates">Coordinates</Label>
+            <Label htmlFor="coordinates">{t('vendors.coordinates')}</Label>
             <Input
               id="coordinates"
               value={formData.coordinates || ""}
               onChange={(e) => handleInputChange("coordinates", e.target.value)}
-              placeholder="e.g., 33.5138,36.2765"
+              placeholder={t('vendors.coordinatesPlaceholder')}
             />
           </div>
 
@@ -249,14 +246,14 @@ export function AddVendorDialog() {
               onClick={() => setOpen(false)}
               className="flex-1"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               disabled={createVendorMutation.isPending}
               className="flex-1"
             >
-              {createVendorMutation.isPending ? "Creating..." : "Create Vendor"}
+              {createVendorMutation.isPending ? t('common.creating') : t('vendors.createVendor')}
             </Button>
           </div>
         </form>

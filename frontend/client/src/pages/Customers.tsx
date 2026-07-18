@@ -11,9 +11,11 @@ import { CustomerFiltersComponent, type CustomerFilters } from "@/components/cus
 import { CustomerMap } from "@/components/map/CustomerMap";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Customer, CustomerPage } from "@/lib/types";
 
 export default function Customers() {
+  const { t, te } = useLanguage();
   const [, setLocation] = useLocation();
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [filters, setFilters] = useState<CustomerFilters>({
@@ -154,21 +156,21 @@ export default function Customers() {
       const listCustomers = customersData?.customers || [];
       setDisplayCustomers(listCustomers);
       setDisplayCount(listCustomers.length);
-      setDisplayText(isLoading ? "Loading customers..." : `${listCustomers.length} customers on this page`);
+      setDisplayText(isLoading ? t('customers.loadingCustomers') : t('customers.countOnPage', { count: listCustomers.length }));
     } else if (viewMode === 'map') {
       const mapCustomers = mapCustomersData?.customers || [];
       setDisplayCustomers(mapCustomers);
       setDisplayCount(mapCustomers.length);
-      setDisplayText(isMapLoading ? "Loading customers in area..." : `${mapCustomers.length} customers in current area`);
+      setDisplayText(isMapLoading ? t('customers.loadingCustomersInArea') : t('customers.countInArea', { count: mapCustomers.length }));
     }
-  }, [viewMode, customersData, mapCustomersData, isLoading, isMapLoading]);
+  }, [viewMode, customersData, mapCustomersData, isLoading, isMapLoading, t]);
 
   // Reset display immediately when view changes
   useEffect(() => {
     setDisplayCustomers([]);
     setDisplayCount(0);
-    setDisplayText(viewMode === 'list' ? "Loading customers..." : "Loading customers in area...");
-  }, [viewMode]);
+    setDisplayText(viewMode === 'list' ? t('customers.loadingCustomers') : t('customers.loadingCustomersInArea'));
+  }, [viewMode, t]);
 
   // Delete customer mutation
   const deleteCustomerMutation = useMutation({
@@ -193,21 +195,21 @@ export default function Customers() {
       });
       
       toast({
-        title: "Success",
-        description: "Customer deleted successfully",
+        title: t('common.success'),
+        description: t('customers.deleteSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error", 
-        description: error.message || "Failed to delete customer",
+        title: t('common.error'),
+        description: error.message || t('customers.deleteFailed'),
         variant: "destructive",
       });
     },
   });
 
   const handleDeleteCustomer = (uuid: string, companyName: string) => {
-    if (confirm(`Are you sure you want to delete ${companyName}? This action cannot be undone.`)) {
+    if (confirm(t('customers.deleteConfirm', { name: companyName }))) {
       deleteCustomerMutation.mutate(uuid);
     }
   };
@@ -238,7 +240,7 @@ export default function Customers() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Customers</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{t('nav.customers')}</h2>
           </div>
           <AddCustomerDialog categories={categories || []} />
         </div>
@@ -268,7 +270,7 @@ export default function Customers() {
               className={viewMode === 'list' ? 'brand-gradient' : ''}
             >
               <List className="w-4 h-4 me-2" />
-              List
+              {t('customers.list')}
             </Button>
             <Button
               variant={viewMode === 'map' ? 'default' : 'ghost'}
@@ -277,7 +279,7 @@ export default function Customers() {
               className={viewMode === 'map' ? 'brand-gradient' : ''}
             >
               <Map className="w-4 h-4 me-2" />
-              Map
+              {t('customers.map')}
             </Button>
           </div>
 
@@ -311,13 +313,13 @@ export default function Customers() {
                       <p className="text-sm text-gray-600">{customer.full_name}</p>
                     </div>
                     <Badge variant="secondary" className="ms-2 capitalize">
-                      {customer.category}
+                      {te(customer.category)}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div>
-                    <p className="text-xs text-gray-500">Contact</p>
+                    <p className="text-xs text-gray-500">{t('customers.contact')}</p>
                     <p className="text-sm text-gray-900">{customer.phone_number}</p>
                     {customer.email_address && (
                       <p className="text-sm text-gray-600">{customer.email_address}</p>
@@ -325,13 +327,13 @@ export default function Customers() {
                   </div>
                   
                   <div>
-                    <p className="text-xs text-gray-500">Address</p>
+                    <p className="text-xs text-gray-500">{t('common.address')}</p>
                     <p className="text-sm text-gray-900 line-clamp-2">{customer.full_address}</p>
                   </div>
 
                   {customer.notes && (
                     <div>
-                      <p className="text-xs text-gray-500">Notes</p>
+                      <p className="text-xs text-gray-500">{t('common.notes')}</p>
                       <p className="text-sm text-gray-700 line-clamp-2">{customer.notes}</p>
                     </div>
                   )}
@@ -341,12 +343,12 @@ export default function Customers() {
           </div>
         ) : (
           /* Customer Map View */
-          <div className="h-[600px] rounded-lg overflow-hidden border relative z-0">
+          <div className="h-[600px] rounded-lg overflow-hidden border relative z-0" dir="ltr">
             {isMapLoading && (
               <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-20">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto mb-2"></div>
-                  <p className="text-sm text-gray-600">Loading customers...</p>
+                  <p className="text-sm text-gray-600">{t('customers.loadingCustomers')}</p>
                 </div>
               </div>
             )}
@@ -362,11 +364,11 @@ export default function Customers() {
 
         {viewMode === 'list' && displayCount === 0 && !isLoading && (
           <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No customers found</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('customers.noCustomersFound')}</h3>
             <p className="text-gray-600 mb-4">
               {Object.keys(filters).some(key => key !== 'page' && key !== 'per_page' && filters[key as keyof CustomerFilters])
-                ? "Try adjusting your filters" 
-                : "Get started by adding your first customer"}
+                ? t('customers.tryAdjustingFilters')
+                : t('customers.getStartedFirst')}
             </p>
             <AddCustomerDialog categories={categories || []} />
           </div>
@@ -374,9 +376,9 @@ export default function Customers() {
         
         {viewMode === 'map' && displayCount === 0 && !isMapLoading && (
           <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No customers found in this area</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('customers.noCustomersFoundInArea')}</h3>
             <p className="text-gray-600 mb-4">
-              Pan and zoom the map to explore different areas, or add your first customer.
+              {t('customers.panZoomHint')}
             </p>
             <AddCustomerDialog categories={categories || []} />
           </div>
@@ -390,17 +392,17 @@ export default function Customers() {
               disabled={filters.page === 1}
               onClick={() => setFilters(prev => ({ ...prev, page: (prev.page || 1) - 1 }))}
             >
-              Previous
+              {t('common.previous')}
             </Button>
             <span className="text-sm text-gray-600">
-              Page {filters.page || 1} of {customersData.pages}
+              {t('customers.pageOf', { page: filters.page || 1, total: customersData.pages })}
             </span>
             <Button
               variant="outline"
               disabled={filters.page === customersData.pages}
               onClick={() => setFilters(prev => ({ ...prev, page: (prev.page || 1) + 1 }))}
             >
-              Next
+              {t('common.next')}
             </Button>
           </div>
         )}

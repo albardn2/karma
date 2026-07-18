@@ -9,17 +9,18 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Copy, Edit, Trash2, StickyNote, Image as ImageIcon, IdCard, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Employee } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 
-const EMPLOYEE_ROLE_LABELS = {
-  admin: "Admin",
-  manager: "Manager", 
-  employee: "Operator",
-  accountant: "Accountant",
-  driver: "Driver",
-  sales: "Sales"
+const EMPLOYEE_ROLE_LABEL_KEYS = {
+  admin: "employees.roleAdmin",
+  manager: "employees.roleManager",
+  employee: "employees.roleOperator",
+  accountant: "employees.roleAccountant",
+  driver: "employees.roleDriver",
+  sales: "employees.roleSales"
 };
 
 const EMPLOYEE_ROLE_COLORS = {
@@ -35,6 +36,7 @@ export default function EmployeeDetail() {
   const { uuid } = useParams<{ uuid: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
 
   // Fetch employee details
@@ -61,17 +63,17 @@ export default function EmployeeDetail() {
       });
       
       toast({
-        title: "Success",
-        description: "Employee deleted successfully",
+        title: t('common.success'),
+        description: t('employees.deleteSuccess'),
       });
-      
+
       // Navigate back to employees list
       setLocation("/employees");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete employee",
+        title: t('common.error'),
+        description: error.message || t('employees.deleteFailed'),
         variant: "destructive",
       });
     },
@@ -81,13 +83,13 @@ export default function EmployeeDetail() {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: "Copied!",
-        description: `${label} copied to clipboard`,
+        title: t('employees.copied'),
+        description: t('employees.copiedDescription', { label }),
       });
     } catch (err) {
       toast({
-        title: "Error",
-        description: "Failed to copy to clipboard",
+        title: t('common.error'),
+        description: t('employees.copyFailed'),
         variant: "destructive",
       });
     }
@@ -106,7 +108,7 @@ export default function EmployeeDetail() {
               <Link href="/employees">
                 <Button variant="outline" size="sm">
                   <ArrowLeft className="h-4 w-4 me-2" />
-                  Back to Employees
+                  {t('employees.backToList')}
                 </Button>
               </Link>
             </div>
@@ -132,13 +134,13 @@ export default function EmployeeDetail() {
               <Link href="/employees">
                 <Button variant="outline" size="sm">
                   <ArrowLeft className="h-4 w-4 me-2" />
-                  Back to Employees
+                  {t('employees.backToList')}
                 </Button>
               </Link>
             </div>
             <Card>
               <CardContent className="p-6">
-                <p className="text-center text-muted-foreground">Employee not found</p>
+                <p className="text-center text-muted-foreground">{t('employees.notFound')}</p>
               </CardContent>
             </Card>
           </div>
@@ -157,7 +159,7 @@ export default function EmployeeDetail() {
               <Link href="/employees">
                 <Button variant="outline" size="sm">
                   <ArrowLeft className="h-4 w-4 me-2" />
-                  Back to Employees
+                  {t('employees.backToList')}
                 </Button>
               </Link>
               <div>
@@ -165,7 +167,7 @@ export default function EmployeeDetail() {
                   <User className="h-6 w-6" />
                   {employee.full_name}
                 </h1>
-                <p className="text-muted-foreground">Employee details and information</p>
+                <p className="text-muted-foreground">{t('employees.detailSubtitle')}</p>
               </div>
             </div>
             
@@ -176,38 +178,38 @@ export default function EmployeeDetail() {
                 size="sm"
               >
                 <DollarSign className="h-4 w-4 me-2" />
-                Create Salary
+                {t('employees.createSalary')}
               </Button>
-              
+
               <Link href={`/employees/${uuid}/edit`}>
                 <Button variant="outline" size="sm">
                   <Edit className="h-4 w-4 me-2" />
-                  Edit
+                  {t('common.edit')}
                 </Button>
               </Link>
-              
+
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm">
                     <Trash2 className="h-4 w-4 me-2" />
-                    Delete
+                    {t('common.delete')}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+                    <AlertDialogTitle>{t('employees.deleteTitle')}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete "{employee.full_name}"? This action cannot be undone.
+                      {t('employees.deleteDialogDescription', { name: employee.full_name })}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleDelete}
                       disabled={deleteEmployeeMutation.isPending}
                       className="bg-red-600 hover:bg-red-700"
                     >
-                      {deleteEmployeeMutation.isPending ? "Deleting..." : "Delete"}
+                      {deleteEmployeeMutation.isPending ? t('common.deleting') : t('common.delete')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -219,20 +221,20 @@ export default function EmployeeDetail() {
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Basic Information</CardTitle>
+                <CardTitle>{t('employees.basicInfo')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Full Name</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('common.fullName')}</p>
                       <p className="font-medium">{employee.full_name}</p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(employee.full_name, "Full Name")}
+                      onClick={() => copyToClipboard(employee.full_name, t('common.fullName'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -242,7 +244,7 @@ export default function EmployeeDetail() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Phone Number</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('employees.phoneNumber')}</p>
                       <div className="flex items-center gap-2">
                         <Phone className="h-4 w-4 text-muted-foreground" />
                         <span>{employee.phone_number}</span>
@@ -252,7 +254,7 @@ export default function EmployeeDetail() {
                       variant="ghost"
                       size="sm"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(employee.phone_number, "Phone Number")}
+                      onClick={() => copyToClipboard(employee.phone_number, t('employees.phoneNumber'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -262,14 +264,14 @@ export default function EmployeeDetail() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Email Address</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('employees.emailAddress')}</p>
                       {employee.email_address ? (
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-muted-foreground" />
                           <span>{employee.email_address}</span>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">No email address</span>
+                        <span className="text-muted-foreground">{t('employees.noEmail')}</span>
                       )}
                     </div>
                     {employee.email_address && (
@@ -277,7 +279,7 @@ export default function EmployeeDetail() {
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(employee.email_address!, "Email Address")}
+                        onClick={() => copyToClipboard(employee.email_address!, t('employees.emailAddress'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -288,16 +290,16 @@ export default function EmployeeDetail() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Role</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('employees.role')}</p>
                       {employee.role ? (
-                        <Badge 
-                          variant="secondary" 
+                        <Badge
+                          variant="secondary"
                           className={EMPLOYEE_ROLE_COLORS[employee.role]}
                         >
-                          {EMPLOYEE_ROLE_LABELS[employee.role]}
+                          {t(EMPLOYEE_ROLE_LABEL_KEYS[employee.role])}
                         </Badge>
                       ) : (
-                        <span className="text-muted-foreground">No role assigned</span>
+                        <span className="text-muted-foreground">{t('employees.noRole')}</span>
                       )}
                     </div>
                     {employee.role && (
@@ -305,7 +307,7 @@ export default function EmployeeDetail() {
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(EMPLOYEE_ROLE_LABELS[employee.role!], "Role")}
+                        onClick={() => copyToClipboard(t(EMPLOYEE_ROLE_LABEL_KEYS[employee.role!]), t('employees.role'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -316,14 +318,14 @@ export default function EmployeeDetail() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">UUID</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('employees.uuid')}</p>
                       <span className="font-mono text-sm">{employee.uuid}</span>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(employee.uuid, "UUID")}
+                      onClick={() => copyToClipboard(employee.uuid, t('employees.uuid'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -334,20 +336,20 @@ export default function EmployeeDetail() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Additional Information</CardTitle>
+                <CardTitle>{t('employees.additionalInfo')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Full Address</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('employees.fullAddress')}</p>
                       {employee.full_address ? (
                         <div className="flex items-start gap-2">
                           <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                           <span className="text-sm">{employee.full_address}</span>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">No address provided</span>
+                        <span className="text-muted-foreground">{t('employees.noAddress')}</span>
                       )}
                     </div>
                     {employee.full_address && (
@@ -355,7 +357,7 @@ export default function EmployeeDetail() {
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(employee.full_address!, "Address")}
+                        onClick={() => copyToClipboard(employee.full_address!, t('common.address'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -366,14 +368,14 @@ export default function EmployeeDetail() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Identification</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('employees.identification')}</p>
                       {employee.identification ? (
                         <div className="flex items-center gap-2">
                           <IdCard className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm">{employee.identification}</span>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">No identification provided</span>
+                        <span className="text-muted-foreground">{t('employees.noIdentification')}</span>
                       )}
                     </div>
                     {employee.identification && (
@@ -381,7 +383,7 @@ export default function EmployeeDetail() {
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(employee.identification!, "Identification")}
+                        onClick={() => copyToClipboard(employee.identification!, t('employees.identification'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -392,14 +394,14 @@ export default function EmployeeDetail() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Image</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('employees.image')}</p>
                       {employee.image ? (
                         <div className="flex items-center gap-2">
                           <ImageIcon className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm">{employee.image}</span>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">No image provided</span>
+                        <span className="text-muted-foreground">{t('employees.noImage')}</span>
                       )}
                     </div>
                     {employee.image && (
@@ -407,7 +409,7 @@ export default function EmployeeDetail() {
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(employee.image!, "Image")}
+                        onClick={() => copyToClipboard(employee.image!, t('employees.image'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -418,14 +420,14 @@ export default function EmployeeDetail() {
                 <div className="space-y-2">
                   <div className="flex items-start justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Notes</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('common.notes')}</p>
                       {employee.notes ? (
                         <div className="flex items-start gap-2">
                           <StickyNote className="h-4 w-4 text-muted-foreground mt-0.5" />
                           <span className="text-sm">{employee.notes}</span>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">No notes</span>
+                        <span className="text-muted-foreground">{t('employees.noNotes')}</span>
                       )}
                     </div>
                     {employee.notes && (
@@ -433,7 +435,7 @@ export default function EmployeeDetail() {
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(employee.notes!, "Notes")}
+                        onClick={() => copyToClipboard(employee.notes!, t('common.notes'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -444,7 +446,7 @@ export default function EmployeeDetail() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Created</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('employees.created')}</p>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm">{formatDate(employee.created_at)}</span>
@@ -454,7 +456,7 @@ export default function EmployeeDetail() {
                       variant="ghost"
                       size="sm"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(formatDate(employee.created_at), "Created Date")}
+                      onClick={() => copyToClipboard(formatDate(employee.created_at), t('employees.createdDate'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
