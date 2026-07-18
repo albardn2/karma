@@ -4,8 +4,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import Landing from "@/pages/Landing";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
@@ -83,12 +84,26 @@ import WorkflowExecutionTaskDetail from "@/pages/WorkflowExecutionTaskDetail";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 
+function HomeRoute() {
+  // "/" is the public landing page for visitors and the dashboard for
+  // signed-in users
+  const { isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return <div className="min-h-screen brand-gradient" />;
+  return isAuthenticated ? (
+    <ProtectedRoute>
+      <Dashboard />
+    </ProtectedRoute>
+  ) : (
+    <Landing />
+  );
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
-      <Route path="/" component={() => <ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/" component={HomeRoute} />
       <Route path="/customers" component={() => <ProtectedRoute><Customers /></ProtectedRoute>} />
       <Route path="/customers/:uuid" component={() => <ProtectedRoute><CustomerDetail /></ProtectedRoute>} />
       <Route path="/vendors" component={() => <ProtectedRoute><Vendors /></ProtectedRoute>} />
