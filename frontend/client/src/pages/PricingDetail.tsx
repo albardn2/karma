@@ -33,9 +33,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { Pricing, PricingUpdateData } from "@/lib/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function PricingDetail() {
   const { uuid } = useParams<{ uuid: string }>();
+  const { t } = useLanguage();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -85,16 +87,16 @@ export default function PricingDetail() {
       });
       
       toast({
-        title: "Success",
-        description: "Pricing updated successfully",
+        title: t('common.success'),
+        description: t('pricing.updatedSuccess'),
       });
-      
+
       setIsEditing(false);
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to update pricing",
+        title: t('common.error'),
+        description: t('pricing.updateFailed'),
         variant: "destructive",
       });
     },
@@ -110,16 +112,16 @@ export default function PricingDetail() {
       queryClient.refetchQueries({ queryKey: ["/pricing/"] });
       
       toast({
-        title: "Success",
-        description: "Pricing deleted successfully",
+        title: t('common.success'),
+        description: t('pricing.deletedSuccess'),
       });
-      
+
       setLocation("/pricing");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete pricing",
+        title: t('common.error'),
+        description: error.message || t('pricing.deleteFailed'),
         variant: "destructive",
       });
     },
@@ -129,13 +131,13 @@ export default function PricingDetail() {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: "Copied!",
-        description: `${label} copied to clipboard`,
+        title: t('pricing.copied'),
+        description: t('pricing.copiedToClipboard', { label }),
       });
     } catch (err) {
       toast({
-        title: "Error",
-        description: "Failed to copy to clipboard",
+        title: t('common.error'),
+        description: t('pricing.copyFailed'),
         variant: "destructive",
       });
     }
@@ -185,9 +187,9 @@ export default function PricingDetail() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Pricing Not Found</h1>
+          <h1 className="text-2xl font-bold mb-4">{t('pricing.notFound')}</h1>
           <Link href="/pricing">
-            <Button>Back to Pricing</Button>
+            <Button>{t('pricing.backToPricing')}</Button>
           </Link>
         </div>
       </div>
@@ -201,8 +203,8 @@ export default function PricingDetail() {
         <div className="flex items-center gap-4">
           <Link href="/pricing">
             <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Pricing
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t('pricing.backToPricing')}
             </Button>
           </Link>
           <div className="flex items-center gap-2">
@@ -215,31 +217,31 @@ export default function PricingDetail() {
           {!isEditing ? (
             <>
               <Button variant="outline" size="sm" onClick={handleEdit}>
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
+                <Edit className="h-4 w-4 me-2" />
+                {t('common.edit')}
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
+                    <Trash2 className="h-4 w-4 me-2" />
+                    {t('common.delete')}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Pricing</AlertDialogTitle>
+                    <AlertDialogTitle>{t('pricing.deleteTitle')}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete this pricing entry? This action cannot be undone.
+                      {t('pricing.deleteConfirm')}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={() => deletePricingMutation.mutate()}
                       disabled={deletePricingMutation.isPending}
                       className="bg-red-600 hover:bg-red-700"
                     >
-                      {deletePricingMutation.isPending ? "Deleting..." : "Delete"}
+                      {deletePricingMutation.isPending ? t('common.deleting') : t('common.delete')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -253,12 +255,12 @@ export default function PricingDetail() {
                 disabled={updatePricingMutation.isPending}
                 className="bg-gradient-to-r from-[#5469D4] to-[#8B5CF6] hover:from-[#4F63D2] hover:to-[#8A5AF5]"
               >
-                <Save className="h-4 w-4 mr-2" />
-                {updatePricingMutation.isPending ? "Saving..." : "Save"}
+                <Save className="h-4 w-4 me-2" />
+                {updatePricingMutation.isPending ? t('common.saving') : t('common.save')}
               </Button>
               <Button variant="outline" size="sm" onClick={handleCancelEdit}>
-                <X className="h-4 w-4 mr-2" />
-                Cancel
+                <X className="h-4 w-4 me-2" />
+                {t('common.cancel')}
               </Button>
             </>
           )}
@@ -270,14 +272,14 @@ export default function PricingDetail() {
         {/* Basic Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Pricing Information</CardTitle>
+            <CardTitle>{t('pricing.pricingInfo')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Price per Unit */}
             <div className="space-y-2">
               <div className="flex items-center justify-between group">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">Price per Unit</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('pricing.pricePerUnit')}</p>
                   {isEditing ? (
                     <Input
                       type="number"
@@ -285,7 +287,7 @@ export default function PricingDetail() {
                       min="0"
                       value={formData.price_per_unit}
                       onChange={(e) => handleInputChange("price_per_unit", parseFloat(e.target.value) || 0)}
-                      placeholder="Enter price per unit"
+                      placeholder={t('pricing.pricePerUnitPlaceholder')}
                       className="mt-1"
                     />
                   ) : (
@@ -297,7 +299,7 @@ export default function PricingDetail() {
                     variant="ghost"
                     size="sm"
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => copyToClipboard(pricing.price_per_unit.toString(), "Price per Unit")}
+                    onClick={() => copyToClipboard(pricing.price_per_unit.toString(), t('pricing.pricePerUnit'))}
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
@@ -311,14 +313,14 @@ export default function PricingDetail() {
             <div className="space-y-2">
               <div className="flex items-center justify-between group">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">Currency</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('common.currency')}</p>
                   {isEditing ? (
                     <Select
                       value={formData.currency}
                       onValueChange={(value) => handleInputChange("currency", value)}
                     >
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select currency" />
+                        <SelectValue placeholder={t('pricing.selectCurrency')} />
                       </SelectTrigger>
                       <SelectContent>
                         {currencies?.map((currency) => (
@@ -339,7 +341,7 @@ export default function PricingDetail() {
                     variant="ghost"
                     size="sm"
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => copyToClipboard(pricing.currency, "Currency")}
+                    onClick={() => copyToClipboard(pricing.currency, t('common.currency'))}
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
@@ -355,14 +357,14 @@ export default function PricingDetail() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Unit of Measure</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('pricing.unitOfMeasure')}</p>
                       <p className="text-sm">{pricing.unit}</p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(pricing.unit!, "Unit of Measure")}
+                      onClick={() => copyToClipboard(pricing.unit!, t('pricing.unitOfMeasure'))}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -377,14 +379,14 @@ export default function PricingDetail() {
         {/* Additional Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Additional Information</CardTitle>
+            <CardTitle>{t('pricing.additionalInfo')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Material Information */}
             <div className="space-y-2">
               <div className="flex items-center justify-between group">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Material</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('pricing.material')}</p>
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">
@@ -396,7 +398,7 @@ export default function PricingDetail() {
                   variant="ghost"
                   size="sm"
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => copyToClipboard(pricing.material_uuid, "Material ID")}
+                  onClick={() => copyToClipboard(pricing.material_uuid, t('pricing.materialId'))}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>
@@ -409,7 +411,7 @@ export default function PricingDetail() {
             <div className="space-y-2">
               <div className="flex items-center justify-between group">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Created Date</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('pricing.createdDate')}</p>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">
@@ -421,7 +423,7 @@ export default function PricingDetail() {
                   variant="ghost"
                   size="sm"
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => copyToClipboard(pricing.created_at, "Created Date")}
+                  onClick={() => copyToClipboard(pricing.created_at, t('pricing.createdDate'))}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>
@@ -434,7 +436,7 @@ export default function PricingDetail() {
             <div className="space-y-2">
               <div className="flex items-center justify-between group">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Pricing ID</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t('pricing.pricingId')}</p>
                   <p className="text-xs font-mono text-muted-foreground">
                     {pricing.uuid}
                   </p>
@@ -443,7 +445,7 @@ export default function PricingDetail() {
                   variant="ghost"
                   size="sm"
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => copyToClipboard(pricing.uuid, "Pricing ID")}
+                  onClick={() => copyToClipboard(pricing.uuid, t('pricing.pricingId'))}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>

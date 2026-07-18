@@ -9,19 +9,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { EmployeeFormData, EmployeeRole } from "@/lib/types";
 
 const EMPLOYEE_ROLES = [
-  { value: "admin", label: "Admin" },
-  { value: "manager", label: "Manager" },
-  { value: "employee", label: "Operator" },
-  { value: "accountant", label: "Accountant" },
-  { value: "driver", label: "Driver" },
-  { value: "sales", label: "Sales" }
+  { value: "admin", labelKey: "employees.roleAdmin" },
+  { value: "manager", labelKey: "employees.roleManager" },
+  { value: "employee", labelKey: "employees.roleOperator" },
+  { value: "accountant", labelKey: "employees.roleAccountant" },
+  { value: "driver", labelKey: "employees.roleDriver" },
+  { value: "sales", labelKey: "employees.roleSales" }
 ];
 
 export function AddEmployeeDialog() {
   const [open, setOpen] = useState(false);
+  const { t } = useLanguage();
   const [formData, setFormData] = useState<EmployeeFormData>({
     full_name: "",
     phone_number: "",
@@ -70,14 +72,14 @@ export function AddEmployeeDialog() {
         image: null,
       });
       toast({
-        title: "Success",
-        description: "Employee created successfully",
+        title: t('common.success'),
+        description: t('employees.createSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create employee",
+        title: t('common.error'),
+        description: error.message || t('employees.createFailed'),
         variant: "destructive",
       });
     },
@@ -93,8 +95,8 @@ export function AddEmployeeDialog() {
     // Basic validation
     if (!formData.full_name || !formData.phone_number) {
       toast({
-        title: "Validation Error",
-        description: "Full name and phone number are required",
+        title: t('employees.validationError'),
+        description: t('employees.validationRequired'),
         variant: "destructive",
       });
       return;
@@ -118,64 +120,64 @@ export function AddEmployeeDialog() {
       <DialogTrigger asChild>
         <Button className="gap-2">
           <Plus className="h-4 w-4" />
-          Add Employee
+          {t('employees.addEmployee')}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Employee</DialogTitle>
+          <DialogTitle>{t('employees.addTitle')}</DialogTitle>
           <DialogDescription>
-            Create a new employee record with their information.
+            {t('employees.addDescription')}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="full_name">Full Name *</Label>
+            <Label htmlFor="full_name">{t('common.fullName')} *</Label>
             <Input
               id="full_name"
               value={formData.full_name}
               onChange={(e) => handleInputChange("full_name", e.target.value)}
-              placeholder="Enter full name"
+              placeholder={t('employees.fullNamePlaceholder')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone_number">Phone Number *</Label>
+            <Label htmlFor="phone_number">{t('employees.phoneNumber')} *</Label>
             <Input
               id="phone_number"
               value={formData.phone_number}
               onChange={(e) => handleInputChange("phone_number", e.target.value)}
-              placeholder="Enter phone number"
+              placeholder={t('employees.phonePlaceholder')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email_address">Email Address</Label>
+            <Label htmlFor="email_address">{t('employees.emailAddress')}</Label>
             <Input
               id="email_address"
               type="email"
               value={formData.email_address || ""}
               onChange={(e) => handleInputChange("email_address", e.target.value)}
-              placeholder="Enter email address"
+              placeholder={t('employees.emailPlaceholder')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
+            <Label htmlFor="role">{t('employees.role')}</Label>
             <Select
               value={formData.role || "none"}
               onValueChange={(value: string) => handleInputChange("role", value === "none" ? undefined : value as EmployeeRole)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select role" />
+                <SelectValue placeholder={t('employees.selectRole')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No role</SelectItem>
+                <SelectItem value="none">{t('employees.noRoleOption')}</SelectItem>
                 {EMPLOYEE_ROLES.map(role => (
                   <SelectItem key={role.value} value={role.value}>
-                    {role.label}
+                    {t(role.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -183,43 +185,43 @@ export function AddEmployeeDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="full_address">Full Address</Label>
+            <Label htmlFor="full_address">{t('employees.fullAddress')}</Label>
             <Textarea
               id="full_address"
               value={formData.full_address || ""}
               onChange={(e) => handleInputChange("full_address", e.target.value)}
-              placeholder="Enter full address"
+              placeholder={t('employees.addressPlaceholder')}
               rows={2}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="identification">Identification</Label>
+            <Label htmlFor="identification">{t('employees.identification')}</Label>
             <Input
               id="identification"
               value={formData.identification || ""}
               onChange={(e) => handleInputChange("identification", e.target.value)}
-              placeholder="ID documents or file paths"
+              placeholder={t('employees.identificationPlaceholder')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="image">Image</Label>
+            <Label htmlFor="image">{t('employees.image')}</Label>
             <Input
               id="image"
               value={formData.image || ""}
               onChange={(e) => handleInputChange("image", e.target.value)}
-              placeholder="Image URL or file path"
+              placeholder={t('employees.imagePlaceholder')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t('common.notes')}</Label>
             <Textarea
               id="notes"
               value={formData.notes || ""}
               onChange={(e) => handleInputChange("notes", e.target.value)}
-              placeholder="Additional notes about the employee"
+              placeholder={t('employees.notesPlaceholderAdd')}
               rows={2}
             />
           </div>
@@ -230,10 +232,10 @@ export function AddEmployeeDialog() {
               disabled={createEmployeeMutation.isPending}
               className="flex-1"
             >
-              {createEmployeeMutation.isPending ? "Creating..." : "Create Employee"}
+              {createEmployeeMutation.isPending ? t('common.creating') : t('employees.createEmployee')}
             </Button>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </form>

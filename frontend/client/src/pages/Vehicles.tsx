@@ -9,11 +9,13 @@ import { Trash2, Car, Calendar, Palette } from "lucide-react";
 import { AddVehicleDialog } from "@/components/vehicles/AddVehicleDialog";
 import { VehicleFiltersComponent, type VehicleFilters } from "@/components/vehicles/VehicleFilters";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest } from "@/lib/queryClient";
 import type { Vehicle, VehiclePage, VehicleStatus } from "@/lib/types";
 
 export default function Vehicles() {
   const [, setLocation] = useLocation();
+  const { t, te } = useLanguage();
   const [filters, setFilters] = useState<VehicleFilters>({
     page: 1,
     per_page: 12,
@@ -48,21 +50,25 @@ export default function Vehicles() {
   // Create isolated display state
   const [displayVehicles, setDisplayVehicles] = useState<Vehicle[]>([]);
   const [displayCount, setDisplayCount] = useState<number>(0);
-  const [displayText, setDisplayText] = useState<string>("Loading vehicles...");
+  const [displayText, setDisplayText] = useState<string>(t("vehicles.loadingVehicles"));
 
   // Update display data from fresh API data
   useEffect(() => {
     if (isError) {
       setDisplayVehicles([]);
       setDisplayCount(0);
-      setDisplayText("Unable to load vehicles - backend endpoint not available");
+      setDisplayText(t("vehicles.loadErrorBanner"));
     } else {
       const vehicles = vehiclesData?.items || [];
       setDisplayVehicles(vehicles);
       setDisplayCount(vehicles.length);
-      setDisplayText(isLoading ? "Loading vehicles..." : `${vehicles.length} vehicles on this page`);
+      setDisplayText(
+        isLoading
+          ? t("vehicles.loadingVehicles")
+          : t("vehicles.countOnPage", { count: vehicles.length })
+      );
     }
-  }, [vehiclesData, isLoading, isError]);
+  }, [vehiclesData, isLoading, isError, t]);
 
   // Handle filter changes
   const handleFiltersChange = (newFilters: VehicleFilters) => {
@@ -85,21 +91,21 @@ export default function Vehicles() {
         exact: false 
       });
       toast({
-        title: "Success",
-        description: "Vehicle deleted successfully",
+        title: t("common.success"),
+        description: t("vehicles.deleteSuccess"),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error", 
-        description: error.message || "Failed to delete vehicle",
+        title: t("common.error"),
+        description: error.message || t("vehicles.deleteFailed"),
         variant: "destructive",
       });
     },
   });
 
   const handleDeleteVehicle = (uuid: string, plateNumber: string) => {
-    if (confirm(`Are you sure you want to delete vehicle "${plateNumber}"? This action cannot be undone.`)) {
+    if (confirm(t("vehicles.confirmDelete", { plate: plateNumber }))) {
       deleteVehicleMutation.mutate(uuid);
     }
   };
@@ -127,17 +133,13 @@ export default function Vehicles() {
     }
   };
 
-  const formatStatus = (status: VehicleStatus) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
-  };
-
   return (
     <AppLayout>
       <div className="flex-1 overflow-auto p-4 lg:p-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Vehicles</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{t("nav.vehicles")}</h2>
           </div>
           <AddVehicleDialog />
         </div>
@@ -150,7 +152,7 @@ export default function Vehicles() {
               : "bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200"
           }`}>
             <div className="flex items-center">
-              <div className={`w-3 h-3 rounded-full mr-3 ${
+              <div className={`w-3 h-3 rounded-full me-3 ${
                 isError ? "bg-red-500" : "bg-indigo-500"
               }`}></div>
               <span className={`text-sm font-medium ${
@@ -180,12 +182,12 @@ export default function Vehicles() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
               <Car className="w-8 h-8 text-red-600" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Backend Not Available</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{t("vehicles.backendNotAvailable")}</h3>
             <p className="text-gray-600 mb-4">
-              The vehicles endpoint is not configured in your Flask backend.
+              {t("vehicles.backendNotConfigured")}
             </p>
             <p className="text-sm text-gray-500">
-              To enable vehicle management, add the /vehicle endpoint to your backend API.
+              {t("vehicles.backendEnableHint")}
             </p>
           </div>
         ) : displayVehicles.length === 0 && !isLoading ? (
@@ -193,9 +195,9 @@ export default function Vehicles() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
               <Car className="w-8 h-8 text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No vehicles found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{t("vehicles.noVehiclesFound")}</h3>
             <p className="text-gray-600">
-              No vehicles match your current filters.
+              {t("vehicles.noVehiclesMatch")}
             </p>
           </div>
         ) : (
@@ -235,27 +237,27 @@ export default function Vehicles() {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          Year
+                          {t("vehicles.year")}
                         </span>
                         <span className="font-medium" data-testid={`text-year-${vehicle.uuid}`}>{vehicle.year}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground flex items-center gap-1">
                           <Palette className="h-3 w-3" />
-                          Color
+                          {t("vehicles.color")}
                         </span>
                         <span className="font-medium" data-testid={`text-color-${vehicle.uuid}`}>{vehicle.color}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Status</span>
+                        <span className="text-muted-foreground">{t("common.status")}</span>
                         <Badge className={getStatusBadgeColor(vehicle.status)} data-testid={`badge-status-${vehicle.uuid}`}>
-                          {formatStatus(vehicle.status)}
+                          {te(vehicle.status)}
                         </Badge>
                       </div>
                       {vehicle.vin && (
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">VIN</span>
-                          <span className="font-medium text-xs truncate ml-2" data-testid={`text-vin-${vehicle.uuid}`}>{vehicle.vin}</span>
+                          <span className="text-muted-foreground">{t("vehicles.vin")}</span>
+                          <span className="font-medium text-xs truncate ms-2" data-testid={`text-vin-${vehicle.uuid}`}>{vehicle.vin}</span>
                         </div>
                       )}
                     </div>
@@ -268,7 +270,11 @@ export default function Vehicles() {
             {vehiclesData && vehiclesData.pages > 1 && (
               <div className="flex items-center justify-between mt-6">
                 <div className="text-sm text-gray-700">
-                  Page {vehiclesData.page} of {vehiclesData.pages} ({vehiclesData.total_count} total vehicles)
+                  {t("vehicles.paginationInfo", {
+                    page: vehiclesData.page,
+                    pages: vehiclesData.pages,
+                    total: vehiclesData.total_count,
+                  })}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -277,7 +283,7 @@ export default function Vehicles() {
                     disabled={filters.page === 1}
                     data-testid="button-prev-page"
                   >
-                    Previous
+                    {t("common.previous")}
                   </Button>
                   <Button
                     variant="outline"
@@ -285,7 +291,7 @@ export default function Vehicles() {
                     disabled={filters.page === vehiclesData.pages}
                     data-testid="button-next-page"
                   >
-                    Next
+                    {t("common.next")}
                   </Button>
                 </div>
               </div>

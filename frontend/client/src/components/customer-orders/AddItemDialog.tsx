@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ChevronsUpDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const ItemSchema = z.object({
   material_uuid: z.string().min(1, "Material is required"),
@@ -27,6 +28,7 @@ interface AddItemDialogProps {
 }
 
 export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogProps) {
+  const { t } = useLanguage();
   const [materialOpen, setMaterialOpen] = useState(false);
   const [materialSearch, setMaterialSearch] = useState("");
   const [materialValue, setMaterialValue] = useState("");
@@ -108,7 +110,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px] z-[9999]">
         <DialogHeader>
-          <DialogTitle>Add Item</DialogTitle>
+          <DialogTitle>{t('customerOrders.addItem')}</DialogTitle>
         </DialogHeader>
         
         <Form {...form}>
@@ -128,7 +130,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                     form.setValue("material_uuid", "");
                   }}
                 >
-                  Select
+                  {t('common.select')}
                 </Button>
                 <Button
                   type="button"
@@ -142,7 +144,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                     form.setValue("material_uuid", "");
                   }}
                 >
-                  Enter UUID manually
+                  {t('customerOrders.enterUuidManually')}
                 </Button>
               </div>
 
@@ -152,9 +154,9 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                   name="material_uuid"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Material UUID</FormLabel>
+                      <FormLabel>{t('customerOrders.materialUuid')}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter material UUID..." {...field} />
+                        <Input placeholder={t('customerOrders.enterMaterialUuid')} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -162,7 +164,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                 />
               ) : (
                 <div className="space-y-2">
-                  <FormLabel>Material</FormLabel>
+                  <FormLabel>{t('customerOrders.material')}</FormLabel>
                   <div className="relative">
                     <Button
                       type="button"
@@ -171,16 +173,16 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                       onClick={() => setMaterialOpen(!materialOpen)}
                     >
                       {materialValue
-                        ? materials?.find((material: any) => material.uuid === materialValue)?.name || "Material not found"
-                        : "Select material..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        ? materials?.find((material: any) => material.uuid === materialValue)?.name || t('customerOrders.materialNotFound')
+                        : t('customerOrders.selectMaterial')}
+                      <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                     
                     {materialOpen && (
                       <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
                         <div className="p-3">
                           <Input
-                            placeholder="Search materials..."
+                            placeholder={t('customerOrders.searchMaterials')}
                             value={materialSearch}
                             onChange={(e) => setMaterialSearch(e.target.value)}
                             className="mb-2"
@@ -201,7 +203,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                               >
                                 <Check
                                   className={cn(
-                                    "mr-2 h-4 w-4",
+                                    "me-2 h-4 w-4",
                                     materialValue === material.uuid ? "opacity-100" : "opacity-0"
                                   )}
                                 />
@@ -210,7 +212,7 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
                             ))
                           ) : (
                             <div className="px-3 py-2 text-gray-500 dark:text-gray-400">
-                              {materials === undefined ? "Loading..." : "No materials found."}
+                              {materials === undefined ? t('common.loading') : t('customerOrders.noMaterialsFound')}
                             </div>
                           )}
                         </div>
@@ -230,11 +232,11 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
               name="quantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Quantity {materialUnit && `(${materialUnit})`}</FormLabel>
+                  <FormLabel>{t('common.quantity')} {materialUnit && `(${materialUnit})`}</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
-                      placeholder="Enter quantity..." 
+                    <Input
+                      type="number"
+                      placeholder={t('customerOrders.enterQuantity')}
                       {...field}
                       onChange={(e) => field.onChange(Number(e.target.value))}
                     />
@@ -250,12 +252,12 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
               name="price_per_unit"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Price per Unit {materialUnit && `(per ${materialUnit})`}</FormLabel>
+                  <FormLabel>{t('customerOrders.pricePerUnit')} {materialUnit && `(${t('customerOrders.per')} ${materialUnit})`}</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
+                    <Input
+                      type="number"
                       step="0.01"
-                      placeholder="Enter price per unit..." 
+                      placeholder={t('customerOrders.enterPricePerUnit')}
                       {...field}
                       onChange={(e) => field.onChange(Number(e.target.value))}
                     />
@@ -268,8 +270,8 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
             {/* Unit (Read-only) */}
             {materialUnit && (
               <div className="space-y-2">
-                <FormLabel>Unit</FormLabel>
-                <Input 
+                <FormLabel>{t('customerOrders.unit')}</FormLabel>
+                <Input
                   value={materialUnit}
                   readOnly
                   className="bg-gray-50 dark:bg-gray-700"
@@ -279,10 +281,10 @@ export function AddItemDialog({ open, onOpenChange, onAddItem }: AddItemDialogPr
 
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" className="bg-[#5469D4] hover:bg-[#4356C7]">
-                Add Item
+                {t('customerOrders.addItem')}
               </Button>
             </div>
           </form>

@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 
 const PurchaseOrderItemSchema = z.object({
@@ -55,6 +56,7 @@ export function AddPurchaseOrderDialog() {
   }>({});
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   // Fetch vendors
   const { data: vendorsData } = useQuery({
@@ -170,8 +172,8 @@ export function AddPurchaseOrderDialog() {
       queryClient.invalidateQueries({ queryKey: ["/purchase-order"] });
       queryClient.refetchQueries({ queryKey: ["/purchase-order"] });
       toast({
-        title: "Success",
-        description: "Purchase order created successfully",
+        title: t('common.success'),
+        description: t('purchaseOrders.createSuccess'),
       });
       // Reset form and close dialog
       form.reset();
@@ -184,8 +186,8 @@ export function AddPurchaseOrderDialog() {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create purchase order",
+        title: t('common.error'),
+        description: error.message || t('purchaseOrders.createError'),
         variant: "destructive",
       });
     },
@@ -205,13 +207,13 @@ export function AddPurchaseOrderDialog() {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button className="bg-[#5469D4] hover:bg-[#4356C7]">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Purchase Order
+          <Plus className="h-4 w-4 me-2" />
+          {t('purchaseOrders.addPurchaseOrder')}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Purchase Order</DialogTitle>
+          <DialogTitle>{t('purchaseOrders.createNewTitle')}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -221,7 +223,7 @@ export function AddPurchaseOrderDialog() {
                 name="vendor_uuid"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Vendor</FormLabel>
+                    <FormLabel>{t('purchaseOrders.vendor')}</FormLabel>
                     <div className="flex gap-2 mb-2">
                       <Button
                         type="button"
@@ -234,7 +236,7 @@ export function AddPurchaseOrderDialog() {
                           field.onChange("");
                         }}
                       >
-                        Select Vendor
+                        {t('purchaseOrders.selectVendorBtn')}
                       </Button>
                       <Button
                         type="button"
@@ -247,13 +249,13 @@ export function AddPurchaseOrderDialog() {
                           field.onChange("");
                         }}
                       >
-                        Enter UUID manually
+                        {t('purchaseOrders.enterUuidManually')}
                       </Button>
                     </div>
                     <FormControl>
                       {useManualVendorUuid ? (
                         <Input
-                          placeholder="Enter vendor UUID..."
+                          placeholder={t('purchaseOrders.enterVendorUuid')}
                           value={field.value}
                           onChange={(e) => {
                             field.onChange(e.target.value);
@@ -273,16 +275,16 @@ export function AddPurchaseOrderDialog() {
                             }}
                           >
                             {vendorValue
-                              ? vendors?.find((vendor: any) => vendor.uuid === vendorValue)?.company_name || "Vendor not found"
-                              : "Select vendor..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              ? vendors?.find((vendor: any) => vendor.uuid === vendorValue)?.company_name || t('purchaseOrders.vendorNotFound')
+                              : t('purchaseOrders.selectVendorEllipsis')}
+                            <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                           
                           {vendorOpen && (
                             <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
                               <div className="p-2">
                                 <Input
-                                  placeholder="Search vendors..."
+                                  placeholder={t('purchaseOrders.searchVendors')}
                                   value={vendorSearch}
                                   onChange={(e) => setVendorSearch(e.target.value)}
                                   className="mb-2"
@@ -303,7 +305,7 @@ export function AddPurchaseOrderDialog() {
                                     >
                                       <Check
                                         className={cn(
-                                          "mr-2 h-4 w-4",
+                                          "me-2 h-4 w-4",
                                           vendorValue === vendor.uuid ? "opacity-100" : "opacity-0"
                                         )}
                                       />
@@ -312,7 +314,7 @@ export function AddPurchaseOrderDialog() {
                                   ))
                                 ) : (
                                   <div className="px-3 py-2 text-gray-500">
-                                    {vendors === undefined ? "Loading..." : "No vendors found."}
+                                    {vendors === undefined ? t('common.loading') : t('purchaseOrders.noVendorsFound')}
                                   </div>
                                 )}
                               </div>
@@ -331,11 +333,11 @@ export function AddPurchaseOrderDialog() {
                 name="currency"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Currency</FormLabel>
+                    <FormLabel>{t('common.currency')}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select currency" />
+                          <SelectValue placeholder={t('purchaseOrders.selectCurrency')} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -356,23 +358,23 @@ export function AddPurchaseOrderDialog() {
                 name="payout_due_date"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Due Date</FormLabel>
+                    <FormLabel>{t('purchaseOrders.dueDate')}</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
                             variant={"outline"}
                             className={cn(
-                              "w-full pl-3 text-left font-normal",
+                              "w-full ps-3 text-start font-normal",
                               !field.value && "text-muted-foreground"
                             )}
                           >
                             {field.value ? (
                               format(field.value, "PPP")
                             ) : (
-                              <span>Pick a date</span>
+                              <span>{t('purchaseOrders.pickDate')}</span>
                             )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            <CalendarIcon className="ms-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
@@ -399,10 +401,10 @@ export function AddPurchaseOrderDialog() {
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>{t('common.notes')}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Enter any additional notes..."
+                      placeholder={t('purchaseOrders.notesPlaceholder')}
                       className="resize-none"
                       {...field}
                     />
@@ -414,7 +416,7 @@ export function AddPurchaseOrderDialog() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Purchase Order Items</CardTitle>
+                <CardTitle>{t('purchaseOrders.itemsCardTitle')}</CardTitle>
                 <Button
                   type="button"
                   variant="outline"
@@ -428,15 +430,15 @@ export function AddPurchaseOrderDialog() {
                     quantity_received: 0,
                   })}
                 >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Item
+                  <Plus className="h-4 w-4 me-1" />
+                  {t('purchaseOrders.addItem')}
                 </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 {fields.map((field, index) => (
                   <div key={field.id} className="p-4 border rounded-lg space-y-4">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium">Item {index + 1}</h4>
+                      <h4 className="font-medium">{t('purchaseOrders.itemNumber', { number: index + 1 })}</h4>
                       {fields.length > 1 && (
                         <Button
                           type="button"
@@ -458,7 +460,7 @@ export function AddPurchaseOrderDialog() {
                           
                           return (
                             <FormItem>
-                              <FormLabel>Material</FormLabel>
+                              <FormLabel>{t('purchaseOrders.material')}</FormLabel>
                               <div className="flex gap-2 mb-2">
                                 <Button
                                   type="button"
@@ -473,7 +475,7 @@ export function AddPurchaseOrderDialog() {
                                     field.onChange("");
                                   }}
                                 >
-                                  Select Material
+                                  {t('purchaseOrders.selectMaterial')}
                                 </Button>
                                 <Button
                                   type="button"
@@ -488,13 +490,13 @@ export function AddPurchaseOrderDialog() {
                                     field.onChange("");
                                   }}
                                 >
-                                  Enter UUID manually
+                                  {t('purchaseOrders.enterUuidManually')}
                                 </Button>
                               </div>
                               <FormControl>
                                 {itemState.useManualMaterialUuid ? (
                                   <Input
-                                    placeholder="Enter material UUID..."
+                                    placeholder={t('purchaseOrders.enterMaterialUuid')}
                                     value={field.value}
                                     onChange={(e) => {
                                       const value = e.target.value;
@@ -518,16 +520,16 @@ export function AddPurchaseOrderDialog() {
                                       }}
                                     >
                                       {itemState.materialValue
-                                        ? materials?.find((material: any) => material.uuid === itemState.materialValue)?.name || "Material not found"
-                                        : "Select material..."}
-                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        ? materials?.find((material: any) => material.uuid === itemState.materialValue)?.name || t('purchaseOrders.materialNotFound')
+                                        : t('purchaseOrders.selectMaterialEllipsis')}
+                                      <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                     
                                     {itemState.materialOpen && (
                                       <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
                                         <div className="p-2">
                                           <Input
-                                            placeholder="Search materials..."
+                                            placeholder={t('purchaseOrders.searchMaterials')}
                                             value={itemState.materialSearch}
                                             onChange={(e) => updateMaterialState(index, { materialSearch: e.target.value })}
                                             className="mb-2"
@@ -555,7 +557,7 @@ export function AddPurchaseOrderDialog() {
                                               >
                                                 <Check
                                                   className={cn(
-                                                    "mr-2 h-4 w-4",
+                                                    "me-2 h-4 w-4",
                                                     itemState.materialValue === material.uuid ? "opacity-100" : "opacity-0"
                                                   )}
                                                 />
@@ -564,7 +566,7 @@ export function AddPurchaseOrderDialog() {
                                             ))
                                           ) : (
                                             <div className="px-3 py-2 text-gray-500">
-                                              {materials === undefined ? "Loading..." : "No materials found."}
+                                              {materials === undefined ? t('common.loading') : t('purchaseOrders.noMaterialsFound')}
                                             </div>
                                           )}
                                         </div>
@@ -584,7 +586,7 @@ export function AddPurchaseOrderDialog() {
                         name={`purchase_order_items.${index}.quantity`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Quantity</FormLabel>
+                            <FormLabel>{t('common.quantity')}</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -603,7 +605,7 @@ export function AddPurchaseOrderDialog() {
                         name={`purchase_order_items.${index}.price_per_unit`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Price per Unit</FormLabel>
+                            <FormLabel>{t('purchaseOrders.pricePerUnitLabel')}</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -623,9 +625,9 @@ export function AddPurchaseOrderDialog() {
                         name={`purchase_order_items.${index}.unit`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Unit</FormLabel>
+                            <FormLabel>{t('purchaseOrders.unit')}</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g., kg, pcs, m" {...field} />
+                              <Input placeholder={t('purchaseOrders.unitPlaceholder')} {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -637,7 +639,7 @@ export function AddPurchaseOrderDialog() {
                         name={`purchase_order_items.${index}.quantity_received`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Quantity Received</FormLabel>
+                            <FormLabel>{t('purchaseOrders.quantityReceived')}</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -657,20 +659,20 @@ export function AddPurchaseOrderDialog() {
               </CardContent>
             </Card>
 
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-end space-x-2 rtl:space-x-reverse">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsOpen(false)}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 disabled={createMutation.isPending}
                 className="bg-[#5469D4] hover:bg-[#4356C7]"
               >
-                {createMutation.isPending ? "Creating..." : "Create Purchase Order"}
+                {createMutation.isPending ? t('common.creating') : t('purchaseOrders.createTitle')}
               </Button>
             </div>
           </form>

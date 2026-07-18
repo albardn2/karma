@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface FilterParams {
   uuid?: string;
@@ -35,6 +36,7 @@ export function CreditNoteItemFilters({
   perPage, 
   onPerPageChange 
 }: CreditNoteItemFiltersProps) {
+  const { t, te } = useLanguage();
   const [open, setOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<Partial<FilterParams>>(() => ({
     uuid: filters.uuid || "",
@@ -103,7 +105,7 @@ export function CreditNoteItemFilters({
     <div className="flex items-center gap-2">
       {/* Per Page Selector */}
       <div className="flex items-center gap-2">
-        <Label htmlFor="perPage" className="text-sm whitespace-nowrap">Show:</Label>
+        <Label htmlFor="perPage" className="text-sm whitespace-nowrap">{t('notes.show')}</Label>
         <Select value={perPage.toString()} onValueChange={(value) => onPerPageChange(parseInt(value))}>
           <SelectTrigger className="w-20">
             <SelectValue />
@@ -116,7 +118,7 @@ export function CreditNoteItemFilters({
           </SelectContent>
         </Select>
         <span className="text-sm text-gray-500 whitespace-nowrap">
-          of {totalCount} items
+          {t('notes.ofItems', { count: totalCount })}
         </span>
       </div>
 
@@ -132,10 +134,10 @@ export function CreditNoteItemFilters({
               setOpen(true);
             }}
           >
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
+            <Filter className="h-4 w-4 me-2" />
+            {t('common.filter')}
             {activeFilterCount > 0 && (
-              <span className="ml-2 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="ms-2 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
@@ -143,19 +145,19 @@ export function CreditNoteItemFilters({
         </SheetTrigger>
         <SheetContent className="w-[400px] sm:w-[540px] z-[9999]">
           <SheetHeader>
-            <SheetTitle>Filter Credit Note Items</SheetTitle>
+            <SheetTitle>{t('notes.filterCreditTitle')}</SheetTitle>
             <SheetDescription>
-              Use the filters below to narrow down the credit note items list.
+              {t('notes.filterCreditDesc')}
             </SheetDescription>
           </SheetHeader>
           
           <div className="grid gap-4 py-4">
             {/* UUID Filter */}
             <div className="space-y-2">
-              <Label htmlFor="uuid">Credit Note Item UUID</Label>
+              <Label htmlFor="uuid">{t('notes.creditItemUuid')}</Label>
               <Input
                 id="uuid"
-                placeholder="Enter credit note item UUID..."
+                placeholder={t('notes.enterCreditItemUuid')}
                 value={localFilters.uuid || ""}
                 onChange={(e) => setLocalFilters(prev => ({ ...prev, uuid: e.target.value }))}
               />
@@ -163,10 +165,10 @@ export function CreditNoteItemFilters({
 
             {/* Invoice Item UUID Filter */}
             <div className="space-y-2">
-              <Label htmlFor="invoice_item_uuid">Invoice Item UUID</Label>
+              <Label htmlFor="invoice_item_uuid">{t('notes.invoiceItemUuid')}</Label>
               <Input
                 id="invoice_item_uuid"
-                placeholder="Enter invoice item UUID..."
+                placeholder={t('notes.enterInvoiceItemUuid')}
                 value={localFilters.invoice_item_uuid || ""}
                 onChange={(e) => setLocalFilters(prev => ({ ...prev, invoice_item_uuid: e.target.value }))}
               />
@@ -174,10 +176,10 @@ export function CreditNoteItemFilters({
 
             {/* Customer Order Item UUID Filter */}
             <div className="space-y-2">
-              <Label htmlFor="customer_order_item_uuid">Customer Order Item UUID</Label>
+              <Label htmlFor="customer_order_item_uuid">{t('notes.customerOrderItemUuid')}</Label>
               <Input
                 id="customer_order_item_uuid"
-                placeholder="Enter customer order item UUID..."
+                placeholder={t('notes.enterCustomerOrderItemUuid')}
                 value={localFilters.customer_order_item_uuid || ""}
                 onChange={(e) => setLocalFilters(prev => ({ ...prev, customer_order_item_uuid: e.target.value }))}
               />
@@ -185,10 +187,10 @@ export function CreditNoteItemFilters({
 
             {/* Purchase Order Item UUID Filter */}
             <div className="space-y-2">
-              <Label htmlFor="purchase_order_item_uuid">Purchase Order Item UUID</Label>
+              <Label htmlFor="purchase_order_item_uuid">{t('notes.purchaseOrderItemUuid')}</Label>
               <Input
                 id="purchase_order_item_uuid"
-                placeholder="Enter purchase order item UUID..."
+                placeholder={t('notes.enterPurchaseOrderItemUuid')}
                 value={localFilters.purchase_order_item_uuid || ""}
                 onChange={(e) => setLocalFilters(prev => ({ ...prev, purchase_order_item_uuid: e.target.value }))}
               />
@@ -196,10 +198,10 @@ export function CreditNoteItemFilters({
 
             {/* Customer UUID Filter */}
             <div className="space-y-2">
-              <Label htmlFor="customer_uuid">Customer UUID</Label>
+              <Label htmlFor="customer_uuid">{t('notes.customerUuid')}</Label>
               <Input
                 id="customer_uuid"
-                placeholder="Enter customer UUID..."
+                placeholder={t('notes.enterCustomerUuid')}
                 value={localFilters.customer_uuid || ""}
                 onChange={(e) => setLocalFilters(prev => ({ ...prev, customer_uuid: e.target.value }))}
               />
@@ -207,10 +209,10 @@ export function CreditNoteItemFilters({
 
             {/* Vendor UUID Filter */}
             <div className="space-y-2">
-              <Label htmlFor="vendor_uuid">Vendor UUID</Label>
+              <Label htmlFor="vendor_uuid">{t('notes.vendorUuid')}</Label>
               <Input
                 id="vendor_uuid"
-                placeholder="Enter vendor UUID..."
+                placeholder={t('notes.enterVendorUuid')}
                 value={localFilters.vendor_uuid || ""}
                 onChange={(e) => setLocalFilters(prev => ({ ...prev, vendor_uuid: e.target.value }))}
               />
@@ -218,27 +220,27 @@ export function CreditNoteItemFilters({
 
             {/* Status Filter */}
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select 
-                value={localFilters.status || "all"} 
+              <Label htmlFor="status">{t('common.status')}</Label>
+              <Select
+                value={localFilters.status || "all"}
                 onValueChange={(value) => setLocalFilters(prev => ({ ...prev, status: value === "all" ? undefined : value }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
+                  <SelectValue placeholder={t('notes.allStatuses')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="all">{t('notes.allStatuses')}</SelectItem>
                   {statuses && Array.isArray(statuses) ? statuses.map((status: string) => (
                     <SelectItem key={status} value={status}>
-                      {status}
+                      {te(status)}
                     </SelectItem>
                   )) : (
                     <>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="sent">Sent</SelectItem>
-                      <SelectItem value="paid">Paid</SelectItem>
-                      <SelectItem value="overdue">Overdue</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="draft">{te('draft')}</SelectItem>
+                      <SelectItem value="sent">{te('sent')}</SelectItem>
+                      <SelectItem value="paid">{te('paid')}</SelectItem>
+                      <SelectItem value="overdue">{te('overdue')}</SelectItem>
+                      <SelectItem value="cancelled">{te('cancelled')}</SelectItem>
                     </>
                   )}
                 </SelectContent>
@@ -247,21 +249,21 @@ export function CreditNoteItemFilters({
 
             {/* Payment Status Filter */}
             <div className="space-y-2">
-              <Label htmlFor="is_paid">Payment Status</Label>
-              <Select 
-                value={localFilters.is_paid === undefined ? "all" : localFilters.is_paid.toString()} 
-                onValueChange={(value) => setLocalFilters(prev => ({ 
-                  ...prev, 
+              <Label htmlFor="is_paid">{t('notes.paymentStatus')}</Label>
+              <Select
+                value={localFilters.is_paid === undefined ? "all" : localFilters.is_paid.toString()}
+                onValueChange={(value) => setLocalFilters(prev => ({
+                  ...prev,
                   is_paid: value === "all" ? undefined : value === "true"
                 }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="All payment statuses" />
+                  <SelectValue placeholder={t('notes.allPaymentStatuses')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All payment statuses</SelectItem>
-                  <SelectItem value="true">Paid</SelectItem>
-                  <SelectItem value="false">Unpaid</SelectItem>
+                  <SelectItem value="all">{t('notes.allPaymentStatuses')}</SelectItem>
+                  <SelectItem value="true">{te('paid')}</SelectItem>
+                  <SelectItem value="false">{te('unpaid')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -274,13 +276,13 @@ export function CreditNoteItemFilters({
               className="flex items-center gap-2"
             >
               <X className="h-4 w-4" />
-              Clear All
+              {t('notes.clearAll')}
             </Button>
-            <Button 
+            <Button
               onClick={handleApplyFilters}
               className="bg-purple-600 hover:bg-purple-700"
             >
-              Apply Filters
+              {t('notes.applyFilters')}
             </Button>
           </div>
         </SheetContent>

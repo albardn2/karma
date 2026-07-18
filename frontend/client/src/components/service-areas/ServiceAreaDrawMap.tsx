@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // Track if leaflet-draw is already loaded globally
 let isLeafletDrawLoaded = false;
@@ -104,6 +105,7 @@ function polygonToWKT(polygon: L.Polygon): string {
 }
 
 function DrawControl({ onGeometryChange, initialGeometry }: ServiceAreaDrawMapProps) {
+  const { t } = useLanguage();
   const map = useMap();
   const drawnItemsRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
   const drawControlRef = useRef<any>(null);
@@ -144,7 +146,7 @@ function DrawControl({ onGeometryChange, initialGeometry }: ServiceAreaDrawMapPr
             showArea: true,
             drawError: {
               color: '#e1e100',
-              message: '<strong>Oh snap!</strong> you can\'t draw that!'
+              message: t('serviceAreas.drawError')
             },
             shapeOptions: {
               color: '#5469D4',

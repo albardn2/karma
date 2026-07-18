@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PayoutCreateData {
   purchase_order_uuid?: string;
@@ -25,6 +26,7 @@ interface PayoutCreateData {
 export default function PayoutCreate() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [formData, setFormData] = useState<PayoutCreateData>({
     amount: 0,
     currency: '',
@@ -120,8 +122,8 @@ export default function PayoutCreate() {
       }
       
       toast({
-        title: "Success",
-        description: "Payout created successfully",
+        title: t("common.success"),
+        description: t("payouts.createSuccess"),
       });
       // Clear the referrer and redirect back
       localStorage.removeItem('payout_create_referrer');
@@ -129,8 +131,8 @@ export default function PayoutCreate() {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create payout",
+        title: t("common.error"),
+        description: error.message || t("payouts.createFailed"),
         variant: "destructive",
       });
     },
@@ -140,8 +142,8 @@ export default function PayoutCreate() {
     // Validation
     if (!formData.amount || formData.amount <= 0) {
       toast({
-        title: "Validation Error",
-        description: "Amount must be greater than 0",
+        title: t("payouts.validationError"),
+        description: t("payouts.validationAmount"),
         variant: "destructive",
       });
       return;
@@ -149,8 +151,8 @@ export default function PayoutCreate() {
 
     if (!formData.currency) {
       toast({
-        title: "Validation Error",
-        description: "Currency is required",
+        title: t("payouts.validationError"),
+        description: t("payouts.validationCurrency"),
         variant: "destructive",
       });
       return;
@@ -159,8 +161,8 @@ export default function PayoutCreate() {
     // At least one reference UUID is required
     if (!formData.purchase_order_uuid && !formData.expense_uuid && !formData.employee_uuid && !formData.credit_note_item_uuid) {
       toast({
-        title: "Validation Error",
-        description: "At least one reference UUID (Purchase Order, Expense, Employee, or Credit Note Item) is required",
+        title: t("payouts.validationError"),
+        description: t("payouts.validationAtLeastOne"),
         variant: "destructive",
       });
       return;
@@ -176,8 +178,8 @@ export default function PayoutCreate() {
 
     if (referenceCount > 1) {
       toast({
-        title: "Validation Error",
-        description: "Only one reference UUID can be provided",
+        title: t("payouts.validationError"),
+        description: t("payouts.validationOnlyOne"),
         variant: "destructive",
       });
       return;
@@ -215,25 +217,25 @@ export default function PayoutCreate() {
               variant="ghost"
               size="sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t("common.back")}
             </Button>
             <div>
               <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100">
-                Create Payout
+                {t("payouts.create")}
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
-                Add a new payout record
+                {t("payouts.createSubtitle")}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <Button onClick={handleCancel} variant="outline">
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSubmit} disabled={createMutation.isPending} className="bg-[#5469D4] hover:bg-[#4356C7] text-white">
-              <Save className="h-4 w-4 mr-2" />
-              {createMutation.isPending ? "Creating..." : "Create Payout"}
+              <Save className="h-4 w-4 me-2" />
+              {createMutation.isPending ? t("common.creating") : t("payouts.create")}
             </Button>
           </div>
         </div>
@@ -243,14 +245,14 @@ export default function PayoutCreate() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Payout Information
+              {t("payouts.information")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Amount */}
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount * {prefilledAmount && '(Pre-filled)'}</Label>
+                <Label htmlFor="amount">{t("common.amount")} * {prefilledAmount && t("payouts.prefilled")}</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -258,7 +260,7 @@ export default function PayoutCreate() {
                   min="0"
                   value={formData.amount || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                  placeholder="Enter payout amount"
+                  placeholder={t("payouts.amountPlaceholder")}
                   className={prefilledAmount ? "bg-blue-50 dark:bg-blue-900/20" : ""}
                   required
                 />
@@ -266,10 +268,10 @@ export default function PayoutCreate() {
 
               {/* Currency */}
               <div className="space-y-2">
-                <Label htmlFor="currency">Currency * {prefilledCurrency && '(Pre-filled)'}</Label>
+                <Label htmlFor="currency">{t("common.currency")} * {prefilledCurrency && t("payouts.prefilled")}</Label>
                 <Select value={formData.currency} onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}>
                   <SelectTrigger className={prefilledCurrency ? "bg-blue-50 dark:bg-blue-900/20" : ""}>
-                    <SelectValue placeholder={currenciesLoading ? "Loading currencies..." : "Select currency"} />
+                    <SelectValue placeholder={currenciesLoading ? t("payouts.loadingCurrencies") : t("payouts.selectCurrency")} />
                   </SelectTrigger>
                   <SelectContent>
                     {currencies && currencies.length > 0 ? (
@@ -280,77 +282,77 @@ export default function PayoutCreate() {
                       ))
                     ) : (
                       <SelectItem value="placeholder" disabled>
-                        {currenciesLoading ? "Loading..." : currenciesError ? "Error loading currencies" : "No currencies available"}
+                        {currenciesLoading ? t("common.loading") : currenciesError ? t("payouts.errorLoadingCurrencies") : t("payouts.noCurrencies")}
                       </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
                 {currenciesError && (
-                  <p className="text-xs text-red-500">Error loading currencies: {currenciesError.message}</p>
+                  <p className="text-xs text-red-500">{t("payouts.errorLoadingCurrenciesMsg", { message: currenciesError.message })}</p>
                 )}
               </div>
 
               {/* Purchase Order UUID */}
               <div className="space-y-2">
-                <Label htmlFor="purchase_order_uuid">Purchase Order UUID {prefilledPurchaseOrderUuid && '(Pre-filled)'}</Label>
+                <Label htmlFor="purchase_order_uuid">{t("payouts.purchaseOrderUuid")} {prefilledPurchaseOrderUuid && t("payouts.prefilled")}</Label>
                 <Input
                   id="purchase_order_uuid"
                   value={formData.purchase_order_uuid || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, purchase_order_uuid: e.target.value }))}
-                  placeholder="Enter purchase order UUID"
+                  placeholder={t("payouts.enterPurchaseOrderUuid")}
                   className={prefilledPurchaseOrderUuid ? "bg-blue-50 dark:bg-blue-900/20" : ""}
                 />
               </div>
 
               {/* Expense UUID */}
               <div className="space-y-2">
-                <Label htmlFor="expense_uuid">Expense UUID {prefilledExpenseUuid && '(Pre-filled)'}</Label>
+                <Label htmlFor="expense_uuid">{t("payouts.expenseUuid")} {prefilledExpenseUuid && t("payouts.prefilled")}</Label>
                 <Input
                   id="expense_uuid"
                   value={formData.expense_uuid || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, expense_uuid: e.target.value }))}
-                  placeholder="Enter expense UUID"
+                  placeholder={t("payouts.enterExpenseUuid")}
                   className={prefilledExpenseUuid ? "bg-blue-50 dark:bg-blue-900/20" : ""}
                 />
               </div>
 
               {/* Employee UUID */}
               <div className="space-y-2">
-                <Label htmlFor="employee_uuid">Employee UUID {prefilledEmployeeUuid && '(Pre-filled)'}</Label>
+                <Label htmlFor="employee_uuid">{t("payouts.employeeUuid")} {prefilledEmployeeUuid && t("payouts.prefilled")}</Label>
                 <Input
                   id="employee_uuid"
                   value={formData.employee_uuid || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, employee_uuid: e.target.value }))}
-                  placeholder="Enter employee UUID"
+                  placeholder={t("payouts.enterEmployeeUuid")}
                   className={prefilledEmployeeUuid ? "bg-blue-50 dark:bg-blue-900/20" : ""}
                 />
                 {prefilledEmployeeUuid && (
                   <p className="text-xs text-blue-600 dark:text-blue-400">
-                    Employee UUID has been pre-filled from the employee page
+                    {t("payouts.employeePrefilledNote")}
                   </p>
                 )}
               </div>
 
               {/* Credit Note Item UUID */}
               <div className="space-y-2">
-                <Label htmlFor="credit_note_item_uuid">Credit Note Item UUID</Label>
+                <Label htmlFor="credit_note_item_uuid">{t("payouts.creditNoteItemUuid")}</Label>
                 <Input
                   id="credit_note_item_uuid"
                   value={formData.credit_note_item_uuid || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, credit_note_item_uuid: e.target.value }))}
-                  placeholder="Enter credit note item UUID"
+                  placeholder={t("payouts.enterCreditNoteItemUuid")}
                 />
               </div>
             </div>
 
             {/* Notes */}
             <div className="space-y-2 mt-6">
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="notes">{t("common.notes")}</Label>
               <Textarea
                 id="notes"
                 value={formData.notes || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Enter notes for this payout..."
+                placeholder={t("payouts.notesPlaceholder")}
                 rows={3}
               />
             </div>
@@ -358,13 +360,13 @@ export default function PayoutCreate() {
             {/* Validation Info */}
             <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Note:</strong> Exactly one reference UUID (Purchase Order, Expense, Employee, or Credit Note Item) is required.
+                <strong>{t("payouts.noteLabel")}</strong> {t("payouts.noteExactlyOne")}
                 {(prefilledPurchaseOrderUuid || prefilledAmount || prefilledCurrency) && (
                   <br />
                 )}
-                {prefilledPurchaseOrderUuid && ' • Purchase Order UUID has been pre-filled from the purchase order'}
-                {prefilledExpenseUuid && ' • Expense UUID has been pre-filled from the expense'}
-                {(prefilledAmount || prefilledCurrency) && ' • Amount and currency pre-filled from source record'}
+                {prefilledPurchaseOrderUuid && t("payouts.notePrefilledPO")}
+                {prefilledExpenseUuid && t("payouts.notePrefilledExpense")}
+                {(prefilledAmount || prefilledCurrency) && t("payouts.notePrefilledAmountCurrency")}
               </p>
             </div>
           </CardContent>

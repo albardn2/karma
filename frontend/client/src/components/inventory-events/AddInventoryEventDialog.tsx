@@ -13,20 +13,22 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
-const inventoryEventSchema = z.object({
-  inventory_uuid: z.string().min(1, "Inventory UUID is required"),
-  event_type: z.string().min(1, "Event type is required"),
-  quantity: z.string().min(1, "Quantity is required"),
+const makeInventoryEventSchema = (t: (key: string) => string) => z.object({
+  inventory_uuid: z.string().min(1, t('inventoryEvents.inventoryUuidRequired')),
+  event_type: z.string().min(1, t('inventoryEvents.eventTypeRequired')),
+  quantity: z.string().min(1, t('inventoryEvents.quantityRequired')),
   notes: z.string().optional(),
   cost_per_unit: z.string().optional(),
   currency: z.string().optional(),
   affect_original: z.boolean(),
 });
 
-type InventoryEventFormData = z.infer<typeof inventoryEventSchema>;
+type InventoryEventFormData = z.infer<ReturnType<typeof makeInventoryEventSchema>>;
 
 export function AddInventoryEventDialog() {
+  const { t, te } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -50,7 +52,7 @@ export function AddInventoryEventDialog() {
   });
 
   const form = useForm<InventoryEventFormData>({
-    resolver: zodResolver(inventoryEventSchema),
+    resolver: zodResolver(makeInventoryEventSchema(t)),
     defaultValues: {
       inventory_uuid: "",
       event_type: "",
@@ -81,8 +83,8 @@ export function AddInventoryEventDialog() {
       queryClient.refetchQueries({ queryKey: ["/inventory-event/"] });
       
       toast({
-        title: "Success",
-        description: "Inventory event created successfully",
+        title: t('common.success'),
+        description: t('common.created'),
       });
 
       form.reset();
@@ -90,7 +92,7 @@ export function AddInventoryEventDialog() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('common.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -105,13 +107,13 @@ export function AddInventoryEventDialog() {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button className="bg-[#5469D4] hover:bg-[#4356C7] text-white">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Inventory Event
+          <Plus className="h-4 w-4 me-2" />
+          {t('inventoryEvents.addEvent')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add New Inventory Event</DialogTitle>
+          <DialogTitle>{t('inventoryEvents.addNewEvent')}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -120,9 +122,9 @@ export function AddInventoryEventDialog() {
               name="inventory_uuid"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Inventory UUID</FormLabel>
+                  <FormLabel>{t('inventoryEvents.inventoryUuid')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter inventory UUID" {...field} />
+                    <Input placeholder={t('inventoryEvents.inventoryUuidPlaceholder')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -134,17 +136,17 @@ export function AddInventoryEventDialog() {
               name="event_type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Event Type</FormLabel>
+                  <FormLabel>{t('inventoryEvents.eventType')}</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select event type" />
+                        <SelectValue placeholder={t('inventoryEvents.selectEventType')} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {eventTypes?.map((type) => (
                         <SelectItem key={type} value={type}>
-                          {type.replace('_', ' ').toUpperCase()}
+                          {te(type)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -159,9 +161,9 @@ export function AddInventoryEventDialog() {
               name="quantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Quantity</FormLabel>
+                  <FormLabel>{t('common.quantity')}</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="Enter quantity" {...field} />
+                    <Input type="number" step="0.01" placeholder={t('inventoryEvents.quantityPlaceholder')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -174,9 +176,9 @@ export function AddInventoryEventDialog() {
                 name="cost_per_unit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cost per Unit (Optional)</FormLabel>
+                    <FormLabel>{t('inventoryEvents.costPerUnitOptional')}</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="Enter cost" {...field} />
+                      <Input type="number" step="0.01" placeholder={t('inventoryEvents.costPlaceholder')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -188,11 +190,11 @@ export function AddInventoryEventDialog() {
                 name="currency"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Currency (Optional)</FormLabel>
+                    <FormLabel>{t('inventoryEvents.currencyOptional')}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select currency" />
+                          <SelectValue placeholder={t('inventoryEvents.selectCurrency')} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -215,9 +217,9 @@ export function AddInventoryEventDialog() {
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                   <div className="space-y-0.5">
-                    <FormLabel className="text-base">Affect Original Quantity</FormLabel>
+                    <FormLabel className="text-base">{t('inventoryEvents.affectOriginalQuantity')}</FormLabel>
                     <div className="text-sm text-muted-foreground">
-                      Whether this event affects the original inventory quantity
+                      {t('inventoryEvents.affectOriginalHint')}
                     </div>
                   </div>
                   <FormControl>
@@ -235,10 +237,10 @@ export function AddInventoryEventDialog() {
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes (Optional)</FormLabel>
+                  <FormLabel>{t('inventoryEvents.notesOptional')}</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Enter any additional notes"
+                    <Textarea
+                      placeholder={t('inventoryEvents.notesPlaceholder')}
                       className="resize-none"
                       rows={3}
                       {...field}
@@ -250,19 +252,19 @@ export function AddInventoryEventDialog() {
             />
 
             <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => setIsOpen(false)}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={createInventoryEventMutation.isPending}
                 className="bg-[#5469D4] hover:bg-[#4356C7]"
               >
-                {createInventoryEventMutation.isPending ? "Creating..." : "Create Event"}
+                {createInventoryEventMutation.isPending ? t('common.creating') : t('inventoryEvents.createEvent')}
               </Button>
             </div>
           </form>

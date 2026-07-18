@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Workflow } from "@shared/schema";
 
 interface WorkflowPage {
@@ -41,6 +42,7 @@ interface WorkflowFilters {
 }
 
 export default function Workflows() {
+  const { t } = useLanguage();
   const [filters, setFilters] = useState<WorkflowFilters>({
     page: 1,
     per_page: 20,
@@ -78,15 +80,15 @@ export default function Workflows() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Workflows</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('nav.workflows')}</h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1">
-              Manage your business workflows
+              {t('workflows.subtitle')}
             </p>
           </div>
           <Link href="/workflows/new">
             <Button data-testid="button-create-workflow">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Workflow
+              <Plus className="me-2 h-4 w-4" />
+              {t('workflows.createWorkflow')}
             </Button>
           </Link>
         </div>
@@ -95,25 +97,25 @@ export default function Workflows() {
         <Card className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Search by Name</label>
+              <label className="text-sm font-medium mb-2 block">{t('workflows.searchByName')}</label>
               <Input
                 data-testid="input-search-name"
-                placeholder="Search workflows..."
+                placeholder={t('workflows.searchPlaceholder')}
                 value={filters.name || ""}
                 onChange={(e) => handleFilterChange("name", e.target.value)}
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block">Filter by Tags</label>
+              <label className="text-sm font-medium mb-2 block">{t('workflows.filterByTags')}</label>
               <Input
                 data-testid="input-filter-tags"
-                placeholder="e.g., coated_peanuts,distribution"
+                placeholder={t('workflows.tagsFilterPlaceholder')}
                 value={filters.tags || ""}
                 onChange={(e) => handleFilterChange("tags", e.target.value)}
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block">Per Page</label>
+              <label className="text-sm font-medium mb-2 block">{t('common.perPage')}</label>
               <Select
                 value={filters.per_page.toString()}
                 onValueChange={(value) => handleFilterChange("per_page", value)}
@@ -135,20 +137,20 @@ export default function Workflows() {
         {/* Workflows Table */}
         <Card>
           {isLoading ? (
-            <div className="p-12 text-center text-gray-500">Loading workflows...</div>
+            <div className="p-12 text-center text-gray-500">{t('workflows.loadingWorkflows')}</div>
           ) : workflows.length === 0 ? (
             <div className="p-12 text-center">
               <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                No workflows found
+                {t('workflows.noWorkflowsFound')}
               </h3>
               <p className="text-gray-500 dark:text-gray-400 mb-4">
-                Get started by creating your first workflow
+                {t('workflows.getStartedCreate')}
               </p>
               <Link href="/workflows/new">
                 <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Workflow
+                  <Plus className="me-2 h-4 w-4" />
+                  {t('workflows.createWorkflow')}
                 </Button>
               </Link>
             </div>
@@ -157,11 +159,11 @@ export default function Workflows() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Tags</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
+                    <TableHead>{t('common.name')}</TableHead>
+                    <TableHead>{t('common.description')}</TableHead>
+                    <TableHead>{t('workflows.tags')}</TableHead>
+                    <TableHead>{t('workflows.created')}</TableHead>
+                    <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -198,7 +200,7 @@ export default function Workflows() {
                       <TableCell>
                         <Link href={`/workflows/${workflow.uuid}`}>
                           <Button variant="ghost" size="sm" data-testid={`button-view-${workflow.uuid}`}>
-                            View
+                            {t('common.view')}
                           </Button>
                         </Link>
                       </TableCell>
@@ -211,7 +213,7 @@ export default function Workflows() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t p-4">
                   <div className="text-sm text-gray-500">
-                    Page {currentPage} of {totalPages}
+                    {t('common.page')} {currentPage} {t('common.of')} {totalPages}
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -221,7 +223,7 @@ export default function Workflows() {
                       disabled={currentPage === 1}
                       data-testid="button-previous-page"
                     >
-                      Previous
+                      {t('common.previous')}
                     </Button>
                     <Button
                       variant="outline"
@@ -230,7 +232,7 @@ export default function Workflows() {
                       disabled={currentPage === totalPages}
                       data-testid="button-next-page"
                     >
-                      Next
+                      {t('common.next')}
                     </Button>
                   </div>
                 </div>

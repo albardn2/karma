@@ -24,11 +24,13 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Customer } from "@/lib/types";
 import { EditCustomerDialog } from "@/components/customers/EditCustomerDialog";
 import { CustomerDetailMap } from "@/components/map/CustomerDetailMap";
 
 export default function CustomerDetail() {
+  const { t, te } = useLanguage();
   const { uuid } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -72,22 +74,22 @@ export default function CustomerDetail() {
       });
       
       toast({
-        title: "Success",
-        description: "Customer deleted successfully",
+        title: t('common.success'),
+        description: t('customers.deleteSuccess'),
       });
       setLocation("/customers");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete customer",
+        title: t('common.error'),
+        description: error.message || t('customers.deleteFailed'),
         variant: "destructive",
       });
     },
   });
 
   const handleDeleteCustomer = () => {
-    if (confirm(`Are you sure you want to delete ${customer?.company_name}? This action cannot be undone.`)) {
+    if (confirm(t('customers.deleteConfirm', { name: customer?.company_name || '' }))) {
       deleteCustomerMutation.mutate();
     }
   };
@@ -96,14 +98,14 @@ export default function CustomerDetail() {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: "Copied to clipboard",
-        description: `${fieldName} copied successfully.`,
+        title: t('customers.copiedTitle'),
+        description: t('customers.copiedDesc', { field: fieldName }),
       });
     } catch (error) {
       console.error("Failed to copy:", error);
       toast({
-        title: "Copy failed",
-        description: "Failed to copy to clipboard. Please try again.",
+        title: t('customers.copyFailedTitle'),
+        description: t('customers.copyFailedDesc'),
         variant: "destructive",
       });
     }
@@ -131,11 +133,11 @@ export default function CustomerDetail() {
       <AppLayout>
         <div className="container mx-auto px-4 py-8">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Customer Not Found</h2>
-            <p className="text-gray-600 mb-6">The customer you're looking for doesn't exist.</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('customers.notFoundTitle')}</h2>
+            <p className="text-gray-600 mb-6">{t('customers.notFoundDesc')}</p>
             <Button onClick={() => setLocation("/customers")}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Customers
+              <ArrowLeft className="w-4 h-4 me-2" />
+              {t('customers.backToCustomers')}
             </Button>
           </div>
         </div>
@@ -148,38 +150,38 @@ export default function CustomerDetail() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 rtl:space-x-reverse">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setLocation("/customers")}
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+              <ArrowLeft className="w-4 h-4 me-2" />
+              {t('common.back')}
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">{customer.company_name}</h1>
               <p className="text-gray-600">{customer.full_name}</p>
             </div>
             <Badge variant="secondary" className="capitalize">
-              {customer.category}
+              {te(customer.category)}
             </Badge>
           </div>
           
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 rtl:space-x-reverse">
             <Button
               onClick={() => setLocation(`/customer-orders/create?customer_uuid=${customer.uuid}`)}
               className="bg-purple-600 hover:bg-purple-700 text-white"
             >
-              <ClipboardList className="w-4 h-4 mr-2" />
-              Create Customer Order
+              <ClipboardList className="w-4 h-4 me-2" />
+              {t('customers.createOrder')}
             </Button>
             <Button
               variant="outline"
               onClick={() => setEditDialogOpen(true)}
             >
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
+              <Edit className="w-4 h-4 me-2" />
+              {t('common.edit')}
             </Button>
             <Button
               variant="outline"
@@ -187,8 +189,8 @@ export default function CustomerDetail() {
               onClick={handleDeleteCustomer}
               disabled={deleteCustomerMutation.isPending}
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete
+              <Trash2 className="w-4 h-4 me-2" />
+              {t('common.delete')}
             </Button>
           </div>
         </div>
@@ -200,22 +202,22 @@ export default function CustomerDetail() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <User className="w-5 h-5 mr-2" />
-                  Contact Information
+                  <User className="w-5 h-5 me-2" />
+                  {t('customers.contactInformation')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 rtl:space-x-reverse">
                     <Building className="w-4 h-4 text-gray-500" />
                     <div>
-                      <p className="text-sm text-gray-500">Company</p>
+                      <p className="text-sm text-gray-500">{t('customers.company')}</p>
                       <div className="flex items-center gap-1">
                         <p className="font-medium">{customer.company_name}</p>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleCopyToClipboard(customer.company_name, "Company name")}
+                          onClick={() => handleCopyToClipboard(customer.company_name, t('common.companyName'))}
                           className="h-5 w-5 p-0 hover:bg-gray-100"
                         >
                           <Copy className="w-3 h-3 text-gray-400" />
@@ -223,16 +225,16 @@ export default function CustomerDetail() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 rtl:space-x-reverse">
                     <User className="w-4 h-4 text-gray-500" />
                     <div>
-                      <p className="text-sm text-gray-500">Contact Person</p>
+                      <p className="text-sm text-gray-500">{t('customers.contactPerson')}</p>
                       <div className="flex items-center gap-1">
                         <p className="font-medium">{customer.full_name}</p>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleCopyToClipboard(customer.full_name, "Contact person")}
+                          onClick={() => handleCopyToClipboard(customer.full_name, t('customers.contactPerson'))}
                           className="h-5 w-5 p-0 hover:bg-gray-100"
                         >
                           <Copy className="w-3 h-3 text-gray-400" />
@@ -240,16 +242,16 @@ export default function CustomerDetail() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 rtl:space-x-reverse">
                     <Phone className="w-4 h-4 text-gray-500" />
                     <div>
-                      <p className="text-sm text-gray-500">Phone</p>
+                      <p className="text-sm text-gray-500">{t('common.phone')}</p>
                       <div className="flex items-center gap-1">
                         <p className="font-medium">{customer.phone_number}</p>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleCopyToClipboard(customer.phone_number, "Phone number")}
+                          onClick={() => handleCopyToClipboard(customer.phone_number, t('customers.phoneNumber'))}
                           className="h-5 w-5 p-0 hover:bg-gray-100"
                         >
                           <Copy className="w-3 h-3 text-gray-400" />
@@ -258,16 +260,16 @@ export default function CustomerDetail() {
                     </div>
                   </div>
                   {customer.email_address && (
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3 rtl:space-x-reverse">
                       <Mail className="w-4 h-4 text-gray-500" />
                       <div>
-                        <p className="text-sm text-gray-500">Email</p>
+                        <p className="text-sm text-gray-500">{t('common.email')}</p>
                         <div className="flex items-center gap-1">
                           <p className="font-medium">{customer.email_address}</p>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleCopyToClipboard(customer.email_address, "Email address")}
+                            onClick={() => handleCopyToClipboard(customer.email_address, t('customers.emailAddress'))}
                             className="h-5 w-5 p-0 hover:bg-gray-100"
                           >
                             <Copy className="w-3 h-3 text-gray-400" />
@@ -280,16 +282,16 @@ export default function CustomerDetail() {
                 
                 <Separator />
                 
-                <div className="flex items-start space-x-3">
+                <div className="flex items-start space-x-3 rtl:space-x-reverse">
                   <MapPin className="w-4 h-4 text-gray-500 mt-1" />
                   <div>
-                    <p className="text-sm text-gray-500">Address</p>
+                    <p className="text-sm text-gray-500">{t('common.address')}</p>
                     <div className="flex items-start gap-1">
                       <p className="font-medium">{customer.full_address}</p>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleCopyToClipboard(customer.full_address, "Address")}
+                        onClick={() => handleCopyToClipboard(customer.full_address, t('common.address'))}
                         className="h-5 w-5 p-0 hover:bg-gray-100 flex-shrink-0 mt-0.5"
                       >
                         <Copy className="w-3 h-3 text-gray-400" />
@@ -305,11 +307,11 @@ export default function CustomerDetail() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    Notes
+                    {t('common.notes')}
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleCopyToClipboard(customer.notes!, "Notes")}
+                      onClick={() => handleCopyToClipboard(customer.notes!, t('common.notes'))}
                       className="h-5 w-5 p-0 hover:bg-gray-100"
                     >
                       <Copy className="w-3 h-3 text-gray-400" />
@@ -326,7 +328,7 @@ export default function CustomerDetail() {
             {customer.business_cards && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Business Cards</CardTitle>
+                  <CardTitle>{t('customers.businessCards')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-700">{customer.business_cards}</p>
@@ -340,31 +342,31 @@ export default function CustomerDetail() {
             {/* Customer Details */}
             <Card>
               <CardHeader>
-                <CardTitle>Details</CardTitle>
+                <CardTitle>{t('common.details')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 rtl:space-x-reverse">
                   <Calendar className="w-4 h-4 text-gray-500" />
                   <div>
-                    <p className="text-sm text-gray-500">Added</p>
+                    <p className="text-sm text-gray-500">{t('customers.added')}</p>
                     <p className="font-medium">
                       {new Date(customer.created_at).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 rtl:space-x-reverse">
                   <Building className="w-4 h-4 text-gray-500" />
                   <div>
-                    <p className="text-sm text-gray-500">Category</p>
+                    <p className="text-sm text-gray-500">{t('common.category')}</p>
                     <div className="flex items-center gap-1">
                       <Badge variant="secondary" className="capitalize">
-                        {customer.category}
+                        {te(customer.category)}
                       </Badge>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleCopyToClipboard(customer.category, "Category")}
+                        onClick={() => handleCopyToClipboard(customer.category, t('common.category'))}
                         className="h-5 w-5 p-0 hover:bg-gray-100"
                       >
                         <Copy className="w-3 h-3 text-gray-400" />
@@ -373,16 +375,16 @@ export default function CustomerDetail() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 rtl:space-x-reverse">
                   <CreditCard className="w-4 h-4 text-gray-500" />
                   <div>
-                    <p className="text-sm text-gray-500">Customer ID</p>
+                    <p className="text-sm text-gray-500">{t('customers.customerId')}</p>
                     <div className="flex items-center gap-1">
                       <p className="font-mono text-xs text-gray-600">{customer.uuid}</p>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleCopyToClipboard(customer.uuid, "Customer ID")}
+                        onClick={() => handleCopyToClipboard(customer.uuid, t('customers.customerId'))}
                         className="h-5 w-5 p-0 hover:bg-gray-100"
                       >
                         <Copy className="w-3 h-3 text-gray-400" />
@@ -398,15 +400,15 @@ export default function CustomerDetail() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
-                    <DollarSign className="w-5 h-5 mr-2" />
-                    Account Balance
+                    <DollarSign className="w-5 h-5 me-2" />
+                    {t('customers.accountBalance')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
                     {Object.entries(customer.balance_per_currency).map(([currency, balance]) => (
                       <div key={currency} className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600 uppercase">{currency}</span>
+                        <span className="text-sm text-gray-600 uppercase">{te(currency)}</span>
                         <span className={`font-medium ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {balance >= 0 ? '+' : ''}{balance.toFixed(2)}
                         </span>
@@ -422,10 +424,12 @@ export default function CustomerDetail() {
         {/* Customer Location Map */}
         <div className="mt-8">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <MapPin className="w-5 h-5 mr-2" />
-            Customer Location
+            <MapPin className="w-5 h-5 me-2" />
+            {t('customers.customerLocation')}
           </h3>
-          <CustomerDetailMap customer={customer} />
+          <div dir="ltr">
+            <CustomerDetailMap customer={customer} />
+          </div>
         </div>
 
         {/* Edit Dialog */}

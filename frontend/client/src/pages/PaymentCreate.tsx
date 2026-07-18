@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, CreditCard, Save } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PaymentCreateData {
   invoice_uuid?: string;
@@ -23,6 +24,7 @@ interface PaymentCreateData {
 }
 
 export default function PaymentCreate() {
+  const { t, te } = useLanguage();
   const [, setLocation] = useLocation();
   const [formData, setFormData] = useState<PaymentCreateData>({
     amount: 0,
@@ -108,8 +110,8 @@ export default function PaymentCreate() {
       }
       
       toast({
-        title: "Success",
-        description: "Payment created successfully",
+        title: t('common.success'),
+        description: t('payments.createdSuccess'),
       });
       // Clear the referrer and redirect back
       localStorage.removeItem('payment_create_referrer');
@@ -117,8 +119,8 @@ export default function PaymentCreate() {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create payment",
+        title: t('common.error'),
+        description: error.message || t('payments.failedCreate'),
         variant: "destructive",
       });
     },
@@ -128,8 +130,8 @@ export default function PaymentCreate() {
     // Validation
     if (!formData.amount || formData.amount <= 0) {
       toast({
-        title: "Validation Error",
-        description: "Amount must be greater than 0",
+        title: t('payments.validationError'),
+        description: t('payments.amountGreaterThanZero'),
         variant: "destructive",
       });
       return;
@@ -137,8 +139,8 @@ export default function PaymentCreate() {
 
     if (!formData.currency) {
       toast({
-        title: "Validation Error",
-        description: "Currency is required",
+        title: t('payments.validationError'),
+        description: t('payments.currencyRequired'),
         variant: "destructive",
       });
       return;
@@ -146,8 +148,8 @@ export default function PaymentCreate() {
 
     if (!formData.payment_method) {
       toast({
-        title: "Validation Error",
-        description: "Payment method is required",
+        title: t('payments.validationError'),
+        description: t('payments.paymentMethodRequired'),
         variant: "destructive",
       });
       return;
@@ -156,8 +158,8 @@ export default function PaymentCreate() {
     // Either invoice_uuid or debit_note_item_uuid must be provided
     if (!formData.invoice_uuid && !formData.debit_note_item_uuid) {
       toast({
-        title: "Validation Error",
-        description: "Either Invoice UUID or Debit Note Item UUID must be provided",
+        title: t('payments.validationError'),
+        description: t('payments.eitherInvoiceOrDebitRequired'),
         variant: "destructive",
       });
       return;
@@ -166,8 +168,8 @@ export default function PaymentCreate() {
     // Both cannot be provided
     if (formData.invoice_uuid && formData.debit_note_item_uuid) {
       toast({
-        title: "Validation Error",
-        description: "Only one of Invoice UUID or Debit Note Item UUID can be provided",
+        title: t('payments.validationError'),
+        description: t('payments.onlyOneInvoiceOrDebit'),
         variant: "destructive",
       });
       return;
@@ -212,25 +214,25 @@ export default function PaymentCreate() {
               variant="ghost"
               size="sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t('common.back')}
             </Button>
             <div>
               <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100">
-                Create Payment
+                {t('payments.createPaymentTitle')}
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
-                Add a new payment record
+                {t('payments.createSubtitle')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <Button onClick={handleCancel} variant="outline">
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSubmit} disabled={createMutation.isPending} className="bg-[#5469D4] hover:bg-[#4356C7] text-white">
-              <Save className="h-4 w-4 mr-2" />
-              {createMutation.isPending ? "Creating..." : "Create Payment"}
+              <Save className="h-4 w-4 me-2" />
+              {createMutation.isPending ? t('common.creating') : t('payments.createPaymentTitle')}
             </Button>
           </div>
         </div>
@@ -240,14 +242,14 @@ export default function PaymentCreate() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Payment Information
+              {t('payments.paymentInformation')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Amount */}
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount * {prefilledAmount && '(Pre-filled)'}</Label>
+                <Label htmlFor="amount">{t('common.amount')} * {prefilledAmount && t('payments.preFilled')}</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -255,7 +257,7 @@ export default function PaymentCreate() {
                   min="0"
                   value={formData.amount || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                  placeholder="Enter payment amount"
+                  placeholder={t('payments.enterAmount')}
                   className={prefilledAmount ? "bg-blue-50 dark:bg-blue-900/20" : ""}
                   required
                 />
@@ -263,106 +265,106 @@ export default function PaymentCreate() {
 
               {/* Currency */}
               <div className="space-y-2">
-                <Label htmlFor="currency">Currency * {prefilledCurrency && '(Pre-filled)'}</Label>
+                <Label htmlFor="currency">{t('common.currency')} * {prefilledCurrency && t('payments.preFilled')}</Label>
                 <Select value={formData.currency} onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}>
                   <SelectTrigger className={prefilledCurrency ? "bg-blue-50 dark:bg-blue-900/20" : ""}>
-                    <SelectValue placeholder={currenciesLoading ? "Loading currencies..." : "Select currency"} />
+                    <SelectValue placeholder={currenciesLoading ? t('payments.loadingCurrencies') : t('payments.selectCurrency')} />
                   </SelectTrigger>
                   <SelectContent>
                     {currencies && currencies.length > 0 ? (
                       currencies.map((currency: string) => (
                         <SelectItem key={currency} value={currency}>
-                          {currency}
+                          {te(currency)}
                         </SelectItem>
                       ))
                     ) : (
                       <SelectItem value="placeholder" disabled>
-                        {currenciesLoading ? "Loading..." : currenciesError ? "Error loading currencies" : "No currencies available"}
+                        {currenciesLoading ? t('common.loading') : currenciesError ? t('payments.errorLoadingCurrencies') : t('payments.noCurrencies')}
                       </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
                 {currenciesError && (
-                  <p className="text-xs text-red-500">Error loading currencies: {currenciesError.message}</p>
+                  <p className="text-xs text-red-500">{t('payments.errorLoadingCurrenciesMsg', { message: currenciesError.message })}</p>
                 )}
               </div>
 
               {/* Payment Method */}
               <div className="space-y-2">
-                <Label htmlFor="payment_method">Payment Method * {methodsLoading && '(Loading...)'}</Label>
+                <Label htmlFor="payment_method">{t('payments.paymentMethod')} * {methodsLoading && t('payments.loadingParen')}</Label>
                 <Select value={formData.payment_method} onValueChange={(value) => setFormData(prev => ({ ...prev, payment_method: value }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder={methodsLoading ? "Loading payment methods..." : "Select payment method"} />
+                    <SelectValue placeholder={methodsLoading ? t('payments.loadingPaymentMethods') : t('payments.selectPaymentMethod')} />
                   </SelectTrigger>
                   <SelectContent>
                     {paymentMethods && paymentMethods.length > 0 ? (
                       paymentMethods.map((method: string) => (
                         <SelectItem key={method} value={method}>
-                          {method}
+                          {te(method)}
                         </SelectItem>
                       ))
                     ) : (
                       <SelectItem value="placeholder" disabled>
-                        {methodsLoading ? "Loading..." : methodsError ? "Error loading payment methods" : "No payment methods available"}
+                        {methodsLoading ? t('common.loading') : methodsError ? t('payments.errorLoadingPaymentMethods') : t('payments.noPaymentMethods')}
                       </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
                 {methodsError && (
-                  <p className="text-xs text-red-500">Error loading payment methods: {methodsError.message}</p>
+                  <p className="text-xs text-red-500">{t('payments.errorLoadingPaymentMethodsMsg', { message: methodsError.message })}</p>
                 )}
               </div>
 
               {/* Financial Account UUID */}
               <div className="space-y-2">
-                <Label htmlFor="financial_account_uuid">Financial Account UUID</Label>
+                <Label htmlFor="financial_account_uuid">{t('payments.financialAccountUuid')}</Label>
                 <Input
                   id="financial_account_uuid"
                   value={formData.financial_account_uuid || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, financial_account_uuid: e.target.value }))}
-                  placeholder="Enter financial account UUID"
+                  placeholder={t('payments.enterFinancialAccountUuid')}
                 />
               </div>
 
               {/* Invoice UUID */}
               <div className="space-y-2">
-                <Label htmlFor="invoice_uuid">Invoice UUID {prefilledInvoiceUuid && '(Pre-filled)'}</Label>
+                <Label htmlFor="invoice_uuid">{t('payments.invoiceUuid')} {prefilledInvoiceUuid && t('payments.preFilled')}</Label>
                 <Input
                   id="invoice_uuid"
                   value={formData.invoice_uuid || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, invoice_uuid: e.target.value }))}
-                  placeholder="Enter invoice UUID"
+                  placeholder={t('payments.enterInvoiceUuid')}
                   className={prefilledInvoiceUuid ? "bg-blue-50 dark:bg-blue-900/20" : ""}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Either Invoice UUID or Debit Note Item UUID is required
-                  {prefilledInvoiceUuid && ' • Invoice UUID has been pre-filled from the invoice'}
-                  {(prefilledAmount || prefilledCurrency) && ' • Amount and currency pre-filled from invoice'}
+                  {t('payments.eitherInvoiceOrDebit')}
+                  {prefilledInvoiceUuid && t('payments.invoicePreFilledNote')}
+                  {(prefilledAmount || prefilledCurrency) && t('payments.amountCurrencyPreFilledNote')}
                 </p>
               </div>
 
               {/* Debit Note Item UUID */}
               <div className="space-y-2">
-                <Label htmlFor="debit_note_item_uuid">Debit Note Item UUID</Label>
+                <Label htmlFor="debit_note_item_uuid">{t('payments.debitNoteItemUuid')}</Label>
                 <Input
                   id="debit_note_item_uuid"
                   value={formData.debit_note_item_uuid || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, debit_note_item_uuid: e.target.value }))}
-                  placeholder="Enter debit note item UUID"
+                  placeholder={t('payments.enterDebitNoteItemUuid')}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Alternative to Invoice UUID - only one can be provided
+                  {t('payments.debitNoteAlternative')}
                 </p>
               </div>
 
               {/* Notes */}
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes">{t('common.notes')}</Label>
                 <Textarea
                   id="notes"
                   value={formData.notes || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Add any additional notes about this payment..."
+                  placeholder={t('payments.notesPlaceholder')}
                   rows={3}
                 />
               </div>

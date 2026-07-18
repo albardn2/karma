@@ -10,8 +10,10 @@ import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { MaterialFormData } from "@/lib/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function AddMaterialDialog() {
+  const { t, te } = useLanguage();
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState<MaterialFormData>({
     name: "",
@@ -59,8 +61,8 @@ export function AddMaterialDialog() {
   const handleSubmit = () => {
     if (!formData.name.trim()) {
       toast({
-        title: "Error",
-        description: "Material name is required",
+        title: t('common.error'),
+        description: t('materials.nameRequired'),
         variant: "destructive",
       });
       return;
@@ -68,8 +70,8 @@ export function AddMaterialDialog() {
 
     if (!formData.sku.trim()) {
       toast({
-        title: "Error",
-        description: "SKU is required",
+        title: t('common.error'),
+        description: t('materials.skuRequired'),
         variant: "destructive",
       });
       return;
@@ -77,8 +79,8 @@ export function AddMaterialDialog() {
 
     if (!formData.type.trim()) {
       toast({
-        title: "Error",
-        description: "Material type is required",
+        title: t('common.error'),
+        description: t('materials.typeRequired'),
         variant: "destructive",
       });
       return;
@@ -95,14 +97,14 @@ export function AddMaterialDialog() {
           measure_unit: null,
         });
         toast({
-          title: "Success",
-          description: "Material created successfully",
+          title: t('common.success'),
+          description: t('materials.createSuccess'),
         });
       },
       onError: (error: any) => {
         toast({
-          title: "Error",
-          description: error.message || "Failed to create material",
+          title: t('common.error'),
+          description: error.message || t('materials.createFailed'),
           variant: "destructive",
         });
       },
@@ -113,54 +115,54 @@ export function AddMaterialDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Material
+          <Plus className="h-4 w-4 me-2" />
+          {t('materials.addMaterial')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Material</DialogTitle>
+          <DialogTitle>{t('materials.addNewMaterial')}</DialogTitle>
           <DialogDescription>
-            Create a new material entry for your inventory system.
+            {t('materials.addDescription')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Material Name*</Label>
+            <Label htmlFor="name">{t('materials.materialName')}*</Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => handleInputChange("name", e.target.value)}
-              placeholder="Enter material name"
+              placeholder={t('materials.enterName')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="sku">SKU*</Label>
+            <Label htmlFor="sku">{t('materials.sku')}*</Label>
             <Input
               id="sku"
               value={formData.sku}
               onChange={(e) => handleInputChange("sku", e.target.value)}
-              placeholder="Enter SKU code"
+              placeholder={t('materials.enterSkuCode')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="type">Material Type*</Label>
+            <Label htmlFor="type">{t('materials.materialType')}*</Label>
             <Select
               value={formData.type || ""}
               onValueChange={(value: string) => handleInputChange("type", value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select material type" />
+                <SelectValue placeholder={t('materials.selectType')} />
               </SelectTrigger>
               <SelectContent>
                 {materialTypes?.map(type => (
                   <SelectItem key={type} value={type}>
-                    {type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                    {te(type)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -168,19 +170,19 @@ export function AddMaterialDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="measure_unit">Unit of Measure</Label>
+            <Label htmlFor="measure_unit">{t('materials.unitOfMeasure')}</Label>
             <Select
               value={formData.measure_unit || "none"}
               onValueChange={(value: string) => handleInputChange("measure_unit", value === "none" ? null : value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select unit" />
+                <SelectValue placeholder={t('materials.selectUnitShort')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No unit</SelectItem>
+                <SelectItem value="none">{t('materials.noUnit')}</SelectItem>
                 {unitOfMeasures?.map(unit => (
                   <SelectItem key={unit} value={unit}>
-                    {unit}
+                    {te(unit)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -188,12 +190,12 @@ export function AddMaterialDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t('common.description')}</Label>
             <Textarea
               id="description"
               value={formData.description || ""}
               onChange={(e) => handleInputChange("description", e.target.value || null)}
-              placeholder="Enter material description"
+              placeholder={t('materials.enterDescription')}
               rows={2}
             />
           </div>
@@ -205,13 +207,13 @@ export function AddMaterialDialog() {
             onClick={() => setOpen(false)}
             disabled={createMaterialMutation.isPending}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={createMaterialMutation.isPending}
           >
-            {createMaterialMutation.isPending ? "Creating..." : "Create Material"}
+            {createMaterialMutation.isPending ? t('common.creating') : t('materials.createMaterial')}
           </Button>
         </div>
       </DialogContent>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
 import { LatLngBounds, Map as LeafletMap } from "leaflet";
 import { Warehouse } from "@/lib/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 import "leaflet/dist/leaflet.css";
 
 // Fix for default markers in react-leaflet
@@ -71,6 +72,7 @@ function parseCoordinates(coordinates?: string): [number, number] | null {
 
 // Separate markers component to prevent map re-rendering
 function WarehouseMarkers({ warehouses }: { warehouses: Warehouse[] }) {
+  const { t } = useLanguage();
   const warehousesWithCoordinates = useMemo(() => {
     return warehouses.filter(warehouse => {
       const coords = parseCoordinates(warehouse.coordinates);
@@ -94,7 +96,7 @@ function WarehouseMarkers({ warehouses }: { warehouses: Warehouse[] }) {
                   <p className="text-xs text-gray-500 mt-1">{warehouse.notes}</p>
                 )}
                 <p className="text-xs text-gray-400 mt-1">
-                  Created: {new Date(warehouse.created_at).toLocaleDateString()}
+                  {t("location.createdLabel", { date: new Date(warehouse.created_at).toLocaleDateString() })}
                 </p>
               </div>
             </Popup>
@@ -161,7 +163,7 @@ export function WarehouseMap({ warehouses, onBoundsChange, center = [33.5138, 36
   }, [isInitialized, onBoundsChange]);
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full" dir="ltr">
       <MapContainer
         {...mapConfig}
         ref={mapRef}

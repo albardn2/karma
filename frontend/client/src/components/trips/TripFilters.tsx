@@ -15,6 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Filter } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { TripFilters as TripFiltersType } from "@/lib/types";
 
 interface TripFiltersProps {
@@ -32,6 +33,7 @@ export function TripFilters({
   perPage,
   onPerPageChange,
 }: TripFiltersProps) {
+  const { t, te } = useLanguage();
   const [localFilters, setLocalFilters] = useState(filters);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -65,7 +67,7 @@ export function TripFilters({
   return (
     <div className="flex items-center gap-3">
       <div className="flex items-center gap-2">
-        <Label className="text-sm text-gray-600 dark:text-gray-400">Show:</Label>
+        <Label className="text-sm text-gray-600 dark:text-gray-400">{t('trips.showLabel')}</Label>
         <Select
           value={perPage.toString()}
           onValueChange={(value) => onPerPageChange(parseInt(value))}
@@ -81,7 +83,7 @@ export function TripFilters({
           </SelectContent>
         </Select>
         <span className="text-sm text-gray-600 dark:text-gray-400">
-          of {totalCount}
+          {t('common.of')} {totalCount}
         </span>
       </div>
 
@@ -93,9 +95,9 @@ export function TripFilters({
             data-testid="button-filters"
           >
             <Filter className="h-4 w-4" />
-            Filters
+            {t('common.filters')}
             {hasActiveFilters && (
-              <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#5469D4] text-xs text-white">
+              <span className="ms-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#5469D4] text-xs text-white">
                 {Object.keys(filters).filter(key => 
                   filters[key as keyof typeof filters] !== undefined &&
                   filters[key as keyof typeof filters] !== null &&
@@ -108,15 +110,15 @@ export function TripFilters({
         <PopoverContent className="w-80" align="end">
           <div className="space-y-4">
             <div>
-              <h3 className="font-medium text-sm mb-3">Filter trips</h3>
+              <h3 className="font-medium text-sm mb-3">{t('trips.filterTitle')}</h3>
             </div>
 
             <div className="space-y-3">
               <div>
-                <Label htmlFor="filter-uuid" className="text-sm">Trip UUID</Label>
+                <Label htmlFor="filter-uuid" className="text-sm">{t('trips.tripUuid')}</Label>
                 <Input
                   id="filter-uuid"
-                  placeholder="Enter trip UUID"
+                  placeholder={t('trips.enterTripUuid')}
                   value={localFilters.uuid || ''}
                   onChange={(e) => setLocalFilters({ ...localFilters, uuid: e.target.value || undefined })}
                   data-testid="input-filter-uuid"
@@ -124,10 +126,10 @@ export function TripFilters({
               </div>
 
               <div>
-                <Label htmlFor="filter-vehicle" className="text-sm">Vehicle UUID</Label>
+                <Label htmlFor="filter-vehicle" className="text-sm">{t('trips.vehicleUuid')}</Label>
                 <Input
                   id="filter-vehicle"
-                  placeholder="Enter vehicle UUID"
+                  placeholder={t('trips.enterVehicleUuid')}
                   value={localFilters.vehicle_uuid || ''}
                   onChange={(e) => setLocalFilters({ ...localFilters, vehicle_uuid: e.target.value || undefined })}
                   data-testid="input-filter-vehicle"
@@ -135,10 +137,10 @@ export function TripFilters({
               </div>
 
               <div>
-                <Label htmlFor="filter-service-area" className="text-sm">Service Area UUID</Label>
+                <Label htmlFor="filter-service-area" className="text-sm">{t('trips.serviceAreaUuid')}</Label>
                 <Input
                   id="filter-service-area"
-                  placeholder="Enter service area UUID"
+                  placeholder={t('trips.enterServiceAreaUuid')}
                   value={localFilters.service_area_uuid || ''}
                   onChange={(e) => setLocalFilters({ ...localFilters, service_area_uuid: e.target.value || undefined })}
                   data-testid="input-filter-service-area"
@@ -146,20 +148,20 @@ export function TripFilters({
               </div>
 
               <div>
-                <Label htmlFor="filter-status" className="text-sm">Status</Label>
+                <Label htmlFor="filter-status" className="text-sm">{t('common.status')}</Label>
                 <Select
                   value={localFilters.status || 'all'}
                   onValueChange={(value) => setLocalFilters({ ...localFilters, status: value === 'all' ? undefined : value as any })}
                 >
                   <SelectTrigger id="filter-status" data-testid="select-filter-status">
-                    <SelectValue placeholder="Select status" />
+                    <SelectValue placeholder={t('trips.selectStatus')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="planned">Planned</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="all">{t('trips.allStatuses')}</SelectItem>
+                    <SelectItem value="planned">{te('planned')}</SelectItem>
+                    <SelectItem value="in_progress">{te('in_progress')}</SelectItem>
+                    <SelectItem value="completed">{te('completed')}</SelectItem>
+                    <SelectItem value="cancelled">{te('cancelled')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -172,14 +174,14 @@ export function TripFilters({
                 onClick={handleClear}
                 data-testid="button-clear-filters"
               >
-                Clear
+                {t('trips.clear')}
               </Button>
               <Button
                 className="flex-1 bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 onClick={handleApply}
                 data-testid="button-apply-filters"
               >
-                Apply
+                {t('common.apply')}
               </Button>
             </div>
           </div>

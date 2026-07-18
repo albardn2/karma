@@ -6,6 +6,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { CreditCard, CheckCircle } from "lucide-react";
 import { PaymentFilters } from "@/components/payments/PaymentFilters";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { format } from "date-fns";
 
 interface Payment {
@@ -38,6 +39,7 @@ interface PaymentFilters {
 }
 
 export default function Payments() {
+  const { t, te } = useLanguage();
   const [, setLocation] = useLocation();
   const [filters, setFilters] = useState<PaymentFilters>({});
   const [currentPage, setCurrentPage] = useState(1);
@@ -112,9 +114,9 @@ export default function Payments() {
       <div className="p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100 mb-2">Payments</h1>
+          <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100 mb-2">{t('nav.payments')}</h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage payment records and transactions
+            {t('payments.subtitle')}
           </p>
         </div>
 
@@ -131,7 +133,7 @@ export default function Payments() {
             onClick={() => setLocation("/payments/create")}
             className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
           >
-            Create payment
+            {t('payments.createPayment')}
           </Button>
         </div>
 
@@ -141,23 +143,23 @@ export default function Payments() {
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Amount
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('common.amount')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Method
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('payments.method')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Invoice UUID
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('payments.invoiceUuid')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Financial Account
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('payments.financialAccount')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Created
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('payments.created')}
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
+                  <th className="px-6 py-3 text-end text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('common.actions')}
                   </th>
                 </tr>
               </thead>
@@ -170,7 +172,7 @@ export default function Payments() {
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-48 mx-auto"></div>
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-24 mx-auto"></div>
                       </div>
-                      <p className="mt-4 text-gray-500 dark:text-gray-400">Loading payments...</p>
+                      <p className="mt-4 text-gray-500 dark:text-gray-400">{t('payments.loading')}</p>
                     </td>
                   </tr>
                 ) : payments.length === 0 ? (
@@ -178,19 +180,19 @@ export default function Payments() {
                     <td colSpan={6} className="px-6 py-16 text-center">
                       <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                        {error ? "Authentication Required" : "No payments"}
+                        {error ? t('payments.authRequired') : t('payments.noPayments')}
                       </h3>
                       <p className="text-gray-500 dark:text-gray-400 mb-6">
-                        {error?.message?.includes('JWT') || error?.message?.includes('Authorization') 
-                          ? "Please log in to view payments." 
-                          : error ? `Error: ${error.message}` : "Get started by creating your first payment."}
+                        {error?.message?.includes('JWT') || error?.message?.includes('Authorization')
+                          ? t('payments.pleaseLogIn')
+                          : error ? t('payments.errorMessage', { message: error.message }) : t('payments.emptyHint')}
                       </p>
                       {!error && (
                         <Button 
                           onClick={() => setLocation("/payments/create")}
                           className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                         >
-                          Create payment
+                          {t('payments.createPayment')}
                         </Button>
                       )}
                     </td>
@@ -211,17 +213,17 @@ export default function Payments() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
-                          {payment.payment_method}
+                          {te(payment.payment_method)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-900 dark:text-gray-100">
-                          {payment.invoice_uuid ? payment.invoice_uuid.substring(0, 8) + '...' : 'N/A'}
+                          {payment.invoice_uuid ? payment.invoice_uuid.substring(0, 8) + '...' : t('payments.na')}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-900 dark:text-gray-100">
-                          {payment.financial_account_uuid ? payment.financial_account_uuid.substring(0, 8) + '...' : 'N/A'}
+                          {payment.financial_account_uuid ? payment.financial_account_uuid.substring(0, 8) + '...' : t('payments.na')}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -229,7 +231,7 @@ export default function Payments() {
                           {format(new Date(payment.created_at), 'MMM d, yyyy')}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <td className="px-6 py-4 whitespace-nowrap text-end">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -238,7 +240,7 @@ export default function Payments() {
                             setLocation(`/payments/${payment.uuid}`);
                           }}
                         >
-                          View
+                          {t('common.view')}
                         </Button>
                       </td>
                     </tr>
@@ -258,47 +260,44 @@ export default function Payments() {
                 disabled={currentPage <= 1}
                 variant="outline"
               >
-                Previous
+                {t('common.previous')}
               </Button>
               <Button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage >= totalPages}
                 variant="outline"
               >
-                Next
+                {t('common.next')}
               </Button>
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Showing{' '}
-                  <span className="font-medium">{((currentPage - 1) * perPage) + 1}</span>
-                  {' '}to{' '}
-                  <span className="font-medium">
-                    {Math.min(currentPage * perPage, totalCount)}
-                  </span>
-                  {' '}of{' '}
-                  <span className="font-medium">{totalCount}</span>
-                  {' '}results
+                  {t('common.showing', {
+                    from: ((currentPage - 1) * perPage) + 1,
+                    to: Math.min(currentPage * perPage, totalCount),
+                    total: totalCount,
+                  })}{' '}
+                  {t('common.results')}
                 </p>
               </div>
               <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px rtl:space-x-reverse">
                   <Button
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage <= 1}
                     variant="outline"
-                    className="rounded-r-none"
+                    className="rounded-e-none"
                   >
-                    Previous
+                    {t('common.previous')}
                   </Button>
                   <Button
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage >= totalPages}
                     variant="outline"
-                    className="rounded-l-none"
+                    className="rounded-s-none"
                   >
-                    Next
+                    {t('common.next')}
                   </Button>
                 </nav>
               </div>

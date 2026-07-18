@@ -1,0 +1,150 @@
+// Warehouses domain strings (pages/Warehouses.tsx, pages/WarehouseDetail.tsx,
+// pages/WarehouseEdit.tsx, components/warehouses/*).
+
+export const en: Record<string, string> = {
+  // List page
+  'warehouses.subtitle': 'Manage your warehouse locations',
+  'warehouses.loadingWarehouses': 'Loading warehouses...',
+  'warehouses.loadingInArea': 'Loading warehouses in area...',
+  'warehouses.countOnPage': '{count} warehouses on this page',
+  'warehouses.countInArea': '{count} warehouses in current area',
+  'warehouses.listView': 'List View',
+  'warehouses.mapView': 'Map View',
+  'warehouses.noWarehousesFound': 'No warehouses found',
+  'warehouses.noMatchFilters': 'No warehouses match your current filters.',
+  'warehouses.noneYet': "You haven't added any warehouses yet.",
+  'warehouses.locationAvailable': 'Location available',
+  'warehouses.createdOn': 'Created {date}',
+  'warehouses.pageOf': 'Page {page} of {pages}',
+  'warehouses.confirmDelete': 'Are you sure you want to delete warehouse "{name}"?',
+
+  // Detail page
+  'warehouses.backToWarehouses': 'Back to Warehouses',
+  'warehouses.detailSubtitle': 'Warehouse details and information',
+  'warehouses.notFound': 'Warehouse not found',
+  'warehouses.notFoundDescription': "The warehouse you're looking for doesn't exist or may have been deleted.",
+  'warehouses.warehouseInformation': 'Warehouse Information',
+  'warehouses.locationMap': 'Location Map',
+  'warehouses.warehouseName': 'Warehouse Name',
+  'warehouses.coordinates': 'Coordinates',
+  'warehouses.created': 'Created',
+  'warehouses.creationDate': 'Creation date',
+  'warehouses.warehouseId': 'Warehouse ID',
+  'warehouses.deleteWarehouse': 'Delete Warehouse',
+  'warehouses.deleteConfirmDescription': 'Are you sure you want to delete "{name}"? This action cannot be undone.',
+  'warehouses.copied': 'Copied!',
+  'warehouses.copiedToClipboard': '{label} copied to clipboard',
+  'warehouses.copyFailed': 'Failed to copy to clipboard',
+
+  // Edit page
+  'warehouses.editWarehouse': 'Edit Warehouse',
+  'warehouses.editSubtitle': 'Update warehouse information',
+  'warehouses.enterName': 'Enter warehouse name',
+  'warehouses.enterAddress': 'Enter warehouse address',
+  'warehouses.coordinatesExample': 'e.g., 33.5138,36.2765',
+  'warehouses.coordinatesHint': 'Optional: Enter coordinates as latitude,longitude',
+  'warehouses.enterNotes': 'Enter any additional notes',
+  'warehouses.saveChanges': 'Save Changes',
+  'warehouses.updateSuccess': 'Warehouse updated successfully',
+  'warehouses.updateFailed': 'Failed to update warehouse',
+
+  // Add dialog
+  'warehouses.addWarehouse': 'Add Warehouse',
+  'warehouses.addNewWarehouse': 'Add New Warehouse',
+  'warehouses.coordinatesLatLng': 'Coordinates (lat,lng)',
+  'warehouses.coordinatesHintMap': 'Optional. Enter coordinates as latitude,longitude for map display.',
+  'warehouses.notesPlaceholder': 'Additional notes about this warehouse',
+  'warehouses.createWarehouse': 'Create Warehouse',
+  'warehouses.createSuccess': 'Warehouse created successfully',
+  'warehouses.createFailed': 'Failed to create warehouse',
+  'warehouses.validationError': 'Validation Error',
+  'warehouses.nameAddressRequired': 'Warehouse name and address are required',
+
+  // Delete (shared by list + detail)
+  'warehouses.deleteSuccess': 'Warehouse deleted successfully',
+  'warehouses.deleteFailed': 'Failed to delete warehouse',
+
+  // Filters sheet
+  'warehouses.filterWarehouses': 'Filter Warehouses',
+  'warehouses.filterDescription': 'Narrow down the warehouse list using the filters below.',
+  'warehouses.uuid': 'UUID',
+  'warehouses.searchByUuid': 'Search by UUID...',
+  'warehouses.searchByName': 'Search by warehouse name...',
+  'warehouses.itemsPerPage': 'Items per page',
+  'warehouses.perPageOption': '{count} per page',
+  'warehouses.applyFilters': 'Apply Filters',
+};
+
+export const ar: Record<string, string> = {
+  // List page
+  'warehouses.subtitle': 'إدارة مواقع مستودعاتك',
+  'warehouses.loadingWarehouses': 'جارٍ تحميل المستودعات...',
+  'warehouses.loadingInArea': 'جارٍ تحميل المستودعات في المنطقة...',
+  'warehouses.countOnPage': 'عدد المستودعات في هذه الصفحة: {count}',
+  'warehouses.countInArea': 'عدد المستودعات في المنطقة الحالية: {count}',
+  'warehouses.listView': 'عرض القائمة',
+  'warehouses.mapView': 'عرض الخريطة',
+  'warehouses.noWarehousesFound': 'لم يتم العثور على مستودعات',
+  'warehouses.noMatchFilters': 'لا توجد مستودعات تطابق عوامل التصفية الحالية.',
+  'warehouses.noneYet': 'لم تقم بإضافة أي مستودعات بعد.',
+  'warehouses.locationAvailable': 'الموقع متوفر',
+  'warehouses.createdOn': 'أُنشئ في {date}',
+  'warehouses.pageOf': 'الصفحة {page} من {pages}',
+  'warehouses.confirmDelete': 'هل أنت متأكد أنك تريد حذف المستودع "{name}"؟',
+
+  // Detail page
+  'warehouses.backToWarehouses': 'العودة إلى المستودعات',
+  'warehouses.detailSubtitle': 'تفاصيل المستودع ومعلوماته',
+  'warehouses.notFound': 'المستودع غير موجود',
+  'warehouses.notFoundDescription': 'المستودع الذي تبحث عنه غير موجود أو ربما تم حذفه.',
+  'warehouses.warehouseInformation': 'معلومات المستودع',
+  'warehouses.locationMap': 'خريطة الموقع',
+  'warehouses.warehouseName': 'اسم المستودع',
+  'warehouses.coordinates': 'الإحداثيات',
+  'warehouses.created': 'تاريخ الإنشاء',
+  'warehouses.creationDate': 'تاريخ الإنشاء',
+  'warehouses.warehouseId': 'معرّف المستودع',
+  'warehouses.deleteWarehouse': 'حذف المستودع',
+  'warehouses.deleteConfirmDescription': 'هل أنت متأكد أنك تريد حذف "{name}"؟ لا يمكن التراجع عن هذا الإجراء.',
+  'warehouses.copied': 'تم النسخ!',
+  'warehouses.copiedToClipboard': 'تم نسخ {label} إلى الحافظة',
+  'warehouses.copyFailed': 'فشل النسخ إلى الحافظة',
+
+  // Edit page
+  'warehouses.editWarehouse': 'تعديل المستودع',
+  'warehouses.editSubtitle': 'تحديث معلومات المستودع',
+  'warehouses.enterName': 'أدخل اسم المستودع',
+  'warehouses.enterAddress': 'أدخل عنوان المستودع',
+  'warehouses.coordinatesExample': 'مثال: 33.5138,36.2765',
+  'warehouses.coordinatesHint': 'اختياري: أدخل الإحداثيات بصيغة خط العرض,خط الطول',
+  'warehouses.enterNotes': 'أدخل أي ملاحظات إضافية',
+  'warehouses.saveChanges': 'حفظ التغييرات',
+  'warehouses.updateSuccess': 'تم تحديث المستودع بنجاح',
+  'warehouses.updateFailed': 'فشل تحديث المستودع',
+
+  // Add dialog
+  'warehouses.addWarehouse': 'إضافة مستودع',
+  'warehouses.addNewWarehouse': 'إضافة مستودع جديد',
+  'warehouses.coordinatesLatLng': 'الإحداثيات (خط العرض، خط الطول)',
+  'warehouses.coordinatesHintMap': 'اختياري. أدخل الإحداثيات بصيغة خط العرض,خط الطول لعرضها على الخريطة.',
+  'warehouses.notesPlaceholder': 'ملاحظات إضافية حول هذا المستودع',
+  'warehouses.createWarehouse': 'إنشاء مستودع',
+  'warehouses.createSuccess': 'تم إنشاء المستودع بنجاح',
+  'warehouses.createFailed': 'فشل إنشاء المستودع',
+  'warehouses.validationError': 'خطأ في التحقق',
+  'warehouses.nameAddressRequired': 'اسم المستودع وعنوانه مطلوبان',
+
+  // Delete (shared by list + detail)
+  'warehouses.deleteSuccess': 'تم حذف المستودع بنجاح',
+  'warehouses.deleteFailed': 'فشل حذف المستودع',
+
+  // Filters sheet
+  'warehouses.filterWarehouses': 'تصفية المستودعات',
+  'warehouses.filterDescription': 'قم بتضييق قائمة المستودعات باستخدام عوامل التصفية أدناه.',
+  'warehouses.uuid': 'المعرّف الفريد (UUID)',
+  'warehouses.searchByUuid': 'البحث بالمعرّف الفريد...',
+  'warehouses.searchByName': 'البحث باسم المستودع...',
+  'warehouses.itemsPerPage': 'عدد العناصر في الصفحة',
+  'warehouses.perPageOption': '{count} في الصفحة',
+  'warehouses.applyFilters': 'تطبيق عوامل التصفية',
+};

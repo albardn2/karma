@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Play, Pause } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // Fix default marker icons in react-leaflet (see components/map/CustomerMap.tsx)
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -82,6 +83,7 @@ export function LocationPlayback({
   points: PlaybackPoint[];
   heightClass?: string;
 }): JSX.Element {
+  const { t } = useLanguage();
   const parsed = useMemo<ParsedPoint[]>(() => {
     return points
       .map((p) => {
@@ -139,7 +141,7 @@ export function LocationPlayback({
         className={`${heightClass} w-full rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center`}
         data-testid="location-playback-empty"
       >
-        <p className="text-sm text-gray-500">No location points recorded.</p>
+        <p className="text-sm text-gray-500">{t("location.noPointsRecorded")}</p>
       </div>
     );
   }
@@ -163,13 +165,13 @@ export function LocationPlayback({
   });
   const speedKmh =
     current.speed !== null && current.speed !== undefined
-      ? `${(current.speed * 3.6).toFixed(1)} km/h`
+      ? t("location.kmh", { speed: (current.speed * 3.6).toFixed(1) })
       : null;
 
   return (
     <div className="space-y-3" data-testid="location-playback">
       {/* map */}
-      <div className={`${heightClass} w-full rounded-lg overflow-hidden border border-gray-200`}>
+      <div className={`${heightClass} w-full rounded-lg overflow-hidden border border-gray-200`} dir="ltr">
         <MapContainer center={path[0]} zoom={13} style={{ height: "100%", width: "100%" }}>
           <FitBoundsOnce positions={path} />
           <TileLayer
@@ -205,11 +207,11 @@ export function LocationPlayback({
         >
           {playing ? (
             <>
-              <Pause className="h-4 w-4 mr-2" /> Pause
+              <Pause className="h-4 w-4 me-2" /> {t("location.pause")}
             </>
           ) : (
             <>
-              <Play className="h-4 w-4 mr-2" /> Play
+              <Play className="h-4 w-4 me-2" /> {t("location.play")}
             </>
           )}
         </Button>
@@ -232,7 +234,7 @@ export function LocationPlayback({
           <SelectContent>
             {SPEED_OPTIONS.map((s) => (
               <SelectItem key={s} value={String(s)}>
-                {s}x
+                {t("location.playbackSpeed", { speed: s })}
               </SelectItem>
             ))}
           </SelectContent>

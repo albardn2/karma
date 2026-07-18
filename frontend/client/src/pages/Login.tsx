@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { KeyboardIcon, CreditCard, User, Lock } from 'lucide-react';
+import { KeyboardIcon, CreditCard, User, Lock, Globe } from 'lucide-react';
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const { login, isLoading } = useAuth();
   const { toast } = useToast();
+  const { t, lang, setLang } = useLanguage();
   
   // Default to RFID on desktop, username/password on mobile
   const [activeTab, setActiveTab] = useState<'rfid' | 'manual'>(() => {
@@ -74,8 +76,8 @@ export default function Login() {
   const handleRfidLogin = async (rfidCode: string) => {
     if (!rfidCode || rfidCode.length < 8) {
       toast({
-        title: "Invalid RFID",
-        description: "RFID code is too short",
+        title: t('misc.login.invalidRfidTitle'),
+        description: t('misc.login.invalidRfidDesc'),
         variant: "destructive",
       });
       return;
@@ -87,15 +89,15 @@ export default function Login() {
         setLocation('/');
       } else {
         toast({
-          title: "Login Failed",
-          description: "Invalid RFID code. Please try again or use manual login.",
+          title: t('misc.login.failedTitle'),
+          description: t('misc.login.invalidRfidCode'),
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: "Network Error",
-        description: "Unable to connect to the server. Please check your connection.",
+        title: t('misc.login.networkErrorTitle'),
+        description: t('misc.login.networkErrorDesc'),
         variant: "destructive",
       });
     }
@@ -106,8 +108,8 @@ export default function Login() {
     
     if (!username || !password) {
       toast({
-        title: "Error",
-        description: "Please fill in all fields",
+        title: t('common.error'),
+        description: t('misc.login.fillAllFields'),
         variant: "destructive",
       });
       return;
@@ -119,15 +121,15 @@ export default function Login() {
         setLocation('/');
       } else {
         toast({
-          title: "Login Failed",
-          description: "Invalid username or password. Please check your credentials.",
+          title: t('misc.login.failedTitle'),
+          description: t('misc.login.invalidCredentials'),
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: "Network Error",
-        description: "Unable to connect to the server. Please check your connection.",
+        title: t('misc.login.networkErrorTitle'),
+        description: t('misc.login.networkErrorDesc'),
         variant: "destructive",
       });
     }
@@ -137,6 +139,19 @@ export default function Login() {
     <div className="min-h-screen brand-gradient flex items-center justify-center p-4">
       <Card className="w-full max-w-md bg-white/95 backdrop-blur-sm shadow-2xl">
         <CardContent className="p-8">
+          {/* Language toggle */}
+          <div className="flex justify-end mb-2">
+            <button
+              type="button"
+              onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}
+              className="flex items-center px-2 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              data-testid="login-language-toggle"
+            >
+              <Globe className="w-4 h-4 me-2" />
+              {lang === 'en' ? 'العربية' : 'English'}
+            </button>
+          </div>
+
           {/* Logo and Title */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 brand-gradient rounded-full flex items-center justify-center mx-auto mb-4">
@@ -145,10 +160,10 @@ export default function Login() {
               </span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              {activeTab === 'rfid' ? 'RFID Authentication' : 'Welcome Back'}
+              {activeTab === 'rfid' ? t('misc.login.rfidAuth') : t('misc.login.welcomeBack')}
             </h1>
             <p className="text-gray-600">
-              {activeTab === 'rfid' ? 'Tap your card to continue' : 'Sign in to continue to your account'}
+              {activeTab === 'rfid' ? t('misc.login.rfidSubtitle') : t('misc.login.subtitle')}
             </p>
           </div>
 
@@ -165,8 +180,8 @@ export default function Login() {
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                <CreditCard className="w-4 h-4 mr-2" />
-                RFID Scan
+                <CreditCard className="w-4 h-4 me-2" />
+                {t('misc.login.rfidTab')}
               </button>
               <button
                 type="button"
@@ -178,8 +193,8 @@ export default function Login() {
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                <KeyboardIcon className="w-4 h-4 mr-2" />
-                Username & Password
+                <KeyboardIcon className="w-4 h-4 me-2" />
+                {t('misc.login.manualTab')}
               </button>
             </div>
           )}
@@ -194,7 +209,7 @@ export default function Login() {
               </div>
               <div className="space-y-2">
                 <p className="text-lg font-medium text-gray-900">
-                  {isLoading ? 'Authenticating...' : isScanning ? 'Scanning...' : 'Ready to scan'}
+                  {isLoading ? t('misc.login.authenticating') : isScanning ? t('misc.login.scanning') : t('misc.login.readyToScan')}
                 </p>
                 {rfidInput.length > 0 && (
                   <p className="text-sm text-gray-600 font-mono">
@@ -202,7 +217,7 @@ export default function Login() {
                   </p>
                 )}
                 <p className="text-sm text-gray-500">
-                  Position your RFID card near the reader
+                  {t('misc.login.positionCard')}
                 </p>
               </div>
             </div>
@@ -212,17 +227,17 @@ export default function Login() {
               <div className="space-y-4">
                 <div>
                   <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                    Username or Email
+                    {t('misc.login.usernameOrEmail')}
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <User className="absolute start-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                     <Input
                       id="username"
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Enter your username or email"
-                      className="pl-10"
+                      placeholder={t('misc.login.usernamePlaceholder')}
+                      className="ps-10"
                       disabled={isLoading}
                       autoComplete="username"
                     />
@@ -231,17 +246,17 @@ export default function Login() {
 
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                    Password
+                    {t('common.password')}
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Lock className="absolute start-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                     <Input
                       id="password"
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your password"
-                      className="pl-10"
+                      placeholder={t('misc.login.passwordPlaceholder')}
+                      className="ps-10"
                       disabled={isLoading}
                       autoComplete="current-password"
                     />
@@ -254,7 +269,7 @@ export default function Login() {
                 className="w-full brand-gradient hover:opacity-90 text-white"
                 disabled={isLoading || !username || !password}
               >
-                {isLoading ? 'Signing In...' : 'Sign In'}
+                {isLoading ? t('misc.login.signingIn') : t('common.signIn')}
               </Button>
             </form>
           )}
@@ -268,7 +283,7 @@ export default function Login() {
                 className="text-sm text-gray-600 hover:text-gray-900 underline"
                 disabled={isLoading}
               >
-                Use username and password instead
+                {t('misc.login.useManualInstead')}
               </button>
             </div>
           )}

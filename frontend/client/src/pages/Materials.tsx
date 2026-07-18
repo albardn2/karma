@@ -12,8 +12,10 @@ import { apiRequest } from "@/lib/queryClient";
 import type { MaterialPage, Material } from "@/lib/types";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function Materials() {
+  const { t, te } = useLanguage();
   const [selectedTab, setSelectedTab] = useState<string>("all");
   const [filters, setFilters] = useState<MaterialFilters>({
     page: 1,
@@ -83,8 +85,8 @@ export default function Materials() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold">Materials</h1>
-                <p className="text-muted-foreground">Manage your material inventory</p>
+                <h1 className="text-2xl font-bold">{t('nav.materials')}</h1>
+                <p className="text-muted-foreground">{t('materials.subtitle')}</p>
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -115,9 +117,9 @@ export default function Materials() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">Materials</h1>
+              <h1 className="text-2xl font-bold">{t('nav.materials')}</h1>
               <p className="text-muted-foreground">
-                {materialPage?.materials ? `${materialPage.materials.length} materials on this page` : "Loading materials..."}
+                {materialPage?.materials ? t('materials.countOnPage', { count: materialPage.materials.length }) : t('materials.loadingMaterials')}
               </p>
             </div>
             <div className="flex gap-2">
@@ -130,11 +132,11 @@ export default function Materials() {
           <Tabs value={selectedTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid w-full auto-cols-max grid-flow-col overflow-x-auto">
               <TabsTrigger value="all" className="whitespace-nowrap">
-                All Materials
+                {t('materials.allMaterials')}
               </TabsTrigger>
               {materialTypes?.map(type => (
                 <TabsTrigger key={type} value={type} className="whitespace-nowrap">
-                  {type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                  {te(type)}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -166,12 +168,12 @@ export default function Materials() {
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-sm">
                             <Package className="h-3 w-3 text-muted-foreground" />
-                            <span>SKU: {material.sku}</span>
+                            <span>{t('materials.skuLabel', { sku: material.sku })}</span>
                           </div>
                           {material.measure_unit && (
                             <div className="flex items-center gap-2 text-sm">
                               <Hash className="h-3 w-3 text-muted-foreground" />
-                              <span>Unit: {material.measure_unit}</span>
+                              <span>{t('materials.unitLabel', { unit: te(material.measure_unit) })}</span>
                             </div>
                           )}
                           {material.description && (
@@ -181,7 +183,7 @@ export default function Materials() {
                           )}
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="h-3 w-3" />
-                            <span>Created {formatDate(material.created_at)}</span>
+                            <span>{t('materials.createdLabel', { date: formatDate(material.created_at) })}</span>
                           </div>
                         </div>
                       </CardContent>
@@ -194,7 +196,7 @@ export default function Materials() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Page {currentPage} of {totalPages}
+                    {t('materials.pageOf', { page: currentPage, pages: totalPages })}
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -203,8 +205,8 @@ export default function Materials() {
                       onClick={() => setFilters(prev => ({ ...prev, page: currentPage - 1 }))}
                       disabled={currentPage <= 1}
                     >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Previous
+                      <ChevronLeft className="h-4 w-4 me-1" />
+                      {t('common.previous')}
                     </Button>
                     <Button
                       variant="outline"
@@ -212,8 +214,8 @@ export default function Materials() {
                       onClick={() => setFilters(prev => ({ ...prev, page: currentPage + 1 }))}
                       disabled={currentPage >= totalPages}
                     >
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
+                      {t('common.next')}
+                      <ChevronRight className="h-4 w-4 ms-1" />
                     </Button>
                   </div>
                 </div>
@@ -223,9 +225,9 @@ export default function Materials() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">
                 <Package className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No materials found</h3>
+                <h3 className="text-lg font-semibold mb-2">{t('materials.noMaterialsFound')}</h3>
                 <p className="text-muted-foreground text-center mb-4">
-                  Get started by creating your first material record.
+                  {t('materials.emptyDescription')}
                 </p>
                 <AddMaterialDialog />
               </CardContent>

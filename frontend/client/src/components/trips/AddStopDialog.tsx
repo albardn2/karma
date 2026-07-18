@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { MapPin, Plus, Crosshair } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -37,6 +38,7 @@ export function AddStopDialog({
     full_address: "",
   });
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
 
   // debounce the search text, then filter server-side (company_name ilike)
@@ -77,12 +79,12 @@ export function AddStopDialog({
 
   const captureLocation = () => {
     if (!navigator.geolocation) {
-      toast({ title: "Location unavailable", description: "Geolocation is not supported here.", variant: "destructive" });
+      toast({ title: t("trips.locationUnavailable"), description: t("trips.geolocationNotSupported"), variant: "destructive" });
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => setCoords(`${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`),
-      (e) => toast({ title: "Location error", description: e.message, variant: "destructive" }),
+      (e) => toast({ title: t("trips.locationError"), description: e.message, variant: "destructive" }),
       { enableHighAccuracy: true, timeout: 8000 }
     );
   };
@@ -112,14 +114,14 @@ export function AddStopDialog({
       return apiRequest(`/workflow-execution/${workflowExecutionUuid}/manual-stop`, { method: "POST", body });
     },
     onSuccess: (res: any) => {
-      toast({ title: "Stop added", description: "The trip stop was created." });
+      toast({ title: t("trips.stopAdded"), description: t("trips.stopCreated") });
       queryClient.invalidateQueries({ queryKey: ["/workflow-execution/", workflowExecutionUuid] });
       queryClient.invalidateQueries({ queryKey: ["/customer/"] });
       reset();
       setIsOpen(false);
       if (res?.task_execution_uuid && onCreated) onCreated(res.task_execution_uuid);
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   const canSubmit =
@@ -131,13 +133,13 @@ export function AddStopDialog({
     <Dialog open={isOpen} onOpenChange={(o) => { setIsOpen(o); if (!o) reset(); }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" data-testid="button-add-stop">
-          <MapPin className="h-4 w-4 mr-2" />
-          Add Stop
+          <MapPin className="h-4 w-4 me-2" />
+          {t("trips.addStop")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Stop</DialogTitle>
+          <DialogTitle>{t("trips.addStop")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -150,7 +152,7 @@ export function AddStopDialog({
               onClick={() => setMode("existing")}
               data-testid="mode-existing-customer"
             >
-              Existing customer
+              {t("trips.existingCustomer")}
             </Button>
             <Button
               type="button"
@@ -159,22 +161,22 @@ export function AddStopDialog({
               onClick={() => setMode("new")}
               data-testid="mode-new-customer"
             >
-              <Plus className="h-4 w-4 mr-1" />
-              New customer
+              <Plus className="h-4 w-4 me-1" />
+              {t("trips.newCustomer")}
             </Button>
           </div>
 
           {mode === "existing" ? (
             <div className="space-y-2">
               <Input
-                placeholder="Search customers..."
+                placeholder={t("trips.searchCustomers")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 data-testid="input-customer-search"
               />
               <div className="border rounded-md divide-y max-h-56 overflow-y-auto">
                 {filtered.length === 0 ? (
-                  <div className="text-sm text-gray-500 p-3">No customers match.</div>
+                  <div className="text-sm text-gray-500 p-3">{t("trips.noCustomersMatch")}</div>
                 ) : (
                   filtered.map((c) => (
                     <div
@@ -193,24 +195,24 @@ export function AddStopDialog({
             </div>
           ) : (
             <div className="space-y-3">
-              <Input placeholder="Company / shop name *" value={newCustomer.company_name}
+              <Input placeholder={t("trips.companyNamePlaceholder")} value={newCustomer.company_name}
                 onChange={(e) => setNewCustomer((p) => ({ ...p, company_name: e.target.value }))}
                 data-testid="input-new-company" />
-              <Input placeholder="Contact full name *" value={newCustomer.full_name}
+              <Input placeholder={t("trips.contactFullNamePlaceholder")} value={newCustomer.full_name}
                 onChange={(e) => setNewCustomer((p) => ({ ...p, full_name: e.target.value }))}
                 data-testid="input-new-fullname" />
-              <Input placeholder="Phone number *" value={newCustomer.phone_number}
+              <Input placeholder={t("trips.phoneNumberPlaceholder")} value={newCustomer.phone_number}
                 onChange={(e) => setNewCustomer((p) => ({ ...p, phone_number: e.target.value }))}
                 data-testid="input-new-phone" />
               <Select value={newCustomer.category} onValueChange={(v) => setNewCustomer((p) => ({ ...p, category: v }))}>
                 <SelectTrigger data-testid="select-new-category">
-                  <SelectValue placeholder="Category *" />
+                  <SelectValue placeholder={t("trips.categoryPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {(categories || []).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Input placeholder="Address (optional)" value={newCustomer.full_address}
+              <Input placeholder={t("trips.addressPlaceholder")} value={newCustomer.full_address}
                 onChange={(e) => setNewCustomer((p) => ({ ...p, full_address: e.target.value }))}
                 data-testid="input-new-address" />
             </div>
@@ -219,16 +221,16 @@ export function AddStopDialog({
           {/* location (used when the customer has no stored coordinates) */}
           <div>
             <label className="text-xs text-gray-500 mb-1 block">
-              Location (lat,lon) — used if the customer has no saved location
+              {t("trips.locationHint")}
             </label>
             <div className="flex gap-2">
               <Input
-                placeholder="e.g. 33.5138,36.2765"
+                placeholder={t("trips.coordsPlaceholder")}
                 value={coords}
                 onChange={(e) => setCoords(e.target.value)}
                 data-testid="input-stop-coords"
               />
-              <Button type="button" variant="outline" size="icon" onClick={captureLocation} title="Use my location">
+              <Button type="button" variant="outline" size="icon" onClick={captureLocation} title={t("trips.useMyLocation")}>
                 <Crosshair className="h-4 w-4" />
               </Button>
             </div>
@@ -240,7 +242,7 @@ export function AddStopDialog({
             disabled={!canSubmit || addStop.isPending}
             data-testid="button-submit-add-stop"
           >
-            {addStop.isPending ? "Adding…" : "Add Stop"}
+            {addStop.isPending ? t("trips.adding") : t("trips.addStop")}
           </Button>
         </div>
       </DialogContent>

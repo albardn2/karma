@@ -41,6 +41,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { TaskExecutionProgress } from "@/components/TaskExecutionProgress";
 import { TripOperatorMap } from "@/components/map/TripOperatorMap";
@@ -62,6 +63,7 @@ export default function WorkflowExecutionTaskDetail() {
   const executionUuid = params?.execution_uuid || "";
   const { toast } = useToast();
   const { isAdmin } = useAuth();
+  const { t, te, tef } = useLanguage();
   const [selectedTaskExecutionUuid, setSelectedTaskExecutionUuid] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -249,7 +251,7 @@ export default function WorkflowExecutionTaskDetail() {
   // Task execution completion mutation
   const completeTaskMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      if (!selectedTaskExecution) throw new Error("No task execution selected");
+      if (!selectedTaskExecution) throw new Error(t('workflows.noTaskSelected'));
       
       // Convert form data to result object with label:value pairs
       const result: Record<string, any> = {};
@@ -280,8 +282,8 @@ export default function WorkflowExecutionTaskDetail() {
         
         if (!completedTaskName) {
           toast({
-            title: "Task completed",
-            description: "Task execution has been completed successfully.",
+            title: t('workflows.taskCompleted'),
+            description: t('workflows.taskCompletedDesc'),
           });
           return;
         }
@@ -320,38 +322,38 @@ export default function WorkflowExecutionTaskDetail() {
           // Auto-select the next task in the DAG
           setSelectedTaskExecutionUuid(readyTask.uuid);
           toast({
-            title: "Task completed",
-            description: "Loading next task...",
+            title: t('workflows.taskCompleted'),
+            description: t('workflows.loadingNextTask'),
           });
         } else {
           // No dependent tasks ready, check for any in_progress task
           const inProgressTask = taskExecutions.find(te => te.status === "in_progress");
-          
+
           if (inProgressTask) {
             setSelectedTaskExecutionUuid(inProgressTask.uuid);
             toast({
-              title: "Task completed",
-              description: "Loading next task...",
+              title: t('workflows.taskCompleted'),
+              description: t('workflows.loadingNextTask'),
             });
           } else {
             // All tasks are complete or no next task available
             toast({
-              title: "Task completed",
-              description: "All tasks have been completed!",
+              title: t('workflows.taskCompleted'),
+              description: t('workflows.allTasksCompleted'),
             });
           }
         }
       } else {
         toast({
-          title: "Task completed",
-          description: "Task execution has been completed successfully.",
+          title: t('workflows.taskCompleted'),
+          description: t('workflows.taskCompletedDesc'),
         });
       }
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to complete task execution",
+        title: t('common.error'),
+        description: error.message || t('workflows.taskCompleteFailed'),
         variant: "destructive",
       });
     },
@@ -367,15 +369,15 @@ export default function WorkflowExecutionTaskDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/workflow-execution/", executionUuid] });
       toast({
-        title: "Execution cancelled",
-        description: "Workflow execution has been cancelled successfully.",
+        title: t('workflows.executionCancelled'),
+        description: t('workflows.executionCancelledDesc'),
       });
       setShowCancelDialog(false);
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to cancel workflow execution",
+        title: t('common.error'),
+        description: error.message || t('workflows.cancelFailed'),
         variant: "destructive",
       });
       setShowCancelDialog(false);
@@ -392,12 +394,12 @@ export default function WorkflowExecutionTaskDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/workflow-execution/"] });
       queryClient.invalidateQueries({ queryKey: ["/trip/"] });
-      toast({ title: "Execution deleted" });
+      toast({ title: t('workflows.executionDeleted') });
       setLocation(`/workflow-execution/${workflowUuid}`);
     },
     onError: (error: any) => {
       toast({
-        title: "Failed to delete execution",
+        title: t('workflows.executionDeleteFailed'),
         description: error.message,
         variant: "destructive",
       });
@@ -442,7 +444,7 @@ export default function WorkflowExecutionTaskDetail() {
   };
 
   const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return "N/A";
+    if (!dateString) return t('workflows.na');
     return new Date(dateString).toLocaleString("en-US", {
       year: "numeric",
       month: "short",
@@ -783,18 +785,18 @@ export default function WorkflowExecutionTaskDetail() {
             render={({ field: formField }) => (
               <FormItem>
                 <FormLabel>
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                  {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
                 <Select onValueChange={formField.onChange} value={formField.value}>
                   <FormControl>
                     <SelectTrigger data-testid={`select-${key}`}>
-                      <SelectValue placeholder={field.placeholder || "Select an option"} />
+                      <SelectValue placeholder={field.placeholder || t('workflows.selectAnOption')} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     {field.options?.map((option) => (
                       <SelectItem key={option} value={option}>
-                        {option}
+                        {te(option)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -814,7 +816,7 @@ export default function WorkflowExecutionTaskDetail() {
             render={() => (
               <FormItem>
                 <FormLabel>
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                  {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
                 <div className="space-y-2">
                   {field.options?.map((option) => (
@@ -823,7 +825,7 @@ export default function WorkflowExecutionTaskDetail() {
                       control={form.control}
                       name={key as any}
                       render={({ field: formField }) => (
-                        <FormItem className="flex items-center space-x-2">
+                        <FormItem className="flex items-center space-x-2 rtl:space-x-reverse">
                           <FormControl>
                             <Checkbox
                               data-testid={`checkbox-${key}-${option}`}
@@ -838,7 +840,7 @@ export default function WorkflowExecutionTaskDetail() {
                               }}
                             />
                           </FormControl>
-                          <FormLabel className="font-normal">{option}</FormLabel>
+                          <FormLabel className="font-normal">{te(option)}</FormLabel>
                         </FormItem>
                       )}
                     />
@@ -859,7 +861,7 @@ export default function WorkflowExecutionTaskDetail() {
             render={({ field: formField }) => (
               <FormItem>
                 <FormLabel>
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                  {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
                 <FormControl>
                   <RadioGroup
@@ -868,9 +870,9 @@ export default function WorkflowExecutionTaskDetail() {
                     data-testid={`radio-${key}`}
                   >
                     {field.options?.map((option) => (
-                      <div key={option} className="flex items-center space-x-2">
+                      <div key={option} className="flex items-center space-x-2 rtl:space-x-reverse">
                         <RadioGroupItem value={option} id={`${key}-${option}`} />
-                        <Label htmlFor={`${key}-${option}`}>{option}</Label>
+                        <Label htmlFor={`${key}-${option}`}>{te(option)}</Label>
                       </div>
                     ))}
                   </RadioGroup>
@@ -890,7 +892,7 @@ export default function WorkflowExecutionTaskDetail() {
             render={({ field: formField }) => (
               <FormItem>
                 <FormLabel>
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                  {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -917,7 +919,7 @@ export default function WorkflowExecutionTaskDetail() {
             render={({ field: formField }) => (
               <FormItem>
                 <FormLabel>
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                  {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -941,7 +943,7 @@ export default function WorkflowExecutionTaskDetail() {
             render={({ field: formField }) => (
               <FormItem>
                 <FormLabel>
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                  {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -965,7 +967,7 @@ export default function WorkflowExecutionTaskDetail() {
             render={({ field: formField }) => (
               <FormItem>
                 <FormLabel>
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                  {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -990,7 +992,7 @@ export default function WorkflowExecutionTaskDetail() {
             render={({ field: formField }) => (
               <FormItem>
                 <FormLabel>
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                  {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -1015,7 +1017,7 @@ export default function WorkflowExecutionTaskDetail() {
             render={({ field: formField }) => (
               <FormItem>
                 <FormLabel>
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                  {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -1041,7 +1043,7 @@ export default function WorkflowExecutionTaskDetail() {
             render={({ field: formField }) => (
               <FormItem>
                 <FormLabel>
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                  {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
                 <FormControl>
                   {field.rows && field.rows > 1 ? (
@@ -1079,13 +1081,13 @@ export default function WorkflowExecutionTaskDetail() {
             <div className="flex items-center gap-4">
               <Link href={`/workflow-execution/${workflowUuid}`}>
                 <Button variant="ghost" size="sm" data-testid="button-back">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
+                  <ArrowLeft className="h-4 w-4 me-2" />
+                  {t('common.back')}
                 </Button>
               </Link>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Workflow Execution
+                  {t('nav.workflowExecution')}
                 </h1>
                 {workflowExecution && (
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -1106,8 +1108,8 @@ export default function WorkflowExecutionTaskDetail() {
                     disabled={cancelExecutionMutation.isPending}
                     data-testid="button-cancel-execution"
                   >
-                    <Ban className="h-4 w-4 mr-2" />
-                    {cancelExecutionMutation.isPending ? "Cancelling..." : "Cancel Execution"}
+                    <Ban className="h-4 w-4 me-2" />
+                    {cancelExecutionMutation.isPending ? t('workflows.cancelling') : t('workflows.cancelExecution')}
                   </Button>
                 )}
                 {isAdmin && (
@@ -1119,12 +1121,12 @@ export default function WorkflowExecutionTaskDetail() {
                     disabled={deleteExecutionMutation.isPending}
                     data-testid="button-delete-execution"
                   >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    {deleteExecutionMutation.isPending ? "Deleting..." : "Delete"}
+                    <Trash2 className="h-4 w-4 me-2" />
+                    {deleteExecutionMutation.isPending ? t('common.deleting') : t('common.delete')}
                   </Button>
                 )}
                 <Badge variant={getStatusBadgeVariant(workflowExecution.status)}>
-                  {workflowExecution.status}
+                  {te(workflowExecution.status)}
                 </Badge>
               </div>
             )}
@@ -1133,21 +1135,20 @@ export default function WorkflowExecutionTaskDetail() {
           <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete this execution?</AlertDialogTitle>
+                <AlertDialogTitle>{t('workflows.deleteExecutionTitle')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  The execution and any trip it created will be removed from all lists.
-                  This cannot be undone from the app.
+                  {t('workflows.deleteExecutionDesc')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel data-testid="button-cancel-delete-execution">Cancel</AlertDialogCancel>
+                <AlertDialogCancel data-testid="button-cancel-delete-execution">{t('common.cancel')}</AlertDialogCancel>
                 <AlertDialogAction
                   className="bg-red-600 hover:bg-red-700"
                   disabled={deleteExecutionMutation.isPending}
                   onClick={() => deleteExecutionMutation.mutate()}
                   data-testid="button-confirm-delete-execution"
                 >
-                  Delete
+                  {t('common.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -1162,16 +1163,16 @@ export default function WorkflowExecutionTaskDetail() {
               <CardContent className="pt-6 text-center space-y-3">
                 <AlertCircle className="h-10 w-10 text-gray-400 mx-auto" />
                 <p className="font-medium text-gray-900 dark:text-gray-100">
-                  This workflow execution could not be loaded.
+                  {t('workflows.executionLoadError')}
                 </p>
                 <p className="text-sm text-gray-500" data-testid="text-execution-not-found">
-                  It may have been deleted, or the link is out of date.
+                  {t('workflows.executionLoadErrorDesc')}
                   {executionError ? ` (${executionError.message})` : ""}
                 </p>
                 <Link href={`/workflow-execution/${workflowUuid}`}>
                   <Button variant="outline" data-testid="button-back-to-executions">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to executions
+                    <ArrowLeft className="h-4 w-4 me-2" />
+                    {t('workflows.backToExecutions')}
                   </Button>
                 </Link>
               </CardContent>
@@ -1182,24 +1183,24 @@ export default function WorkflowExecutionTaskDetail() {
               {workflowExecution && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Execution Details</CardTitle>
+                    <CardTitle>{t('workflows.executionDetails')}</CardTitle>
                   </CardHeader>
                   <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Started</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{t('workflows.started')}</p>
                       <p className="font-medium">{formatDate(workflowExecution.start_time)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Ended</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{t('workflows.ended')}</p>
                       <p className="font-medium">{formatDate(workflowExecution.end_time)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Created By</p>
-                      <p className="font-medium">{workflowExecution.created_by_uuid || "N/A"}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{t('workflows.createdBy')}</p>
+                      <p className="font-medium">{workflowExecution.created_by_uuid || t('workflows.na')}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
-                      <p className="font-medium">{workflowExecution.status}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{t('common.status')}</p>
+                      <p className="font-medium">{te(workflowExecution.status)}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -1209,7 +1210,7 @@ export default function WorkflowExecutionTaskDetail() {
               <Card>
                 <CardHeader>
                   <div className="flex justify-between items-center">
-                    <CardTitle>Task Execution Progress</CardTitle>
+                    <CardTitle>{t('workflows.taskExecutionProgress')}</CardTitle>
                     <div className="flex items-center gap-3">
                       {canAddStop && (
                         <AddStopDialog
@@ -1218,7 +1219,7 @@ export default function WorkflowExecutionTaskDetail() {
                         />
                       )}
                       <span className="text-sm text-gray-500">
-                        {Math.round(calculateProgress())}% Complete
+                        {t('workflows.percentComplete', { percent: Math.round(calculateProgress()) })}
                       </span>
                     </div>
                   </div>
@@ -1237,17 +1238,17 @@ export default function WorkflowExecutionTaskDetail() {
                 <Card>
                   <CardHeader>
                     <CardTitle>
-                      {selectedTaskExecution.name || "Task Execution"}
+                      {selectedTaskExecution.name || t('workflows.taskExecution')}
                     </CardTitle>
                     <p className="text-sm text-gray-500">
                       {selectedTaskExecution.status === "completed" ? (
-                        "This task has been completed. You can view the results below or update them."
+                        t('workflows.taskCompletedMessage')
                       ) : selectedTaskExecution.status === "failed" ? (
                         <span className="text-red-500">
-                          Task failed: {selectedTaskExecution.error_message || "Unknown error"}
+                          {t('workflows.taskFailed', { error: selectedTaskExecution.error_message || t('workflows.unknownError') })}
                         </span>
                       ) : (
-                        "Complete the form below to finish this task."
+                        t('workflows.completeFormMessage')
                       )}
                     </p>
                   </CardHeader>
@@ -1256,7 +1257,7 @@ export default function WorkflowExecutionTaskDetail() {
                     {tripRouteData && (
                       <div className="mb-6">
                         <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
-                          Trip Route
+                          {t('workflows.tripRoute')}
                         </h3>
                         <TripOperatorMap
                           waypoints={tripRouteData.waypoints}
@@ -1269,7 +1270,7 @@ export default function WorkflowExecutionTaskDetail() {
                     {customerLocationData && (
                       <div className="mb-6">
                         <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
-                          Customer Location
+                          {t('workflows.customerLocation')}
                         </h3>
                         <CustomerLocationMap
                           coordinates={customerLocationData.coordinates}
@@ -1296,7 +1297,7 @@ export default function WorkflowExecutionTaskDetail() {
                           visibleTaskInputFields.map((field) => renderFormField(field))
                         ) : (
                           <div className="text-center text-gray-500 py-4">
-                            No input fields defined for this task.
+                            {t('workflows.noInputFields')}
                           </div>
                         )}
 
@@ -1310,13 +1311,13 @@ export default function WorkflowExecutionTaskDetail() {
                         >
                           {completeTaskMutation.isPending ? (
                             <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              {selectedTaskExecution.status === "completed" ? "Updating..." : "Completing..."}
+                              <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                              {selectedTaskExecution.status === "completed" ? t('common.updating') : t('workflows.completing')}
                             </>
                           ) : selectedTaskExecution.status === "completed" ? (
-                            "Update Task"
+                            t('workflows.updateTask')
                           ) : (
-                            "Complete Task"
+                            t('workflows.completeTask')
                           )}
                         </Button>
                       </form>
@@ -1333,15 +1334,14 @@ export default function WorkflowExecutionTaskDetail() {
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Workflow Execution?</AlertDialogTitle>
+            <AlertDialogTitle>{t('workflows.cancelExecutionTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to cancel this workflow execution? This action cannot be undone.
-              All in-progress tasks will be stopped.
+              {t('workflows.cancelExecutionDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-dialog-close">
-              No, Keep Running
+              {t('workflows.noKeepRunning')}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCancelExecution}
@@ -1349,7 +1349,7 @@ export default function WorkflowExecutionTaskDetail() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-cancel-dialog-confirm"
             >
-              {cancelExecutionMutation.isPending ? "Cancelling..." : "Yes, Cancel Execution"}
+              {cancelExecutionMutation.isPending ? t('workflows.cancelling') : t('workflows.yesCancelExecution')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

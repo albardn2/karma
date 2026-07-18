@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, Package, ArrowRight } from "lucide-react";
 import { InventoryEventFilters } from "@/components/inventory-events/InventoryEventFilters";
 import { AddInventoryEventDialog } from "@/components/inventory-events/AddInventoryEventDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface InventoryEvent {
   uuid: string;
@@ -46,6 +47,7 @@ interface InventoryEventFilters {
 }
 
 export default function InventoryEvents() {
+  const { t, te } = useLanguage();
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [filters, setFilters] = useState<Omit<InventoryEventFilters, 'page' | 'per_page'>>({});
@@ -116,9 +118,9 @@ export default function InventoryEvents() {
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Inventory Events</h1>
+            <h1 className="text-2xl font-bold">{t('nav.inventoryEvents')}</h1>
             <p className="text-muted-foreground">
-              {inventoryEventData ? `${inventoryEventData.total_count} events` : "Loading..."}
+              {inventoryEventData ? t('inventoryEvents.countEvents', { count: inventoryEventData.total_count }) : t('common.loading')}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -139,11 +141,11 @@ export default function InventoryEvents() {
               <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#5469D4] via-[#6B73E0] to-[#8B5CF6] mx-auto mb-4">
                 <Calendar className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">No inventory events found</h3>
+              <h3 className="text-lg font-semibold mb-2">{t('inventoryEvents.emptyTitle')}</h3>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                 {Object.values(filters).some(value => value && value !== "")
-                  ? "No inventory events match your current filters. Try adjusting your search criteria." 
-                  : "Get started by adding your first inventory event to track inventory changes."}
+                  ? t('inventoryEvents.emptyFiltered')
+                  : t('inventoryEvents.emptyDefault')}
               </p>
               <AddInventoryEventDialog />
             </div>
@@ -160,47 +162,47 @@ export default function InventoryEvents() {
                               <Calendar className="h-5 w-5 text-white" />
                             </div>
                             <div>
-                              <h3 className="font-semibold text-lg">{event.event_type.replace('_', ' ').toUpperCase()}</h3>
-                              <p className="text-sm text-muted-foreground">Event ID: {event.uuid}</p>
+                              <h3 className="font-semibold text-lg">{te(event.event_type)}</h3>
+                              <p className="text-sm text-muted-foreground">{t('inventoryEvents.eventId', { id: event.uuid })}</p>
                             </div>
                           </div>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Material</p>
+                              <p className="text-sm font-medium text-muted-foreground">{t('inventoryEvents.material')}</p>
                               <p className="text-sm" data-testid={`text-event-material-${event.uuid}`}>
                                 {event.material_name || event.material_uuid}
                               </p>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Quantity</p>
+                              <p className="text-sm font-medium text-muted-foreground">{t('common.quantity')}</p>
                               <p className="text-sm">{event.quantity}</p>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Cost per Unit</p>
-                              <p className="text-sm">{event.cost_per_unit ? `${event.cost_per_unit} ${event.currency || ''}` : 'N/A'}</p>
+                              <p className="text-sm font-medium text-muted-foreground">{t('inventoryEvents.costPerUnit')}</p>
+                              <p className="text-sm">{event.cost_per_unit ? `${event.cost_per_unit} ${event.currency || ''}` : t('inventoryEvents.notAvailable')}</p>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Affects Original</p>
+                              <p className="text-sm font-medium text-muted-foreground">{t('inventoryEvents.affectsOriginal')}</p>
                               <Badge variant={event.affect_original ? "default" : "secondary"}>
-                                {event.affect_original ? "Yes" : "No"}
+                                {event.affect_original ? t('common.yes') : t('common.no')}
                               </Badge>
                             </div>
                           </div>
 
                           {event.notes && (
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Notes</p>
+                              <p className="text-sm font-medium text-muted-foreground">{t('common.notes')}</p>
                               <p className="text-sm">{event.notes}</p>
                             </div>
                           )}
 
                           <div>
-                            <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                            <p className="text-sm font-medium text-muted-foreground">{t('common.createdAt')}</p>
                             <p className="text-sm">{new Date(event.created_at).toLocaleString()}</p>
                           </div>
                         </div>
-                        <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0 ml-4" />
+                        <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0 ms-4" />
                       </div>
                     </CardContent>
                   </Card>
@@ -217,7 +219,7 @@ export default function InventoryEvents() {
                       onClick={() => handlePageChange(1)}
                       disabled={currentPage === 1}
                     >
-                      First
+                      {t('inventoryEvents.first')}
                     </Button>
                     <Button
                       variant="outline"
@@ -225,10 +227,10 @@ export default function InventoryEvents() {
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
                     >
-                      Previous
+                      {t('common.previous')}
                     </Button>
                     <span className="text-sm text-muted-foreground">
-                      Page {currentPage} of {totalPages}
+                      {t('inventoryEvents.pageOf', { page: currentPage, pages: totalPages })}
                     </span>
                     <Button
                       variant="outline"
@@ -236,7 +238,7 @@ export default function InventoryEvents() {
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
                     >
-                      Next
+                      {t('common.next')}
                     </Button>
                     <Button
                       variant="outline"
@@ -244,11 +246,11 @@ export default function InventoryEvents() {
                       onClick={() => handlePageChange(totalPages)}
                       disabled={currentPage === totalPages}
                     >
-                      Last
+                      {t('inventoryEvents.last')}
                     </Button>
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, totalCount)} of {totalCount} events
+                    {t('inventoryEvents.showingEvents', { from: ((currentPage - 1) * perPage) + 1, to: Math.min(currentPage * perPage, totalCount), total: totalCount })}
                   </div>
                 </div>
               )}

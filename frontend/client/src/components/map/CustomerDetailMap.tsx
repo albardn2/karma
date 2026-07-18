@@ -1,5 +1,6 @@
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { Customer } from "@/lib/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 import "leaflet/dist/leaflet.css";
 
 // Fix for default markers in react-leaflet
@@ -44,18 +45,19 @@ function parseCoordinates(coordinates?: string): [number, number] | null {
 }
 
 export function CustomerDetailMap({ customer }: CustomerDetailMapProps) {
+  const { t } = useLanguage();
   const coordinates = parseCoordinates(customer.coordinates);
-  
+
   if (!coordinates) {
     return (
       <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-        <p className="text-gray-500">No location data available for this customer</p>
+        <p className="text-gray-500">{t("location.noCustomerLocation")}</p>
       </div>
     );
   }
 
   return (
-    <div className="h-64 w-full rounded-lg overflow-hidden">
+    <div className="h-64 w-full rounded-lg overflow-hidden" dir="ltr">
       <MapContainer
         center={coordinates}
         zoom={15}

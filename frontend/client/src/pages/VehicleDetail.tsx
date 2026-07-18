@@ -33,29 +33,32 @@ import {
   Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { VehicleStatus, type Vehicle, type VehicleUpdateData } from "@/lib/types";
 import { VehicleInventoryDialog } from "@/components/vehicles/VehicleInventoryDialog";
 import { VehicleInventoryChart } from "@/components/vehicles/VehicleInventoryChart";
 import { VehicleInventoryTable } from "@/components/vehicles/VehicleInventoryTable";
 
-const vehicleUpdateSchema = z.object({
-  plate_number: z.string().min(1, "Plate number is required").optional(),
-  make: z.string().min(1, "Make is required").optional(),
-  model: z.string().min(1, "Model is required").optional(),
-  year: z.number().min(1900, "Invalid year").max(new Date().getFullYear() + 1, "Invalid year").optional(),
-  color: z.string().min(1, "Color is required").optional(),
-  status: z.nativeEnum(VehicleStatus).optional(),
-  vin: z.string().optional().or(z.literal("")),
-  notes: z.string().optional().or(z.literal("")),
-});
+const makeVehicleUpdateSchema = (t: (key: string) => string) =>
+  z.object({
+    plate_number: z.string().min(1, t("vehicles.plateRequired")).optional(),
+    make: z.string().min(1, t("vehicles.makeRequired")).optional(),
+    model: z.string().min(1, t("vehicles.modelRequired")).optional(),
+    year: z.number().min(1900, t("vehicles.invalidYear")).max(new Date().getFullYear() + 1, t("vehicles.invalidYear")).optional(),
+    color: z.string().min(1, t("vehicles.colorRequired")).optional(),
+    status: z.nativeEnum(VehicleStatus).optional(),
+    vin: z.string().optional().or(z.literal("")),
+    notes: z.string().optional().or(z.literal("")),
+  });
 
-type VehicleUpdateFormValues = z.infer<typeof vehicleUpdateSchema>;
+type VehicleUpdateFormValues = z.infer<ReturnType<typeof makeVehicleUpdateSchema>>;
 
 export default function VehicleDetail() {
   const [, params] = useRoute("/vehicles/:uuid");
   const uuid = params?.uuid;
   const [isEditing, setIsEditing] = useState(false);
+  const { t, te } = useLanguage();
   const { toast } = useToast();
 
   // Fetch vehicle details
@@ -69,7 +72,7 @@ export default function VehicleDetail() {
   });
 
   const form = useForm<VehicleUpdateFormValues>({
-    resolver: zodResolver(vehicleUpdateSchema),
+    resolver: zodResolver(makeVehicleUpdateSchema(t)),
     defaultValues: {
       plate_number: "",
       make: "",
@@ -117,15 +120,15 @@ export default function VehicleDetail() {
         exact: false 
       });
       toast({
-        title: "Success",
-        description: "Vehicle updated successfully",
+        title: t("common.success"),
+        description: t("vehicles.updateSuccess"),
       });
       setIsEditing(false);
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update vehicle",
+        title: t("common.error"),
+        description: error.message || t("vehicles.updateFailed"),
         variant: "destructive",
       });
     },
@@ -152,15 +155,15 @@ export default function VehicleDetail() {
       });
       
       toast({
-        title: "Success",
-        description: "Vehicle deleted successfully",
+        title: t("common.success"),
+        description: t("vehicles.deleteSuccess"),
       });
       history.back();
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete vehicle",
+        title: t("common.error"),
+        description: error.message || t("vehicles.deleteFailed"),
         variant: "destructive",
       });
     },
@@ -197,22 +200,18 @@ export default function VehicleDetail() {
     }
   };
 
-  const formatStatus = (status: VehicleStatus) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
-  };
-
   const handleCopyToClipboard = async (text: string, fieldName: string) => {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: "Copied to clipboard",
-        description: `${fieldName} copied successfully.`,
+        title: t("vehicles.copiedTitle"),
+        description: t("vehicles.copiedDesc", { field: fieldName }),
       });
     } catch (error) {
       console.error("Failed to copy:", error);
       toast({
-        title: "Copy failed",
-        description: "Failed to copy to clipboard. Please try again.",
+        title: t("vehicles.copyFailedTitle"),
+        description: t("vehicles.copyFailedDesc"),
         variant: "destructive",
       });
     }
@@ -224,7 +223,7 @@ export default function VehicleDetail() {
         <div className="flex items-center justify-center h-screen">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading vehicle details...</p>
+            <p className="mt-4 text-gray-600">{t("vehicles.loadingDetails")}</p>
           </div>
         </div>
       </AppLayout>
@@ -237,11 +236,11 @@ export default function VehicleDetail() {
         <div className="flex items-center justify-center h-screen">
           <div className="text-center">
             <Car className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Vehicle not found</h2>
-            <p className="text-gray-600 mb-4">The vehicle you're looking for doesn't exist.</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">{t("vehicles.notFound")}</h2>
+            <p className="text-gray-600 mb-4">{t("vehicles.notFoundDesc")}</p>
             <Button onClick={() => history.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Go Back
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t("vehicles.goBack")}
             </Button>
           </div>
         </div>
@@ -261,8 +260,8 @@ export default function VehicleDetail() {
               onClick={() => history.back()}
               data-testid="button-back"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t("common.back")}
             </Button>
             <div>
               <h2 className="text-2xl font-bold text-gray-900" data-testid="text-vehicle-title">
@@ -282,31 +281,31 @@ export default function VehicleDetail() {
                   onClick={() => setIsEditing(true)}
                   data-testid="button-edit"
                 >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
+                  <Edit className="h-4 w-4 me-2" />
+                  {t("common.edit")}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" data-testid="button-delete">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
+                      <Trash2 className="h-4 w-4 me-2" />
+                      {t("common.delete")}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogTitle>{t("common.areYouSure")}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will permanently delete the vehicle "{vehicle.plate_number}". This action cannot be undone.
+                        {t("vehicles.deleteConfirmDesc", { plate: vehicle.plate_number })}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteVehicleMutation.mutate()}
                         className="bg-red-600 hover:bg-red-700"
                         data-testid="button-confirm-delete"
                       >
-                        Delete Vehicle
+                        {t("vehicles.deleteVehicle")}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -323,16 +322,16 @@ export default function VehicleDetail() {
                   }}
                   data-testid="button-cancel-edit"
                 >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
+                  <X className="h-4 w-4 me-2" />
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   onClick={form.handleSubmit(onSubmit)}
                   disabled={updateVehicleMutation.isPending}
                   data-testid="button-save"
                 >
-                  <Save className="h-4 w-4 mr-2" />
-                  {updateVehicleMutation.isPending ? "Saving..." : "Save Changes"}
+                  <Save className="h-4 w-4 me-2" />
+                  {updateVehicleMutation.isPending ? t("common.saving") : t("vehicles.saveChanges")}
                 </Button>
               </>
             )}
@@ -344,20 +343,20 @@ export default function VehicleDetail() {
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>Vehicle Information</CardTitle>
+                <CardTitle>{t("vehicles.vehicleInformation")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {!isEditing ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm font-medium text-gray-500 mb-1">Plate Number</p>
+                        <p className="text-sm font-medium text-gray-500 mb-1">{t("vehicles.plateNumber")}</p>
                         <div className="flex items-center justify-between">
                           <p className="text-base font-medium" data-testid="text-plate-number">{vehicle.plate_number}</p>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleCopyToClipboard(vehicle.plate_number, "Plate number")}
+                            onClick={() => handleCopyToClipboard(vehicle.plate_number, t("vehicles.plateNumber"))}
                             data-testid="button-copy-plate"
                           >
                             <Copy className="h-4 w-4" />
@@ -365,31 +364,31 @@ export default function VehicleDetail() {
                         </div>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-500 mb-1">Make</p>
+                        <p className="text-sm font-medium text-gray-500 mb-1">{t("vehicles.make")}</p>
                         <p className="text-base font-medium" data-testid="text-make">{vehicle.make}</p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-500 mb-1">Model</p>
+                        <p className="text-sm font-medium text-gray-500 mb-1">{t("vehicles.model")}</p>
                         <p className="text-base font-medium" data-testid="text-model">{vehicle.model}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
-                          Year
+                          {t("vehicles.year")}
                         </p>
                         <p className="text-base font-medium" data-testid="text-year">{vehicle.year}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-1">
                           <Palette className="h-4 w-4" />
-                          Color
+                          {t("vehicles.color")}
                         </p>
                         <p className="text-base font-medium" data-testid="text-color">{vehicle.color}</p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-500 mb-1">Status</p>
+                        <p className="text-sm font-medium text-gray-500 mb-1">{t("common.status")}</p>
                         <Badge className={getStatusBadgeColor(vehicle.status)} data-testid="badge-status">
-                          {formatStatus(vehicle.status)}
+                          {te(vehicle.status)}
                         </Badge>
                       </div>
                     </div>
@@ -398,13 +397,13 @@ export default function VehicleDetail() {
 
                     {vehicle.vin && (
                       <div>
-                        <p className="text-sm font-medium text-gray-500 mb-1">VIN</p>
+                        <p className="text-sm font-medium text-gray-500 mb-1">{t("vehicles.vin")}</p>
                         <div className="flex items-center justify-between">
                           <p className="text-base font-medium font-mono" data-testid="text-vin">{vehicle.vin}</p>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleCopyToClipboard(vehicle.vin!, "VIN")}
+                            onClick={() => handleCopyToClipboard(vehicle.vin!, t("vehicles.vin"))}
                             data-testid="button-copy-vin"
                           >
                             <Copy className="h-4 w-4" />
@@ -415,7 +414,7 @@ export default function VehicleDetail() {
 
                     {vehicle.notes && (
                       <div>
-                        <p className="text-sm font-medium text-gray-500 mb-1">Notes</p>
+                        <p className="text-sm font-medium text-gray-500 mb-1">{t("common.notes")}</p>
                         <p className="text-base text-gray-700 whitespace-pre-wrap" data-testid="text-notes">{vehicle.notes}</p>
                       </div>
                     )}
@@ -429,7 +428,7 @@ export default function VehicleDetail() {
                           name="plate_number"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Plate Number</FormLabel>
+                              <FormLabel>{t("vehicles.plateNumber")}</FormLabel>
                               <FormControl>
                                 <Input {...field} data-testid="input-edit-plate" />
                               </FormControl>
@@ -443,7 +442,7 @@ export default function VehicleDetail() {
                           name="make"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Make</FormLabel>
+                              <FormLabel>{t("vehicles.make")}</FormLabel>
                               <FormControl>
                                 <Input {...field} data-testid="input-edit-make" />
                               </FormControl>
@@ -457,7 +456,7 @@ export default function VehicleDetail() {
                           name="model"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Model</FormLabel>
+                              <FormLabel>{t("vehicles.model")}</FormLabel>
                               <FormControl>
                                 <Input {...field} data-testid="input-edit-model" />
                               </FormControl>
@@ -471,10 +470,10 @@ export default function VehicleDetail() {
                           name="year"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Year</FormLabel>
+                              <FormLabel>{t("vehicles.year")}</FormLabel>
                               <FormControl>
-                                <Input 
-                                  type="number" 
+                                <Input
+                                  type="number"
                                   {...field} 
                                   onChange={(e) => field.onChange(parseInt(e.target.value))}
                                   data-testid="input-edit-year"
@@ -490,7 +489,7 @@ export default function VehicleDetail() {
                           name="color"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Color</FormLabel>
+                              <FormLabel>{t("vehicles.color")}</FormLabel>
                               <FormControl>
                                 <Input {...field} data-testid="input-edit-color" />
                               </FormControl>
@@ -504,20 +503,20 @@ export default function VehicleDetail() {
                           name="status"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Status</FormLabel>
+                              <FormLabel>{t("common.status")}</FormLabel>
                               <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
                                   <SelectTrigger data-testid="select-edit-status">
-                                    <SelectValue placeholder="Select status" />
+                                    <SelectValue placeholder={t("vehicles.selectStatus")} />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value={VehicleStatus.ACTIVE}>Active</SelectItem>
-                                  <SelectItem value={VehicleStatus.INACTIVE}>Inactive</SelectItem>
-                                  <SelectItem value={VehicleStatus.SOLD}>Sold</SelectItem>
-                                  <SelectItem value={VehicleStatus.MAINTENANCE}>Maintenance</SelectItem>
-                                  <SelectItem value={VehicleStatus.RETIRED}>Retired</SelectItem>
-                                  <SelectItem value={VehicleStatus.UTILIZED}>Utilized</SelectItem>
+                                  <SelectItem value={VehicleStatus.ACTIVE}>{te(VehicleStatus.ACTIVE)}</SelectItem>
+                                  <SelectItem value={VehicleStatus.INACTIVE}>{te(VehicleStatus.INACTIVE)}</SelectItem>
+                                  <SelectItem value={VehicleStatus.SOLD}>{te(VehicleStatus.SOLD)}</SelectItem>
+                                  <SelectItem value={VehicleStatus.MAINTENANCE}>{te(VehicleStatus.MAINTENANCE)}</SelectItem>
+                                  <SelectItem value={VehicleStatus.RETIRED}>{te(VehicleStatus.RETIRED)}</SelectItem>
+                                  <SelectItem value={VehicleStatus.UTILIZED}>{te(VehicleStatus.UTILIZED)}</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />
@@ -531,9 +530,9 @@ export default function VehicleDetail() {
                         name="vin"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>VIN (Optional)</FormLabel>
+                            <FormLabel>{t("vehicles.vinOptional")}</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="Enter vehicle identification number" data-testid="input-edit-vin" />
+                              <Input {...field} placeholder={t("vehicles.vinPlaceholder")} data-testid="input-edit-vin" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -545,9 +544,9 @@ export default function VehicleDetail() {
                         name="notes"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Notes (Optional)</FormLabel>
+                            <FormLabel>{t("vehicles.notesOptional")}</FormLabel>
                             <FormControl>
-                              <Textarea {...field} rows={3} placeholder="Enter any additional notes" data-testid="textarea-edit-notes" />
+                              <Textarea {...field} rows={3} placeholder={t("vehicles.notesPlaceholder")} data-testid="textarea-edit-notes" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -564,17 +563,17 @@ export default function VehicleDetail() {
           <div>
             <Card>
               <CardHeader>
-                <CardTitle>Metadata</CardTitle>
+                <CardTitle>{t("vehicles.metadata")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 mb-1">UUID</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">{t("vehicles.uuid")}</p>
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-mono text-gray-900 truncate" data-testid="text-uuid">{vehicle.uuid}</p>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleCopyToClipboard(vehicle.uuid, "UUID")}
+                      onClick={() => handleCopyToClipboard(vehicle.uuid, t("vehicles.uuid"))}
                       data-testid="button-copy-uuid"
                     >
                       <Copy className="h-4 w-4" />
@@ -587,14 +586,14 @@ export default function VehicleDetail() {
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
-                    Created At
+                    {t("common.createdAt")}
                   </p>
                   <p className="text-sm text-gray-900" data-testid="text-created-at">{formatDate(vehicle.created_at)}</p>
                 </div>
 
                 {vehicle.created_by_uuid && (
                   <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Created By</p>
+                    <p className="text-sm font-medium text-gray-500 mb-1">{t("vehicles.createdBy")}</p>
                     <p className="text-sm font-mono text-gray-900 truncate" data-testid="text-created-by">{vehicle.created_by_uuid}</p>
                   </div>
                 )}

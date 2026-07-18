@@ -14,6 +14,7 @@ import { ArrowLeft, Edit3, Save, X, Trash2, Copy, Check, CreditCard } from "luci
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Payment {
   uuid: string;
@@ -30,6 +31,7 @@ interface Payment {
 }
 
 export default function PaymentDetail() {
+  const { t, te } = useLanguage();
   const params = useParams();
   const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
@@ -80,14 +82,14 @@ export default function PaymentDetail() {
       queryClient.invalidateQueries({ queryKey: ["/payment", params?.id] });
       setIsEditing(false);
       toast({
-        title: "Success",
-        description: "Payment updated successfully",
+        title: t('common.success'),
+        description: t('payments.updatedSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update payment",
+        title: t('common.error'),
+        description: error.message || t('payments.failedUpdate'),
         variant: "destructive",
       });
     },
@@ -101,15 +103,15 @@ export default function PaymentDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/payment"] });
       toast({
-        title: "Success",
-        description: "Payment deleted successfully",
+        title: t('common.success'),
+        description: t('payments.deletedSuccess'),
       });
       setLocation("/payments");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete payment",
+        title: t('common.error'),
+        description: error.message || t('payments.failedDelete'),
         variant: "destructive",
       });
     },
@@ -151,9 +153,23 @@ export default function PaymentDetail() {
   };
 
   const handleDelete = () => {
-    if (window.confirm("Are you sure you want to delete this payment?")) {
+    if (window.confirm(t('payments.confirmDelete'))) {
       deleteMutation.mutate();
     }
+  };
+
+  // Map the stable field identifiers (used for copy-state + clipboard) to their
+  // translation keys so the toast can show a localized field label.
+  const fieldLabelKeys: Record<string, string> = {
+    "Payment UUID": 'payments.paymentUuid',
+    "Amount": 'common.amount',
+    "Payment Method": 'payments.paymentMethod',
+    "Invoice UUID": 'payments.invoiceUuid',
+    "Financial Account UUID": 'payments.financialAccountUuid',
+    "Debit Note Item UUID": 'payments.debitNoteItemUuid',
+    "Created At": 'common.createdAt',
+    "Created By UUID": 'payments.createdByUuid',
+    "Notes": 'common.notes',
   };
 
   const copyToClipboard = async (text: string, fieldName: string) => {
@@ -164,10 +180,11 @@ export default function PaymentDetail() {
     } catch (err) {
       console.error('Failed to copy text: ', err);
     }
-    
+
+    const fieldLabel = fieldLabelKeys[fieldName] ? t(fieldLabelKeys[fieldName]) : fieldName;
     toast({
-      title: "Copied",
-      description: `${fieldName} copied to clipboard`,
+      title: t('payments.copied'),
+      description: t('payments.copiedToClipboard', { field: fieldLabel }),
     });
   };
 
@@ -191,13 +208,13 @@ export default function PaymentDetail() {
           <Card>
             <CardContent className="p-16 text-center">
               <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Payment not found</h3>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">{t('payments.paymentNotFound')}</h3>
               <p className="text-gray-500 dark:text-gray-400 mb-4">
-                The payment you're looking for doesn't exist or has been deleted.
+                {t('payments.notFoundHint')}
               </p>
               <Button onClick={() => setLocation("/payments")} variant="outline">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to payments
+                <ArrowLeft className="h-4 w-4 me-2" />
+                {t('payments.backToPayments')}
               </Button>
             </CardContent>
           </Card>
@@ -217,12 +234,12 @@ export default function PaymentDetail() {
               variant="ghost"
               size="sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to payments
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t('payments.backToPayments')}
             </Button>
             <div>
               <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100">
-                Payment Details
+                {t('payments.paymentDetails')}
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
                 #{payment.uuid.substring(0, 8)}
@@ -233,23 +250,23 @@ export default function PaymentDetail() {
             {!isEditing ? (
               <>
                 <Button onClick={handleEdit} variant="outline">
-                  <Edit3 className="h-4 w-4 mr-2" />
-                  Edit
+                  <Edit3 className="h-4 w-4 me-2" />
+                  {t('common.edit')}
                 </Button>
                 <Button onClick={handleDelete} variant="destructive">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                  <Trash2 className="h-4 w-4 me-2" />
+                  {t('common.delete')}
                 </Button>
               </>
             ) : (
               <>
                 <Button onClick={handleCancel} variant="outline">
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
+                  <X className="h-4 w-4 me-2" />
+                  {t('common.cancel')}
                 </Button>
                 <Button onClick={handleSave} disabled={updateMutation.isPending}>
-                  <Save className="h-4 w-4 mr-2" />
-                  {updateMutation.isPending ? "Saving..." : "Save"}
+                  <Save className="h-4 w-4 me-2" />
+                  {updateMutation.isPending ? t('common.saving') : t('common.save')}
                 </Button>
               </>
             )}
@@ -261,19 +278,19 @@ export default function PaymentDetail() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Payment Information
+              {t('payments.paymentInformation')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Payment UUID */}
               <div className="group cursor-pointer" onClick={() => copyToClipboard(payment.uuid, "Payment UUID")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment UUID</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('payments.paymentUuid')}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                     {payment.uuid}
                   </p>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Payment UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -281,12 +298,12 @@ export default function PaymentDetail() {
 
               {/* Amount */}
               <div className="group cursor-pointer" onClick={() => copyToClipboard(payment.amount.toString(), "Amount")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.amount')}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {formatCurrency(payment.amount, payment.currency)}
                   </p>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Amount" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -294,16 +311,16 @@ export default function PaymentDetail() {
 
               {/* Payment Method */}
               <div>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Method</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('payments.paymentMethod')}</Label>
                 {isEditing ? (
                   <Select value={editedPaymentMethod} onValueChange={setEditedPaymentMethod}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select payment method" />
+                      <SelectValue placeholder={t('payments.selectPaymentMethod')} />
                     </SelectTrigger>
                     <SelectContent>
                       {paymentMethods.map((method: string) => (
                         <SelectItem key={method} value={method}>
-                          {method}
+                          {te(method)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -312,9 +329,9 @@ export default function PaymentDetail() {
                   <div className="group cursor-pointer" onClick={() => copyToClipboard(payment.payment_method, "Payment Method")}>
                     <div className="flex items-center justify-between">
                       <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
-                        {payment.payment_method}
+                        {te(payment.payment_method)}
                       </span>
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Payment Method" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
@@ -325,12 +342,12 @@ export default function PaymentDetail() {
               {/* Invoice UUID */}
               {payment.invoice_uuid && (
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(payment.invoice_uuid!, "Invoice UUID")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Invoice UUID</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('payments.invoiceUuid')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                       {payment.invoice_uuid}
                     </p>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                       {copiedField === "Invoice UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -340,12 +357,12 @@ export default function PaymentDetail() {
               {/* Financial Account UUID */}
               {payment.financial_account_uuid && (
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(payment.financial_account_uuid!, "Financial Account UUID")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Financial Account UUID</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('payments.financialAccountUuid')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                       {payment.financial_account_uuid}
                     </p>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                       {copiedField === "Financial Account UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -355,12 +372,12 @@ export default function PaymentDetail() {
               {/* Debit Note Item UUID */}
               {payment.debit_note_item_uuid && (
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(payment.debit_note_item_uuid!, "Debit Note Item UUID")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Debit Note Item UUID</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('payments.debitNoteItemUuid')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                       {payment.debit_note_item_uuid}
                     </p>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                       {copiedField === "Debit Note Item UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -369,12 +386,12 @@ export default function PaymentDetail() {
 
               {/* Created At */}
               <div className="group cursor-pointer" onClick={() => copyToClipboard(payment.created_at, "Created At")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created At</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.createdAt')}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-900 dark:text-gray-100">
                     {format(new Date(payment.created_at), 'MMM d, yyyy h:mm a')}
                   </p>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                     {copiedField === "Created At" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -383,12 +400,12 @@ export default function PaymentDetail() {
               {/* Created By UUID */}
               {payment.created_by_uuid && (
                 <div className="group cursor-pointer" onClick={() => copyToClipboard(payment.created_by_uuid!, "Created By UUID")}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created By UUID</Label>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('payments.createdByUuid')}</Label>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                       {payment.created_by_uuid}
                     </p>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                       {copiedField === "Created By UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -397,22 +414,22 @@ export default function PaymentDetail() {
 
               {/* Notes */}
               <div className="md:col-span-2 lg:col-span-3">
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Notes</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.notes')}</Label>
                 {isEditing ? (
                   <Textarea
                     value={editedNotes}
                     onChange={(e) => setEditedNotes(e.target.value)}
-                    placeholder="Add notes about this payment..."
+                    placeholder={t('payments.editNotesPlaceholder')}
                     className="mt-1"
                     rows={3}
                   />
                 ) : (
-                  <div className="group cursor-pointer" onClick={() => copyToClipboard(payment.notes || 'No notes', "Notes")}>
+                  <div className="group cursor-pointer" onClick={() => copyToClipboard(payment.notes || t('payments.noNotes'), "Notes")}>
                     <div className="flex items-start justify-between mt-1">
                       <p className="text-sm text-gray-900 dark:text-gray-100">
-                        {payment.notes || 'No notes'}
+                        {payment.notes || t('payments.noNotes')}
                       </p>
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity ms-2">
                         {copiedField === "Notes" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { format } from "date-fns";
 
 interface Payout {
@@ -32,6 +33,7 @@ export default function PayoutDetail() {
   const params = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotes, setEditedNotes] = useState("");
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -51,14 +53,14 @@ export default function PayoutDetail() {
       queryClient.invalidateQueries({ queryKey: ["/payout/"] });
       setIsEditing(false);
       toast({
-        title: "Success",
-        description: "Payout updated successfully",
+        title: t("common.success"),
+        description: t("payouts.updateSuccess"),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update payout",
+        title: t("common.error"),
+        description: error.message || t("payouts.updateFailed"),
         variant: "destructive",
       });
     },
@@ -69,27 +71,27 @@ export default function PayoutDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/payout/"] });
       toast({
-        title: "Success",
-        description: "Payout deleted successfully",
+        title: t("common.success"),
+        description: t("payouts.deleteSuccess"),
       });
       setLocation("/payouts");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete payout",
+        title: t("common.error"),
+        description: error.message || t("payouts.deleteFailed"),
         variant: "destructive",
       });
     },
   });
 
-  const copyToClipboard = (text: string, fieldName: string) => {
+  const copyToClipboard = (text: string, fieldName: string, fieldLabel?: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
     toast({
-      title: "Copied",
-      description: `${fieldName} copied to clipboard`,
+      title: t("payouts.copied"),
+      description: t("payouts.copiedToClipboard", { field: fieldLabel ?? fieldName }),
     });
   };
 
@@ -125,12 +127,12 @@ export default function PayoutDetail() {
   };
 
   const getPayoutType = () => {
-    if (!payout) return { type: "Unknown", uuid: "", label: "Unknown" };
-    if (payout.purchase_order_uuid) return { type: "Purchase Order", uuid: payout.purchase_order_uuid, label: "Purchase Order UUID" };
-    if (payout.expense_uuid) return { type: "Expense", uuid: payout.expense_uuid, label: "Expense UUID" };
-    if (payout.employee_uuid) return { type: "Employee", uuid: payout.employee_uuid, label: "Employee UUID" };
-    if (payout.credit_note_item_uuid) return { type: "Credit Note", uuid: payout.credit_note_item_uuid, label: "Credit Note Item UUID" };
-    return { type: "Unknown", uuid: "", label: "Unknown" };
+    if (!payout) return { typeKey: "common.unknown", uuid: "", labelKey: "common.unknown", fieldId: "Unknown" };
+    if (payout.purchase_order_uuid) return { typeKey: "payouts.typePurchaseOrder", uuid: payout.purchase_order_uuid, labelKey: "payouts.purchaseOrderUuid", fieldId: "Purchase Order UUID" };
+    if (payout.expense_uuid) return { typeKey: "payouts.typeExpense", uuid: payout.expense_uuid, labelKey: "payouts.expenseUuid", fieldId: "Expense UUID" };
+    if (payout.employee_uuid) return { typeKey: "payouts.typeEmployee", uuid: payout.employee_uuid, labelKey: "payouts.employeeUuid", fieldId: "Employee UUID" };
+    if (payout.credit_note_item_uuid) return { typeKey: "payouts.typeCreditNote", uuid: payout.credit_note_item_uuid, labelKey: "payouts.creditNoteItemUuid", fieldId: "Credit Note Item UUID" };
+    return { typeKey: "common.unknown", uuid: "", labelKey: "common.unknown", fieldId: "Unknown" };
   };
 
   if (isLoading) {
@@ -151,9 +153,9 @@ export default function PayoutDetail() {
       <AppLayout>
         <div className="p-8">
           <div className="text-center py-8">
-            <p className="text-red-600">Error loading payout: {error?.message || "Payout not found"}</p>
+            <p className="text-red-600">{t("payouts.errorLoadingDetail", { message: error?.message || t("payouts.notFound") })}</p>
             <Button onClick={() => setLocation("/payouts")} className="mt-4">
-              Back to Payouts
+              {t("payouts.backToPayouts")}
             </Button>
           </div>
         </div>
@@ -174,15 +176,15 @@ export default function PayoutDetail() {
               variant="ghost"
               size="sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Payouts
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t("payouts.backToPayouts")}
             </Button>
             <div>
               <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100">
-                Payout Details
+                {t("payouts.detailsTitle")}
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
-                {formatCurrency(payout.amount, payout.currency)} • {payoutType.type}
+                {formatCurrency(payout.amount, payout.currency)} • {t(payoutType.typeKey)}
               </p>
             </div>
           </div>
@@ -190,40 +192,40 @@ export default function PayoutDetail() {
             {isEditing ? (
               <>
                 <Button onClick={handleCancel} variant="outline">
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button onClick={handleSave} disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? "Saving..." : "Save"}
+                  {updateMutation.isPending ? t("common.saving") : t("common.save")}
                 </Button>
               </>
             ) : (
               <>
                 <Button onClick={handleEdit} variant="outline">
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
+                  <Edit className="h-4 w-4 me-2" />
+                  {t("common.edit")}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" className="text-red-600 hover:text-red-700">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
+                      <Trash2 className="h-4 w-4 me-2" />
+                      {t("common.delete")}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Payout</AlertDialogTitle>
+                      <AlertDialogTitle>{t("payouts.deleteTitle")}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete this payout? This action cannot be undone.
+                        {t("payouts.deleteConfirmDesc")}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteMutation.mutate()}
                         disabled={deleteMutation.isPending}
                         className="bg-red-600 hover:bg-red-700"
                       >
-                        {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                        {deleteMutation.isPending ? t("common.deleting") : t("common.delete")}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -238,14 +240,14 @@ export default function PayoutDetail() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Payout Information
+              {t("payouts.information")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* UUID */}
-              <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.uuid, "Payout UUID")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Payout UUID</Label>
+              <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.uuid, "Payout UUID", t("payouts.payoutUuid"))}>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("payouts.payoutUuid")}</Label>
                 <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1">
                   <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
                     {payout.uuid}
@@ -257,8 +259,8 @@ export default function PayoutDetail() {
               </div>
 
               {/* Amount */}
-              <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.amount.toString(), "Amount")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount</Label>
+              <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.amount.toString(), "Amount", t("common.amount"))}>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("common.amount")}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                     {formatCurrency(payout.amount, payout.currency)}
@@ -270,8 +272,8 @@ export default function PayoutDetail() {
               </div>
 
               {/* Currency */}
-              <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.currency, "Currency")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Currency</Label>
+              <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.currency, "Currency", t("common.currency"))}>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("common.currency")}</Label>
                 <div className="flex items-center justify-between">
                   <Badge variant="outline" className="mt-1">
                     {payout.currency}
@@ -284,30 +286,30 @@ export default function PayoutDetail() {
 
               {/* Payout Type */}
               <div>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Type</Label>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("common.type")}</Label>
                 <Badge variant="outline" className="mt-1">
-                  {payoutType.type}
+                  {t(payoutType.typeKey)}
                 </Badge>
               </div>
 
               {/* Reference UUID */}
               {payoutType.uuid && (
-                <div className="group cursor-pointer" onClick={() => copyToClipboard(payoutType.uuid, payoutType.label)}>
-                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{payoutType.label}</Label>
+                <div className="group cursor-pointer" onClick={() => copyToClipboard(payoutType.uuid, payoutType.fieldId, t(payoutType.labelKey))}>
+                  <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t(payoutType.labelKey)}</Label>
                   <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1">
                     <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
                       {payoutType.uuid}
                     </p>
                     <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {copiedField === payoutType.label ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copiedField === payoutType.fieldId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
               )}
 
               {/* Financial Account UUID */}
-              <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.financial_account_uuid, "Financial Account UUID")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Financial Account UUID</Label>
+              <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.financial_account_uuid, "Financial Account UUID", t("payouts.financialAccountUuid"))}>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("payouts.financialAccountUuid")}</Label>
                 <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1">
                   <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
                     {payout.financial_account_uuid}
@@ -319,8 +321,8 @@ export default function PayoutDetail() {
               </div>
 
               {/* Created At */}
-              <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.created_at, "Created Date")}>
-                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created Date</Label>
+              <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.created_at, "Created Date", t("payouts.createdDate"))}>
+                <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("payouts.createdDate")}</Label>
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
                     {format(new Date(payout.created_at), 'PPP p')}
@@ -334,19 +336,19 @@ export default function PayoutDetail() {
 
             {/* Notes */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Notes</Label>
+              <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("common.notes")}</Label>
               {isEditing ? (
                 <Textarea
                   value={editedNotes}
                   onChange={(e) => setEditedNotes(e.target.value)}
-                  placeholder="Enter notes for this payout..."
+                  placeholder={t("payouts.notesPlaceholder")}
                   rows={3}
                 />
               ) : (
-                <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.notes || "", "Notes")}>
+                <div className="group cursor-pointer" onClick={() => copyToClipboard(payout.notes || "", "Notes", t("common.notes"))}>
                   <div className="flex items-start justify-between bg-gray-50 dark:bg-gray-800 rounded p-3 min-h-[80px]">
                     <p className="text-sm text-gray-900 dark:text-gray-100">
-                      {payout.notes || "No notes provided"}
+                      {payout.notes || t("payouts.noNotes")}
                     </p>
                     <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
                       {copiedField === "Notes" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}

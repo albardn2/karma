@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface WarehouseFormData {
   name: string;
@@ -26,6 +27,7 @@ export function AddWarehouseDialog() {
   });
 
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
 
   const createWarehouseMutation = useMutation({
@@ -57,14 +59,14 @@ export function AddWarehouseDialog() {
         notes: "",
       });
       toast({
-        title: "Success",
-        description: "Warehouse created successfully",
+        title: t('common.success'),
+        description: t('warehouses.createSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create warehouse",
+        title: t('common.error'),
+        description: error.message || t('warehouses.createFailed'),
         variant: "destructive",
       });
     },
@@ -80,8 +82,8 @@ export function AddWarehouseDialog() {
     // Basic validation
     if (!formData.name || !formData.address) {
       toast({
-        title: "Validation Error",
-        description: "Warehouse name and address are required",
+        title: t('warehouses.validationError'),
+        description: t('warehouses.nameAddressRequired'),
         variant: "destructive",
       });
       return;
@@ -102,67 +104,67 @@ export function AddWarehouseDialog() {
       <DialogTrigger asChild>
         <Button className="gap-2">
           <Plus className="h-4 w-4" />
-          Add Warehouse
+          {t('warehouses.addWarehouse')}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Warehouse</DialogTitle>
+          <DialogTitle>{t('warehouses.addNewWarehouse')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Warehouse Name *</Label>
+            <Label htmlFor="name">{t('warehouses.warehouseName')} *</Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => handleInputChange("name", e.target.value)}
-              placeholder="Enter warehouse name"
+              placeholder={t('warehouses.enterName')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="address">Address *</Label>
+            <Label htmlFor="address">{t('common.address')} *</Label>
             <Textarea
               id="address"
               value={formData.address}
               onChange={(e) => handleInputChange("address", e.target.value)}
-              placeholder="Enter warehouse address"
+              placeholder={t('warehouses.enterAddress')}
               required
               rows={3}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="coordinates">Coordinates (lat,lng)</Label>
+            <Label htmlFor="coordinates">{t('warehouses.coordinatesLatLng')}</Label>
             <Input
               id="coordinates"
               value={formData.coordinates || ""}
               onChange={(e) => handleInputChange("coordinates", e.target.value)}
-              placeholder="e.g., 33.5138,36.2765"
+              placeholder={t('warehouses.coordinatesExample')}
             />
             <p className="text-xs text-muted-foreground">
-              Optional. Enter coordinates as latitude,longitude for map display.
+              {t('warehouses.coordinatesHintMap')}
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t('common.notes')}</Label>
             <Textarea
               id="notes"
               value={formData.notes || ""}
               onChange={(e) => handleInputChange("notes", e.target.value)}
-              placeholder="Additional notes about this warehouse"
+              placeholder={t('warehouses.notesPlaceholder')}
               rows={3}
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={createWarehouseMutation.isPending}>
-              {createWarehouseMutation.isPending ? "Creating..." : "Create Warehouse"}
+              {createWarehouseMutation.isPending ? t('common.creating') : t('warehouses.createWarehouse')}
             </Button>
           </div>
         </form>

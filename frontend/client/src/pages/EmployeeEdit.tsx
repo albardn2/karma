@@ -12,15 +12,16 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Employee, EmployeeRole } from "@/lib/types";
 
 const EMPLOYEE_ROLES = [
-  { value: "admin", label: "Admin" },
-  { value: "manager", label: "Manager" },
-  { value: "employee", label: "Operator" },
-  { value: "accountant", label: "Accountant" },
-  { value: "driver", label: "Driver" },
-  { value: "sales", label: "Sales" }
+  { value: "admin", labelKey: "employees.roleAdmin" },
+  { value: "manager", labelKey: "employees.roleManager" },
+  { value: "employee", labelKey: "employees.roleOperator" },
+  { value: "accountant", labelKey: "employees.roleAccountant" },
+  { value: "driver", labelKey: "employees.roleDriver" },
+  { value: "sales", labelKey: "employees.roleSales" }
 ];
 
 interface EmployeeFormData {
@@ -38,6 +39,7 @@ export default function EmployeeEdit() {
   const [, params] = useRoute("/employees/:id/edit");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const id = params?.id;
 
@@ -91,17 +93,17 @@ export default function EmployeeEdit() {
       });
       
       toast({
-        title: "Success",
-        description: "Employee updated successfully",
+        title: t('common.success'),
+        description: t('employees.updateSuccess'),
       });
-      
+
       // Navigate back to employee detail page
       setLocation(`/employees/${id}`);
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to update employee",
+        title: t('common.error'),
+        description: t('employees.updateFailed'),
         variant: "destructive",
       });
     },
@@ -138,8 +140,8 @@ export default function EmployeeEdit() {
             <div className="flex items-center gap-4">
               <Link href={`/employees/${id}`}>
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
+                  <ArrowLeft className="h-4 w-4 me-2" />
+                  {t('common.back')}
                 </Button>
               </Link>
             </div>
@@ -161,14 +163,14 @@ export default function EmployeeEdit() {
             <div className="flex items-center gap-4">
               <Link href="/employees">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Employees
+                  <ArrowLeft className="h-4 w-4 me-2" />
+                  {t('employees.backToList')}
                 </Button>
               </Link>
             </div>
             <Card>
               <CardContent className="p-6">
-                <p className="text-center text-muted-foreground">Employee not found</p>
+                <p className="text-center text-muted-foreground">{t('employees.notFound')}</p>
               </CardContent>
             </Card>
           </div>
@@ -185,42 +187,42 @@ export default function EmployeeEdit() {
           <div className="flex items-center gap-4">
             <Link href={`/employees/${id}`}>
               <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
+                <ArrowLeft className="h-4 w-4 me-2" />
+                {t('common.back')}
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold">Edit Employee</h1>
-              <p className="text-muted-foreground">Update employee information</p>
+              <h1 className="text-2xl font-bold">{t('employees.editTitle')}</h1>
+              <p className="text-muted-foreground">{t('employees.editSubtitle')}</p>
             </div>
           </div>
 
           {/* Edit Form */}
           <Card>
             <CardHeader>
-              <CardTitle>Employee Information</CardTitle>
+              <CardTitle>{t('employees.employeeInfo')}</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="full_name">Full Name *</Label>
+                    <Label htmlFor="full_name">{t('common.fullName')} *</Label>
                     <Input
                       id="full_name"
                       value={formData.full_name}
                       onChange={(e) => handleInputChange("full_name", e.target.value)}
-                      placeholder="Enter full name"
+                      placeholder={t('employees.fullNamePlaceholder')}
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="phone_number">Phone Number *</Label>
+                    <Label htmlFor="phone_number">{t('employees.phoneNumber')} *</Label>
                     <Input
                       id="phone_number"
                       value={formData.phone_number}
                       onChange={(e) => handleInputChange("phone_number", e.target.value)}
-                      placeholder="Enter phone number"
+                      placeholder={t('employees.phonePlaceholder')}
                       required
                     />
                   </div>
@@ -228,30 +230,30 @@ export default function EmployeeEdit() {
 
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="email_address">Email Address</Label>
+                    <Label htmlFor="email_address">{t('employees.emailAddress')}</Label>
                     <Input
                       id="email_address"
                       type="email"
                       value={formData.email_address || ""}
                       onChange={(e) => handleInputChange("email_address", e.target.value)}
-                      placeholder="Enter email address"
+                      placeholder={t('employees.emailPlaceholder')}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="role">Role</Label>
+                    <Label htmlFor="role">{t('employees.role')}</Label>
                     <Select
                       value={formData.role || "none"}
                       onValueChange={(value: string) => handleInputChange("role", value === "none" ? undefined : value as EmployeeRole)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select role" />
+                        <SelectValue placeholder={t('employees.selectRole')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">No role</SelectItem>
+                        <SelectItem value="none">{t('employees.noRoleOption')}</SelectItem>
                         {EMPLOYEE_ROLES.map(role => (
                           <SelectItem key={role.value} value={role.value}>
-                            {role.label}
+                            {t(role.labelKey)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -260,45 +262,45 @@ export default function EmployeeEdit() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="full_address">Full Address</Label>
+                  <Label htmlFor="full_address">{t('employees.fullAddress')}</Label>
                   <Textarea
                     id="full_address"
                     value={formData.full_address || ""}
                     onChange={(e) => handleInputChange("full_address", e.target.value)}
-                    placeholder="Enter full address"
+                    placeholder={t('employees.addressPlaceholder')}
                     rows={2}
                   />
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="identification">Identification</Label>
+                    <Label htmlFor="identification">{t('employees.identification')}</Label>
                     <Input
                       id="identification"
                       value={formData.identification || ""}
                       onChange={(e) => handleInputChange("identification", e.target.value)}
-                      placeholder="ID documents or file paths"
+                      placeholder={t('employees.identificationPlaceholder')}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="image">Image</Label>
+                    <Label htmlFor="image">{t('employees.image')}</Label>
                     <Input
                       id="image"
                       value={formData.image || ""}
                       onChange={(e) => handleInputChange("image", e.target.value)}
-                      placeholder="Image URL or file path"
+                      placeholder={t('employees.imagePlaceholder')}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
+                  <Label htmlFor="notes">{t('common.notes')}</Label>
                   <Textarea
                     id="notes"
                     value={formData.notes || ""}
                     onChange={(e) => handleInputChange("notes", e.target.value)}
-                    placeholder="Enter any additional notes"
+                    placeholder={t('employees.notesPlaceholder')}
                     rows={4}
                   />
                 </div>
@@ -308,12 +310,12 @@ export default function EmployeeEdit() {
                     type="submit"
                     disabled={updateEmployeeMutation.isPending}
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    {updateEmployeeMutation.isPending ? "Saving..." : "Save Changes"}
+                    <Save className="h-4 w-4 me-2" />
+                    {updateEmployeeMutation.isPending ? t('common.saving') : t('employees.saveChanges')}
                   </Button>
                   <Link href={`/employees/${id}`}>
                     <Button variant="outline" type="button">
-                      Cancel
+                      {t('common.cancel')}
                     </Button>
                   </Link>
                 </div>

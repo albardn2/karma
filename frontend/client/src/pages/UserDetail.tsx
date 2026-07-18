@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -41,33 +41,35 @@ import {
   History
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { UserLocationMap } from "@/components/location/UserLocationMap";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { User, UserUpdateData, PermissionScope } from "@/lib/types";
 
-const userUpdateSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters").optional(),
-  first_name: z.string().min(1, "First name is required").optional(),
-  last_name: z.string().min(1, "Last name is required").optional(),
-  email: z.string().email("Invalid email format").optional().or(z.literal("")),
-  phone_number: z.string().optional(),
-  language: z.string().optional(),
-  password: z.string().min(6, "Password must be at least 6 characters").optional().or(z.literal("")),
-  permission_scope: z.string().optional(),
-  rfid_token: z.string().optional(),
-  track_location: z.boolean().optional(),
-  location_ping_seconds: z.preprocess(
-    (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
-    z
-      .number({ invalid_type_error: "Must be a number" })
-      .int("Must be a whole number")
-      .min(1, "Must be at least 1 second")
-      .max(3600, "Must be at most 3600 seconds")
-      .optional()
-  ),
-});
+const makeUserUpdateSchema = (t: (key: string) => string) =>
+  z.object({
+    username: z.string().min(3, t("users.usernameMin")).optional(),
+    first_name: z.string().min(1, t("users.firstNameRequired")).optional(),
+    last_name: z.string().min(1, t("users.lastNameRequired")).optional(),
+    email: z.string().email(t("users.invalidEmail")).optional().or(z.literal("")),
+    phone_number: z.string().optional(),
+    language: z.string().optional(),
+    password: z.string().min(6, t("users.passwordMin")).optional().or(z.literal("")),
+    permission_scope: z.string().optional(),
+    rfid_token: z.string().optional(),
+    track_location: z.boolean().optional(),
+    location_ping_seconds: z.preprocess(
+      (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
+      z
+        .number({ invalid_type_error: t("users.mustBeNumber") })
+        .int(t("users.mustBeWholeNumber"))
+        .min(1, t("users.pingMinSeconds"))
+        .max(3600, t("users.pingMaxSeconds"))
+        .optional()
+    ),
+  });
 
-type UserUpdateFormValues = z.infer<typeof userUpdateSchema>;
+type UserUpdateFormValues = z.infer<ReturnType<typeof makeUserUpdateSchema>>;
 
 export default function UserDetail() {
   const [, params] = useRoute("/users/:uuid");
@@ -75,6 +77,9 @@ export default function UserDetail() {
   const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
   const { toast } = useToast();
+  const { t, te } = useLanguage();
+
+  const userUpdateSchema = useMemo(() => makeUserUpdateSchema(t), [t]);
 
   // Fetch user details
   const { data: user, isLoading } = useQuery<User>({
@@ -149,15 +154,15 @@ export default function UserDetail() {
         exact: false 
       });
       toast({
-        title: "Success",
-        description: "User updated successfully",
+        title: t("common.success"),
+        description: t("users.updatedSuccess"),
       });
       setIsEditing(false);
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update user",
+        title: t("common.error"),
+        description: error.message || t("users.updateFailed"),
         variant: "destructive",
       });
     },
@@ -186,16 +191,16 @@ export default function UserDetail() {
       });
       
       toast({
-        title: "Success",
-        description: "User deleted successfully",
+        title: t("common.success"),
+        description: t("users.deletedSuccess"),
       });
       // Navigate back to the list page
       history.back();
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete user",
+        title: t("common.error"),
+        description: error.message || t("users.deleteFailed"),
         variant: "destructive",
       });
     },
@@ -214,8 +219,8 @@ export default function UserDetail() {
   };
 
   const formatPermissionScope = (scope?: string) => {
-    if (!scope) return "No Permission";
-    return scope.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    if (!scope) return t("users.noPermission");
+    return te(scope);
   };
 
   const getPermissionBadgeColor = (scope?: string) => {
@@ -230,14 +235,14 @@ export default function UserDetail() {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: "Copied to clipboard",
-        description: `${fieldName} copied successfully.`,
+        title: t("users.copiedTitle"),
+        description: t("users.copiedDesc", { field: fieldName }),
       });
     } catch (error) {
       console.error("Failed to copy:", error);
       toast({
-        title: "Copy failed",
-        description: "Failed to copy to clipboard. Please try again.",
+        title: t("users.copyFailedTitle"),
+        description: t("users.copyFailedDesc"),
         variant: "destructive",
       });
     }
@@ -249,12 +254,12 @@ export default function UserDetail() {
         <div className="space-y-6">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => history.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t("common.back")}
             </Button>
           </div>
           <div className="text-center py-12">
-            <p className="text-gray-600">Loading user details...</p>
+            <p className="text-gray-600">{t("users.loadingUserDetails")}</p>
           </div>
         </div>
       </AppLayout>
@@ -267,13 +272,13 @@ export default function UserDetail() {
         <div className="space-y-6">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => history.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t("common.back")}
             </Button>
           </div>
           <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">User not found</h3>
-            <p className="text-gray-600">The user you're looking for doesn't exist or has been deleted.</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t("users.userNotFound")}</h3>
+            <p className="text-gray-600">{t("users.userNotFoundDesc")}</p>
           </div>
         </div>
       </AppLayout>
@@ -288,8 +293,8 @@ export default function UserDetail() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => history.back()}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
+                <ArrowLeft className="h-4 w-4 me-2" />
+                {t("common.back")}
               </Button>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
@@ -312,15 +317,15 @@ export default function UserDetail() {
                     }}
                     disabled={updateUserMutation.isPending}
                   >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
+                    <X className="h-4 w-4 me-2" />
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     onClick={form.handleSubmit(onSubmit)}
                     disabled={updateUserMutation.isPending}
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    {updateUserMutation.isPending ? "Saving..." : "Save Changes"}
+                    <Save className="h-4 w-4 me-2" />
+                    {updateUserMutation.isPending ? t("common.saving") : t("users.saveChanges")}
                   </Button>
                 </>
               ) : (
@@ -328,25 +333,28 @@ export default function UserDetail() {
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" size="sm">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
+                        <Trash2 className="h-4 w-4 me-2" />
+                        {t("common.delete")}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete User</AlertDialogTitle>
+                        <AlertDialogTitle>{t("users.deleteUser")}</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Are you sure you want to delete "{user.first_name} {user.last_name}" (@{user.username})? This action cannot be undone and will permanently remove the user and all associated data.
+                          {t("users.deleteConfirmDesc", {
+                            name: `${user.first_name} ${user.last_name}`,
+                            username: user.username,
+                          })}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => deleteUserMutation.mutate()}
                           disabled={deleteUserMutation.isPending}
                           className="bg-red-600 hover:bg-red-700"
                         >
-                          {deleteUserMutation.isPending ? "Deleting..." : "Delete User"}
+                          {deleteUserMutation.isPending ? t("common.deleting") : t("users.deleteUser")}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -355,12 +363,12 @@ export default function UserDetail() {
                     variant="outline"
                     onClick={() => setLocation(`/users/${uuid}/location-history`)}
                   >
-                    <History className="h-4 w-4 mr-2" />
-                    Location History
+                    <History className="h-4 w-4 me-2" />
+                    {t("users.locationHistory")}
                   </Button>
                   <Button onClick={() => setIsEditing(true)}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit User
+                    <Edit className="h-4 w-4 me-2" />
+                    {t("users.editUser")}
                   </Button>
                 </>
               )}
@@ -372,7 +380,7 @@ export default function UserDetail() {
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>User Information</CardTitle>
+                <CardTitle>{t("users.userInformation")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {isEditing ? (
@@ -384,9 +392,9 @@ export default function UserDetail() {
                           name="username"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Username</FormLabel>
+                              <FormLabel>{t("common.username")}</FormLabel>
                               <FormControl>
-                                <Input placeholder="Enter username" {...field} />
+                                <Input placeholder={t("users.enterUsername")} {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -398,11 +406,11 @@ export default function UserDetail() {
                           name="permission_scope"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Permission Scope</FormLabel>
+                              <FormLabel>{t("users.permissionScope")}</FormLabel>
                               <Select onValueChange={field.onChange} value={field.value || ""}>
                                 <FormControl>
                                   <SelectTrigger>
-                                    <SelectValue placeholder="Select permission scope" />
+                                    <SelectValue placeholder={t("users.selectPermissionScope")} />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
@@ -423,9 +431,9 @@ export default function UserDetail() {
                           name="first_name"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>First Name</FormLabel>
+                              <FormLabel>{t("users.firstName")}</FormLabel>
                               <FormControl>
-                                <Input placeholder="Enter first name" {...field} />
+                                <Input placeholder={t("users.enterFirstName")} {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -437,9 +445,9 @@ export default function UserDetail() {
                           name="last_name"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Last Name</FormLabel>
+                              <FormLabel>{t("users.lastName")}</FormLabel>
                               <FormControl>
-                                <Input placeholder="Enter last name" {...field} />
+                                <Input placeholder={t("users.enterLastName")} {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -451,9 +459,9 @@ export default function UserDetail() {
                           name="email"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Email</FormLabel>
+                              <FormLabel>{t("common.email")}</FormLabel>
                               <FormControl>
-                                <Input type="email" placeholder="Enter email" {...field} />
+                                <Input type="email" placeholder={t("users.enterEmail")} {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -465,9 +473,9 @@ export default function UserDetail() {
                           name="phone_number"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Phone Number</FormLabel>
+                              <FormLabel>{t("users.phoneNumber")}</FormLabel>
                               <FormControl>
-                                <Input placeholder="Enter phone number" {...field} />
+                                <Input placeholder={t("users.enterPhoneNumber")} {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -479,9 +487,9 @@ export default function UserDetail() {
                           name="language"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Language</FormLabel>
+                              <FormLabel>{t("common.language")}</FormLabel>
                               <FormControl>
-                                <Input placeholder="Enter language preference" {...field} />
+                                <Input placeholder={t("users.enterLanguage")} {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -493,9 +501,9 @@ export default function UserDetail() {
                           name="password"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>New Password (optional)</FormLabel>
+                              <FormLabel>{t("users.newPasswordOptional")}</FormLabel>
                               <FormControl>
-                                <Input type="password" placeholder="Enter new password" {...field} />
+                                <Input type="password" placeholder={t("users.enterNewPassword")} {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -507,9 +515,9 @@ export default function UserDetail() {
                           name="rfid_token"
                           render={({ field }) => (
                             <FormItem className="md:col-span-2">
-                              <FormLabel>RFID Token</FormLabel>
+                              <FormLabel>{t("users.rfidToken")}</FormLabel>
                               <FormControl>
-                                <Input placeholder="Enter RFID token" {...field} />
+                                <Input placeholder={t("users.enterRfidToken")} {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -522,9 +530,9 @@ export default function UserDetail() {
                           render={({ field }) => (
                             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 md:col-span-2">
                               <div className="space-y-0.5">
-                                <FormLabel>Track location</FormLabel>
+                                <FormLabel>{t("users.trackLocation")}</FormLabel>
                                 <FormDescription>
-                                  Publish this user's live location from the mobile app
+                                  {t("users.trackLocationDesc")}
                                 </FormDescription>
                               </div>
                               <FormControl>
@@ -542,19 +550,19 @@ export default function UserDetail() {
                           name="location_ping_seconds"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Live ping cadence (seconds)</FormLabel>
+                              <FormLabel>{t("users.pingCadenceLabel")}</FormLabel>
                               <FormControl>
                                 <Input
                                   type="number"
                                   min={1}
                                   max={3600}
-                                  placeholder="Enter ping cadence in seconds"
+                                  placeholder={t("users.enterPingCadence")}
                                   {...field}
                                   value={field.value ?? ""}
                                 />
                               </FormControl>
                               <FormDescription>
-                                How often the app publishes while tracking
+                                {t("users.pingCadenceDesc")}
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -569,11 +577,11 @@ export default function UserDetail() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-500">
                           <UserIcon className="h-4 w-4" />
-                          <span>Username</span>
+                          <span>{t("common.username")}</span>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleCopyToClipboard(user.username, "Username")}
+                            onClick={() => handleCopyToClipboard(user.username, t("common.username"))}
                             className="h-5 w-5 p-0 hover:bg-gray-100"
                           >
                             <Copy className="w-3 h-3 text-gray-400" />
@@ -585,11 +593,11 @@ export default function UserDetail() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-500">
                           <Shield className="h-4 w-4" />
-                          <span>Permission Scope</span>
+                          <span>{t("users.permissionScope")}</span>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleCopyToClipboard(user.permission_scope || "None", "Permission Scope")}
+                            onClick={() => handleCopyToClipboard(user.permission_scope || "None", t("users.permissionScope"))}
                             className="h-5 w-5 p-0 hover:bg-gray-100"
                           >
                             <Copy className="w-3 h-3 text-gray-400" />
@@ -605,11 +613,11 @@ export default function UserDetail() {
 
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <span>First Name</span>
+                          <span>{t("users.firstName")}</span>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleCopyToClipboard(user.first_name, "First Name")}
+                            onClick={() => handleCopyToClipboard(user.first_name, t("users.firstName"))}
                             className="h-5 w-5 p-0 hover:bg-gray-100"
                           >
                             <Copy className="w-3 h-3 text-gray-400" />
@@ -620,11 +628,11 @@ export default function UserDetail() {
 
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <span>Last Name</span>
+                          <span>{t("users.lastName")}</span>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleCopyToClipboard(user.last_name, "Last Name")}
+                            onClick={() => handleCopyToClipboard(user.last_name, t("users.lastName"))}
                             className="h-5 w-5 p-0 hover:bg-gray-100"
                           >
                             <Copy className="w-3 h-3 text-gray-400" />
@@ -636,76 +644,76 @@ export default function UserDetail() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-500">
                           <Mail className="h-4 w-4" />
-                          <span>Email</span>
+                          <span>{t("common.email")}</span>
                           {user.email && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleCopyToClipboard(user.email!, "Email")}
+                              onClick={() => handleCopyToClipboard(user.email!, t("common.email"))}
                               className="h-5 w-5 p-0 hover:bg-gray-100"
                             >
                               <Copy className="w-3 h-3 text-gray-400" />
                             </Button>
                           )}
                         </div>
-                        <p className="font-medium">{user.email || "Not provided"}</p>
+                        <p className="font-medium">{user.email || t("users.notProvided")}</p>
                       </div>
 
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-500">
                           <Phone className="h-4 w-4" />
-                          <span>Phone Number</span>
+                          <span>{t("users.phoneNumber")}</span>
                           {user.phone_number && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleCopyToClipboard(user.phone_number!, "Phone Number")}
+                              onClick={() => handleCopyToClipboard(user.phone_number!, t("users.phoneNumber"))}
                               className="h-5 w-5 p-0 hover:bg-gray-100"
                             >
                               <Copy className="w-3 h-3 text-gray-400" />
                             </Button>
                           )}
                         </div>
-                        <p className="font-medium">{user.phone_number || "Not provided"}</p>
+                        <p className="font-medium">{user.phone_number || t("users.notProvided")}</p>
                       </div>
 
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-500">
                           <Globe className="h-4 w-4" />
-                          <span>Language</span>
+                          <span>{t("common.language")}</span>
                           {user.language && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleCopyToClipboard(user.language!, "Language")}
+                              onClick={() => handleCopyToClipboard(user.language!, t("common.language"))}
                               className="h-5 w-5 p-0 hover:bg-gray-100"
                             >
                               <Copy className="w-3 h-3 text-gray-400" />
                             </Button>
                           )}
                         </div>
-                        <p className="font-medium">{user.language || "Not provided"}</p>
+                        <p className="font-medium">{user.language || t("users.notProvided")}</p>
                       </div>
 
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-500">
                           <MapPin className="h-4 w-4" />
-                          <span>Track Location</span>
+                          <span>{t("users.trackLocation")}</span>
                         </div>
                         <Badge variant={user.track_location ? "default" : "secondary"}>
-                          {user.track_location ? "Enabled" : "Disabled"}
+                          {user.track_location ? t("users.enabled") : t("users.disabled")}
                         </Badge>
                       </div>
 
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-500">
                           <Timer className="h-4 w-4" />
-                          <span>Live Ping Cadence</span>
+                          <span>{t("users.pingCadence")}</span>
                         </div>
                         <p className="font-medium">
                           {user.location_ping_seconds != null
-                            ? `${user.location_ping_seconds} seconds`
-                            : "Not set"}
+                            ? t("users.seconds", { count: user.location_ping_seconds })
+                            : t("users.notSet")}
                         </p>
                       </div>
                     </div>
@@ -719,17 +727,17 @@ export default function UserDetail() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Account Details</CardTitle>
+                <CardTitle>{t("users.accountDetails")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <Calendar className="h-4 w-4" />
-                    <span>Created</span>
+                    <span>{t("users.created")}</span>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleCopyToClipboard(formatDate(user.created_at), "Created Date")}
+                      onClick={() => handleCopyToClipboard(formatDate(user.created_at), t("users.created"))}
                       className="h-5 w-5 p-0 hover:bg-gray-100"
                     >
                       <Copy className="w-3 h-3 text-gray-400" />
@@ -743,11 +751,11 @@ export default function UserDetail() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <Key className="h-4 w-4" />
-                    <span>User ID</span>
+                    <span>{t("users.userId")}</span>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleCopyToClipboard(user.uuid, "User ID")}
+                      onClick={() => handleCopyToClipboard(user.uuid, t("users.userId"))}
                       className="h-5 w-5 p-0 hover:bg-gray-100"
                     >
                       <Copy className="w-3 h-3 text-gray-400" />
@@ -762,10 +770,10 @@ export default function UserDetail() {
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <span>Status</span>
+                    <span>{t("common.status")}</span>
                   </div>
                   <Badge variant={user.is_deleted ? "destructive" : "default"}>
-                    {user.is_deleted ? "Deleted" : "Active"}
+                    {user.is_deleted ? t("users.deleted") : t("users.active")}
                   </Badge>
                 </div>
               </CardContent>

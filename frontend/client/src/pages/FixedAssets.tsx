@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +47,7 @@ interface FixedAssetFilters {
 }
 
 export default function FixedAssets() {
+  const { t } = useLanguage();
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [filters, setFilters] = useState<Omit<FixedAssetFilters, 'page' | 'per_page'>>({});
@@ -113,9 +115,11 @@ export default function FixedAssets() {
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">Fixed Assets</h1>
+            <h1 className="text-2xl font-bold">{t('nav.fixedAssets')}</h1>
             <p className="text-sm text-muted-foreground">
-              {totalCount} fixed {totalCount === 1 ? 'asset' : 'assets'} on this page
+              {totalCount === 1
+                ? t('fixedAssets.countOnPageSingular', { count: totalCount })
+                : t('fixedAssets.countOnPage', { count: totalCount })}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -148,18 +152,18 @@ export default function FixedAssets() {
                               ${asset.current_value.toLocaleString()}
                             </Badge>
                             <Badge variant="secondary">
-                              {asset.annual_depreciation_rate}% depreciation
+                              {t('fixedAssets.depreciationBadge', { rate: asset.annual_depreciation_rate })}
                             </Badge>
                           </div>
-                          
+
                           <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                            <span>Quantity: {asset.quantity} {asset.unit}</span>
+                            <span>{t('fixedAssets.quantityLabel', { quantity: asset.quantity, unit: asset.unit })}</span>
                             <span>•</span>
-                            <span>Purchase Price: ${asset.total_price.toLocaleString()}</span>
+                            <span>{t('fixedAssets.purchasePriceLabel', { price: `$${asset.total_price.toLocaleString()}` })}</span>
                             {asset.purchase_date && (
                               <>
                                 <span>•</span>
-                                <span>Purchased: {new Date(asset.purchase_date).toLocaleDateString()}</span>
+                                <span>{t('fixedAssets.purchasedLabel', { date: new Date(asset.purchase_date).toLocaleDateString() })}</span>
                               </>
                             )}
                           </div>
@@ -182,12 +186,12 @@ export default function FixedAssets() {
                 <Package2 className="h-12 w-12 text-[#5469D4]" />
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                {Object.values(filters).some(v => v) ? "No fixed assets found" : "No fixed assets yet"}
+                {Object.values(filters).some(v => v) ? t('fixedAssets.noAssetsFound') : t('fixedAssets.noAssetsYet')}
               </h3>
               <p className="text-gray-500 mb-8 max-w-md text-center leading-relaxed">
-                {Object.values(filters).some(v => v) 
-                  ? "No fixed assets match your current filters. Try adjusting your search criteria." 
-                  : "Get started by adding your first fixed asset to track your company's assets and depreciation."}
+                {Object.values(filters).some(v => v)
+                  ? t('fixedAssets.emptyFiltered')
+                  : t('fixedAssets.emptyDescription')}
               </p>
               <AddFixedAssetDialog />
             </div>
@@ -197,16 +201,20 @@ export default function FixedAssets() {
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-sm text-muted-foreground">
-                Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, totalCount)} of {totalCount} fixed assets
+                {t('fixedAssets.showingRange', {
+                  from: ((currentPage - 1) * perPage) + 1,
+                  to: Math.min(currentPage * perPage, totalCount),
+                  total: totalCount,
+                })}
               </p>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 rtl:space-x-reverse">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handlePageChange(1)}
                   disabled={currentPage <= 1}
                 >
-                  First
+                  {t('fixedAssets.first')}
                 </Button>
                 <Button
                   variant="outline"
@@ -214,12 +222,12 @@ export default function FixedAssets() {
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage <= 1}
                 >
-                  Previous
+                  {t('common.previous')}
                 </Button>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">Page</span>
+                  <span className="text-sm">{t('common.page')}</span>
                   <span className="text-sm font-medium">{currentPage}</span>
-                  <span className="text-sm">of</span>
+                  <span className="text-sm">{t('common.of')}</span>
                   <span className="text-sm font-medium">{totalPages}</span>
                 </div>
                 <Button
@@ -228,7 +236,7 @@ export default function FixedAssets() {
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage >= totalPages}
                 >
-                  Next
+                  {t('common.next')}
                 </Button>
                 <Button
                   variant="outline"
@@ -236,7 +244,7 @@ export default function FixedAssets() {
                   onClick={() => handlePageChange(totalPages)}
                   disabled={currentPage >= totalPages}
                 >
-                  Last
+                  {t('fixedAssets.last')}
                 </Button>
               </div>
             </div>

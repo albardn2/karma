@@ -6,6 +6,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { ShoppingBag, Plus, CheckCircle } from "lucide-react";
 import { CustomerOrderFilters } from "@/components/customer-orders/CustomerOrderFilters";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { format } from "date-fns";
 
 interface CustomerOrder {
@@ -52,6 +53,7 @@ interface CustomerOrderFilters {
 }
 
 export default function CustomerOrders() {
+  const { t } = useLanguage();
   const [, setLocation] = useLocation();
   const [filters, setFilters] = useState<CustomerOrderFilters>({});
   const [currentPage, setCurrentPage] = useState(1);
@@ -216,7 +218,7 @@ export default function CustomerOrders() {
       <div className="p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100 mb-2">Customer Orders</h1>
+          <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100 mb-2">{t('nav.customerOrders')}</h1>
         </div>
 
         {/* Tab Navigation and Actions */}
@@ -230,7 +232,7 @@ export default function CustomerOrders() {
                   : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              All orders
+              {t('customerOrders.tabAll')}
             </button>
             <button 
               onClick={() => handleTabChange('unpaid')}
@@ -240,7 +242,7 @@ export default function CustomerOrders() {
                   : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              Unpaid
+              {t('customerOrders.unpaid')}
             </button>
             <button 
               onClick={() => handleTabChange('unfulfilled')}
@@ -250,7 +252,7 @@ export default function CustomerOrders() {
                   : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              Unfulfilled
+              {t('customerOrders.unfulfilled')}
             </button>
             <button 
               onClick={() => handleTabChange('pastdue')}
@@ -260,7 +262,7 @@ export default function CustomerOrders() {
                   : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              Past due
+              {t('customerOrders.tabPastDue')}
             </button>
             <button 
               onClick={() => handleTabChange('paid')}
@@ -270,7 +272,7 @@ export default function CustomerOrders() {
                   : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              Paid
+              {t('customerOrders.paid')}
             </button>
           </div>
           
@@ -286,7 +288,7 @@ export default function CustomerOrders() {
               onClick={() => setLocation("/customer-orders/create")}
               className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
             >
-              Create order
+              {t('customerOrders.createOrder')}
             </Button>
           </div>
         </div>
@@ -297,29 +299,29 @@ export default function CustomerOrders() {
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Amount
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('common.amount')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Net Amount Paid
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('customerOrders.netAmountPaid')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Company
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('customerOrders.company')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Customer
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('customerOrders.customer')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Fulfillment
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('customerOrders.fulfillment')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('common.status')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Created
+                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('customerOrders.created')}
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
+                  <th className="px-6 py-3 text-end text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {t('common.actions')}
                   </th>
                 </tr>
               </thead>
@@ -332,7 +334,7 @@ export default function CustomerOrders() {
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-48 mx-auto"></div>
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-24 mx-auto"></div>
                       </div>
-                      <p className="mt-4 text-gray-500 dark:text-gray-400">Loading customer orders...</p>
+                      <p className="mt-4 text-gray-500 dark:text-gray-400">{t('customerOrders.loadingOrders')}</p>
                     </td>
                   </tr>
                 ) : customerOrders.length === 0 ? (
@@ -340,19 +342,19 @@ export default function CustomerOrders() {
                     <td colSpan={8} className="px-6 py-16 text-center">
                       <ShoppingBag className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                        {error ? "Authentication Required" : "No customer orders"}
+                        {error ? t('customerOrders.authRequired') : t('customerOrders.noOrders')}
                       </h3>
                       <p className="text-gray-500 dark:text-gray-400 mb-6">
-                        {error?.message?.includes('JWT') || error?.message?.includes('Authorization') 
-                          ? "Please log in to view customer orders. Use the authentication form that appears." 
-                          : error ? `Error: ${error.message}` : "Get started by creating your first customer order."}
+                        {error?.message?.includes('JWT') || error?.message?.includes('Authorization')
+                          ? t('customerOrders.loginPrompt')
+                          : error ? t('customerOrders.errorWithMessage', { message: error.message }) : t('customerOrders.getStarted')}
                       </p>
                       {!error && (
                         <Button 
                           onClick={() => setLocation("/customer-orders/create")}
                           className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                         >
-                          Create order
+                          {t('customerOrders.createOrder')}
                         </Button>
                       )}
                     </td>
@@ -377,7 +379,7 @@ export default function CustomerOrders() {
                               ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
                               : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300'
                           }`}>
-                            {order.is_paid ? 'Paid' : 'Unpaid'}
+                            {order.is_paid ? t('customerOrders.paid') : t('customerOrders.unpaid')}
                           </span>
                         </div>
                       </td>
@@ -402,14 +404,14 @@ export default function CustomerOrders() {
                             ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300'
                             : 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300'
                         }`}>
-                          {order.is_fulfilled ? 'Fulfilled' : 'Pending'}
+                          {order.is_fulfilled ? t('customerOrders.fulfilled') : t('customerOrders.pending')}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {order.is_overdue && (
                             <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300">
-                              Overdue
+                              {t('customerOrders.overdue')}
                             </span>
                           )}
                         </div>
@@ -419,7 +421,7 @@ export default function CustomerOrders() {
                           {format(new Date(order.created_at), 'MMM d, h:mm a')}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <td className="px-6 py-4 whitespace-nowrap text-end">
                         <Button 
                           variant="ghost" 
                           size="sm"
@@ -428,7 +430,7 @@ export default function CustomerOrders() {
                             setLocation(`/customer-orders/${order.uuid}`);
                           }}
                         >
-                          View
+                          {t('common.view')}
                         </Button>
                       </td>
                     </tr>
@@ -444,7 +446,7 @@ export default function CustomerOrders() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, totalCount)} of {totalCount} results
+                    {t('common.showing', { from: ((currentPage - 1) * perPage) + 1, to: Math.min(currentPage * perPage, totalCount), total: totalCount })} {t('common.results')}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -454,10 +456,10 @@ export default function CustomerOrders() {
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage === 1}
                   >
-                    Previous
+                    {t('common.previous')}
                   </Button>
                   <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Page {currentPage} of {totalPages}
+                    {t('common.page')} {currentPage} {t('common.of')} {totalPages}
                   </span>
                   <Button
                     variant="outline"
@@ -465,7 +467,7 @@ export default function CustomerOrders() {
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
                   >
-                    Next
+                    {t('common.next')}
                   </Button>
                 </div>
               </div>

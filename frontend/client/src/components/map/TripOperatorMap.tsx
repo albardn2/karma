@@ -5,6 +5,7 @@ import L from "leaflet";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Square } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface TripOperatorMapProps {
   waypoints: number[][];
@@ -44,6 +45,7 @@ function createNumberedIcon(number: number) {
 }
 
 export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMapProps) {
+  const { t } = useLanguage();
   const [isAnimated, setIsAnimated] = useState(false);
   const [stopIndex, setStopIndex] = useState(1);
 
@@ -51,7 +53,7 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
   if (!waypoints || waypoints.length === 0) {
     return (
       <div className="h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">No waypoints available for this trip</p>
+        <p className="text-gray-500 dark:text-gray-400">{t("location.noWaypoints")}</p>
       </div>
     );
   }
@@ -69,7 +71,7 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
   if (validWaypoints.length === 0) {
     return (
       <div className="h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">Invalid waypoint data</p>
+        <p className="text-gray-500 dark:text-gray-400">{t("location.invalidWaypoints")}</p>
       </div>
     );
   }
@@ -114,8 +116,8 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
             onClick={() => setIsAnimated(false)}
             data-testid="button-full-route"
           >
-            <Square className="h-4 w-4 mr-2" />
-            Full Route
+            <Square className="h-4 w-4 me-2" />
+            {t("location.fullRoute")}
           </Button>
           <Button
             variant={isAnimated ? "default" : "outline"}
@@ -123,8 +125,8 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
             onClick={() => setIsAnimated(true)}
             data-testid="button-animated-route"
           >
-            <Play className="h-4 w-4 mr-2" />
-            Animated Route
+            <Play className="h-4 w-4 me-2" />
+            {t("location.animatedRoute")}
           </Button>
         </div>
 
@@ -132,7 +134,7 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
         {isAnimated && (
           <div className="flex-1 flex items-center gap-4">
             <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
-              Stop {stopIndex + 1} of {validWaypoints.length}
+              {t("location.stopXofY", { current: stopIndex + 1, total: validWaypoints.length })}
             </span>
             <Slider
               value={[stopIndex]}
@@ -148,7 +150,7 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
       </div>
 
       {/* Map */}
-      <div className="h-96 w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+      <div className="h-96 w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700" dir="ltr">
         <MapContainer
           center={center}
           zoom={13}
@@ -184,12 +186,12 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
               >
                 <Popup>
                   <div className="p-2">
-                    <h3 className="font-semibold text-gray-900">Stop {index + 1}</h3>
+                    <h3 className="font-semibold text-gray-900">{t("location.stopN", { n: index + 1 })}</h3>
                     <p className="text-xs text-gray-600 mt-1">
-                      Latitude: {position[0].toFixed(6)}
+                      {t("location.latitudeLabel", { value: position[0].toFixed(6) })}
                     </p>
                     <p className="text-xs text-gray-600">
-                      Longitude: {position[1].toFixed(6)}
+                      {t("location.longitudeLabel", { value: position[1].toFixed(6) })}
                     </p>
                   </div>
                 </Popup>

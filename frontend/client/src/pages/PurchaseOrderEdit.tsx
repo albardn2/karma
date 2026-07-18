@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 
 const PurchaseOrderItemSchema = z.object({
@@ -48,6 +49,7 @@ export default function PurchaseOrderEdit() {
   const [useManualMaterialUuid, setUseManualMaterialUuid] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   // Fetch purchase order data
   const { data: purchaseOrder, isLoading } = useQuery({
@@ -128,15 +130,15 @@ export default function PurchaseOrderEdit() {
       queryClient.invalidateQueries({ queryKey: ["/purchase-order"] });
       queryClient.invalidateQueries({ queryKey: ["/purchase-order", id] });
       toast({
-        title: "Success",
-        description: "Purchase order updated successfully",
+        title: t('common.success'),
+        description: t('purchaseOrders.updateSuccess'),
       });
       setLocation(`/purchase-orders/${id}`);
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update purchase order",
+        title: t('common.error'),
+        description: error.message || t('purchaseOrders.updateError'),
         variant: "destructive",
       });
     },
@@ -162,10 +164,10 @@ export default function PurchaseOrderEdit() {
       <AppLayout>
         <div className="p-6">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900">Purchase Order Not Found</h2>
-            <p className="mt-2 text-gray-600">The purchase order you're looking for doesn't exist.</p>
+            <h2 className="text-2xl font-bold text-gray-900">{t('purchaseOrders.notFoundTitle')}</h2>
+            <p className="mt-2 text-gray-600">{t('purchaseOrders.notFoundDesc')}</p>
             <Button className="mt-4" onClick={() => setLocation("/purchase-orders")}>
-              Back to Purchase Orders
+              {t('purchaseOrders.backToPurchaseOrders')}
             </Button>
           </div>
         </div>
@@ -187,21 +189,21 @@ export default function PurchaseOrderEdit() {
               size="sm"
               onClick={() => setLocation(`/purchase-orders/${id}`)}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Purchase Order
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t('purchaseOrders.backToPurchaseOrder')}
             </Button>
             <div>
               <h1 className="text-2xl font-bold">
-                Edit PO-{purchaseOrder.uuid.slice(-8).toUpperCase()}
+                {t('purchaseOrders.editTitle', { id: purchaseOrder.uuid.slice(-8).toUpperCase() })}
               </h1>
-              <p className="text-muted-foreground">Update purchase order details</p>
+              <p className="text-muted-foreground">{t('purchaseOrders.editSubtitle')}</p>
             </div>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Purchase Order Information</CardTitle>
+            <CardTitle>{t('purchaseOrders.orderInfoCardTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -212,7 +214,7 @@ export default function PurchaseOrderEdit() {
                     name="vendor_uuid"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Vendor</FormLabel>
+                        <FormLabel>{t('purchaseOrders.vendor')}</FormLabel>
                         <div className="flex gap-2 mb-2">
                           <Button
                             type="button"
@@ -225,7 +227,7 @@ export default function PurchaseOrderEdit() {
                               field.onChange("");
                             }}
                           >
-                            Select Vendor
+                            {t('purchaseOrders.selectVendorBtn')}
                           </Button>
                           <Button
                             type="button"
@@ -238,20 +240,20 @@ export default function PurchaseOrderEdit() {
                               field.onChange("");
                             }}
                           >
-                            Enter UUID manually
+                            {t('purchaseOrders.enterUuidManually')}
                           </Button>
                         </div>
                         <FormControl>
                           {useManualVendorUuid ? (
                             <Input
-                              placeholder="Enter vendor UUID..."
+                              placeholder={t('purchaseOrders.enterVendorUuid')}
                               value={field.value}
                               onChange={field.onChange}
                             />
                           ) : (
                             <Select onValueChange={field.onChange} value={field.value}>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select vendor" />
+                                <SelectValue placeholder={t('purchaseOrders.selectVendorPlaceholder')} />
                               </SelectTrigger>
                               <SelectContent>
                                 {vendors.map((vendor: any) => (
@@ -273,11 +275,11 @@ export default function PurchaseOrderEdit() {
                     name="currency"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Currency</FormLabel>
+                        <FormLabel>{t('common.currency')}</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select currency" />
+                              <SelectValue placeholder={t('purchaseOrders.selectCurrency')} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -289,7 +291,7 @@ export default function PurchaseOrderEdit() {
                               ))
                             ) : (
                               <SelectItem value="" disabled>
-                                No currencies available
+                                {t('purchaseOrders.noCurrencies')}
                               </SelectItem>
                             )}
                           </SelectContent>
@@ -304,23 +306,23 @@ export default function PurchaseOrderEdit() {
                     name="payout_due_date"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel>Due Date</FormLabel>
+                        <FormLabel>{t('purchaseOrders.dueDate')}</FormLabel>
                         <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
                                 variant={"outline"}
                                 className={cn(
-                                  "w-full pl-3 text-left font-normal",
+                                  "w-full ps-3 text-start font-normal",
                                   !field.value && "text-muted-foreground"
                                 )}
                               >
                                 {field.value ? (
                                   format(field.value, "PPP")
                                 ) : (
-                                  <span>Pick a date</span>
+                                  <span>{t('purchaseOrders.pickDate')}</span>
                                 )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                <CalendarIcon className="ms-auto h-4 w-4 opacity-50" />
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
@@ -347,10 +349,10 @@ export default function PurchaseOrderEdit() {
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Notes</FormLabel>
+                      <FormLabel>{t('common.notes')}</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Enter any additional notes..."
+                          placeholder={t('purchaseOrders.notesPlaceholder')}
                           className="resize-none"
                           {...field}
                         />
@@ -362,7 +364,7 @@ export default function PurchaseOrderEdit() {
 
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Purchase Order Items</CardTitle>
+                    <CardTitle>{t('purchaseOrders.itemsCardTitle')}</CardTitle>
                     <Button
                       type="button"
                       variant="outline"
@@ -376,15 +378,15 @@ export default function PurchaseOrderEdit() {
                         quantity_received: 0,
                       })}
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Item
+                      <Plus className="h-4 w-4 me-1" />
+                      {t('purchaseOrders.addItem')}
                     </Button>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {fields.map((field, index) => (
                       <div key={field.id} className="p-4 border rounded-lg space-y-4">
                         <div className="flex items-center justify-between">
-                          <h4 className="font-medium">Item {index + 1}</h4>
+                          <h4 className="font-medium">{t('purchaseOrders.itemNumber', { number: index + 1 })}</h4>
                           {fields.length > 1 && (
                             <Button
                               type="button"
@@ -403,7 +405,7 @@ export default function PurchaseOrderEdit() {
                             name={`purchase_order_items.${index}.material_uuid`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Material</FormLabel>
+                                <FormLabel>{t('purchaseOrders.material')}</FormLabel>
                                 <div className="flex gap-2 mb-2">
                                   <Button
                                     type="button"
@@ -414,7 +416,7 @@ export default function PurchaseOrderEdit() {
                                       field.onChange("");
                                     }}
                                   >
-                                    Select Material
+                                    {t('purchaseOrders.selectMaterial')}
                                   </Button>
                                   <Button
                                     type="button"
@@ -425,20 +427,20 @@ export default function PurchaseOrderEdit() {
                                       field.onChange("");
                                     }}
                                   >
-                                    Enter UUID manually
+                                    {t('purchaseOrders.enterUuidManually')}
                                   </Button>
                                 </div>
                                 <FormControl>
                                   {useManualMaterialUuid ? (
                                     <Input
-                                      placeholder="Enter material UUID..."
+                                      placeholder={t('purchaseOrders.enterMaterialUuid')}
                                       value={field.value}
                                       onChange={field.onChange}
                                     />
                                   ) : (
                                     <Select onValueChange={field.onChange} value={field.value}>
                                       <SelectTrigger>
-                                        <SelectValue placeholder="Select material" />
+                                        <SelectValue placeholder={t('purchaseOrders.selectMaterialPlaceholder')} />
                                       </SelectTrigger>
                                       <SelectContent>
                                         {materials.map((material: any) => (
@@ -460,7 +462,7 @@ export default function PurchaseOrderEdit() {
                             name={`purchase_order_items.${index}.quantity`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Quantity</FormLabel>
+                                <FormLabel>{t('common.quantity')}</FormLabel>
                                 <FormControl>
                                   <Input
                                     type="number"
@@ -479,7 +481,7 @@ export default function PurchaseOrderEdit() {
                             name={`purchase_order_items.${index}.price_per_unit`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Price per Unit</FormLabel>
+                                <FormLabel>{t('purchaseOrders.pricePerUnitLabel')}</FormLabel>
                                 <FormControl>
                                   <Input
                                     type="number"
@@ -499,9 +501,9 @@ export default function PurchaseOrderEdit() {
                             name={`purchase_order_items.${index}.unit`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Unit</FormLabel>
+                                <FormLabel>{t('purchaseOrders.unit')}</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="e.g., kg, pcs, m" {...field} />
+                                  <Input placeholder={t('purchaseOrders.unitPlaceholder')} {...field} />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -513,7 +515,7 @@ export default function PurchaseOrderEdit() {
                             name={`purchase_order_items.${index}.quantity_received`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Quantity Received</FormLabel>
+                                <FormLabel>{t('purchaseOrders.quantityReceived')}</FormLabel>
                                 <FormControl>
                                   <Input
                                     type="number"
@@ -533,20 +535,20 @@ export default function PurchaseOrderEdit() {
                   </CardContent>
                 </Card>
 
-                <div className="flex justify-end space-x-2">
+                <div className="flex justify-end space-x-2 rtl:space-x-reverse">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setLocation(`/purchase-orders/${id}`)}
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     type="submit"
                     disabled={updateMutation.isPending}
                     className="bg-[#5469D4] hover:bg-[#4356C7]"
                   >
-                    {updateMutation.isPending ? "Updating..." : "Update Purchase Order"}
+                    {updateMutation.isPending ? t('common.updating') : t('purchaseOrders.updateOrderBtn')}
                   </Button>
                 </div>
               </form>

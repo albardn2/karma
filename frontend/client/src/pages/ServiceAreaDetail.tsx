@@ -29,6 +29,7 @@ import { ArrowLeft, Edit2, Trash2, Copy, Check, Save, X, Map } from "lucide-reac
 import { Link, useLocation } from "wouter";
 import { ServiceAreaDrawMap } from "@/components/service-areas/ServiceAreaDrawMap";
 import { ServiceAreaDetailMap } from "@/components/service-areas/ServiceAreaDetailMap";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ServiceArea {
   uuid: string;
@@ -40,15 +41,14 @@ interface ServiceArea {
   is_deleted: boolean;
 }
 
-const serviceAreaUpdateSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
-  geometry: z.string().min(1, "Geometry is required"),
-});
-
-type ServiceAreaUpdateData = z.infer<typeof serviceAreaUpdateSchema>;
+type ServiceAreaUpdateData = {
+  name: string;
+  description?: string;
+  geometry: string;
+};
 
 export default function ServiceAreaDetail() {
+  const { t } = useLanguage();
   const [, params] = useRoute("/service-areas/:uuid");
   const [, setLocation] = useLocation();
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -56,6 +56,12 @@ export default function ServiceAreaDetail() {
   const [editGeometry, setEditGeometry] = useState<string>("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const serviceAreaUpdateSchema = z.object({
+    name: z.string().min(1, t("serviceAreas.nameRequired")),
+    description: z.string().optional(),
+    geometry: z.string().min(1, t("serviceAreas.geometryRequired")),
+  });
 
   const form = useForm<ServiceAreaUpdateData>({
     resolver: zodResolver(serviceAreaUpdateSchema),
@@ -117,14 +123,14 @@ export default function ServiceAreaDetail() {
       queryClient.refetchQueries({ queryKey: ["/service-area/"] });
       
       toast({
-        title: "Success",
-        description: "Service area updated successfully",
+        title: t('common.success'),
+        description: t('serviceAreas.updateSuccess'),
       });
       setIsEditing(false);
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('common.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -142,14 +148,14 @@ export default function ServiceAreaDetail() {
       queryClient.removeQueries({ queryKey: ["/service-area/", params?.uuid] });
       
       toast({
-        title: "Success",
-        description: "Service area deleted successfully",
+        title: t('common.success'),
+        description: t('serviceAreas.deleteSuccess'),
       });
       setLocation("/service-areas");
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('common.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -167,8 +173,8 @@ export default function ServiceAreaDetail() {
     
     if (isEditing && !geometryToUse) {
       toast({
-        title: "Error",
-        description: "Please draw a polygon on the map",
+        title: t('common.error'),
+        description: t('serviceAreas.drawPolygonError'),
         variant: "destructive",
       });
       return;
@@ -183,19 +189,19 @@ export default function ServiceAreaDetail() {
     updateServiceAreaMutation.mutate(finalData);
   };
 
-  const copyToClipboard = async (text: string, field: string) => {
+  const copyToClipboard = async (text: string, field: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedField(field);
       setTimeout(() => setCopiedField(null), 2000);
       toast({
-        title: "Copied",
-        description: `${field} copied to clipboard`,
+        title: t('serviceAreas.copied'),
+        description: t('serviceAreas.copiedToClipboard', { label }),
       });
     } catch (err) {
       toast({
-        title: "Error",
-        description: "Failed to copy to clipboard",
+        title: t('common.error'),
+        description: t('serviceAreas.copyFailed'),
         variant: "destructive",
       });
     }
@@ -217,11 +223,11 @@ export default function ServiceAreaDetail() {
       <AppLayout>
         <div className="space-y-6 p-6">
           <div className="text-center">
-            <h1 className="text-2xl font-bold">Service Area Not Found</h1>
+            <h1 className="text-2xl font-bold">{t('serviceAreas.notFound')}</h1>
             <Link href="/service-areas">
               <Button className="mt-4">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Service Areas
+                <ArrowLeft className="h-4 w-4 me-2" />
+                {t('serviceAreas.backToServiceAreas')}
               </Button>
             </Link>
           </div>
@@ -241,7 +247,7 @@ export default function ServiceAreaDetail() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold">Service Area Details</h1>
+              <h1 className="text-2xl font-bold">{t('serviceAreas.detailsTitle')}</h1>
               <p className="text-muted-foreground">{serviceArea.name}</p>
             </div>
           </div>
@@ -252,30 +258,30 @@ export default function ServiceAreaDetail() {
                   variant="outline"
                   onClick={() => setIsEditing(true)}
                 >
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Edit
+                  <Edit2 className="h-4 w-4 me-2" />
+                  {t('common.edit')}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
+                      <Trash2 className="h-4 w-4 me-2" />
+                      {t('common.delete')}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogTitle>{t('common.areYouSure')}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the service area.
+                        {t('serviceAreas.deleteConfirmDescription')}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteServiceAreaMutation.mutate()}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
-                        Delete
+                        {t('common.delete')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -297,16 +303,16 @@ export default function ServiceAreaDetail() {
                     }
                   }}
                 >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
+                  <X className="h-4 w-4 me-2" />
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={form.handleSubmit(handleSave)}
                   disabled={updateServiceAreaMutation.isPending}
                   className="bg-[#5469D4] hover:bg-[#4356C7]"
                 >
-                  <Save className="h-4 w-4 mr-2" />
-                  {updateServiceAreaMutation.isPending ? "Saving..." : "Save"}
+                  <Save className="h-4 w-4 me-2" />
+                  {updateServiceAreaMutation.isPending ? t('common.saving') : t('common.save')}
                 </Button>
               </>
             )}
@@ -320,7 +326,7 @@ export default function ServiceAreaDetail() {
                 <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[#5469D4] via-[#6B73E0] to-[#8B5CF6]">
                   <Map className="h-4 w-4 text-white" />
                 </div>
-                Service Area Information
+                {t('serviceAreas.information')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -328,14 +334,14 @@ export default function ServiceAreaDetail() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">UUID</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('serviceAreas.uuid')}</p>
                       <p className="text-sm">{serviceArea.uuid}</p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(serviceArea.uuid, "UUID")}
+                      onClick={() => copyToClipboard(serviceArea.uuid, "UUID", t('serviceAreas.uuid'))}
                     >
                       {copiedField === "UUID" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
@@ -343,14 +349,14 @@ export default function ServiceAreaDetail() {
 
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Name</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('common.name')}</p>
                       <p className="text-sm">{serviceArea.name}</p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(serviceArea.name, "Name")}
+                      onClick={() => copyToClipboard(serviceArea.name, "Name", t('common.name'))}
                     >
                       {copiedField === "Name" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
@@ -359,14 +365,14 @@ export default function ServiceAreaDetail() {
                   {serviceArea.description && (
                     <div className="flex items-start justify-between group">
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-muted-foreground">Description</p>
+                        <p className="text-sm font-medium text-muted-foreground">{t('common.description')}</p>
                         <p className="text-sm mt-1">{serviceArea.description}</p>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(serviceArea.description!, "Description")}
+                        onClick={() => copyToClipboard(serviceArea.description!, "Description", t('common.description'))}
                       >
                         {copiedField === "Description" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
@@ -375,15 +381,15 @@ export default function ServiceAreaDetail() {
 
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Created By</p>
-                      <p className="text-sm">{serviceArea.created_by_uuid || 'N/A'}</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('serviceAreas.createdBy')}</p>
+                      <p className="text-sm">{serviceArea.created_by_uuid || t('serviceAreas.na')}</p>
                     </div>
                     {serviceArea.created_by_uuid && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyToClipboard(serviceArea.created_by_uuid!, "Created By")}
+                        onClick={() => copyToClipboard(serviceArea.created_by_uuid!, "Created By", t('serviceAreas.createdBy'))}
                       >
                         {copiedField === "Created By" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </Button>
@@ -392,36 +398,36 @@ export default function ServiceAreaDetail() {
 
                   <div className="flex items-center justify-between group">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('common.createdAt')}</p>
                       <p className="text-sm">{new Date(serviceArea.created_at).toLocaleString()}</p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(new Date(serviceArea.created_at).toLocaleString(), "Created At")}
+                      onClick={() => copyToClipboard(new Date(serviceArea.created_at).toLocaleString(), "Created At", t('common.createdAt'))}
                     >
                       {copiedField === "Created At" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
 
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Status</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t('common.status')}</p>
                     <Badge variant={serviceArea.is_deleted ? "destructive" : "default"} className="mt-1">
-                      {serviceArea.is_deleted ? "Deleted" : "Active"}
+                      {serviceArea.is_deleted ? t('serviceAreas.deleted') : t('serviceAreas.active')}
                     </Badge>
                   </div>
 
                   <div className="flex items-start justify-between group">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-muted-foreground">Geometry (WKT)</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('serviceAreas.geometryWkt')}</p>
                       <p className="text-xs font-mono mt-1 break-all">{serviceArea.geometry}</p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(serviceArea.geometry, "Geometry")}
+                      onClick={() => copyToClipboard(serviceArea.geometry, "Geometry", t('serviceAreas.geometry'))}
                     >
                       {copiedField === "Geometry" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
@@ -435,7 +441,7 @@ export default function ServiceAreaDetail() {
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Name</FormLabel>
+                          <FormLabel>{t('common.name')}</FormLabel>
                           <FormControl>
                             <Input {...field} />
                           </FormControl>
@@ -449,9 +455,9 @@ export default function ServiceAreaDetail() {
                       name="description"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Description</FormLabel>
+                          <FormLabel>{t('common.description')}</FormLabel>
                           <FormControl>
-                            <Textarea 
+                            <Textarea
                               className="resize-none"
                               rows={3}
                               {...field}
@@ -467,9 +473,9 @@ export default function ServiceAreaDetail() {
                       name="geometry"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Geometry</FormLabel>
+                          <FormLabel>{t('serviceAreas.geometry')}</FormLabel>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Edit the polygon on the map to update the service area
+                            {t('serviceAreas.editPolygonHint')}
                           </p>
                           <FormControl>
                             <Input {...field} type="hidden" />
@@ -491,10 +497,10 @@ export default function ServiceAreaDetail() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Service Area Map</CardTitle>
+              <CardTitle>{t('serviceAreas.map')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[500px] border rounded-lg overflow-hidden">
+              <div dir="ltr" className="h-[500px] border rounded-lg overflow-hidden">
                 {!isEditing ? (
                   <ServiceAreaDetailMap geometry={serviceArea.geometry} name={serviceArea.name} />
                 ) : (

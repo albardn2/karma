@@ -9,17 +9,18 @@ import { AddEmployeeDialog } from "@/components/employees/AddEmployeeDialog";
 import { EmployeeFiltersComponent, type EmployeeFilters } from "@/components/employees/EmployeeFilters";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { EmployeePage, Employee } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 
-const EMPLOYEE_ROLE_LABELS = {
-  admin: "Admin",
-  manager: "Manager", 
-  employee: "Operator",
-  accountant: "Accountant",
-  driver: "Driver",
-  sales: "Sales"
+const EMPLOYEE_ROLE_LABEL_KEYS = {
+  admin: "employees.roleAdmin",
+  manager: "employees.roleManager",
+  employee: "employees.roleOperator",
+  accountant: "employees.roleAccountant",
+  driver: "employees.roleDriver",
+  sales: "employees.roleSales"
 };
 
 const EMPLOYEE_ROLE_COLORS = {
@@ -38,6 +39,7 @@ export default function Employees() {
   });
 
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
 
   const buildApiUrl = (baseFilters: EmployeeFilters) => {
@@ -86,21 +88,21 @@ export default function Employees() {
       });
       
       toast({
-        title: "Success",
-        description: "Employee deleted successfully",
+        title: t('common.success'),
+        description: t('employees.deleteSuccess'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete employee",
+        title: t('common.error'),
+        description: error.message || t('employees.deleteFailed'),
         variant: "destructive",
       });
     },
   });
 
   const handleDeleteEmployee = (employee: Employee) => {
-    if (window.confirm(`Are you sure you want to delete employee "${employee.full_name}"?`)) {
+    if (window.confirm(t('employees.confirmDelete', { name: employee.full_name }))) {
       deleteEmployeeMutation.mutate(employee.uuid);
     }
   };
@@ -115,8 +117,8 @@ export default function Employees() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold">Employees</h1>
-                <p className="text-muted-foreground">Manage your employee records</p>
+                <h1 className="text-2xl font-bold">{t('nav.employees')}</h1>
+                <p className="text-muted-foreground">{t('employees.subtitle')}</p>
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -147,9 +149,9 @@ export default function Employees() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">Employees</h1>
+              <h1 className="text-2xl font-bold">{t('nav.employees')}</h1>
               <p className="text-muted-foreground">
-                {employeePage?.employees ? `${employeePage.employees.length} employees on this page` : "Loading employees..."}
+                {employeePage?.employees ? t('employees.countOnPage', { count: employeePage.employees.length }) : t('employees.loadingList')}
               </p>
             </div>
             <div className="flex gap-2">
@@ -178,7 +180,7 @@ export default function Employees() {
                               variant="secondary" 
                               className={EMPLOYEE_ROLE_COLORS[employee.role]}
                             >
-                              {EMPLOYEE_ROLE_LABELS[employee.role]}
+                              {t(EMPLOYEE_ROLE_LABEL_KEYS[employee.role])}
                             </Badge>
                           )}
                         </div>
@@ -197,7 +199,7 @@ export default function Employees() {
                           )}
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="h-3 w-3" />
-                            <span>Created {formatDate(employee.created_at)}</span>
+                            <span>{t('employees.createdOn', { date: formatDate(employee.created_at) })}</span>
                           </div>
                         </div>
                       </CardContent>
@@ -210,7 +212,7 @@ export default function Employees() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Page {currentPage} of {totalPages}
+                    {t('employees.pageOf', { current: currentPage, total: totalPages })}
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -219,8 +221,8 @@ export default function Employees() {
                       onClick={() => setFilters(prev => ({ ...prev, page: currentPage - 1 }))}
                       disabled={currentPage <= 1}
                     >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Previous
+                      <ChevronLeft className="h-4 w-4 me-1" />
+                      {t('common.previous')}
                     </Button>
                     <Button
                       variant="outline"
@@ -228,8 +230,8 @@ export default function Employees() {
                       onClick={() => setFilters(prev => ({ ...prev, page: currentPage + 1 }))}
                       disabled={currentPage >= totalPages}
                     >
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
+                      {t('common.next')}
+                      <ChevronRight className="h-4 w-4 ms-1" />
                     </Button>
                   </div>
                 </div>
@@ -239,9 +241,9 @@ export default function Employees() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">
                 <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No employees found</h3>
+                <h3 className="text-lg font-semibold mb-2">{t('employees.emptyTitle')}</h3>
                 <p className="text-muted-foreground text-center mb-4">
-                  Get started by creating your first employee record.
+                  {t('employees.emptyDescription')}
                 </p>
                 <AddEmployeeDialog />
               </CardContent>

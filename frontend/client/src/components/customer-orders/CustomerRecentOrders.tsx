@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { OrderDetailDialog } from "@/components/customer-orders/OrderDetailDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface OrderRow {
   uuid: string;
@@ -16,6 +17,7 @@ interface OrderRow {
 }
 
 export function CustomerRecentOrders({ customerUuid, tripStopUuid }: { customerUuid: string; tripStopUuid?: string }) {
+  const { t } = useLanguage();
   const [selectedOrderUuid, setSelectedOrderUuid] = useState<string | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ["/customer-order/", "recent", customerUuid],
@@ -52,9 +54,9 @@ export function CustomerRecentOrders({ customerUuid, tripStopUuid }: { customerU
     <Card className="mb-6">
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base">Recent orders</CardTitle>
+          <CardTitle className="text-base">{t('customerOrders.recentOrders')}</CardTitle>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Balance</span>
+            <span className="text-xs text-gray-500">{t('customerOrders.balance')}</span>
             {Object.keys(balances).length === 0 ? (
               <span className="text-sm text-gray-400">—</span>
             ) : (
@@ -69,9 +71,9 @@ export function CustomerRecentOrders({ customerUuid, tripStopUuid }: { customerU
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="text-sm text-gray-500">Loading…</div>
+          <div className="text-sm text-gray-500">{t('common.loading')}</div>
         ) : orders.length === 0 ? (
-          <div className="text-sm text-gray-500">No previous orders for this customer.</div>
+          <div className="text-sm text-gray-500">{t('customerOrders.noPreviousOrders')}</div>
         ) : (
           <div className="divide-y">
             {orders.map((o) => (
@@ -85,15 +87,15 @@ export function CustomerRecentOrders({ customerUuid, tripStopUuid }: { customerU
                 <div className="text-sm">
                   <div className="font-medium text-gray-900">{fmtDate(o.created_at)}</div>
                   <div className="text-gray-500">
-                    {(o.net_amount_due ?? o.total_adjusted_amount ?? 0)} {o.currency || ""} due
+                    {(o.net_amount_due ?? o.total_adjusted_amount ?? 0)} {o.currency || ""} {t('customerOrders.dueSuffix')}
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <Badge variant={o.is_paid ? "secondary" : "destructive"}>
-                    {o.is_paid ? "Paid" : "Unpaid"}
+                    {o.is_paid ? t('customerOrders.paid') : t('customerOrders.unpaid')}
                   </Badge>
                   <Badge variant={o.is_fulfilled ? "secondary" : "outline"}>
-                    {o.is_fulfilled ? "Fulfilled" : "Unfulfilled"}
+                    {o.is_fulfilled ? t('customerOrders.fulfilled') : t('customerOrders.unfulfilled')}
                   </Badge>
                 </div>
               </div>

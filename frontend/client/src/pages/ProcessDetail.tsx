@@ -46,8 +46,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProcessDiagram } from "@/components/processes/ProcessDiagram";
-import { ProcessRead, ProcessTypeLabels } from "@/types/process";
+import { ProcessRead } from "@/types/process";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const editSchema = z.object({
   notes: z.string().optional(),
@@ -59,6 +60,7 @@ export default function ProcessDetail() {
   const { uuid } = useParams<{ uuid: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -92,16 +94,16 @@ export default function ProcessDetail() {
     },
     onSuccess: () => {
       toast({
-        title: "Process updated successfully",
-        description: "The process has been updated.",
+        title: t('processes.updatedSuccess'),
+        description: t('processes.updatedSuccessDesc'),
       });
       queryClient.invalidateQueries({ queryKey: ["/process/", uuid] });
       setIsEditing(false);
     },
     onError: (error: any) => {
       toast({
-        title: "Error updating process",
-        description: error.message || "Failed to update process",
+        title: t('processes.updateError'),
+        description: error.message || t('processes.updateErrorDesc'),
         variant: "destructive",
       });
     },
@@ -115,28 +117,28 @@ export default function ProcessDetail() {
     },
     onSuccess: () => {
       toast({
-        title: "Process deleted successfully",
-        description: "The process has been deleted.",
+        title: t('processes.deletedSuccess'),
+        description: t('processes.deletedSuccessDesc'),
       });
       queryClient.invalidateQueries({ queryKey: ["/process/"] });
       setLocation("/processes");
     },
     onError: (error: any) => {
       toast({
-        title: "Error deleting process",
-        description: error.message || "Failed to delete process",
+        title: t('processes.deleteError'),
+        description: error.message || t('processes.deleteErrorDesc'),
         variant: "destructive",
       });
     },
   });
 
-  const copyToClipboard = (text: string, fieldName: string) => {
+  const copyToClipboard = (text: string, fieldName: string, fieldLabel: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
     toast({
-      title: "Copied to clipboard",
-      description: `${fieldName} has been copied to your clipboard.`,
+      title: t('processes.copied'),
+      description: t('processes.copiedDesc', { field: fieldLabel }),
     });
   };
 
@@ -163,12 +165,12 @@ export default function ProcessDetail() {
 
   const getMaterialName = (materialUuid: string) => {
     const material = materials?.materials?.find((m: any) => m.uuid === materialUuid);
-    return material?.name || "Unknown Material";
+    return material?.name || t('processes.unknownMaterial');
   };
 
   const getWarehouseName = (warehouseUuid: string) => {
     const warehouse = warehouses?.warehouses?.find((w: any) => w.uuid === warehouseUuid);
-    return warehouse?.name || "Unknown Warehouse";
+    return warehouse?.name || t('processes.unknownWarehouse');
   };
 
   const formatDate = (dateString: string) => {
@@ -202,9 +204,9 @@ export default function ProcessDetail() {
       <AppLayout>
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-8">
-            <p className="text-red-600">Error loading process: {error?.message || "Process not found"}</p>
+            <p className="text-red-600">{t('processes.errorLoadingOne', { message: error?.message || t('processes.notFound') })}</p>
             <Button onClick={() => setLocation("/processes")} className="mt-4">
-              Back to Processes
+              {t('processes.backToProcesses')}
             </Button>
           </div>
         </div>
@@ -224,15 +226,15 @@ export default function ProcessDetail() {
               className="flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Processes
+              {t('processes.backToProcesses')}
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
                 <Factory className="h-8 w-8" />
-                Process Details
+                {t('processes.detailsTitle')}
               </h1>
               <p className="text-gray-600 mt-1">
-                {ProcessTypeLabels[process.type] || process.type}
+                {te(process.type)}
               </p>
             </div>
           </div>
@@ -244,14 +246,14 @@ export default function ProcessDetail() {
                   disabled={updateMutation.isPending}
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  Save Changes
+                  {t('processes.saveChanges')}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={handleCancel}
                   disabled={updateMutation.isPending}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </>
             ) : (
@@ -262,30 +264,30 @@ export default function ProcessDetail() {
                   className="flex items-center gap-2"
                 >
                   <Edit className="h-4 w-4" />
-                  Edit
+                  {t('common.edit')}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" className="flex items-center gap-2">
                       <Trash2 className="h-4 w-4" />
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Process</AlertDialogTitle>
+                      <AlertDialogTitle>{t('processes.deleteTitle')}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete this process? This action cannot be undone.
+                        {t('processes.deleteConfirm')}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteMutation.mutate()}
                         disabled={deleteMutation.isPending}
                         className="bg-red-600 hover:bg-red-700"
                       >
-                        Delete
+                        {t('common.delete')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -301,18 +303,18 @@ export default function ProcessDetail() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Process Information
+                {t('processes.processInfo')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Label className="text-sm font-medium text-gray-600">UUID</Label>
+                    <Label className="text-sm font-medium text-gray-600">{t('processes.uuid')}</Label>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(process.uuid, "UUID")}
+                      onClick={() => copyToClipboard(process.uuid, "UUID", t('processes.uuid'))}
                       className="h-6 w-6 p-0"
                     >
                       {copiedField === "UUID" ? (
@@ -328,16 +330,16 @@ export default function ProcessDetail() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-600">Process Type</Label>
+                  <Label className="text-sm font-medium text-gray-600">{t('processes.processType')}</Label>
                   <Badge className="bg-purple-100 text-purple-800">
-                    {ProcessTypeLabels[process.type] || process.type}
+                    {te(process.type)}
                   </Badge>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-gray-500" />
-                    <Label className="text-sm font-medium text-gray-600">Created</Label>
+                    <Label className="text-sm font-medium text-gray-600">{t('processes.created')}</Label>
                   </div>
                   <div className="text-sm text-gray-900">
                     {formatDate(process.created_at)}
@@ -348,11 +350,11 @@ export default function ProcessDetail() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-gray-500" />
-                      <Label className="text-sm font-medium text-gray-600">Created By</Label>
+                      <Label className="text-sm font-medium text-gray-600">{t('processes.createdBy')}</Label>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(process.created_by_uuid!, "Created By UUID")}
+                        onClick={() => copyToClipboard(process.created_by_uuid!, "Created By UUID", t('processes.createdBy'))}
                         className="h-6 w-6 p-0"
                       >
                         {copiedField === "Created By UUID" ? (
@@ -372,11 +374,11 @@ export default function ProcessDetail() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Warehouse className="h-4 w-4 text-gray-500" />
-                      <Label className="text-sm font-medium text-gray-600">Output Warehouse</Label>
+                      <Label className="text-sm font-medium text-gray-600">{t('processes.outputWarehouse')}</Label>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(process.data.output_warehouse_uuid!, "Output Warehouse UUID")}
+                        onClick={() => copyToClipboard(process.data.output_warehouse_uuid!, "Output Warehouse UUID", t('processes.outputWarehouse'))}
                         className="h-6 w-6 p-0"
                       >
                         {copiedField === "Output Warehouse UUID" ? (
@@ -395,11 +397,11 @@ export default function ProcessDetail() {
                 {process.workflow_execution_uuid && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <Label className="text-sm font-medium text-gray-600">Workflow Execution</Label>
+                      <Label className="text-sm font-medium text-gray-600">{t('nav.workflowExecution')}</Label>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(process.workflow_execution_uuid!, "Workflow Execution UUID")}
+                        onClick={() => copyToClipboard(process.workflow_execution_uuid!, "Workflow Execution UUID", t('nav.workflowExecution'))}
                         className="h-6 w-6 p-0"
                       >
                         {copiedField === "Workflow Execution UUID" ? (
@@ -417,16 +419,16 @@ export default function ProcessDetail() {
               </div>
 
               <div className="mt-6 space-y-2">
-                <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                <Label className="text-sm font-medium text-gray-600">{t('common.notes')}</Label>
                 {isEditing ? (
                   <Textarea
                     {...form.register("notes")}
-                    placeholder="Enter process notes..."
+                    placeholder={t('processes.notesEditPlaceholder')}
                     className="min-h-[100px]"
                   />
                 ) : (
                   <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded min-h-[100px]">
-                    {process.notes || "No notes provided"}
+                    {process.notes || t('processes.noNotesProvided')}
                   </div>
                 )}
               </div>
@@ -438,19 +440,19 @@ export default function ProcessDetail() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
-                Input Materials
+                {t('processes.inputMaterials')}
               </CardTitle>
               <CardDescription>
-                Materials consumed in this process
+                {t('processes.inputMaterialsDetailDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Material</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Cost per Unit</TableHead>
+                    <TableHead>{t('processes.material')}</TableHead>
+                    <TableHead>{t('common.quantity')}</TableHead>
+                    <TableHead>{t('processes.costPerUnit')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -472,7 +474,7 @@ export default function ProcessDetail() {
                       <TableCell>
                         {input.cost_per_unit ? (
                           <div className="flex items-center gap-1">
-                            <span className="font-medium">{input.cost_per_unit.toLocaleString()} SYP</span>
+                            <span className="font-medium">{input.cost_per_unit.toLocaleString()} {te('SYP')}</span>
                           </div>
                         ) : (
                           <span className="text-gray-400">-</span>
@@ -490,20 +492,20 @@ export default function ProcessDetail() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ArrowRight className="h-5 w-5" />
-                Output Products
+                {t('processes.outputProducts')}
               </CardTitle>
               <CardDescription>
-                Products produced by this process
+                {t('processes.outputProductsDetailDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Material</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Cost per Unit</TableHead>
-                    <TableHead>Total Cost</TableHead>
+                    <TableHead>{t('processes.material')}</TableHead>
+                    <TableHead>{t('common.quantity')}</TableHead>
+                    <TableHead>{t('processes.costPerUnit')}</TableHead>
+                    <TableHead>{t('processes.totalCost')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -525,7 +527,7 @@ export default function ProcessDetail() {
                       <TableCell>
                         {output.cost_per_unit ? (
                           <div className="flex items-center gap-1">
-                            <span className="font-medium">{output.cost_per_unit.toLocaleString()} SYP</span>
+                            <span className="font-medium">{output.cost_per_unit.toLocaleString()} {te('SYP')}</span>
                           </div>
                         ) : (
                           <span className="text-gray-400">-</span>
@@ -534,7 +536,7 @@ export default function ProcessDetail() {
                       <TableCell>
                         {output.total_cost ? (
                           <div className="flex items-center gap-1">
-                            <span className="font-medium">{output.total_cost.toLocaleString()} SYP</span>
+                            <span className="font-medium">{output.total_cost.toLocaleString()} {te('SYP')}</span>
                           </div>
                         ) : (
                           <span className="text-gray-400">-</span>

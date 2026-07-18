@@ -15,10 +15,12 @@ import {
 import { Plus, ChevronLeft, ChevronRight, Factory, Package, ArrowRight } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProcessFilters } from "@/components/processes/ProcessFilters";
-import { ProcessPage, ProcessType, ProcessTypeLabels } from "@/types/process";
+import { ProcessPage, ProcessType } from "@/types/process";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function Processes() {
+  const { t, te } = useLanguage();
   const [filters, setFilters] = useState({
     uuid: "",
     type: undefined as ProcessType | undefined,
@@ -100,12 +102,12 @@ export default function Processes() {
       <AppLayout>
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-8">
-            <p className="text-red-600">Error loading processes: {error.message}</p>
-            <Button 
-              onClick={() => window.location.reload()} 
+            <p className="text-red-600">{t('processes.errorLoading', { message: error.message })}</p>
+            <Button
+              onClick={() => window.location.reload()}
               className="mt-4"
             >
-              Retry
+              {t('common.retry')}
             </Button>
           </div>
         </div>
@@ -121,10 +123,10 @@ export default function Processes() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
               <Factory className="h-8 w-8" />
-              Processes
+              {t('nav.processes')}
             </h1>
             <p className="text-gray-600 mt-1">
-              {processesPage?.total_count || 0} processes found
+              {t('processes.found', { count: processesPage?.total_count || 0 })}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -134,8 +136,8 @@ export default function Processes() {
             />
             <Link href="/processes/create">
               <Button className="bg-purple-600 hover:bg-purple-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Process
+                <Plus className="h-4 w-4 me-2" />
+                {t('processes.create')}
               </Button>
             </Link>
           </div>
@@ -144,7 +146,7 @@ export default function Processes() {
         {/* Process Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Process List</CardTitle>
+            <CardTitle>{t('processes.list')}</CardTitle>
           </CardHeader>
           <CardContent>
             {!processesPage?.items?.length ? (
@@ -153,15 +155,15 @@ export default function Processes() {
                   <Factory className="h-8 w-8 text-purple-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  No processes found
+                  {t('processes.emptyTitle')}
                 </h3>
                 <p className="text-gray-500 mb-4">
-                  Get started by creating your first manufacturing process.
+                  {t('processes.emptyDescription')}
                 </p>
                 <Link href="/processes/create">
                   <Button className="bg-purple-600 hover:bg-purple-700">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Process
+                    <Plus className="h-4 w-4 me-2" />
+                    {t('processes.create')}
                   </Button>
                 </Link>
               </div>
@@ -170,12 +172,12 @@ export default function Processes() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Inputs</TableHead>
-                      <TableHead>Outputs</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>UUID</TableHead>
-                      <TableHead>Notes</TableHead>
+                      <TableHead>{t('common.type')}</TableHead>
+                      <TableHead>{t('processes.inputs')}</TableHead>
+                      <TableHead>{t('processes.outputs')}</TableHead>
+                      <TableHead>{t('processes.created')}</TableHead>
+                      <TableHead>{t('processes.uuid')}</TableHead>
+                      <TableHead>{t('common.notes')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -187,21 +189,21 @@ export default function Processes() {
                       >
                         <TableCell>
                           <Badge className={getProcessTypeColor(process.type)}>
-                            {ProcessTypeLabels[process.type] || process.type}
+                            {te(process.type)}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Package className="h-4 w-4 text-gray-500" />
                             <span className="font-medium">{process.data.inputs.length}</span>
-                            <span className="text-sm text-gray-500">materials</span>
+                            <span className="text-sm text-gray-500">{t('processes.materialsLabel')}</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <ArrowRight className="h-4 w-4 text-gray-500" />
                             <span className="font-medium">{process.data.outputs.length}</span>
-                            <span className="text-sm text-gray-500">products</span>
+                            <span className="text-sm text-gray-500">{t('processes.productsLabel')}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -216,7 +218,7 @@ export default function Processes() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm text-gray-600 truncate max-w-[200px]">
-                            {process.notes || "No notes"}
+                            {process.notes || t('processes.noNotes')}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -227,9 +229,11 @@ export default function Processes() {
                 {/* Pagination */}
                 <div className="flex items-center justify-between mt-6">
                   <div className="text-sm text-gray-500">
-                    Showing {((processesPage.page - 1) * processesPage.per_page) + 1} to{" "}
-                    {Math.min(processesPage.page * processesPage.per_page, processesPage.total_count)} of{" "}
-                    {processesPage.total_count} processes
+                    {t('processes.showingRange', {
+                      from: ((processesPage.page - 1) * processesPage.per_page) + 1,
+                      to: Math.min(processesPage.page * processesPage.per_page, processesPage.total_count),
+                      total: processesPage.total_count,
+                    })}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -237,19 +241,19 @@ export default function Processes() {
                       onClick={() => setPage(Math.max(1, page - 1))}
                       disabled={page === 1}
                     >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Previous
+                      <ChevronLeft className="h-4 w-4 me-1" />
+                      {t('common.previous')}
                     </Button>
                     <span className="text-sm text-gray-500">
-                      Page {processesPage.page} of {processesPage.pages}
+                      {t('common.page')} {processesPage.page} {t('common.of')} {processesPage.pages}
                     </span>
                     <Button
                       variant="outline"
                       onClick={() => setPage(Math.min(processesPage.pages, page + 1))}
                       disabled={page === processesPage.pages}
                     >
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
+                      {t('common.next')}
+                      <ChevronRight className="h-4 w-4 ms-1" />
                     </Button>
                   </div>
                 </div>

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function OrderDetailDialog({
   orderUuid,
@@ -18,6 +19,7 @@ export function OrderDetailDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [doFulfill, setDoFulfill] = useState(true);
@@ -73,10 +75,10 @@ export function OrderDetailDialog({
       }
     },
     onSuccess: () => {
-      toast({ title: "Order updated", description: "Selected actions were applied." });
+      toast({ title: t('customerOrders.orderUpdated'), description: t('customerOrders.orderUpdatedDesc') });
       refresh();
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: t('common.error'), description: e.message, variant: "destructive" }),
   });
 
   const nothingSelected = !(doFulfill && canFulfill) && !(doPay && canPay);
@@ -91,11 +93,11 @@ export function OrderDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Order details</DialogTitle>
+          <DialogTitle>{t('customerOrders.orderDetailsTitle')}</DialogTitle>
         </DialogHeader>
 
         {isLoading || !order ? (
-          <div className="text-sm text-gray-500 py-6 text-center">Loading…</div>
+          <div className="text-sm text-gray-500 py-6 text-center">{t('common.loading')}</div>
         ) : (
           <div className="space-y-4">
             {/* header */}
@@ -103,10 +105,10 @@ export function OrderDetailDialog({
               <div className="text-sm text-gray-500">{fmtDate(order.created_at)}</div>
               <div className="flex gap-2">
                 <Badge variant={order.is_paid ? "secondary" : "destructive"}>
-                  {order.is_paid ? "Paid" : "Unpaid"}
+                  {order.is_paid ? t('customerOrders.paid') : t('customerOrders.unpaid')}
                 </Badge>
                 <Badge variant={order.is_fulfilled ? "secondary" : "outline"}>
-                  {order.is_fulfilled ? "Fulfilled" : "Unfulfilled"}
+                  {order.is_fulfilled ? t('customerOrders.fulfilled') : t('customerOrders.unfulfilled')}
                 </Badge>
               </div>
             </div>
@@ -117,7 +119,7 @@ export function OrderDetailDialog({
                 <div key={i.uuid} className="flex items-center justify-between px-3 py-2 text-sm">
                   <span>{i.material_name} × {i.quantity} {i.unit || ""}</span>
                   <Badge variant={i.is_fulfilled ? "secondary" : "outline"} className="text-xs">
-                    {i.is_fulfilled ? "fulfilled" : "pending"}
+                    {i.is_fulfilled ? t('customerOrders.itemFulfilled') : t('customerOrders.itemPending')}
                   </Badge>
                 </div>
               ))}
@@ -125,9 +127,9 @@ export function OrderDetailDialog({
 
             {/* totals */}
             <div className="text-sm space-y-1">
-              <div className="flex justify-between"><span className="text-gray-500">Total</span><span>{invoice?.total_amount ?? order.total_adjusted_amount ?? 0} {currency}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Paid</span><span>{invoice?.net_amount_paid ?? order.net_amount_paid ?? 0} {currency}</span></div>
-              <div className="flex justify-between font-semibold"><span>Due</span><span>{amountDue} {currency}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">{t('common.total')}</span><span>{invoice?.total_amount ?? order.total_adjusted_amount ?? 0} {currency}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">{t('customerOrders.paid')}</span><span>{invoice?.net_amount_paid ?? order.net_amount_paid ?? 0} {currency}</span></div>
+              <div className="flex justify-between font-semibold"><span>{t('customerOrders.due')}</span><span>{amountDue} {currency}</span></div>
             </div>
 
             {/* actions: tick what to do, then submit */}
@@ -137,13 +139,13 @@ export function OrderDetailDialog({
                   {canFulfill && (
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input type="checkbox" checked={doFulfill} onChange={(e) => setDoFulfill(e.target.checked)} data-testid="check-fulfill" />
-                      Mark fulfilled ({unfulfilled.length} item{unfulfilled.length > 1 ? "s" : ""})
+                      {unfulfilled.length > 1 ? t('customerOrders.markFulfilledMany', { count: unfulfilled.length }) : t('customerOrders.markFulfilledOne', { count: unfulfilled.length })}
                     </label>
                   )}
                   {canPay && (
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input type="checkbox" checked={doPay} onChange={(e) => setDoPay(e.target.checked)} data-testid="check-pay" />
-                      Mark paid ({amountDue} {currency})
+                      {t('customerOrders.markPaidAmount', { amount: amountDue, currency })}
                     </label>
                   )}
                 </div>
@@ -154,8 +156,8 @@ export function OrderDetailDialog({
                   className="w-full bg-[#5469D4] hover:bg-[#5469D4]/90"
                   data-testid="button-submit-order-actions"
                 >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  {submitMutation.isPending ? "Submitting…" : "Submit"}
+                  <CheckCircle2 className="h-4 w-4 me-2" />
+                  {submitMutation.isPending ? t('customerOrders.submitting') : t('common.submit')}
                 </Button>
               </div>
             )}

@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Filter } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ExpenseFiltersType {
   uuid?: string;
@@ -33,6 +34,7 @@ export function ExpenseFilters({
   perPage, 
   onPerPageChange 
 }: ExpenseFiltersProps) {
+  const { t, te } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<Partial<ExpenseFiltersType>>(filters);
 
@@ -81,16 +83,16 @@ export function ExpenseFilters({
       <div className="flex items-center gap-4">
         {/* Results Count */}
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          {totalCount} expenses
+          {t('expenses.countExpenses', { count: totalCount })}
         </p>
 
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" className="relative">
-              <Filter className="h-4 w-4 mr-2" />
-              Filters
+              <Filter className="h-4 w-4 me-2" />
+              {t('common.filters')}
               {hasActiveFilters && (
-                <span className="absolute -top-2 -right-2 bg-[#5469D4] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                <span className="absolute -top-2 -end-2 bg-[#5469D4] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {activeFilterCount}
                 </span>
               )}
@@ -98,44 +100,44 @@ export function ExpenseFilters({
           </SheetTrigger>
           <SheetContent className="w-[400px] sm:w-[540px]" style={{ zIndex: 9999 }}>
             <SheetHeader>
-              <SheetTitle>Filter Expenses</SheetTitle>
+              <SheetTitle>{t('expenses.filterTitle')}</SheetTitle>
             </SheetHeader>
-            
+
             <div className="space-y-6 mt-6">
               <div className="space-y-2">
-                <Label htmlFor="uuid">Expense UUID</Label>
+                <Label htmlFor="uuid">{t('expenses.expenseUuid')}</Label>
                 <Input
                   id="uuid"
                   value={localFilters.uuid || ""}
                   onChange={(e) => setLocalFilters(prev => ({ ...prev, uuid: e.target.value || undefined }))}
-                  placeholder="Search by expense UUID"
+                  placeholder={t('expenses.searchByUuid')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="vendor_uuid">Vendor UUID</Label>
+                <Label htmlFor="vendor_uuid">{t('expenses.vendorUuid')}</Label>
                 <Input
                   id="vendor_uuid"
                   value={localFilters.vendor_uuid || ""}
                   onChange={(e) => setLocalFilters(prev => ({ ...prev, vendor_uuid: e.target.value || undefined }))}
-                  placeholder="Search by vendor UUID"
+                  placeholder={t('expenses.searchByVendorUuid')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="category">{t('common.category')}</Label>
                 <Select 
                   value={localFilters.category || "all"} 
                   onValueChange={(value) => setLocalFilters(prev => ({ ...prev, category: value === "all" ? undefined : value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder={t('expenses.selectCategory')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="all">{t('expenses.allCategories')}</SelectItem>
                     {categories.map((category: string) => (
                       <SelectItem key={category} value={category}>
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                        {te(category)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -143,27 +145,27 @@ export function ExpenseFilters({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select 
-                  value={localFilters.status || "all"} 
+                <Label htmlFor="status">{t('common.status')}</Label>
+                <Select
+                  value={localFilters.status || "all"}
                   onValueChange={(value) => setLocalFilters(prev => ({ ...prev, status: value === "all" ? undefined : value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
+                    <SelectValue placeholder={t('expenses.selectStatus')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="all">{t('expenses.allStatuses')}</SelectItem>
+                    <SelectItem value="draft">{te('draft')}</SelectItem>
+                    <SelectItem value="pending">{te('pending')}</SelectItem>
+                    <SelectItem value="paid">{te('paid')}</SelectItem>
+                    <SelectItem value="overdue">{te('overdue')}</SelectItem>
+                    <SelectItem value="cancelled">{te('cancelled')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="is_paid">Payment Status</Label>
+                <Label htmlFor="is_paid">{t('expenses.paymentStatus')}</Label>
                 <Select 
                   value={localFilters.is_paid !== undefined ? localFilters.is_paid.toString() : "all"} 
                   onValueChange={(value) => {
@@ -175,23 +177,23 @@ export function ExpenseFilters({
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select payment status" />
+                    <SelectValue placeholder={t('expenses.selectPaymentStatus')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="true">Paid</SelectItem>
-                    <SelectItem value="false">Unpaid</SelectItem>
+                    <SelectItem value="all">{t('common.all')}</SelectItem>
+                    <SelectItem value="true">{te('paid')}</SelectItem>
+                    <SelectItem value="false">{te('unpaid')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleApplyFilters} className="flex-1 bg-[#5469D4] hover:bg-[#4356C7]">
-                  Apply Filters
+                  {t('expenses.applyFilters')}
                 </Button>
                 {hasActiveFilters && (
                   <Button onClick={handleClearFilters} variant="outline" className="flex-1">
-                    Clear All
+                    {t('expenses.clearAll')}
                   </Button>
                 )}
               </div>
@@ -202,7 +204,7 @@ export function ExpenseFilters({
 
       {/* Per Page Selection */}
       <div className="flex items-center gap-2">
-        <Label htmlFor="perPage" className="text-sm">Show:</Label>
+        <Label htmlFor="perPage" className="text-sm">{t('expenses.show')}</Label>
         <select
           id="perPage"
           value={perPage}
@@ -214,7 +216,7 @@ export function ExpenseFilters({
           <option value={50}>50</option>
           <option value={100}>100</option>
         </select>
-        <span className="text-sm text-gray-600 dark:text-gray-400">per page</span>
+        <span className="text-sm text-gray-600 dark:text-gray-400">{t('common.perPage')}</span>
       </div>
     </div>
   );

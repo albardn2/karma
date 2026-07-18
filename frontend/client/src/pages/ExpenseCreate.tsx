@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface ExpenseCreateData {
@@ -25,6 +26,7 @@ interface ExpenseCreateData {
 export default function ExpenseCreate() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const [formData, setFormData] = useState<ExpenseCreateData>({
     amount: 0,
     currency: '',
@@ -64,8 +66,8 @@ export default function ExpenseCreate() {
       queryClient.invalidateQueries({ queryKey: ["/expense/"] });
       
       toast({
-        title: "Success",
-        description: "Expense created successfully",
+        title: t('common.success'),
+        description: t('expenses.createSuccess'),
       });
       // Clear the referrer and redirect back
       localStorage.removeItem('expense_create_referrer');
@@ -73,8 +75,8 @@ export default function ExpenseCreate() {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create expense",
+        title: t('common.error'),
+        description: error.message || t('expenses.createFailed'),
         variant: "destructive",
       });
     },
@@ -84,8 +86,8 @@ export default function ExpenseCreate() {
     // Validation
     if (!formData.amount || formData.amount <= 0) {
       toast({
-        title: "Validation Error",
-        description: "Amount must be greater than 0",
+        title: t('expenses.validationError'),
+        description: t('expenses.amountInvalid'),
         variant: "destructive",
       });
       return;
@@ -93,8 +95,8 @@ export default function ExpenseCreate() {
 
     if (!formData.currency) {
       toast({
-        title: "Validation Error",
-        description: "Currency is required",
+        title: t('expenses.validationError'),
+        description: t('expenses.currencyRequired'),
         variant: "destructive",
       });
       return;
@@ -102,8 +104,8 @@ export default function ExpenseCreate() {
 
     if (!formData.category) {
       toast({
-        title: "Validation Error",
-        description: "Category is required",
+        title: t('expenses.validationError'),
+        description: t('expenses.categoryRequired'),
         variant: "destructive",
       });
       return;
@@ -141,25 +143,25 @@ export default function ExpenseCreate() {
               variant="ghost"
               size="sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t('common.back')}
             </Button>
             <div>
               <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100">
-                Create Expense
+                {t('expenses.create')}
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
-                Add a new expense record
+                {t('expenses.createSubtitle')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <Button onClick={handleCancel} variant="outline">
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSubmit} disabled={createMutation.isPending} className="bg-[#5469D4] hover:bg-[#4356C7] text-white">
-              <Save className="h-4 w-4 mr-2" />
-              {createMutation.isPending ? "Creating..." : "Create Expense"}
+              <Save className="h-4 w-4 me-2" />
+              {createMutation.isPending ? t('common.creating') : t('expenses.create')}
             </Button>
           </div>
         </div>
@@ -169,14 +171,14 @@ export default function ExpenseCreate() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Receipt className="h-5 w-5" />
-              Expense Information
+              {t('expenses.information')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Amount */}
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount *</Label>
+                <Label htmlFor="amount">{t('expenses.amountLabel')}</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -184,23 +186,23 @@ export default function ExpenseCreate() {
                   min="0"
                   value={formData.amount || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                  placeholder="Enter expense amount"
+                  placeholder={t('expenses.amountPlaceholder')}
                   required
                 />
               </div>
 
               {/* Currency */}
               <div className="space-y-2">
-                <Label htmlFor="currency">Currency *</Label>
+                <Label htmlFor="currency">{t('expenses.currencyLabel')}</Label>
                 <Select value={formData.currency} onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder={currenciesLoading ? "Loading currencies..." : "Select currency"} />
+                    <SelectValue placeholder={currenciesLoading ? t('expenses.loadingCurrencies') : t('expenses.selectCurrency')} />
                   </SelectTrigger>
                   <SelectContent>
                     {currenciesLoading ? (
-                      <SelectItem value="loading" disabled>Loading currencies...</SelectItem>
+                      <SelectItem value="loading" disabled>{t('expenses.loadingCurrencies')}</SelectItem>
                     ) : currenciesError ? (
-                      <SelectItem value="error" disabled>Error loading currencies</SelectItem>
+                      <SelectItem value="error" disabled>{t('expenses.errorLoadingCurrencies')}</SelectItem>
                     ) : currencies && currencies.length > 0 ? (
                       currencies.map((currency: string) => (
                         <SelectItem key={currency} value={currency}>
@@ -208,78 +210,78 @@ export default function ExpenseCreate() {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="empty" disabled>No currencies available</SelectItem>
+                      <SelectItem value="empty" disabled>{t('expenses.noCurrencies')}</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
                 {currenciesError && (
-                  <p className="text-xs text-red-500">Error loading currencies: {currenciesError.message}</p>
+                  <p className="text-xs text-red-500">{t('expenses.errorLoadingCurrenciesMsg', { message: currenciesError.message })}</p>
                 )}
               </div>
 
               {/* Category */}
               <div className="space-y-2">
-                <Label htmlFor="category">Category *</Label>
+                <Label htmlFor="category">{t('expenses.categoryLabel')}</Label>
                 <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder={categoriesLoading ? "Loading categories..." : "Select category"} />
+                    <SelectValue placeholder={categoriesLoading ? t('expenses.loadingCategories') : t('expenses.selectCategory')} />
                   </SelectTrigger>
                   <SelectContent>
                     {categoriesLoading ? (
-                      <SelectItem value="loading" disabled>Loading categories...</SelectItem>
+                      <SelectItem value="loading" disabled>{t('expenses.loadingCategories')}</SelectItem>
                     ) : categoriesError ? (
-                      <SelectItem value="error" disabled>Error loading categories</SelectItem>
+                      <SelectItem value="error" disabled>{t('expenses.errorLoadingCategories')}</SelectItem>
                     ) : categories && categories.length > 0 ? (
                       categories.map((category: string) => (
                         <SelectItem key={category} value={category}>
-                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                          {te(category)}
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="empty" disabled>No categories available</SelectItem>
+                      <SelectItem value="empty" disabled>{t('expenses.noCategories')}</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
                 {categoriesError && (
-                  <p className="text-xs text-red-500">Error loading categories: {categoriesError.message}</p>
+                  <p className="text-xs text-red-500">{t('expenses.errorLoadingCategoriesMsg', { message: categoriesError.message })}</p>
                 )}
               </div>
 
               {/* Vendor UUID */}
               <div className="space-y-2">
-                <Label htmlFor="vendor_uuid">Vendor UUID</Label>
+                <Label htmlFor="vendor_uuid">{t('expenses.vendorUuid')}</Label>
                 <Input
                   id="vendor_uuid"
                   value={formData.vendor_uuid || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, vendor_uuid: e.target.value }))}
-                  placeholder="Enter vendor UUID (optional)"
+                  placeholder={t('expenses.vendorUuidOptionalPlaceholder')}
                 />
               </div>
 
               {/* Auto Pay */}
               <div className="space-y-2">
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 rtl:space-x-reverse">
                   <Switch
                     id="should_pay"
                     checked={formData.should_pay || false}
                     onCheckedChange={(checked) => setFormData(prev => ({ ...prev, should_pay: checked }))}
                   />
-                  <Label htmlFor="should_pay">Auto Pay</Label>
+                  <Label htmlFor="should_pay">{t('expenses.autoPay')}</Label>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Mark if this expense should be automatically paid
+                  {t('expenses.autoPayHelp')}
                 </p>
               </div>
             </div>
 
             {/* Description */}
             <div className="space-y-2 mt-6">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t('common.description')}</Label>
               <Textarea
                 id="description"
                 value={formData.description || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Enter expense description..."
+                placeholder={t('expenses.descriptionPlaceholder')}
                 rows={3}
               />
             </div>
@@ -287,7 +289,7 @@ export default function ExpenseCreate() {
             {/* Required Fields Info */}
             <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Note:</strong> Amount, currency, and category are required fields.
+                <strong>{t('expenses.noteLabel')}</strong> {t('expenses.requiredFieldsNote')}
               </p>
             </div>
           </CardContent>

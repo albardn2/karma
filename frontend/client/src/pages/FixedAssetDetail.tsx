@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +53,7 @@ interface FixedAsset {
 }
 
 export default function FixedAssetDetail() {
+  const { t } = useLanguage();
   const { uuid } = useParams<{ uuid: string }>();
   const [, navigate] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
@@ -107,13 +109,13 @@ export default function FixedAssetDetail() {
       queryClient.invalidateQueries({ queryKey: ["/fixed-asset/"] });
       setIsEditing(false);
       toast({
-        title: "Success",
-        description: "Fixed asset updated successfully",
+        title: t('common.success'),
+        description: t('fixedAssets.updateSuccess'),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('common.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -128,14 +130,14 @@ export default function FixedAssetDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/fixed-asset/"] });
       toast({
-        title: "Success",
-        description: "Fixed asset deleted successfully",
+        title: t('common.success'),
+        description: t('fixedAssets.deleteSuccess'),
       });
       navigate("/fixed-assets");
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('common.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -145,8 +147,8 @@ export default function FixedAssetDetail() {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({
-      title: "Copied",
-      description: `${label} copied to clipboard`,
+      title: t('fixedAssets.copied'),
+      description: t('fixedAssets.copiedToClipboard', { label }),
     });
   };
 
@@ -187,11 +189,11 @@ export default function FixedAssetDetail() {
         <div className="container mx-auto px-4 py-6">
           <div className="text-center py-16">
             <Package2 className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-            <h2 className="text-2xl font-bold mb-2">Fixed Asset Not Found</h2>
-            <p className="text-gray-600 mb-4">The fixed asset you're looking for doesn't exist.</p>
+            <h2 className="text-2xl font-bold mb-2">{t('fixedAssets.notFound')}</h2>
+            <p className="text-gray-600 mb-4">{t('fixedAssets.notFoundDescription')}</p>
             <Button onClick={() => navigate("/fixed-assets")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Fixed Assets
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t('fixedAssets.backToAssets')}
             </Button>
           </div>
         </div>
@@ -206,13 +208,13 @@ export default function FixedAssetDetail() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <Button variant="outline" onClick={() => navigate("/fixed-assets")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t('common.back')}
             </Button>
             <div>
               <h1 className="text-2xl font-bold">{fixedAsset.name}</h1>
               <p className="text-sm text-muted-foreground">
-                Fixed Asset Details
+                {t('fixedAssets.detailsTitle')}
               </p>
             </div>
           </div>
@@ -224,45 +226,45 @@ export default function FixedAssetDetail() {
                   onClick={handleCancel}
                   disabled={updateMutation.isPending}
                 >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
+                  <X className="h-4 w-4 me-2" />
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={handleSave}
                   disabled={updateMutation.isPending}
                   className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 >
-                  <Save className="h-4 w-4 mr-2" />
-                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                  <Save className="h-4 w-4 me-2" />
+                  {updateMutation.isPending ? t('common.saving') : t('fixedAssets.saveChanges')}
                 </Button>
               </>
             ) : (
               <>
                 <Button variant="outline" onClick={() => setIsEditing(true)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
+                  <Edit className="h-4 w-4 me-2" />
+                  {t('common.edit')}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" className="text-red-600 hover:text-red-700">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
+                      <Trash2 className="h-4 w-4 me-2" />
+                      {t('common.delete')}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Fixed Asset</AlertDialogTitle>
+                      <AlertDialogTitle>{t('fixedAssets.deleteTitle')}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete "{fixedAsset.name}"? This action cannot be undone.
+                        {t('fixedAssets.deleteConfirmDescription', { name: fixedAsset.name })}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteMutation.mutate()}
                         className="bg-red-600 hover:bg-red-700"
                       >
-                        {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                        {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -279,19 +281,19 @@ export default function FixedAssetDetail() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package2 className="h-5 w-5" />
-                Asset Overview
+                {t('fixedAssets.assetOverview')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Asset Name */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">Asset Name</label>
+                <label className="font-medium">{t('fixedAssets.assetName')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   {isEditing ? (
                     <Input
                       value={editData.name}
                       onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                      placeholder="Enter asset name"
+                      placeholder={t('fixedAssets.enterAssetName')}
                     />
                   ) : (
                     <>
@@ -299,7 +301,7 @@ export default function FixedAssetDetail() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(fixedAsset.name, "Asset name")}
+                        onClick={() => copyToClipboard(fixedAsset.name, t('fixedAssets.copyLabelAssetName'))}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -310,23 +312,23 @@ export default function FixedAssetDetail() {
 
               {/* Description */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                <label className="font-medium">Description</label>
+                <label className="font-medium">{t('common.description')}</label>
                 <div className="md:col-span-2 flex items-start gap-2">
                   {isEditing ? (
                     <Textarea
                       value={editData.description}
                       onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                      placeholder="Enter asset description"
+                      placeholder={t('fixedAssets.enterDescription')}
                       rows={3}
                     />
                   ) : (
                     <>
-                      <span className="flex-1">{fixedAsset.description || "No description"}</span>
+                      <span className="flex-1">{fixedAsset.description || t('fixedAssets.noDescription')}</span>
                       {fixedAsset.description && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => copyToClipboard(fixedAsset.description!, "Description")}
+                          onClick={() => copyToClipboard(fixedAsset.description!, t('fixedAssets.copyLabelDescription'))}
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -338,13 +340,13 @@ export default function FixedAssetDetail() {
 
               {/* UUID */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">UUID</label>
+                <label className="font-medium">{t('fixedAssets.uuid')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   <span className="flex-1 font-mono text-sm">{fixedAsset.uuid}</span>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => copyToClipboard(fixedAsset.uuid, "UUID")}
+                    onClick={() => copyToClipboard(fixedAsset.uuid, t('fixedAssets.copyLabelUuid'))}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
@@ -358,13 +360,13 @@ export default function FixedAssetDetail() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
-                Financial Information
+                {t('fixedAssets.financialInformation')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Current Value */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">Current Value</label>
+                <label className="font-medium">{t('fixedAssets.currentValue')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                     ${fixedAsset.current_value.toLocaleString()}
@@ -372,7 +374,7 @@ export default function FixedAssetDetail() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => copyToClipboard(fixedAsset.current_value.toString(), "Current value")}
+                    onClick={() => copyToClipboard(fixedAsset.current_value.toString(), t('fixedAssets.copyLabelCurrentValue'))}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
@@ -381,13 +383,13 @@ export default function FixedAssetDetail() {
 
               {/* Total Price */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">Total Purchase Price</label>
+                <label className="font-medium">{t('fixedAssets.totalPurchasePrice')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   <span className="flex-1">${fixedAsset.total_price.toLocaleString()}</span>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => copyToClipboard(fixedAsset.total_price.toString(), "Total price")}
+                    onClick={() => copyToClipboard(fixedAsset.total_price.toString(), t('fixedAssets.copyLabelTotalPrice'))}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
@@ -396,7 +398,7 @@ export default function FixedAssetDetail() {
 
               {/* Price per Unit */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">Price per Unit</label>
+                <label className="font-medium">{t('fixedAssets.pricePerUnit')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   {isEditing ? (
                     <Input
@@ -404,7 +406,7 @@ export default function FixedAssetDetail() {
                       step="0.01"
                       value={editData.price_per_unit}
                       onChange={(e) => setEditData({ ...editData, price_per_unit: e.target.value })}
-                      placeholder="Enter price per unit"
+                      placeholder={t('fixedAssets.enterPricePerUnit')}
                     />
                   ) : (
                     <>
@@ -412,7 +414,7 @@ export default function FixedAssetDetail() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(fixedAsset.price_per_unit.toString(), "Price per unit")}
+                        onClick={() => copyToClipboard(fixedAsset.price_per_unit.toString(), t('fixedAssets.copyLabelPricePerUnit'))}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -423,7 +425,7 @@ export default function FixedAssetDetail() {
 
               {/* Quantity */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">Quantity</label>
+                <label className="font-medium">{t('common.quantity')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   {isEditing ? (
                     <Input
@@ -431,7 +433,7 @@ export default function FixedAssetDetail() {
                       step="0.01"
                       value={editData.quantity}
                       onChange={(e) => setEditData({ ...editData, quantity: e.target.value })}
-                      placeholder="Enter quantity"
+                      placeholder={t('fixedAssets.enterQuantity')}
                     />
                   ) : (
                     <>
@@ -439,7 +441,7 @@ export default function FixedAssetDetail() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(`${fixedAsset.quantity} ${fixedAsset.unit}`, "Quantity")}
+                        onClick={() => copyToClipboard(`${fixedAsset.quantity} ${fixedAsset.unit}`, t('fixedAssets.copyLabelQuantity'))}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -450,7 +452,7 @@ export default function FixedAssetDetail() {
 
               {/* Depreciation Rate */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">Annual Depreciation Rate</label>
+                <label className="font-medium">{t('fixedAssets.annualDepreciationRate')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   {isEditing ? (
                     <Input
@@ -458,7 +460,7 @@ export default function FixedAssetDetail() {
                       step="0.01"
                       value={editData.annual_depreciation_rate}
                       onChange={(e) => setEditData({ ...editData, annual_depreciation_rate: e.target.value })}
-                      placeholder="Enter depreciation rate"
+                      placeholder={t('fixedAssets.enterDepreciationRate')}
                     />
                   ) : (
                     <>
@@ -469,7 +471,7 @@ export default function FixedAssetDetail() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(fixedAsset.annual_depreciation_rate.toString(), "Depreciation rate")}
+                        onClick={() => copyToClipboard(fixedAsset.annual_depreciation_rate.toString(), t('fixedAssets.copyLabelDepreciationRate'))}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -480,7 +482,7 @@ export default function FixedAssetDetail() {
 
               {/* Purchase Date */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">Purchase Date</label>
+                <label className="font-medium">{t('fixedAssets.purchaseDate')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   {isEditing ? (
                     <Input
@@ -497,14 +499,14 @@ export default function FixedAssetDetail() {
                             {new Date(fixedAsset.purchase_date).toLocaleDateString()}
                           </>
                         ) : (
-                          "No purchase date"
+                          t('fixedAssets.noPurchaseDate')
                         )}
                       </span>
                       {fixedAsset.purchase_date && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => copyToClipboard(new Date(fixedAsset.purchase_date!).toLocaleDateString(), "Purchase date")}
+                          onClick={() => copyToClipboard(new Date(fixedAsset.purchase_date!).toLocaleDateString(), t('fixedAssets.copyLabelPurchaseDate'))}
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -519,21 +521,21 @@ export default function FixedAssetDetail() {
           {/* Related UUIDs */}
           <Card>
             <CardHeader>
-              <CardTitle>Related Information</CardTitle>
+              <CardTitle>{t('fixedAssets.relatedInformation')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Purchase Order Item UUID */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">Purchase Order Item UUID</label>
+                <label className="font-medium">{t('fixedAssets.purchaseOrderItemUuid')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   <span className="flex-1 font-mono text-sm">
-                    {fixedAsset.purchase_order_item_uuid || "Not linked"}
+                    {fixedAsset.purchase_order_item_uuid || t('fixedAssets.notLinked')}
                   </span>
                   {fixedAsset.purchase_order_item_uuid && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(fixedAsset.purchase_order_item_uuid!, "Purchase order item UUID")}
+                      onClick={() => copyToClipboard(fixedAsset.purchase_order_item_uuid!, t('fixedAssets.copyLabelPurchaseOrderItemUuid'))}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
@@ -543,16 +545,16 @@ export default function FixedAssetDetail() {
 
               {/* Material UUID */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">Material UUID</label>
+                <label className="font-medium">{t('fixedAssets.materialUuid')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   <span className="flex-1 font-mono text-sm">
-                    {fixedAsset.material_uuid || "Not linked"}
+                    {fixedAsset.material_uuid || t('fixedAssets.notLinked')}
                   </span>
                   {fixedAsset.material_uuid && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(fixedAsset.material_uuid!, "Material UUID")}
+                      onClick={() => copyToClipboard(fixedAsset.material_uuid!, t('fixedAssets.copyLabelMaterialUuid'))}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
@@ -562,16 +564,16 @@ export default function FixedAssetDetail() {
 
               {/* Created By */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">Created By</label>
+                <label className="font-medium">{t('fixedAssets.createdBy')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   <span className="flex-1 font-mono text-sm">
-                    {fixedAsset.created_by_uuid || "System"}
+                    {fixedAsset.created_by_uuid || t('fixedAssets.system')}
                   </span>
                   {fixedAsset.created_by_uuid && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(fixedAsset.created_by_uuid!, "Created by UUID")}
+                      onClick={() => copyToClipboard(fixedAsset.created_by_uuid!, t('fixedAssets.copyLabelCreatedBy'))}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
@@ -581,13 +583,13 @@ export default function FixedAssetDetail() {
 
               {/* Created At */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="font-medium">Created At</label>
+                <label className="font-medium">{t('common.createdAt')}</label>
                 <div className="md:col-span-2 flex items-center gap-2">
                   <span className="flex-1">{new Date(fixedAsset.created_at).toLocaleString()}</span>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => copyToClipboard(new Date(fixedAsset.created_at).toLocaleString(), "Created at")}
+                    onClick={() => copyToClipboard(new Date(fixedAsset.created_at).toLocaleString(), t('fixedAssets.copyLabelCreatedAt'))}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>

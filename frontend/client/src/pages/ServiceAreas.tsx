@@ -12,6 +12,7 @@ import { Map, MapPin, ArrowRight } from "lucide-react";
 import { ServiceAreaFilters } from "@/components/service-areas/ServiceAreaFilters";
 import { AddServiceAreaDialog } from "@/components/service-areas/AddServiceAreaDialog";
 import { ServiceAreaMap } from "@/components/service-areas/ServiceAreaMap";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ServiceArea {
   uuid: string;
@@ -41,6 +42,7 @@ interface ServiceAreaFilters {
 }
 
 export default function ServiceAreas() {
+  const { t } = useLanguage();
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [filters, setFilters] = useState<Omit<ServiceAreaFilters, 'page' | 'per_page'>>({});
@@ -147,11 +149,11 @@ export default function ServiceAreas() {
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Service Areas</h1>
+            <h1 className="text-2xl font-bold">{t('nav.serviceAreas')}</h1>
             <p className="text-muted-foreground">
-              {selectedTab === "list" 
-                ? serviceAreaData ? `${serviceAreaData.total_count} areas` : "Loading..."
-                : mapServiceAreaData ? `${mapServiceAreaData.total_count} areas` : "Loading..."
+              {selectedTab === "list"
+                ? serviceAreaData ? t('serviceAreas.areasCount', { count: serviceAreaData.total_count }) : t('common.loading')
+                : mapServiceAreaData ? t('serviceAreas.areasCount', { count: mapServiceAreaData.total_count }) : t('common.loading')
               }
             </p>
           </div>
@@ -169,8 +171,8 @@ export default function ServiceAreas() {
 
         <Tabs value={selectedTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList>
-            <TabsTrigger value="list">List View</TabsTrigger>
-            <TabsTrigger value="map">Map View</TabsTrigger>
+            <TabsTrigger value="list">{t('serviceAreas.listView')}</TabsTrigger>
+            <TabsTrigger value="map">{t('serviceAreas.mapView')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="list" className="space-y-4">
@@ -179,11 +181,11 @@ export default function ServiceAreas() {
                 <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#5469D4] via-[#6B73E0] to-[#8B5CF6] mx-auto mb-4">
                   <Map className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">No service areas found</h3>
+                <h3 className="text-lg font-semibold mb-2">{t('serviceAreas.noAreasFound')}</h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   {Object.values(filters).some(value => value && value !== "")
-                    ? "No service areas match your current filters. Try adjusting your search criteria." 
-                    : "Get started by adding your first service area to define coverage regions."}
+                    ? t('serviceAreas.noMatchFilters')
+                    : t('serviceAreas.emptyGetStarted')}
                 </p>
                 <AddServiceAreaDialog />
               </div>
@@ -201,35 +203,35 @@ export default function ServiceAreas() {
                               </div>
                               <div>
                                 <h3 className="font-semibold text-lg">{area.name}</h3>
-                                <p className="text-sm text-muted-foreground">Area ID: {area.uuid}</p>
+                                <p className="text-sm text-muted-foreground">{t('serviceAreas.areaId', { id: area.uuid })}</p>
                               </div>
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                               <div>
-                                <p className="text-sm font-medium text-muted-foreground">Created By</p>
-                                <p className="text-sm">{area.created_by_uuid || 'N/A'}</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('serviceAreas.createdBy')}</p>
+                                <p className="text-sm">{area.created_by_uuid || t('serviceAreas.na')}</p>
                               </div>
                               <div>
-                                <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('common.createdAt')}</p>
                                 <p className="text-sm">{new Date(area.created_at).toLocaleDateString()}</p>
                               </div>
                               <div>
-                                <p className="text-sm font-medium text-muted-foreground">Status</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('common.status')}</p>
                                 <Badge variant={area.is_deleted ? "destructive" : "default"}>
-                                  {area.is_deleted ? "Deleted" : "Active"}
+                                  {area.is_deleted ? t('serviceAreas.deleted') : t('serviceAreas.active')}
                                 </Badge>
                               </div>
                             </div>
 
                             {area.description && (
                               <div>
-                                <p className="text-sm font-medium text-muted-foreground">Description</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('common.description')}</p>
                                 <p className="text-sm">{area.description}</p>
                               </div>
                             )}
                           </div>
-                          <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0 ml-4" />
+                          <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0 ms-4" />
                         </div>
                       </CardContent>
                     </Card>
@@ -246,7 +248,7 @@ export default function ServiceAreas() {
                         onClick={() => handlePageChange(1)}
                         disabled={currentPage === 1}
                       >
-                        First
+                        {t('serviceAreas.firstPage')}
                       </Button>
                       <Button
                         variant="outline"
@@ -254,10 +256,10 @@ export default function ServiceAreas() {
                         onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage === 1}
                       >
-                        Previous
+                        {t('common.previous')}
                       </Button>
                       <span className="text-sm text-muted-foreground">
-                        Page {currentPage} of {totalPages}
+                        {t('serviceAreas.pageOf', { page: currentPage, pages: totalPages })}
                       </span>
                       <Button
                         variant="outline"
@@ -265,7 +267,7 @@ export default function ServiceAreas() {
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
                       >
-                        Next
+                        {t('common.next')}
                       </Button>
                       <Button
                         variant="outline"
@@ -273,11 +275,11 @@ export default function ServiceAreas() {
                         onClick={() => handlePageChange(totalPages)}
                         disabled={currentPage === totalPages}
                       >
-                        Last
+                        {t('serviceAreas.lastPage')}
                       </Button>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, totalCount)} of {totalCount} areas
+                      {t('serviceAreas.showingAreas', { from: ((currentPage - 1) * perPage) + 1, to: Math.min(currentPage * perPage, totalCount), total: totalCount })}
                     </div>
                   </div>
                 )}
@@ -286,7 +288,7 @@ export default function ServiceAreas() {
           </TabsContent>
 
           <TabsContent value="map" className="space-y-4">
-            <div className="h-[600px] rounded-lg border overflow-hidden">
+            <div dir="ltr" className="h-[600px] rounded-lg border overflow-hidden">
               {isMapLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <Skeleton className="h-full w-full" />

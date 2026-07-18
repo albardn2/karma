@@ -19,10 +19,11 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { AddItemDialog } from "@/components/customer-orders/AddItemDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const CreateCustomerOrderSchema = z.object({
-  customer_uuid: z.string().min(1, "Customer is required"),
-  currency: z.string().min(1, "Currency is required"),
+  customer_uuid: z.string().min(1, "customerOrders.customerRequired"),
+  currency: z.string().min(1, "customerOrders.currencyRequired"),
   notes: z.string().optional(),
   due_date: z.date().optional(),
 });
@@ -39,6 +40,7 @@ interface CustomerOrderItem {
 }
 
 export default function CustomerOrderCreate() {
+  const { t } = useLanguage();
   const [, setLocation] = useLocation();
   const [items, setItems] = useState<CustomerOrderItem[]>([]);
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
@@ -118,15 +120,15 @@ export default function CustomerOrderCreate() {
       queryClient.invalidateQueries({ queryKey: ["/customer-order/"] });
       queryClient.refetchQueries({ queryKey: ["/customer-order/"] });
       toast({
-        title: "Success",
-        description: "Customer order created successfully",
+        title: t('common.success'),
+        description: t('customerOrders.createSuccess'),
       });
       setLocation("/customer-orders");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create customer order",
+        title: t('common.error'),
+        description: error.message || t('customerOrders.createFailed'),
         variant: "destructive",
       });
     },
@@ -135,8 +137,8 @@ export default function CustomerOrderCreate() {
   const onSubmit = (data: CreateCustomerOrderForm) => {
     if (items.length === 0) {
       toast({
-        title: "Error",
-        description: "Please add at least one item to the customer order",
+        title: t('common.error'),
+        description: t('customerOrders.addAtLeastOneItem'),
         variant: "destructive",
       });
       return;
@@ -180,15 +182,15 @@ export default function CustomerOrderCreate() {
               size="sm"
               onClick={() => setLocation("/customer-orders")}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t('common.back')}
             </Button>
             <div>
               <h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
-                Create Customer Order
+                {t('customerOrders.createTitle')}
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Add a new customer order with items and invoice
+                {t('customerOrders.createSubtitle')}
               </p>
             </div>
           </div>
@@ -199,14 +201,14 @@ export default function CustomerOrderCreate() {
               onClick={() => setLocation("/customer-orders")}
               disabled={createMutation.isPending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
-            <Button 
+            <Button
               onClick={form.handleSubmit(onSubmit)}
               disabled={createMutation.isPending || items.length === 0}
               className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
             >
-              {createMutation.isPending ? "Creating..." : "Create Customer Order"}
+              {createMutation.isPending ? t('common.creating') : t('customerOrders.createTitle')}
             </Button>
           </div>
         </div>
@@ -215,7 +217,7 @@ export default function CustomerOrderCreate() {
           {/* Customer Order Details */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Customer Order Details</CardTitle>
+              <CardTitle className="text-lg">{t('customerOrders.orderDetails')}</CardTitle>
             </CardHeader>
             <CardContent className="p-8">
               <div className="space-y-10">
@@ -227,10 +229,10 @@ export default function CustomerOrderCreate() {
                       <div className="w-2 h-8 bg-gradient-to-b from-[#5469D4] to-[#4356C7] rounded-full"></div>
                       <div>
                         <Label className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                          Customer Selection *
+                          {t('customerOrders.customerSelection')} *
                         </Label>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                          Choose your customer or enter UUID manually
+                          {t('customerOrders.chooseCustomerHint')}
                         </p>
                       </div>
                     </div>
@@ -251,7 +253,7 @@ export default function CustomerOrderCreate() {
                           form.setValue("customer_uuid", "");
                         }}
                       >
-                        Browse
+                        {t('customerOrders.browse')}
                       </Button>
                       <Button
                         type="button"
@@ -268,14 +270,14 @@ export default function CustomerOrderCreate() {
                           form.setValue("customer_uuid", "");
                         }}
                       >
-                        Manual Entry
+                        {t('customerOrders.manualEntry')}
                       </Button>
                     </div>
                     
                     <div>
                       {useManualCustomerUuid ? (
                         <Input
-                          placeholder="Enter customer UUID..."
+                          placeholder={t('customerOrders.enterCustomerUuid')}
                           value={form.watch("customer_uuid")}
                           onChange={(e) => {
                             form.setValue("customer_uuid", e.target.value);
@@ -288,23 +290,23 @@ export default function CustomerOrderCreate() {
                           <Button
                             variant="outline"
                             type="button"
-                            className="w-full justify-between h-12 text-lg text-left border-2 border-gray-200 dark:border-gray-600 hover:border-[#5469D4] transition-colors"
+                            className="w-full justify-between h-12 text-lg text-start border-2 border-gray-200 dark:border-gray-600 hover:border-[#5469D4] transition-colors"
                             onClick={() => setCustomerOpen(!customerOpen)}
                           >
                             {customerValue
                               ? customers?.find((customer: any) => customer.uuid === customerValue)?.company_name || 
                                 customers?.find((customer: any) => customer.uuid === customerValue)?.first_name + " " + 
-                                customers?.find((customer: any) => customer.uuid === customerValue)?.last_name || 
-                                "Customer not found"
-                              : "Select customer..."}
-                            <ChevronsUpDown className="ml-2 h-5 w-5 shrink-0 opacity-50" />
+                                customers?.find((customer: any) => customer.uuid === customerValue)?.last_name ||
+                                t('customerOrders.customerNotFound')
+                              : t('customerOrders.selectCustomer')}
+                            <ChevronsUpDown className="ms-2 h-5 w-5 shrink-0 opacity-50" />
                           </Button>
                           
                           {customerOpen && (
                             <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg shadow-xl">
                               <div className="p-4">
                                 <Input
-                                  placeholder="Search customers..."
+                                  placeholder={t('customerOrders.searchCustomers')}
                                   value={customerSearch}
                                   onChange={(e) => setCustomerSearch(e.target.value)}
                                   className="mb-2"
@@ -324,7 +326,7 @@ export default function CustomerOrderCreate() {
                                     >
                                       <Check
                                         className={cn(
-                                          "mr-3 h-4 w-4 text-[#5469D4]",
+                                          "me-3 h-4 w-4 text-[#5469D4]",
                                           customerValue === customer.uuid ? "opacity-100" : "opacity-0"
                                         )}
                                       />
@@ -335,7 +337,7 @@ export default function CustomerOrderCreate() {
                                   ))
                                 ) : (
                                   <div className="px-4 py-3 text-gray-500 dark:text-gray-400 text-center">
-                                    {customers === undefined ? "Loading..." : "No customers found."}
+                                    {customers === undefined ? t('common.loading') : t('customerOrders.noCustomersFound')}
                                   </div>
                                 )}
                               </div>
@@ -344,7 +346,7 @@ export default function CustomerOrderCreate() {
                         </div>
                       )}
                       {form.formState.errors.customer_uuid && (
-                        <p className="text-sm text-red-600 dark:text-red-400 mt-2 font-medium">{form.formState.errors.customer_uuid.message}</p>
+                        <p className="text-sm text-red-600 dark:text-red-400 mt-2 font-medium">{t(form.formState.errors.customer_uuid.message || '')}</p>
                       )}
                     </div>
                   </div>
@@ -358,10 +360,10 @@ export default function CustomerOrderCreate() {
                       <div className="w-1.5 h-6 bg-green-500 rounded-full"></div>
                       <div>
                         <Label className="text-base font-semibold text-gray-800 dark:text-gray-200">
-                          Currency *
+                          {t('common.currency')} *
                         </Label>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Transaction currency
+                          {t('customerOrders.transactionCurrency')}
                         </p>
                       </div>
                     </div>
@@ -371,7 +373,7 @@ export default function CustomerOrderCreate() {
                       onValueChange={(value) => form.setValue("currency", value)}
                     >
                       <SelectTrigger className="h-12 text-lg border-2 border-gray-200 dark:border-gray-600 focus:border-green-500 transition-colors">
-                        <SelectValue placeholder="Select currency" />
+                        <SelectValue placeholder={t('customerOrders.selectCurrency')} />
                       </SelectTrigger>
                       <SelectContent>
                         {currencies.map((currency: string) => (
@@ -382,7 +384,7 @@ export default function CustomerOrderCreate() {
                       </SelectContent>
                     </Select>
                     {form.formState.errors.currency && (
-                      <p className="text-sm text-red-600 dark:text-red-400 font-medium">{form.formState.errors.currency.message}</p>
+                      <p className="text-sm text-red-600 dark:text-red-400 font-medium">{t(form.formState.errors.currency.message || '')}</p>
                     )}
                   </div>
 
@@ -392,10 +394,10 @@ export default function CustomerOrderCreate() {
                       <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
                       <div>
                         <Label className="text-base font-semibold text-gray-800 dark:text-gray-200">
-                          Due Date
+                          {t('customerOrders.dueDate')}
                         </Label>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Optional deadline for payment
+                          {t('customerOrders.dueDateHint')}
                         </p>
                       </div>
                     </div>
@@ -405,16 +407,16 @@ export default function CustomerOrderCreate() {
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full h-12 pl-4 text-lg text-left font-normal justify-start border-2 border-gray-200 dark:border-gray-600 hover:border-amber-500 transition-colors",
+                            "w-full h-12 ps-4 text-lg text-start font-normal justify-start border-2 border-gray-200 dark:border-gray-600 hover:border-amber-500 transition-colors",
                             !form.watch("due_date") && "text-muted-foreground"
                           )}
                         >
                           {form.watch("due_date") ? (
                             format(form.watch("due_date"), "EEEE, MMMM do, yyyy")
                           ) : (
-                            <span>Choose a due date</span>
+                            <span>{t('customerOrders.chooseDueDate')}</span>
                           )}
-                          <CalendarIcon className="ml-auto h-5 w-5 opacity-50" />
+                          <CalendarIcon className="ms-auto h-5 w-5 opacity-50" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -440,16 +442,16 @@ export default function CustomerOrderCreate() {
                       <div className="w-1.5 h-6 bg-slate-500 rounded-full"></div>
                       <div>
                         <Label className="text-base font-semibold text-gray-800 dark:text-gray-200">
-                          Additional Notes
+                          {t('customerOrders.additionalNotes')}
                         </Label>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Any special instructions or requirements
+                          {t('customerOrders.notesHint')}
                         </p>
                       </div>
                     </div>
                     
                     <Textarea
-                      placeholder="Enter any additional notes, special instructions, or requirements for this customer order..."
+                      placeholder={t('customerOrders.notesPlaceholder')}
                       value={form.watch("notes")}
                       onChange={(e) => form.setValue("notes", e.target.value)}
                       rows={4}
@@ -464,15 +466,15 @@ export default function CustomerOrderCreate() {
           {/* Order Items */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Order Items</CardTitle>
+              <CardTitle className="text-lg">{t('customerOrders.orderItems')}</CardTitle>
               <Button
                 type="button"
                 onClick={() => setAddItemDialogOpen(true)}
                 className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 disabled={!form.watch("customer_uuid") || !form.watch("currency")}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Item
+                <Plus className="h-4 w-4 me-2" />
+                {t('customerOrders.addItem')}
               </Button>
             </CardHeader>
             <CardContent>
@@ -482,10 +484,10 @@ export default function CustomerOrderCreate() {
                     <Plus className="h-8 w-8 text-white" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                    No items added yet
+                    {t('customerOrders.noItemsYet')}
                   </h3>
                   <p className="text-gray-500 dark:text-gray-400 mb-6">
-                    Add items to your customer order to get started.
+                    {t('customerOrders.addItemsHint')}
                   </p>
                   <Button
                     type="button"
@@ -493,8 +495,8 @@ export default function CustomerOrderCreate() {
                     className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                     disabled={!form.watch("customer_uuid") || !form.watch("currency")}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Item
+                    <Plus className="h-4 w-4 me-2" />
+                    {t('customerOrders.addFirstItem')}
                   </Button>
                 </div>
               ) : (
@@ -503,11 +505,11 @@ export default function CustomerOrderCreate() {
                     <table className="w-full">
                       <thead className="border-b border-gray-200 dark:border-gray-700">
                         <tr>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Material</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Quantity</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Unit Price</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Total</th>
-                          <th className="text-left py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.material')}</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.quantity')}</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('customerOrders.unitPrice')}</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.total')}</th>
+                          <th className="text-start py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.actions')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -516,7 +518,7 @@ export default function CustomerOrderCreate() {
                             <td className="py-4">
                               <div>
                                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                  {item.material_name || `Material ${item.material_uuid.substring(0, 8)}...`}
+                                  {item.material_name || t('customerOrders.materialFallback', { id: item.material_uuid.substring(0, 8) })}
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
                                   {item.material_uuid.substring(0, 8)}...
@@ -566,12 +568,12 @@ export default function CustomerOrderCreate() {
 
                   {/* Total Section */}
                   <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <div className="text-right space-y-2">
+                    <div className="text-end space-y-2">
                       <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        Total: ${items.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0).toFixed(2)}
+                        {t('common.total')}: ${items.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0).toFixed(2)}
                       </div>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {items.length} item{items.length !== 1 ? 's' : ''}
+                        {items.length === 1 ? t('customerOrders.itemCountOne', { count: items.length }) : t('customerOrders.itemCountMany', { count: items.length })}
                       </p>
                     </div>
                   </div>
@@ -589,14 +591,14 @@ export default function CustomerOrderCreate() {
                 onClick={() => setLocation("/customer-orders")}
                 className="px-6"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 disabled={createMutation.isPending}
                 className="bg-[#5469D4] hover:bg-[#4356C7] text-white px-6"
               >
-                {createMutation.isPending ? "Creating..." : "Create Customer Order"}
+                {createMutation.isPending ? t('common.creating') : t('customerOrders.createTitle')}
               </Button>
             </div>
           </div>

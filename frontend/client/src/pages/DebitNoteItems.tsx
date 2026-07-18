@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DebitNoteItemFilters } from "@/components/debit-note-items/DebitNoteItemFilters";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface DebitNoteItem {
   uuid: string;
@@ -59,11 +60,11 @@ const getReferenceIcon = (item: DebitNoteItem) => {
 };
 
 const getReferenceType = (item: DebitNoteItem) => {
-  if (item.invoice_item_uuid) return "Invoice Item";
-  if (item.customer_uuid) return "Customer";
-  if (item.vendor_uuid) return "Vendor";
-  if (item.purchase_order_item_uuid) return "Purchase Order Item";
-  return "Unknown";
+  if (item.invoice_item_uuid) return "notes.refInvoiceItem";
+  if (item.customer_uuid) return "notes.refCustomer";
+  if (item.vendor_uuid) return "notes.refVendor";
+  if (item.purchase_order_item_uuid) return "notes.refPurchaseOrderItem";
+  return "common.unknown";
 };
 
 const getReferenceColor = (item: DebitNoteItem) => {
@@ -77,6 +78,7 @@ const getReferenceColor = (item: DebitNoteItem) => {
 export default function DebitNoteItems() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t, te } = useLanguage();
   const [activeTab, setActiveTab] = useState("all");
   const [filters, setFilters] = useState({
     uuid: "",
@@ -171,7 +173,7 @@ export default function DebitNoteItems() {
       <AppLayout>
         <div className="p-8">
           <div className="text-center">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Debit Note Items</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('notes.debitErrorLoadingTitle')}</h3>
             <p className="text-red-600">{(error as Error).message}</p>
           </div>
         </div>
@@ -184,9 +186,9 @@ export default function DebitNoteItems() {
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Debit Note Items</h1>
+            <h1 className="text-3xl font-bold">{t('nav.debitNoteItems')}</h1>
             <p className="text-muted-foreground">
-              Manage debit note items and charges ({totalCount} total)
+              {t('notes.debitSubtitle', { count: totalCount })}
             </p>
           </div>
           <div className="flex gap-2">
@@ -198,18 +200,18 @@ export default function DebitNoteItems() {
               onPerPageChange={handlePerPageChange}
             />
             <Button onClick={() => setLocation("/debit-note-items/create")} className="bg-purple-600 hover:bg-purple-700">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Debit Note Item
+              <Plus className="h-4 w-4 me-2" />
+              {t('notes.addDebitItem')}
             </Button>
           </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="all">All ({getTabCount('all')})</TabsTrigger>
-            <TabsTrigger value="unpaid">Unpaid ({getTabCount('unpaid')})</TabsTrigger>
-            <TabsTrigger value="paid">Paid ({getTabCount('paid')})</TabsTrigger>
-            <TabsTrigger value="overdue">Overdue ({getTabCount('overdue')})</TabsTrigger>
+            <TabsTrigger value="all">{t('notes.tabAll', { count: getTabCount('all') })}</TabsTrigger>
+            <TabsTrigger value="unpaid">{t('notes.tabUnpaid', { count: getTabCount('unpaid') })}</TabsTrigger>
+            <TabsTrigger value="paid">{t('notes.tabPaid', { count: getTabCount('paid') })}</TabsTrigger>
+            <TabsTrigger value="overdue">{t('notes.tabOverdue', { count: getTabCount('overdue') })}</TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4">
@@ -218,23 +220,23 @@ export default function DebitNoteItems() {
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Amount
+                      <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        {t('common.amount')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Amount Due
+                      <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        {t('notes.amountDue')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Reference Type
+                      <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        {t('notes.referenceType')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Status
+                      <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        {t('common.status')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Created Date
+                      <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        {t('notes.createdDate')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Notes
+                      <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        {t('common.notes')}
                       </th>
                     </tr>
                   </thead>
@@ -279,17 +281,17 @@ export default function DebitNoteItems() {
                         <td colSpan={6} className="px-6 py-16 text-center">
                           <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                            No debit note items found
+                            {t('notes.debitNoneFound')}
                           </h3>
                           <p className="text-gray-500 dark:text-gray-400 mb-6">
-                            Get started by creating your first debit note item to track charges and adjustments.
+                            {t('notes.debitEmptyHint')}
                           </p>
-                          <Button 
+                          <Button
                             onClick={() => setLocation("/debit-note-items/create")}
                             className="bg-purple-600 hover:bg-purple-700"
                           >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create Debit Note Item
+                            <Plus className="h-4 w-4 me-2" />
+                            {t('notes.createDebitItem')}
                           </Button>
                         </td>
                       </tr>
@@ -319,7 +321,7 @@ export default function DebitNoteItems() {
                             <div className="flex items-center gap-2">
                               <span className="text-sm">{getReferenceIcon(item)}</span>
                               <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getReferenceColor(item)}`}>
-                                {getReferenceType(item)}
+                                {t(getReferenceType(item))}
                               </span>
                             </div>
                           </td>
@@ -330,10 +332,10 @@ export default function DebitNoteItems() {
                                   ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
                                   : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300'
                               }`}>
-                                {item.is_paid ? 'Paid' : 'Unpaid'}
+                                {te(item.is_paid ? 'paid' : 'unpaid')}
                               </span>
                               <Badge variant="secondary" className="text-xs">
-                                {item.status}
+                                {te(item.status)}
                               </Badge>
                             </div>
                           </td>
@@ -345,7 +347,7 @@ export default function DebitNoteItems() {
                           </td>
                           <td className="px-6 py-4">
                             <span className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs block">
-                              {item.notes || "No notes"}
+                              {item.notes || t('notes.noNotes')}
                             </span>
                           </td>
                         </tr>
@@ -361,7 +363,7 @@ export default function DebitNoteItems() {
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Showing {((page - 1) * perPage) + 1} to {Math.min(page * perPage, totalCount)} of {totalCount} results
+                    {t('notes.showingResults', { from: ((page - 1) * perPage) + 1, to: Math.min(page * perPage, totalCount), total: totalCount })}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -371,10 +373,10 @@ export default function DebitNoteItems() {
                     onClick={() => setPage(page - 1)}
                     disabled={page === 1}
                   >
-                    Previous
+                    {t('common.previous')}
                   </Button>
                   <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Page {page} of {debitNoteItemsPage.pages}
+                    {t('notes.pageInfo', { page, pages: debitNoteItemsPage.pages })}
                   </span>
                   <Button
                     variant="outline"
@@ -382,7 +384,7 @@ export default function DebitNoteItems() {
                     onClick={() => setPage(page + 1)}
                     disabled={page === debitNoteItemsPage.pages}
                   >
-                    Next
+                    {t('common.next')}
                   </Button>
                 </div>
               </div>

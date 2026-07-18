@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Filter, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PricingFilters {
   uuid?: string;
@@ -23,6 +24,7 @@ interface PricingFiltersProps {
 }
 
 export function PricingFilters({ filters, onFiltersChange, totalCount, perPage, onPerPageChange }: PricingFiltersProps) {
+  const { t } = useLanguage();
   const [localFilters, setLocalFilters] = useState<PricingFilters>(filters);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -56,55 +58,55 @@ export function PricingFilters({ filters, onFiltersChange, totalCount, perPage, 
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" className="relative">
-          <Filter className="h-4 w-4 mr-2" />
-          Filters
+          <Filter className="h-4 w-4 me-2" />
+          {t('common.filters')}
           {hasActiveFilters && (
-            <span className="absolute -top-1 -right-1 h-3 w-3 bg-[#5469D4] rounded-full"></span>
+            <span className="absolute -top-1 -end-1 h-3 w-3 bg-[#5469D4] rounded-full"></span>
           )}
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-80">
         <SheetHeader>
-          <SheetTitle>Filter Pricing</SheetTitle>
+          <SheetTitle>{t('pricing.filterTitle')}</SheetTitle>
         </SheetHeader>
         
         <div className="mt-6 space-y-6">
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="uuid">UUID</Label>
+                <Label htmlFor="uuid">{t('pricing.uuid')}</Label>
                 <Input
                   id="uuid"
-                  placeholder="Filter by UUID"
+                  placeholder={t('pricing.filterByUuid')}
                   value={localFilters.uuid || ""}
                   onChange={(e) => setLocalFilters({ ...localFilters, uuid: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="material_uuid">Material UUID</Label>
+                <Label htmlFor="material_uuid">{t('pricing.materialUuid')}</Label>
                 <Input
                   id="material_uuid"
-                  placeholder="Filter by material UUID"
+                  placeholder={t('pricing.filterByMaterialUuid')}
                   value={localFilters.material_uuid || ""}
                   onChange={(e) => setLocalFilters({ ...localFilters, material_uuid: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="currency">Currency</Label>
+                <Label htmlFor="currency">{t('common.currency')}</Label>
                 <Select
                   value={localFilters.currency || "all"}
-                  onValueChange={(value) => setLocalFilters({ 
-                    ...localFilters, 
-                    currency: value === "all" ? "" : value 
+                  onValueChange={(value) => setLocalFilters({
+                    ...localFilters,
+                    currency: value === "all" ? "" : value
                   })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select currency" />
+                    <SelectValue placeholder={t('pricing.selectCurrency')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Currencies</SelectItem>
+                    <SelectItem value="all">{t('pricing.allCurrencies')}</SelectItem>
                     {currencies?.map((currency) => (
                       <SelectItem key={currency} value={currency}>
                         {currency}
@@ -115,19 +117,19 @@ export function PricingFilters({ filters, onFiltersChange, totalCount, perPage, 
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="per_page">Items per Page</Label>
+                <Label htmlFor="per_page">{t('pricing.itemsPerPage')}</Label>
                 <Select
                   value={perPage.toString()}
                   onValueChange={(value) => onPerPageChange(parseInt(value))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select items per page" />
+                    <SelectValue placeholder={t('pricing.selectItemsPerPage')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="10">10 per page</SelectItem>
-                    <SelectItem value="20">20 per page</SelectItem>
-                    <SelectItem value="50">50 per page</SelectItem>
-                    <SelectItem value="100">100 per page</SelectItem>
+                    <SelectItem value="10">{t('pricing.perPageOption', { count: 10 })}</SelectItem>
+                    <SelectItem value="20">{t('pricing.perPageOption', { count: 20 })}</SelectItem>
+                    <SelectItem value="50">{t('pricing.perPageOption', { count: 50 })}</SelectItem>
+                    <SelectItem value="100">{t('pricing.perPageOption', { count: 100 })}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -136,17 +138,17 @@ export function PricingFilters({ filters, onFiltersChange, totalCount, perPage, 
 
           <div className="flex flex-col gap-3 pt-6 border-t">
             <Button onClick={handleApplyFilters} className="w-full bg-[#5469D4] hover:bg-[#4356C7] text-white">
-              Apply Filters
+              {t('pricing.applyFilters')}
             </Button>
-            
+
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={handleClearFilters}
                 className="flex-1"
                 disabled={!hasActiveFilters}
               >
-                Clear All
+                {t('pricing.clearAll')}
               </Button>
               <Button variant="outline" onClick={() => setIsOpen(false)} className="flex-1">
                 <X className="h-4 w-4" />

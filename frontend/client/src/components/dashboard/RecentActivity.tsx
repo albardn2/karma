@@ -66,7 +66,7 @@ export function RecentActivity() {
           const { icon: IconComponent, color } = getIcon(activity.type);
           
           return (
-            <div key={activity.id} className="flex items-start space-x-3">
+            <div key={activity.id} className="flex items-start space-x-3 rtl:space-x-reverse">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${color}`}>
                 <IconComponent className="w-4 h-4" />
               </div>

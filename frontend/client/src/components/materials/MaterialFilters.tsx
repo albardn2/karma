@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Filter } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { MaterialFilters } from "@/lib/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface MaterialFiltersComponentProps {
   filters: MaterialFilters;
@@ -15,6 +16,7 @@ interface MaterialFiltersComponentProps {
 }
 
 export function MaterialFiltersComponent({ filters, onFiltersChange }: MaterialFiltersComponentProps) {
+  const { t, te } = useLanguage();
   const [localFilters, setLocalFilters] = useState<MaterialFilters>(filters);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -56,9 +58,9 @@ export function MaterialFiltersComponent({ filters, onFiltersChange }: MaterialF
       <SheetTrigger asChild>
         <Button variant="outline" className="gap-2 relative">
           <Filter className="h-4 w-4" />
-          Filters
+          {t('common.filters')}
           {hasActiveFilters && (
-            <span className="bg-blue-600 text-white text-xs font-medium rounded-full px-2 py-1 ml-2">
+            <span className="bg-blue-600 text-white text-xs font-medium rounded-full px-2 py-1 ms-2">
               {Object.keys(filters).filter(key => key !== 'page' && key !== 'per_page' && filters[key as keyof MaterialFilters]).length}
             </span>
           )}
@@ -66,57 +68,57 @@ export function MaterialFiltersComponent({ filters, onFiltersChange }: MaterialF
       </SheetTrigger>
       <SheetContent side="right" className="w-80">
         <SheetHeader>
-          <SheetTitle>Filter Materials</SheetTitle>
+          <SheetTitle>{t('materials.filterMaterials')}</SheetTitle>
           <SheetDescription>
-            Apply filters to narrow down the material list
+            {t('materials.filterDescription')}
           </SheetDescription>
         </SheetHeader>
-        
+
         <div className="space-y-4 mt-6">
           <div className="space-y-2">
-            <Label htmlFor="uuid">UUID</Label>
+            <Label htmlFor="uuid">{t('materials.uuid')}</Label>
             <Input
               id="uuid"
               value={localFilters.uuid || ""}
               onChange={(e) => setLocalFilters({ ...localFilters, uuid: e.target.value })}
-              placeholder="Search by UUID"
+              placeholder={t('materials.searchByUuid')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="name">Material Name</Label>
+            <Label htmlFor="name">{t('materials.materialName')}</Label>
             <Input
               id="name"
               value={localFilters.name || ""}
               onChange={(e) => setLocalFilters({ ...localFilters, name: e.target.value })}
-              placeholder="Search by material name"
+              placeholder={t('materials.searchByName')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="sku">SKU</Label>
+            <Label htmlFor="sku">{t('materials.sku')}</Label>
             <Input
               id="sku"
               value={localFilters.sku || ""}
               onChange={(e) => setLocalFilters({ ...localFilters, sku: e.target.value })}
-              placeholder="Search by SKU"
+              placeholder={t('materials.searchBySku')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="type">Material Type</Label>
+            <Label htmlFor="type">{t('materials.materialType')}</Label>
             <Select
               value={localFilters.type || "all"}
               onValueChange={(value: string) => setLocalFilters({ ...localFilters, type: value === "all" ? undefined : value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select type" />
+                <SelectValue placeholder={t('materials.selectTypeShort')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="all">{t('materials.allTypes')}</SelectItem>
                 {materialTypes?.map(type => (
                   <SelectItem key={type} value={type}>
-                    {type}
+                    {te(type)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -124,29 +126,29 @@ export function MaterialFiltersComponent({ filters, onFiltersChange }: MaterialF
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="per_page">Items per page</Label>
+            <Label htmlFor="per_page">{t('materials.itemsPerPage')}</Label>
             <Select
               value={localFilters.per_page?.toString() || "20"}
               onValueChange={(value) => setLocalFilters({ ...localFilters, per_page: parseInt(value) })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Items per page" />
+                <SelectValue placeholder={t('materials.itemsPerPage')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="10">10 per page</SelectItem>
-                <SelectItem value="20">20 per page</SelectItem>
-                <SelectItem value="50">50 per page</SelectItem>
-                <SelectItem value="100">100 per page</SelectItem>
+                <SelectItem value="10">{t('materials.perPageOption', { count: 10 })}</SelectItem>
+                <SelectItem value="20">{t('materials.perPageOption', { count: 20 })}</SelectItem>
+                <SelectItem value="50">{t('materials.perPageOption', { count: 50 })}</SelectItem>
+                <SelectItem value="100">{t('materials.perPageOption', { count: 100 })}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="flex gap-2 pt-4">
             <Button onClick={handleApply} className="flex-1">
-              Apply Filters
+              {t('materials.applyFilters')}
             </Button>
             <Button onClick={handleClear} variant="outline" className="flex-1">
-              Clear Filters
+              {t('common.clearFilters')}
             </Button>
           </div>
         </div>

@@ -1,4 +1,20 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { translations, type Lang } from "@/i18n";
+
+// The boundary sits ABOVE LanguageProvider (it must catch crashes in the
+// providers themselves), so useLanguage() is unavailable here. Read the stored
+// language straight from localStorage and resolve strings against the same
+// translations map the context uses.
+const tr = (key: string): string => {
+  let lang: Lang = "en";
+  try {
+    const stored = localStorage.getItem("app_language");
+    if (stored === "ar" || stored === "en") lang = stored;
+  } catch {
+    // localStorage may be unavailable; fall back to English
+  }
+  return translations[lang][key] ?? translations.en[key] ?? key;
+};
 
 /**
  * App-wide error boundary: a render crash anywhere used to unmount the whole
@@ -23,7 +39,7 @@ export class ErrorBoundary extends Component<
       return (
         <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50">
           <div className="max-w-md w-full bg-white border border-gray-200 rounded-lg p-6 text-center space-y-4 shadow-sm">
-            <h1 className="text-lg font-semibold text-gray-900">Something went wrong</h1>
+            <h1 className="text-lg font-semibold text-gray-900">{tr('common.somethingWrong')}</h1>
             <p className="text-sm text-gray-500 break-words" data-testid="text-render-error">
               {this.state.error.message}
             </p>
@@ -36,14 +52,14 @@ export class ErrorBoundary extends Component<
                 }}
                 data-testid="button-error-back"
               >
-                Go back
+                {tr('misc.error.goBack')}
               </button>
               <button
                 className="px-4 py-2 text-sm font-medium rounded-md bg-[#5469D4] text-white hover:bg-[#4356C7]"
                 onClick={() => window.location.reload()}
                 data-testid="button-error-reload"
               >
-                Reload
+                {tr('misc.error.reload')}
               </button>
             </div>
           </div>

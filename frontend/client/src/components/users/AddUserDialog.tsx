@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -23,22 +23,24 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PermissionScope, type UserFormData } from "@/lib/types";
 
-const userSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters").refine(val => !val.includes('@'), "Username cannot be an email address"),
-  first_name: z.string().min(1, "First name is required"),
-  last_name: z.string().min(1, "Last name is required"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  email: z.string().email("Invalid email format").optional().or(z.literal("")),
-  phone_number: z.string().optional(),
-  language: z.string().optional(),
-  permission_scope: z.string().optional(),
-  rfid_token: z.string().optional(),
-});
+const makeUserSchema = (t: (key: string) => string) =>
+  z.object({
+    username: z.string().min(3, t("users.usernameMin")).refine(val => !val.includes('@'), t("users.usernameNotEmail")),
+    first_name: z.string().min(1, t("users.firstNameRequired")),
+    last_name: z.string().min(1, t("users.lastNameRequired")),
+    password: z.string().min(6, t("users.passwordMin")),
+    email: z.string().email(t("users.invalidEmail")).optional().or(z.literal("")),
+    phone_number: z.string().optional(),
+    language: z.string().optional(),
+    permission_scope: z.string().optional(),
+    rfid_token: z.string().optional(),
+  });
 
-type UserFormValues = z.infer<typeof userSchema>;
+type UserFormValues = z.infer<ReturnType<typeof makeUserSchema>>;
 
 interface AddUserDialogProps {
   permissionScopes: string[];
@@ -47,6 +49,9 @@ interface AddUserDialogProps {
 export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const { t, te } = useLanguage();
+
+  const userSchema = useMemo(() => makeUserSchema(t), [t]);
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
@@ -91,16 +96,16 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
       });
       
       toast({
-        title: "Success",
-        description: "User created successfully",
+        title: t("common.success"),
+        description: t("users.createdSuccess"),
       });
       setOpen(false);
       form.reset();
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create user",
+        title: t("common.error"),
+        description: error.message || t("users.createFailed"),
         variant: "destructive",
       });
     },
@@ -115,12 +120,12 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
       <DialogTrigger asChild>
         <Button className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
-          Add User
+          {t("users.addUser")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New User</DialogTitle>
+          <DialogTitle>{t("users.addNewUser")}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -130,9 +135,9 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username *</FormLabel>
+                    <FormLabel>{t("common.username")} *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter username" {...field} />
+                      <Input placeholder={t("users.enterUsername")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -144,9 +149,9 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password *</FormLabel>
+                    <FormLabel>{t("common.password")} *</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="Enter password" {...field} />
+                      <Input type="password" placeholder={t("users.enterPassword")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -158,9 +163,9 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 name="first_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name *</FormLabel>
+                    <FormLabel>{t("users.firstName")} *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter first name" {...field} />
+                      <Input placeholder={t("users.enterFirstName")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -172,9 +177,9 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 name="last_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last Name *</FormLabel>
+                    <FormLabel>{t("users.lastName")} *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter last name" {...field} />
+                      <Input placeholder={t("users.enterLastName")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -186,9 +191,9 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("common.email")}</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="Enter email" {...field} />
+                      <Input type="email" placeholder={t("users.enterEmail")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -200,9 +205,9 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 name="phone_number"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
+                    <FormLabel>{t("users.phoneNumber")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter phone number" {...field} />
+                      <Input placeholder={t("users.enterPhoneNumber")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -214,17 +219,17 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 name="permission_scope"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Permission Scope</FormLabel>
+                    <FormLabel>{t("users.permissionScope")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select permission scope" />
+                          <SelectValue placeholder={t("users.selectPermissionScope")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {Object.values(PermissionScope).map((scope) => (
                           <SelectItem key={scope} value={scope}>
-                            {scope.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            {te(scope)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -239,9 +244,9 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 name="language"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Language</FormLabel>
+                    <FormLabel>{t("common.language")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter language preference" {...field} />
+                      <Input placeholder={t("users.enterLanguage")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -253,9 +258,9 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 name="rfid_token"
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
-                    <FormLabel>RFID Token</FormLabel>
+                    <FormLabel>{t("users.rfidToken")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter RFID token (optional)" {...field} />
+                      <Input placeholder={t("users.enterRfidTokenOptional")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -263,17 +268,17 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
               />
             </div>
 
-            <div className="flex justify-end space-x-2 pt-4">
+            <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setOpen(false)}
                 disabled={createUserMutation.isPending}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={createUserMutation.isPending}>
-                {createUserMutation.isPending ? "Creating..." : "Create User"}
+                {createUserMutation.isPending ? t("common.creating") : t("users.createUser")}
               </Button>
             </div>
           </form>

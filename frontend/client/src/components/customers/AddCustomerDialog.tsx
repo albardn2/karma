@@ -23,6 +23,7 @@ import {
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { CustomerFormData } from "@/lib/types";
 
 interface AddCustomerDialogProps {
@@ -30,6 +31,7 @@ interface AddCustomerDialogProps {
 }
 
 export function AddCustomerDialog({ categories }: AddCustomerDialogProps) {
+  const { t, te } = useLanguage();
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState<CustomerFormData>({
     company_name: "",
@@ -78,14 +80,14 @@ export function AddCustomerDialog({ categories }: AddCustomerDialogProps) {
         coordinates: "",
       });
       toast({
-        title: "Success",
-        description: "Customer created successfully",
+        title: t('common.success'),
+        description: t('customers.createSuccess'),
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
-        description: "Failed to create customer",
+        title: t('common.error'),
+        description: t('customers.createFailed'),
         variant: "destructive",
       });
     },
@@ -95,8 +97,8 @@ export function AddCustomerDialog({ categories }: AddCustomerDialogProps) {
     e.preventDefault();
     if (!formData.company_name || !formData.full_name || !formData.phone_number || !formData.category) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
+        title: t('common.error'),
+        description: t('customers.fillRequired'),
         variant: "destructive",
       });
       return;
@@ -133,74 +135,74 @@ export function AddCustomerDialog({ categories }: AddCustomerDialogProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="brand-gradient hover:opacity-90">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Customer
+          <Plus className="w-4 h-4 me-2" />
+          {t('customers.addCustomer')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Customer</DialogTitle>
+          <DialogTitle>{t('customers.addNewCustomer')}</DialogTitle>
           <DialogDescription>
-            Create a new customer record with their company and contact information.
+            {t('customers.addDialogDesc')}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="company_name">Company Name *</Label>
+            <Label htmlFor="company_name">{t('common.companyName')} *</Label>
             <Input
               id="company_name"
               value={formData.company_name}
               onChange={(e) => handleInputChange("company_name", e.target.value)}
-              placeholder="Enter company name"
+              placeholder={t('customers.enterCompanyName')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="full_name">Contact Person *</Label>
+            <Label htmlFor="full_name">{t('customers.contactPerson')} *</Label>
             <Input
               id="full_name"
               value={formData.full_name}
               onChange={(e) => handleInputChange("full_name", e.target.value)}
-              placeholder="Enter contact person name"
+              placeholder={t('customers.enterContactPerson')}
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="phone_number">Phone Number *</Label>
+              <Label htmlFor="phone_number">{t('customers.phoneNumber')} *</Label>
               <Input
                 id="phone_number"
                 value={formData.phone_number}
                 onChange={(e) => handleInputChange("phone_number", e.target.value)}
-                placeholder="+1 (555) 123-4567"
+                placeholder={t('customers.phonePlaceholder')}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email_address">Email Address</Label>
+              <Label htmlFor="email_address">{t('customers.emailAddress')}</Label>
               <Input
                 id="email_address"
                 type="email"
                 value={formData.email_address}
                 onChange={(e) => handleInputChange("email_address", e.target.value)}
-                placeholder="email@company.com"
+                placeholder={t('customers.emailPlaceholder')}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category">Category *</Label>
+            <Label htmlFor="category">{t('common.category')} *</Label>
             <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select customer category" />
+                <SelectValue placeholder={t('customers.selectCustomerCategory')} />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((category) => (
                   <SelectItem key={category} value={category} className="capitalize">
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                    {te(category)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -208,34 +210,34 @@ export function AddCustomerDialog({ categories }: AddCustomerDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="full_address">Address *</Label>
+            <Label htmlFor="full_address">{t('common.address')} *</Label>
             <Textarea
               id="full_address"
               value={formData.full_address}
               onChange={(e) => handleInputChange("full_address", e.target.value)}
-              placeholder="Enter complete address"
+              placeholder={t('customers.enterCompleteAddress')}
               required
               rows={3}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="coordinates">Coordinates</Label>
+            <Label htmlFor="coordinates">{t('customers.coordinates')}</Label>
             <Input
               id="coordinates"
               value={formData.coordinates}
               onChange={(e) => handleInputChange("coordinates", e.target.value)}
-              placeholder="latitude,longitude (e.g., 33.5138,36.2765)"
+              placeholder={t('customers.coordinatesPlaceholder')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t('common.notes')}</Label>
             <Textarea
               id="notes"
               value={formData.notes}
               onChange={(e) => handleInputChange("notes", e.target.value)}
-              placeholder="Additional notes or comments"
+              placeholder={t('customers.notesPlaceholder')}
               rows={3}
             />
           </div>
@@ -247,14 +249,14 @@ export function AddCustomerDialog({ categories }: AddCustomerDialogProps) {
               onClick={() => setOpen(false)}
               disabled={createCustomerMutation.isPending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               disabled={createCustomerMutation.isPending}
               className="brand-gradient hover:opacity-90"
             >
-              {createCustomerMutation.isPending ? "Creating..." : "Create Customer"}
+              {createCustomerMutation.isPending ? t('common.creating') : t('customers.createCustomer')}
             </Button>
           </DialogFooter>
         </form>

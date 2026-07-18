@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, MapPin, User as UserIcon } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { LocationPlayback, type PlaybackPoint } from "@/components/location/LocationPlayback";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { User } from "@/lib/types";
 
 interface LocationHistoryResponse {
@@ -30,6 +31,7 @@ function toUtcIso(datetimeLocal: string): string {
 }
 
 export default function UserLocationHistory() {
+  const { t } = useLanguage();
   const [, params] = useRoute("/users/:uuid/location-history");
   const uuid = params?.uuid;
   const [, setLocation] = useLocation();
@@ -97,12 +99,12 @@ export default function UserLocationHistory() {
               size="sm"
               onClick={() => setLocation(`/users/${uuid}`)}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 me-2" />
+              {t("common.back")}
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                Location History
+                {t("location.historyTitle")}
               </h1>
               {user && (
                 <p className="text-sm text-gray-600 flex items-center gap-1">
@@ -116,12 +118,12 @@ export default function UserLocationHistory() {
           {/* Time range controls */}
           <Card>
             <CardHeader>
-              <CardTitle>Time Range</CardTitle>
+              <CardTitle>{t("location.timeRange")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col md:flex-row md:items-end gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="from-time">From</Label>
+                  <Label htmlFor="from-time">{t("location.from")}</Label>
                   <Input
                     id="from-time"
                     type="datetime-local"
@@ -131,7 +133,7 @@ export default function UserLocationHistory() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="to-time">To</Label>
+                  <Label htmlFor="to-time">{t("location.to")}</Label>
                   <Input
                     id="to-time"
                     type="datetime-local"
@@ -141,7 +143,7 @@ export default function UserLocationHistory() {
                   />
                 </div>
                 <Button onClick={handleApply} disabled={!fromInput || !toInput}>
-                  Apply
+                  {t("common.apply")}
                 </Button>
               </div>
             </CardContent>
@@ -150,16 +152,16 @@ export default function UserLocationHistory() {
           {/* Playback */}
           {isForbidden ? (
             <div className="text-center py-12">
-              <p className="text-sm text-muted-foreground">Admins only</p>
+              <p className="text-sm text-muted-foreground">{t("location.adminsOnly")}</p>
             </div>
           ) : isLoading ? (
             <div className="text-center py-12">
-              <p className="text-gray-600">Loading location history...</p>
+              <p className="text-gray-600">{t("location.loadingHistory")}</p>
             </div>
           ) : error ? (
             <div className="text-center py-12">
               <p className="text-gray-600">
-                Failed to load location history.{" "}
+                {t("location.failedLoadHistory")}{" "}
                 {error instanceof Error ? error.message : ""}
               </p>
             </div>
@@ -167,16 +169,17 @@ export default function UserLocationHistory() {
             <div className="text-center py-12">
               <MapPin className="h-8 w-8 mx-auto text-gray-400 mb-2" />
               <p className="text-gray-600">
-                No location points in this window.
+                {t("location.noPointsInWindow")}
               </p>
             </div>
           ) : (
             <div className="space-y-2">
               <p className="text-sm text-gray-600">
-                {points.length.toLocaleString()} point
-                {points.length === 1 ? "" : "s"}
+                {points.length === 1
+                  ? t("location.pointCountOne", { count: points.length.toLocaleString() })
+                  : t("location.pointCountOther", { count: points.length.toLocaleString() })}
                 {history && history.total_count > points.length
-                  ? ` (of ${history.total_count.toLocaleString()} total)`
+                  ? t("location.pointOfTotal", { total: history.total_count.toLocaleString() })
                   : ""}
               </p>
               <LocationPlayback points={points} />

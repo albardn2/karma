@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { DollarSign } from "lucide-react";
 import { AddPricingDialog } from "@/components/pricing/AddPricingDialog";
 import { PricingFilters } from "@/components/pricing/PricingFilters";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Pricing {
   uuid: string;
@@ -41,6 +42,7 @@ interface PricingFilters {
 }
 
 export default function Pricing() {
+  const { t } = useLanguage();
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [filters, setFilters] = useState<Omit<PricingFilters, 'page' | 'per_page'>>({});
@@ -108,9 +110,9 @@ export default function Pricing() {
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">Pricing</h1>
+            <h1 className="text-2xl font-bold">{t('nav.pricing')}</h1>
             <p className="text-sm text-muted-foreground">
-              {totalCount} pricing {totalCount === 1 ? 'entry' : 'entries'} on this page
+              {t(totalCount === 1 ? 'pricing.entryOnPage' : 'pricing.entriesOnPage', { count: totalCount })}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -150,13 +152,13 @@ export default function Pricing() {
                           </div>
                           
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>Material: {pricing.material_uuid}</span>
+                            <span>{t('pricing.materialWithId', { id: pricing.material_uuid })}</span>
                             <span>•</span>
-                            <span>Created: {new Date(pricing.created_at).toLocaleDateString()}</span>
+                            <span>{t('pricing.createdOn', { date: new Date(pricing.created_at).toLocaleDateString() })}</span>
                             {pricing.effective_date && (
                               <>
                                 <span>•</span>
-                                <span>Effective: {new Date(pricing.effective_date).toLocaleDateString()}</span>
+                                <span>{t('pricing.effectiveOn', { date: new Date(pricing.effective_date).toLocaleDateString() })}</span>
                               </>
                             )}
                           </div>
@@ -173,12 +175,12 @@ export default function Pricing() {
                 <DollarSign className="h-12 w-12 text-[#5469D4]" />
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                {Object.values(filters).some(v => v) ? "No pricing found" : "No pricing entries yet"}
+                {Object.values(filters).some(v => v) ? t('pricing.noPricingFound') : t('pricing.noPricingYet')}
               </h3>
               <p className="text-gray-500 mb-8 max-w-md text-center leading-relaxed">
-                {Object.values(filters).some(v => v) 
-                  ? "No pricing entries match your current filters. Try adjusting your search criteria." 
-                  : "Get started by creating your first pricing entry to track material costs and pricing information."}
+                {Object.values(filters).some(v => v)
+                  ? t('pricing.emptyFilteredDesc')
+                  : t('pricing.emptyDesc')}
               </p>
               <AddPricingDialog />
             </div>
@@ -188,16 +190,16 @@ export default function Pricing() {
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-sm text-muted-foreground">
-                Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, totalCount)} of {totalCount} pricing entries
+                {t('pricing.showingEntries', { from: ((currentPage - 1) * perPage) + 1, to: Math.min(currentPage * perPage, totalCount), total: totalCount })}
               </p>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 rtl:space-x-reverse">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handlePageChange(1)}
                   disabled={currentPage <= 1}
                 >
-                  First
+                  {t('pricing.first')}
                 </Button>
                 <Button
                   variant="outline"
@@ -205,12 +207,12 @@ export default function Pricing() {
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage <= 1}
                 >
-                  Previous
+                  {t('common.previous')}
                 </Button>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">Page</span>
+                  <span className="text-sm">{t('common.page')}</span>
                   <span className="text-sm font-medium">{currentPage}</span>
-                  <span className="text-sm">of</span>
+                  <span className="text-sm">{t('common.of')}</span>
                   <span className="text-sm font-medium">{totalPages}</span>
                 </div>
                 <Button
@@ -219,7 +221,7 @@ export default function Pricing() {
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage >= totalPages}
                 >
-                  Next
+                  {t('common.next')}
                 </Button>
                 <Button
                   variant="outline"
@@ -227,7 +229,7 @@ export default function Pricing() {
                   onClick={() => handlePageChange(totalPages)}
                   disabled={currentPage >= totalPages}
                 >
-                  Last
+                  {t('pricing.last')}
                 </Button>
               </div>
             </div>

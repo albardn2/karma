@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CreditNoteItemFormData {
   amount: string;
@@ -36,8 +37,9 @@ interface AddCreditNoteItemDialogProps {
 
 export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteItemDialogProps) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
-  
+
   const [formData, setFormData] = useState<CreditNoteItemFormData>({
     amount: "",
     currency: "",
@@ -68,14 +70,14 @@ export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteIte
       onOpenChange(false);
       resetForm();
       toast({
-        title: "Success",
-        description: "Credit note item has been created successfully.",
+        title: t('common.success'),
+        description: t('notes.creditCreatedDialog'),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create credit note item.",
+        title: t('common.error'),
+        description: error.message || t('notes.creditCreateFailedDialog'),
         variant: "destructive",
       });
     },
@@ -105,8 +107,8 @@ export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteIte
     
     if (!formData.amount || !formData.currency) {
       toast({
-        title: "Validation Error",
-        description: "Amount and currency are required.",
+        title: t('notes.validationError'),
+        description: t('notes.amountCurrencyRequired'),
         variant: "destructive",
       });
       return;
@@ -183,15 +185,15 @@ export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteIte
   const getReferenceLabel = () => {
     switch (referenceType) {
       case 'invoice_item':
-        return 'Invoice Item UUID';
+        return t('notes.invoiceItemUuid');
       case 'customer':
-        return 'Customer UUID';
+        return t('notes.customerUuid');
       case 'vendor':
-        return 'Vendor UUID';
+        return t('notes.vendorUuid');
       case 'purchase_order_item':
-        return 'Purchase Order Item UUID';
+        return t('notes.purchaseOrderItemUuid');
       default:
-        return 'Reference UUID';
+        return t('notes.referenceUuid');
     }
   };
 
@@ -205,14 +207,14 @@ export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteIte
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5 text-purple-600" />
-            Create Credit Note Item
+            {t('notes.createCreditItem')}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount *</Label>
+              <Label htmlFor="amount">{t('common.amount')} *</Label>
               <Input
                 id="amount"
                 type="number"
@@ -225,10 +227,10 @@ export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteIte
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="currency">Currency *</Label>
+              <Label htmlFor="currency">{t('common.currency')} *</Label>
               <Select value={formData.currency} onValueChange={(value) => handleInputChange("currency", value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select currency..." />
+                  <SelectValue placeholder={t('notes.selectCurrencyDots')} />
                 </SelectTrigger>
                 <SelectContent>
                   {(currencies as Currency[])?.map((currency: Currency) => (
@@ -242,13 +244,13 @@ export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteIte
           </div>
 
           <div className="space-y-3">
-            <Label>Reference Type *</Label>
+            <Label>{t('notes.referenceType')} *</Label>
             <div className="flex flex-wrap gap-2">
               {[
-                { key: 'invoice_item', label: 'Invoice Item' },
-                { key: 'customer', label: 'Customer' },
-                { key: 'vendor', label: 'Vendor' },
-                { key: 'purchase_order_item', label: 'Purchase Order Item' }
+                { key: 'invoice_item', label: t('notes.refInvoiceItem') },
+                { key: 'customer', label: t('notes.refCustomer') },
+                { key: 'vendor', label: t('notes.refVendor') },
+                { key: 'purchase_order_item', label: t('notes.refPurchaseOrderItem') }
               ].map((type) => (
                 <Button
                   key={type.key}
@@ -268,7 +270,7 @@ export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteIte
             <Label htmlFor="reference_uuid">{getReferenceLabel()} *</Label>
             <Input
               id="reference_uuid"
-              placeholder={`Enter ${getReferenceLabel().toLowerCase()}...`}
+              placeholder={t('notes.enterReference', { label: getReferenceLabel().toLowerCase() })}
               value={getCurrentReferenceValue()}
               onChange={(e) => setCurrentReferenceValue(e.target.value)}
               required
@@ -277,7 +279,7 @@ export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteIte
 
           {canHaveInventoryChange && (
             <div className="space-y-2">
-              <Label htmlFor="inventory_change">Inventory Change</Label>
+              <Label htmlFor="inventory_change">{t('notes.inventoryChange')}</Label>
               <Input
                 id="inventory_change"
                 type="number"
@@ -287,46 +289,46 @@ export function AddCreditNoteItemDialog({ open, onOpenChange }: AddCreditNoteIte
                 onChange={(e) => handleInputChange("inventory_change", e.target.value)}
               />
               <p className="text-sm text-muted-foreground">
-                Optional: Specify inventory quantity change (positive for increase, negative for decrease)
+                {t('notes.inventoryChangeHintDialog')}
               </p>
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t('common.notes')}</Label>
             <Textarea
               id="notes"
               value={formData.notes}
               onChange={(e) => handleInputChange("notes", e.target.value)}
-              placeholder="Add any additional notes about this credit note item..."
+              placeholder={t('notes.notesPlaceholderDialog')}
               rows={3}
             />
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 rtl:space-x-reverse">
             <Switch
               id="create_payout"
               checked={formData.create_payout}
               onCheckedChange={(checked) => handleInputChange("create_payout", checked)}
             />
-            <Label htmlFor="create_payout">Create automatic payout</Label>
+            <Label htmlFor="create_payout">{t('notes.createAutomaticPayout')}</Label>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={createCreditNoteItemMutation.isPending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               disabled={createCreditNoteItemMutation.isPending}
               className="bg-purple-600 hover:bg-purple-700"
             >
-              {createCreditNoteItemMutation.isPending ? "Creating..." : "Create Credit Note Item"}
+              {createCreditNoteItemMutation.isPending ? t('common.creating') : t('notes.createCreditItem')}
             </Button>
           </div>
         </form>

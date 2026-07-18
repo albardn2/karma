@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { TransactionFilters } from "@/components/transactions/TransactionFilters";
 import { format } from "date-fns";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Transaction {
   uuid: string;
@@ -47,6 +48,7 @@ interface TransactionFiltersType {
 }
 
 export default function Transactions() {
+  const { t } = useLanguage();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [filters, setFilters] = useState<TransactionFiltersType>({
@@ -72,14 +74,14 @@ export default function Transactions() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/transaction/"] });
       toast({
-        title: "Success",
-        description: "Transaction deleted successfully",
+        title: t('common.success'),
+        description: t('financial.transactionDeleted'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete transaction",
+        title: t('common.error'),
+        description: error.message || t('financial.failedDeleteTransaction'),
         variant: "destructive",
       });
     },
@@ -99,7 +101,7 @@ export default function Transactions() {
   };
 
   const handleDelete = (uuid: string) => {
-    if (window.confirm("Are you sure you want to delete this transaction?")) {
+    if (window.confirm(t('financial.confirmDeleteTransaction'))) {
       deleteMutation.mutate(uuid);
     }
   };
@@ -141,7 +143,7 @@ export default function Transactions() {
       <AppLayout>
         <div className="p-8">
           <div className="text-center py-8">
-            <p className="text-red-600">Error loading transactions: {error.message}</p>
+            <p className="text-red-600">{t('financial.errorLoadingTransactions', { message: error.message })}</p>
           </div>
         </div>
       </AppLayout>
@@ -155,15 +157,15 @@ export default function Transactions() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-medium text-gray-900 dark:text-gray-100">
-              Transactions
+              {t('nav.transactions')}
             </h1>
           </div>
           <Button
             onClick={() => setLocation("/transactions/create")}
             className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Transaction
+            <Plus className="h-4 w-4 me-2" />
+            {t('financial.createTransaction')}
           </Button>
         </div>
 
@@ -181,20 +183,20 @@ export default function Transactions() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <ArrowRightLeft className="h-5 w-5" />
-              Transactions
+              {t('nav.transactions')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {transactions.length === 0 ? (
               <div className="text-center py-8">
                 <ArrowRightLeft className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 dark:text-gray-400">No transactions found</p>
+                <p className="text-gray-500 dark:text-gray-400">{t('financial.noTransactionsFound')}</p>
                 <Button
                   onClick={() => setLocation("/transactions/create")}
                   className="mt-4 bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create First Transaction
+                  <Plus className="h-4 w-4 me-2" />
+                  {t('financial.createFirstTransaction')}
                 </Button>
               </div>
             ) : (
@@ -202,14 +204,14 @@ export default function Transactions() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>From</TableHead>
-                      <TableHead>To</TableHead>
-                      <TableHead>Exchange Rate</TableHead>
-                      <TableHead>From Account</TableHead>
-                      <TableHead>To Account</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Notes</TableHead>
-                      <TableHead className="w-[70px]">Actions</TableHead>
+                      <TableHead>{t('financial.from')}</TableHead>
+                      <TableHead>{t('financial.to')}</TableHead>
+                      <TableHead>{t('financial.exchangeRate')}</TableHead>
+                      <TableHead>{t('financial.fromAccount')}</TableHead>
+                      <TableHead>{t('financial.toAccount')}</TableHead>
+                      <TableHead>{t('financial.created')}</TableHead>
+                      <TableHead>{t('common.notes')}</TableHead>
+                      <TableHead className="w-[70px]">{t('common.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -261,14 +263,14 @@ export default function Transactions() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setLocation(`/transactions/${transaction.uuid}`)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
+                                <Eye className="h-4 w-4 me-2" />
+                                {t('common.viewDetails')}
                               </DropdownMenuItem>
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={() => handleDelete(transaction.uuid)}
                                 className="text-red-600"
                               >
-                                Delete
+                                {t('common.delete')}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -282,7 +284,11 @@ export default function Transactions() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between mt-4">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Showing {(currentPage - 1) * filters.per_page + 1} to {Math.min(currentPage * filters.per_page, totalCount)} of {totalCount} transactions
+                      {t('financial.showingTransactions', {
+                        from: (currentPage - 1) * filters.per_page + 1,
+                        to: Math.min(currentPage * filters.per_page, totalCount),
+                        total: totalCount,
+                      })}
                     </p>
                     <div className="flex items-center gap-2">
                       <Button
@@ -291,10 +297,10 @@ export default function Transactions() {
                         onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage === 1}
                       >
-                        Previous
+                        {t('common.previous')}
                       </Button>
                       <span className="text-sm px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded">
-                        Page {currentPage} of {totalPages}
+                        {t('financial.pageOf', { page: currentPage, pages: totalPages })}
                       </span>
                       <Button
                         variant="outline"
@@ -302,7 +308,7 @@ export default function Transactions() {
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
                       >
-                        Next
+                        {t('common.next')}
                       </Button>
                     </div>
                   </div>

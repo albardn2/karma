@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface VehicleInventory {
   uuid: string;
@@ -24,6 +25,7 @@ interface VehicleInventory {
  * dialog, so applying an add/adjust/unload refreshes this table live.
  */
 export function VehicleInventoryTable({ vehicleUuid }: { vehicleUuid: string }) {
+  const { t } = useLanguage();
   const { data, isLoading } = useQuery({
     queryKey: ["/vehicle-inventory/", vehicleUuid, "table"],
     queryFn: async () =>
@@ -34,22 +36,22 @@ export function VehicleInventoryTable({ vehicleUuid }: { vehicleUuid: string }) 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Current Inventory</CardTitle>
+        <CardTitle>{t("vehicles.currentInventory")}</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="text-sm text-gray-500 py-6 text-center">Loading...</div>
+          <div className="text-sm text-gray-500 py-6 text-center">{t("common.loading")}</div>
         ) : inventories.length === 0 ? (
           <div className="text-sm text-gray-500 py-6 text-center">
-            No inventory on this vehicle yet.
+            {t("vehicles.noInventory")}
           </div>
         ) : (
           <Table data-testid="table-vehicle-inventory">
             <TableHeader>
               <TableRow>
-                <TableHead>Material</TableHead>
-                <TableHead className="text-right">On hand</TableHead>
-                <TableHead>Unit</TableHead>
+                <TableHead>{t("vehicles.material")}</TableHead>
+                <TableHead className="text-end">{t("vehicles.onHand")}</TableHead>
+                <TableHead>{t("vehicles.unit")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -59,7 +61,7 @@ export function VehicleInventoryTable({ vehicleUuid }: { vehicleUuid: string }) 
                     {inv.material_name || inv.material_uuid}
                   </TableCell>
                   <TableCell
-                    className="text-right font-semibold tabular-nums"
+                    className="text-end font-semibold tabular-nums"
                     data-testid={`text-vinv-qty-${inv.uuid}`}
                   >
                     {inv.current_quantity ?? 0}

@@ -13,11 +13,13 @@ import { apiRequest } from "@/lib/queryClient";
 import type { Warehouse } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function WarehouseDetail() {
   const { uuid } = useParams<{ uuid: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
 
   // Fetch warehouse details
@@ -52,17 +54,17 @@ export default function WarehouseDetail() {
       });
       
       toast({
-        title: "Success",
-        description: "Warehouse deleted successfully",
+        title: t('common.success'),
+        description: t('warehouses.deleteSuccess'),
       });
-      
+
       // Navigate back to warehouses list
       setLocation("/warehouses");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete warehouse",
+        title: t('common.error'),
+        description: error.message || t('warehouses.deleteFailed'),
         variant: "destructive",
       });
     },
@@ -73,13 +75,13 @@ export default function WarehouseDetail() {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: "Copied!",
-        description: `${label} copied to clipboard`,
+        title: t('warehouses.copied'),
+        description: t('warehouses.copiedToClipboard', { label }),
       });
     } catch (err) {
       toast({
-        title: "Error",
-        description: "Failed to copy to clipboard",
+        title: t('common.error'),
+        description: t('warehouses.copyFailed'),
         variant: "destructive",
       });
     }
@@ -97,8 +99,8 @@ export default function WarehouseDetail() {
             <div className="flex items-center gap-4">
               <Link href="/warehouses">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Warehouses
+                  <ArrowLeft className="h-4 w-4 me-2" />
+                  {t('warehouses.backToWarehouses')}
                 </Button>
               </Link>
             </div>
@@ -123,17 +125,17 @@ export default function WarehouseDetail() {
             <div className="flex items-center gap-4">
               <Link href="/warehouses">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Warehouses
+                  <ArrowLeft className="h-4 w-4 me-2" />
+                  {t('warehouses.backToWarehouses')}
                 </Button>
               </Link>
             </div>
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Building className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Warehouse not found</h3>
+                <h3 className="text-lg font-semibold mb-2">{t('warehouses.notFound')}</h3>
                 <p className="text-muted-foreground text-center">
-                  The warehouse you're looking for doesn't exist or may have been deleted.
+                  {t('warehouses.notFoundDescription')}
                 </p>
               </CardContent>
             </Card>
@@ -152,8 +154,8 @@ export default function WarehouseDetail() {
             <div className="flex items-center gap-4">
               <Link href="/warehouses">
                 <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Warehouses
+                  <ArrowLeft className="h-4 w-4 me-2" />
+                  {t('warehouses.backToWarehouses')}
                 </Button>
               </Link>
               <div>
@@ -161,40 +163,40 @@ export default function WarehouseDetail() {
                   <Building className="h-6 w-6" />
                   {warehouse.name}
                 </h1>
-                <p className="text-muted-foreground">Warehouse details and information</p>
+                <p className="text-muted-foreground">{t('warehouses.detailSubtitle')}</p>
               </div>
             </div>
             
             <div className="flex gap-2">
               <Link href={`/warehouses/${uuid}/edit`}>
                 <Button variant="outline" size="sm">
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
+                  <Edit className="h-4 w-4 me-2" />
+                  {t('common.edit')}
                 </Button>
               </Link>
               
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
+                    <Trash2 className="h-4 w-4 me-2" />
+                    {t('common.delete')}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Warehouse</AlertDialogTitle>
+                    <AlertDialogTitle>{t('warehouses.deleteWarehouse')}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete "{warehouse.name}"? This action cannot be undone.
+                      {t('warehouses.deleteConfirmDescription', { name: warehouse.name })}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleDelete}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       disabled={deleteWarehouseMutation.isPending}
                     >
-                      {deleteWarehouseMutation.isPending ? "Deleting..." : "Delete"}
+                      {deleteWarehouseMutation.isPending ? t('common.deleting') : t('common.delete')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -209,7 +211,7 @@ export default function WarehouseDetail() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Building className="h-5 w-5" />
-                  Warehouse Information
+                  {t('warehouses.warehouseInformation')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -217,14 +219,14 @@ export default function WarehouseDetail() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Building className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Name:</span>
+                      <span className="text-sm font-medium">{t('common.name')}:</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm">{warehouse.name}</span>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(warehouse.name, "Warehouse name")}
+                        onClick={() => copyToClipboard(warehouse.name, t('warehouses.warehouseName'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -234,14 +236,14 @@ export default function WarehouseDetail() {
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Address:</span>
+                      <span className="text-sm font-medium">{t('common.address')}:</span>
                     </div>
-                    <div className="flex items-start gap-2 text-right">
+                    <div className="flex items-start gap-2 text-end">
                       <span className="text-sm max-w-[200px]">{warehouse.address}</span>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(warehouse.address, "Address")}
+                        onClick={() => copyToClipboard(warehouse.address, t('common.address'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -252,14 +254,14 @@ export default function WarehouseDetail() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Coordinates:</span>
+                        <span className="text-sm font-medium">{t('warehouses.coordinates')}:</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-mono">{warehouse.coordinates}</span>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => copyToClipboard(warehouse.coordinates!, "Coordinates")}
+                          onClick={() => copyToClipboard(warehouse.coordinates!, t('warehouses.coordinates'))}
                         >
                           <Copy className="h-3 w-3" />
                         </Button>
@@ -270,14 +272,14 @@ export default function WarehouseDetail() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Created:</span>
+                      <span className="text-sm font-medium">{t('warehouses.created')}:</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm">{formatDate(warehouse.created_at)}</span>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(formatDate(warehouse.created_at), "Creation date")}
+                        onClick={() => copyToClipboard(formatDate(warehouse.created_at), t('warehouses.creationDate'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -287,14 +289,14 @@ export default function WarehouseDetail() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Warehouse ID:</span>
+                      <span className="text-sm font-medium">{t('warehouses.warehouseId')}:</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-mono">{warehouse.uuid}</span>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(warehouse.uuid, "Warehouse ID")}
+                        onClick={() => copyToClipboard(warehouse.uuid, t('warehouses.warehouseId'))}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -306,14 +308,14 @@ export default function WarehouseDetail() {
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
                           <StickyNote className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">Notes:</span>
+                          <span className="text-sm font-medium">{t('common.notes')}:</span>
                         </div>
-                        <div className="flex items-start gap-2 text-right">
+                        <div className="flex items-start gap-2 text-end">
                           <span className="text-sm max-w-[200px] whitespace-pre-wrap">{warehouse.notes}</span>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => copyToClipboard(warehouse.notes!, "Notes")}
+                            onClick={() => copyToClipboard(warehouse.notes!, t('common.notes'))}
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
@@ -330,11 +332,13 @@ export default function WarehouseDetail() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="h-5 w-5" />
-                  Location Map
+                  {t('warehouses.locationMap')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <WarehouseDetailMap warehouse={warehouse} />
+                <div dir="ltr">
+                  <WarehouseDetailMap warehouse={warehouse} />
+                </div>
               </CardContent>
             </Card>
           </div>

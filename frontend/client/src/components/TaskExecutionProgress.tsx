@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Check, X, Clock, Circle } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { TaskExecution } from "@/types/taskExecution";
 
 interface TaskExecutionProgressProps {
@@ -13,6 +14,7 @@ export function TaskExecutionProgress({
   selectedTaskExecutionUuid,
   onSelectTaskExecution,
 }: TaskExecutionProgressProps) {
+  const { t, te } = useLanguage();
   // Topological sort to order tasks based on depends_on
   const orderedTasks = topologicalSort(taskExecutions);
 
@@ -29,13 +31,13 @@ export function TaskExecutionProgress({
   if (orderedTasks.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-gray-500">
-        No tasks to display
+        {t('workflows.noTasksToDisplay')}
       </div>
     );
   }
 
   return (
-    <div className="w-full overflow-x-auto py-8" ref={containerRef}>
+    <div className="w-full overflow-x-auto py-8" ref={containerRef} dir="ltr">
       <div className="flex items-center justify-center min-w-max px-8">
         {orderedTasks.map((task, index) => (
           <div key={task.uuid} className="flex items-center">
@@ -60,10 +62,10 @@ export function TaskExecutionProgress({
               {/* Task name below */}
               <div className="mt-3 text-center max-w-[120px]">
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                  {task.name || "Task"}
+                  {task.name || t('workflows.task')}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {formatStatus(task.status)}
+                  {te(task.status)}
                 </p>
               </div>
             </div>
@@ -183,11 +185,4 @@ function getLineColor(fromStatus: string): string {
     default:
       return "bg-gray-300 dark:bg-gray-600";
   }
-}
-
-function formatStatus(status: string): string {
-  return status
-    .split("_")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
 }

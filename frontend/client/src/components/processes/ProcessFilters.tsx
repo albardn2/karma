@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Filter, X } from "lucide-react";
-import { ProcessType, ProcessTypeLabels } from "@/types/process";
+import { ProcessType } from "@/types/process";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ProcessFiltersProps {
   filters: {
@@ -23,6 +24,7 @@ interface ProcessFiltersProps {
 }
 
 export function ProcessFilters({ filters, onFiltersChange }: ProcessFiltersProps) {
+  const { t, te } = useLanguage();
   const [localFilters, setLocalFilters] = useState(filters);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -65,10 +67,10 @@ export function ProcessFilters({ filters, onFiltersChange }: ProcessFiltersProps
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" className="relative">
-          <Filter className="h-4 w-4 mr-2" />
-          Filter
+          <Filter className="h-4 w-4 me-2" />
+          {t('common.filter')}
           {getFilterCount() > 0 && (
-            <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center">
+            <Badge variant="secondary" className="ms-2 h-5 w-5 p-0 flex items-center justify-center">
               {getFilterCount()}
             </Badge>
           )}
@@ -76,24 +78,24 @@ export function ProcessFilters({ filters, onFiltersChange }: ProcessFiltersProps
       </SheetTrigger>
       <SheetContent className="w-[400px] sm:w-[540px] z-[9999]">
         <SheetHeader>
-          <SheetTitle>Filter Processes</SheetTitle>
+          <SheetTitle>{t('processes.filterTitle')}</SheetTitle>
           <SheetDescription>
-            Filter processes by UUID, type, date range, or creator.
+            {t('processes.filterDesc')}
           </SheetDescription>
         </SheetHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="uuid">UUID</Label>
+            <Label htmlFor="uuid">{t('processes.uuid')}</Label>
             <Input
               id="uuid"
-              placeholder="Enter process UUID"
+              placeholder={t('processes.uuidPlaceholder')}
               value={localFilters.uuid || ""}
               onChange={(e) => setLocalFilters({ ...localFilters, uuid: e.target.value })}
             />
           </div>
-          
+
           <div className="grid gap-2">
-            <Label htmlFor="type">Process Type</Label>
+            <Label htmlFor="type">{t('processes.processType')}</Label>
             <Select
               value={localFilters.type || "all"}
               onValueChange={(value) => setLocalFilters({ 
@@ -102,13 +104,13 @@ export function ProcessFilters({ filters, onFiltersChange }: ProcessFiltersProps
               })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select process type" />
+                <SelectValue placeholder={t('processes.selectType')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="all">{t('processes.allTypes')}</SelectItem>
                 {processTypes?.map((type: string) => (
                   <SelectItem key={type} value={type}>
-                    {ProcessTypeLabels[type as ProcessType] || type}
+                    {te(type)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -116,7 +118,7 @@ export function ProcessFilters({ filters, onFiltersChange }: ProcessFiltersProps
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="start_date">Start Date</Label>
+            <Label htmlFor="start_date">{t('processes.startDate')}</Label>
             <Input
               id="start_date"
               type="datetime-local"
@@ -126,7 +128,7 @@ export function ProcessFilters({ filters, onFiltersChange }: ProcessFiltersProps
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="end_date">End Date</Label>
+            <Label htmlFor="end_date">{t('processes.endDate')}</Label>
             <Input
               id="end_date"
               type="datetime-local"
@@ -136,17 +138,17 @@ export function ProcessFilters({ filters, onFiltersChange }: ProcessFiltersProps
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="created_by_uuid">Created By UUID</Label>
+            <Label htmlFor="created_by_uuid">{t('processes.createdByUuid')}</Label>
             <Input
               id="created_by_uuid"
-              placeholder="Enter creator UUID"
+              placeholder={t('processes.creatorUuidPlaceholder')}
               value={localFilters.created_by_uuid || ""}
               onChange={(e) => setLocalFilters({ ...localFilters, created_by_uuid: e.target.value })}
             />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="per_page">Per Page</Label>
+            <Label htmlFor="per_page">{t('common.perPage')}</Label>
             <Select
               value={localFilters.per_page.toString()}
               onValueChange={(value) => setLocalFilters({ ...localFilters, per_page: parseInt(value) })}
@@ -166,11 +168,11 @@ export function ProcessFilters({ filters, onFiltersChange }: ProcessFiltersProps
         
         <div className="flex gap-2 mt-6">
           <Button onClick={handleApplyFilters} className="flex-1">
-            Apply Filters
+            {t('processes.applyFilters')}
           </Button>
           <Button variant="outline" onClick={handleClearFilters} className="flex-1">
-            <X className="h-4 w-4 mr-2" />
-            Clear
+            <X className="h-4 w-4 me-2" />
+            {t('processes.clear')}
           </Button>
         </div>
       </SheetContent>

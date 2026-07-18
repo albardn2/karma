@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest, queryClient as globalQueryClient } from "@/lib/queryClient";
 import { API_BASE_URL } from "@/lib/config";
 import type { Workflow, Task } from "@shared/schema";
@@ -69,6 +70,7 @@ export default function WorkflowDetail() {
   const [, params] = useRoute("/workflows/:uuid");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const uuid = params?.uuid;
 
@@ -196,16 +198,16 @@ export default function WorkflowDetail() {
       });
 
       toast({
-        title: "Success",
-        description: "Workflow updated successfully",
+        title: t('common.success'),
+        description: t('workflows.updatedSuccess'),
       });
 
       setIsEditing(false);
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to update workflow",
+        title: t('common.error'),
+        description: t('workflows.updateFailed'),
         variant: "destructive",
       });
     },
@@ -226,16 +228,16 @@ export default function WorkflowDetail() {
       });
 
       toast({
-        title: "Success",
-        description: "Workflow deleted successfully",
+        title: t('common.success'),
+        description: t('workflows.deletedSuccess'),
       });
 
       setLocation("/workflows");
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to delete workflow",
+        title: t('common.error'),
+        description: t('workflows.deleteFailed'),
         variant: "destructive",
       });
     },
@@ -251,8 +253,8 @@ export default function WorkflowDetail() {
         parsedParameters = JSON.parse(formData.parameters.trim());
       } catch (e) {
         toast({
-          title: "Validation Error",
-          description: "Invalid JSON in parameters field",
+          title: t('workflows.validationError'),
+          description: t('workflows.invalidJsonParameters'),
           variant: "destructive",
         });
         return;
@@ -319,16 +321,16 @@ export default function WorkflowDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/task/", uuid] });
       toast({
-        title: "Success",
-        description: "Task created successfully",
+        title: t('common.success'),
+        description: t('workflows.taskCreatedSuccess'),
       });
       setIsTaskDialogOpen(false);
       resetTaskForm();
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to create task",
+        title: t('common.error'),
+        description: t('workflows.taskCreateFailed'),
         variant: "destructive",
       });
     },
@@ -360,16 +362,16 @@ export default function WorkflowDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/task/", uuid] });
       toast({
-        title: "Success",
-        description: "Task updated successfully",
+        title: t('common.success'),
+        description: t('workflows.taskUpdatedSuccess'),
       });
       setIsTaskDialogOpen(false);
       resetTaskForm();
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to update task",
+        title: t('common.error'),
+        description: t('workflows.taskUpdateFailed'),
         variant: "destructive",
       });
     },
@@ -384,14 +386,14 @@ export default function WorkflowDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/task/", uuid] });
       toast({
-        title: "Success",
-        description: "Task deleted successfully",
+        title: t('common.success'),
+        description: t('workflows.taskDeletedSuccess'),
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to delete task",
+        title: t('common.error'),
+        description: t('workflows.taskDeleteFailed'),
         variant: "destructive",
       });
     },
@@ -486,7 +488,7 @@ export default function WorkflowDetail() {
         <div className="container mx-auto">
           <Card>
             <CardContent className="p-12 text-center text-gray-500">
-              Loading workflow details...
+              {t('workflows.loadingDetails')}
             </CardContent>
           </Card>
         </div>
@@ -501,10 +503,10 @@ export default function WorkflowDetail() {
           <Card>
             <CardContent className="p-12 text-center">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                Workflow not found
+                {t('workflows.notFound')}
               </h3>
               <Link href="/workflows">
-                <Button variant="outline">Back to Workflows</Button>
+                <Button variant="outline">{t('workflows.backToWorkflows')}</Button>
               </Link>
             </CardContent>
           </Card>
@@ -521,8 +523,8 @@ export default function WorkflowDetail() {
           <div className="flex items-center gap-4">
             <Link href="/workflows">
               <Button variant="ghost" size="sm" data-testid="button-back">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
+                <ArrowLeft className="h-4 w-4 me-2" />
+                {t('common.back')}
               </Button>
             </Link>
             <div>
@@ -530,7 +532,7 @@ export default function WorkflowDetail() {
                 {workflow.name}
               </h1>
               <p className="text-gray-500 dark:text-gray-400 mt-1">
-                Workflow Details
+                {t('workflows.workflowDetails')}
               </p>
             </div>
           </div>
@@ -541,31 +543,30 @@ export default function WorkflowDetail() {
                   onClick={() => setIsEditing(true)}
                   data-testid="button-edit"
                 >
-                  Edit
+                  {t('common.edit')}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" data-testid="button-delete">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
+                      <Trash2 className="h-4 w-4 me-2" />
+                      {t('common.delete')}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Workflow</AlertDialogTitle>
+                      <AlertDialogTitle>{t('workflows.deleteWorkflow')}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete this workflow? This action
-                        cannot be undone.
+                        {t('workflows.deleteConfirm')}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteMutation.mutate()}
                         className="bg-red-600 hover:bg-red-700"
                         data-testid="button-confirm-delete"
                       >
-                        Delete
+                        {t('common.delete')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -578,16 +579,16 @@ export default function WorkflowDetail() {
                   onClick={handleCancel}
                   data-testid="button-cancel"
                 >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
+                  <X className="h-4 w-4 me-2" />
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={handleSubmit}
                   disabled={updateMutation.isPending}
                   data-testid="button-save"
                 >
-                  <Save className="h-4 w-4 mr-2" />
-                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                  <Save className="h-4 w-4 me-2" />
+                  {updateMutation.isPending ? t('common.saving') : t('workflows.saveChanges')}
                 </Button>
               </>
             )}
@@ -597,13 +598,13 @@ export default function WorkflowDetail() {
         {/* Workflow Details */}
         <Card>
           <CardHeader>
-            <CardTitle>Workflow Information</CardTitle>
+            <CardTitle>{t('workflows.workflowInformation')}</CardTitle>
           </CardHeader>
           <CardContent>
             {isEditing ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name *</Label>
+                  <Label htmlFor="name">{t('common.name')} *</Label>
                   <Input
                     id="name"
                     data-testid="input-name"
@@ -611,13 +612,13 @@ export default function WorkflowDetail() {
                     onChange={(e) =>
                       setFormData({ ...formData, name: e.target.value })
                     }
-                    placeholder="Enter workflow name"
+                    placeholder={t('workflows.namePlaceholder')}
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">{t('common.description')}</Label>
                   <Textarea
                     id="description"
                     data-testid="input-description"
@@ -625,27 +626,27 @@ export default function WorkflowDetail() {
                     onChange={(e) =>
                       setFormData({ ...formData, description: e.target.value })
                     }
-                    placeholder="Enter workflow description"
+                    placeholder={t('workflows.descriptionPlaceholder')}
                     rows={4}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="tags">Tags (comma-separated)</Label>
+                  <Label htmlFor="tags">{t('workflows.tagsCommaSeparated')}</Label>
                   <Input
                     id="tags"
                     data-testid="input-tags"
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
-                    placeholder="e.g., coated_peanuts, distribution"
+                    placeholder={t('workflows.tagsPlaceholder')}
                   />
                   <p className="text-sm text-gray-500">
-                    Available tags: coated_peanuts, distribution
+                    {t('workflows.availableTags')}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="parameters">Parameters (JSON)</Label>
+                  <Label htmlFor="parameters">{t('workflows.parametersJson')}</Label>
                   <Textarea
                     id="parameters"
                     data-testid="input-parameters"
@@ -660,35 +661,35 @@ export default function WorkflowDetail() {
 
                 <div className="space-y-2">
                   <Label htmlFor="callbacks">
-                    Callback Functions (comma-separated)
+                    {t('workflows.callbackFunctionsCommaSeparated')}
                   </Label>
                   <Input
                     id="callbacks"
                     data-testid="input-callbacks"
                     value={callbacksInput}
                     onChange={(e) => setCallbacksInput(e.target.value)}
-                    placeholder="e.g., function1, function2"
+                    placeholder={t('workflows.callbacksPlaceholder')}
                   />
                 </div>
               </form>
             ) : (
               <div className="space-y-6">
                 <div>
-                  <Label className="text-gray-500">Name</Label>
+                  <Label className="text-gray-500">{t('common.name')}</Label>
                   <p className="mt-1 text-lg font-medium" data-testid="text-name">
                     {workflow.name}
                   </p>
                 </div>
 
                 <div>
-                  <Label className="text-gray-500">Description</Label>
+                  <Label className="text-gray-500">{t('common.description')}</Label>
                   <p className="mt-1" data-testid="text-description">
                     {workflow.description || "-"}
                   </p>
                 </div>
 
                 <div>
-                  <Label className="text-gray-500">Tags</Label>
+                  <Label className="text-gray-500">{t('workflows.tags')}</Label>
                   <div className="mt-2 flex gap-2 flex-wrap" data-testid="text-tags">
                     {workflow.tags && workflow.tags.length > 0 ? (
                       workflow.tags.map((tag, idx) => (
@@ -697,13 +698,13 @@ export default function WorkflowDetail() {
                         </Badge>
                       ))
                     ) : (
-                      <span className="text-gray-400">No tags</span>
+                      <span className="text-gray-400">{t('workflows.noTags')}</span>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-gray-500">Parameters</Label>
+                  <Label className="text-gray-500">{t('workflows.parameters')}</Label>
                   <pre
                     className="mt-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-md text-sm overflow-x-auto"
                     data-testid="text-parameters"
@@ -717,7 +718,7 @@ export default function WorkflowDetail() {
                 </div>
 
                 <div>
-                  <Label className="text-gray-500">Callback Functions</Label>
+                  <Label className="text-gray-500">{t('workflows.callbackFunctions')}</Label>
                   <div className="mt-2" data-testid="text-callbacks">
                     {workflow.callbackFns && workflow.callbackFns.length > 0 ? (
                       <ul className="list-disc list-inside space-y-1">
@@ -728,7 +729,7 @@ export default function WorkflowDetail() {
                         ))}
                       </ul>
                     ) : (
-                      <span className="text-gray-400">No callback functions</span>
+                      <span className="text-gray-400">{t('workflows.noCallbackFunctions')}</span>
                     )}
                   </div>
                 </div>
@@ -736,7 +737,7 @@ export default function WorkflowDetail() {
                 <div className="border-t pt-4">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <Label className="text-gray-500">Created At</Label>
+                      <Label className="text-gray-500">{t('common.createdAt')}</Label>
                       <p className="mt-1" data-testid="text-created-at">
                         {workflow.createdAt
                           ? new Date(workflow.createdAt).toLocaleString()
@@ -744,7 +745,7 @@ export default function WorkflowDetail() {
                       </p>
                     </div>
                     <div>
-                      <Label className="text-gray-500">UUID</Label>
+                      <Label className="text-gray-500">{t('workflows.uuid')}</Label>
                       <p className="mt-1 font-mono text-xs" data-testid="text-uuid">
                         {workflow.uuid}
                       </p>
@@ -759,28 +760,28 @@ export default function WorkflowDetail() {
         {/* Tasks Section */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Tasks</CardTitle>
+            <CardTitle>{t('workflows.tasks')}</CardTitle>
             <div className="flex items-center gap-2">
               <div className="flex items-center border rounded-md">
                 <Button
                   size="sm"
                   variant={taskViewMode === "list" ? "default" : "ghost"}
                   onClick={() => setTaskViewMode("list")}
-                  className="rounded-r-none"
+                  className="rounded-e-none"
                   data-testid="button-view-list"
                 >
-                  <List className="h-4 w-4 mr-1" />
-                  List
+                  <List className="h-4 w-4 me-1" />
+                  {t('workflows.list')}
                 </Button>
                 <Button
                   size="sm"
                   variant={taskViewMode === "dag" ? "default" : "ghost"}
                   onClick={() => setTaskViewMode("dag")}
-                  className="rounded-l-none"
+                  className="rounded-s-none"
                   data-testid="button-view-dag"
                 >
-                  <Network className="h-4 w-4 mr-1" />
-                  DAG
+                  <Network className="h-4 w-4 me-1" />
+                  {t('workflows.dag')}
                 </Button>
               </div>
               <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
@@ -790,38 +791,38 @@ export default function WorkflowDetail() {
                     onClick={() => handleOpenTaskDialog()}
                     data-testid="button-create-task"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Task
+                    <Plus className="h-4 w-4 me-2" />
+                    {t('workflows.createTask')}
                   </Button>
                 </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>
-                    {editingTask ? "Edit Task" : "Create Task"}
+                    {editingTask ? t('workflows.editTask') : t('workflows.createTask')}
                   </DialogTitle>
                   <DialogDescription>
                     {editingTask
-                      ? "Update task details below"
-                      : "Add a new task to this workflow"}
+                      ? t('workflows.updateTaskDesc')
+                      : t('workflows.addTaskDesc')}
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleTaskSubmit} className="space-y-4">
                   <div>
-                    <Label htmlFor="task-name">Name *</Label>
+                    <Label htmlFor="task-name">{t('common.name')} *</Label>
                     <Input
                       id="task-name"
                       value={taskFormData.name}
                       onChange={(e) =>
                         setTaskFormData({ ...taskFormData, name: e.target.value })
                       }
-                      placeholder="Enter task name"
+                      placeholder={t('workflows.taskNamePlaceholder')}
                       required
                       data-testid="input-task-name"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="task-description">Description</Label>
+                    <Label htmlFor="task-description">{t('common.description')}</Label>
                     <Textarea
                       id="task-description"
                       value={taskFormData.description || ""}
@@ -831,16 +832,16 @@ export default function WorkflowDetail() {
                           description: e.target.value,
                         })
                       }
-                      placeholder="Enter task description"
+                      placeholder={t('workflows.taskDescriptionPlaceholder')}
                       rows={3}
                       data-testid="input-task-description"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="task-operator">Operator *</Label>
+                    <Label htmlFor="task-operator">{t('workflows.operator')} *</Label>
                     {operatorsLoading ? (
-                      <div className="text-sm text-gray-500 py-2">Loading operators...</div>
+                      <div className="text-sm text-gray-500 py-2">{t('workflows.loadingOperators')}</div>
                     ) : operators && operators.length > 0 ? (
                       <Select
                         value={taskFormData.operator}
@@ -849,7 +850,7 @@ export default function WorkflowDetail() {
                         }
                       >
                         <SelectTrigger id="task-operator" data-testid="select-operator">
-                          <SelectValue placeholder="Select operator" />
+                          <SelectValue placeholder={t('workflows.selectOperator')} />
                         </SelectTrigger>
                         <SelectContent>
                           {operators.map((op) => (
@@ -861,7 +862,7 @@ export default function WorkflowDetail() {
                       </Select>
                     ) : (
                       <div className="text-sm text-gray-500 py-2 px-3 border rounded-md bg-gray-50">
-                        No operators available from {API_BASE_URL}/task-execution/workflow-operators
+                        {t('workflows.noOperatorsAvailable', { url: `${API_BASE_URL}/task-execution/workflow-operators` })}
                       </div>
                     )}
                   </div>
@@ -876,17 +877,17 @@ export default function WorkflowDetail() {
                   </div>
 
                   <div>
-                    <Label>Dependencies (Depends On)</Label>
+                    <Label>{t('workflows.dependencies')}</Label>
                     <div className="mt-2 space-y-2 max-h-40 overflow-y-auto border rounded-md p-3">
                       {tasks.length === 0 ? (
                         <p className="text-sm text-gray-500">
-                          No other tasks available
+                          {t('workflows.noOtherTasks')}
                         </p>
                       ) : (
                         tasks
                           .filter(t => !editingTask || t.uuid !== editingTask.uuid)
                           .map((task) => (
-                            <div key={task.uuid} className="flex items-center space-x-2">
+                            <div key={task.uuid} className="flex items-center space-x-2 rtl:space-x-reverse">
                               <input
                                 type="checkbox"
                                 id={`dep-${task.uuid}`}
@@ -909,16 +910,16 @@ export default function WorkflowDetail() {
 
                   <div>
                     <Label htmlFor="task-callbacks">
-                      Callback Functions
-                      <span className="text-gray-500 text-xs ml-2">
-                        Comma-separated
+                      {t('workflows.callbackFunctions')}
+                      <span className="text-gray-500 text-xs ms-2">
+                        {t('workflows.commaSeparated')}
                       </span>
                     </Label>
                     <Input
                       id="task-callbacks"
                       value={taskCallbacksInput}
                       onChange={(e) => setTaskCallbacksInput(e.target.value)}
-                      placeholder="callback1, callback2, callback3"
+                      placeholder={t('workflows.callbacksExamplePlaceholder')}
                       data-testid="input-task-callbacks"
                     />
                   </div>
@@ -933,14 +934,14 @@ export default function WorkflowDetail() {
                       }}
                       data-testid="button-cancel-task"
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </Button>
                     <Button
                       type="submit"
                       disabled={createTaskMutation.isPending || updateTaskMutation.isPending}
                       data-testid="button-save-task"
                     >
-                      {editingTask ? "Update" : "Create"} Task
+                      {editingTask ? t('workflows.updateTask') : t('workflows.createTask')}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -950,12 +951,12 @@ export default function WorkflowDetail() {
           </CardHeader>
           <CardContent>
             {tasksLoading ? (
-              <p className="text-center text-gray-500 py-8">Loading tasks...</p>
+              <p className="text-center text-gray-500 py-8">{t('workflows.loadingTasks')}</p>
             ) : tasks.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-500 mb-4">No tasks yet</p>
+                <p className="text-gray-500 mb-4">{t('workflows.noTasksYet')}</p>
                 <p className="text-sm text-gray-400">
-                  Create your first task to get started
+                  {t('workflows.createFirstTask')}
                 </p>
               </div>
             ) : taskViewMode === "dag" ? (
@@ -987,12 +988,12 @@ export default function WorkflowDetail() {
                         )}
                         {task.dependsOn && task.dependsOn.length > 0 && (
                           <div className="mb-2">
-                            <span className="text-xs text-gray-500">Depends on: </span>
+                            <span className="text-xs text-gray-500">{t('workflows.dependsOn')} </span>
                             {task.dependsOn.map((dep, idx) => (
                               <Badge
                                 key={idx}
                                 variant="secondary"
-                                className="mr-1 text-xs"
+                                className="me-1 text-xs"
                               >
                                 {dep}
                               </Badge>
@@ -1001,12 +1002,12 @@ export default function WorkflowDetail() {
                         )}
                         {task.callbackFns && task.callbackFns.length > 0 && (
                           <div className="mb-2">
-                            <span className="text-xs text-gray-500">Callbacks: </span>
+                            <span className="text-xs text-gray-500">{t('workflows.callbacks')} </span>
                             {task.callbackFns.map((cb, idx) => (
                               <Badge
                                 key={idx}
                                 variant="outline"
-                                className="mr-1 text-xs"
+                                className="me-1 text-xs"
                               >
                                 {cb}
                               </Badge>
@@ -1014,10 +1015,10 @@ export default function WorkflowDetail() {
                           </div>
                         )}
                         <p className="text-xs text-gray-400 mt-2">
-                          Created {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : 'N/A'}
+                          {t('workflows.createdWithDate', { date: task.createdAt ? new Date(task.createdAt).toLocaleDateString() : t('workflows.na') })}
                         </p>
                       </div>
-                      <div className="flex gap-2 ml-4">
+                      <div className="flex gap-2 ms-4">
                         <Button
                           size="sm"
                           variant="outline"
@@ -1039,20 +1040,19 @@ export default function WorkflowDetail() {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                              <AlertDialogTitle>{t('workflows.deleteTask')}</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete "{task.name}"? This
-                                action cannot be undone.
+                                {t('workflows.deleteTaskConfirm', { name: task.name })}
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => deleteTaskMutation.mutate(task.uuid)}
                                 className="bg-red-600 hover:bg-red-700"
                                 data-testid={`confirm-delete-task-${task.name}`}
                               >
-                                Delete
+                                {t('common.delete')}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>

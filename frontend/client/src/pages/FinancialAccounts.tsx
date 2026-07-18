@@ -13,8 +13,10 @@ import type { FinancialAccount, FinancialAccountPage, FinancialAccountListParams
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { AddFinancialAccountDialog } from "@/components/financial-accounts/AddFinancialAccountDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function FinancialAccounts() {
+  const { t } = useLanguage();
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [localFilters, setLocalFilters] = useState<FinancialAccountListParams>({
@@ -88,8 +90,8 @@ export default function FinancialAccounts() {
       <AppLayout>
         <div className="flex-1 overflow-auto p-4 lg:p-6">
           <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Error loading accounts</h3>
-            <p className="text-gray-600">Please try again later.</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('financial.accountsLoadError')}</h3>
+            <p className="text-gray-600">{t('financial.tryAgainLater')}</p>
           </div>
         </div>
       </AppLayout>
@@ -103,33 +105,33 @@ export default function FinancialAccounts() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Financial Accounts</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{t('nav.financialAccounts')}</h1>
               <p className="text-gray-600">
-                {accountsData ? `${accountsData.total_count} accounts` : "Loading..."}
+                {accountsData ? t('financial.accountsCount', { count: accountsData.total_count }) : t('common.loading')}
               </p>
             </div>
             <div className="flex gap-2">
               <Sheet open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
                 <SheetTrigger asChild>
                   <Button variant="outline">
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filters
+                    <Filter className="h-4 w-4 me-2" />
+                    {t('common.filters')}
                   </Button>
                 </SheetTrigger>
                 <SheetContent>
                   <SheetHeader>
-                    <SheetTitle>Filter Accounts</SheetTitle>
+                    <SheetTitle>{t('financial.filterAccounts')}</SheetTitle>
                     <SheetDescription>
-                      Adjust the settings below to filter your account list.
+                      {t('financial.filterAccountsDesc')}
                     </SheetDescription>
                   </SheetHeader>
                   <div className="py-6">
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">UUID</label>
+                        <label className="text-sm font-medium">{t('financial.uuid')}</label>
                         <input
                           type="text"
-                          placeholder="Search by UUID..."
+                          placeholder={t('financial.searchByUuid')}
                           value={localFilters.uuid || ""}
                           onChange={(e) => setLocalFilters(prev => ({ 
                             ...prev, 
@@ -139,10 +141,10 @@ export default function FinancialAccounts() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Account Name</label>
+                        <label className="text-sm font-medium">{t('financial.accountName')}</label>
                         <input
                           type="text"
-                          placeholder="Search by account name..."
+                          placeholder={t('financial.searchByAccountName')}
                           value={localFilters.account_name || ""}
                           onChange={(e) => setLocalFilters(prev => ({ 
                             ...prev, 
@@ -152,29 +154,29 @@ export default function FinancialAccounts() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Items per page</label>
+                        <label className="text-sm font-medium">{t('financial.itemsPerPage')}</label>
                         <select
                           value={localFilters.per_page}
-                          onChange={(e) => setLocalFilters(prev => ({ 
-                            ...prev, 
-                            per_page: parseInt(e.target.value) 
+                          onChange={(e) => setLocalFilters(prev => ({
+                            ...prev,
+                            per_page: parseInt(e.target.value)
                           }))}
                           className="w-full p-2 border border-gray-300 rounded-md"
                         >
-                          <option value={10}>10 per page</option>
-                          <option value={20}>20 per page</option>
-                          <option value={50}>50 per page</option>
-                          <option value={100}>100 per page</option>
+                          <option value={10}>{t('financial.nPerPage', { count: 10 })}</option>
+                          <option value={20}>{t('financial.nPerPage', { count: 20 })}</option>
+                          <option value={50}>{t('financial.nPerPage', { count: 50 })}</option>
+                          <option value={100}>{t('financial.nPerPage', { count: 100 })}</option>
                         </select>
                       </div>
                     </div>
                   </div>
                   <div className="flex gap-2">
                     <Button onClick={handleApplyFilters} className="flex-1">
-                      Apply Filters
+                      {t('financial.applyFilters')}
                     </Button>
                     <Button onClick={handleClearFilters} variant="outline" className="flex-1">
-                      Clear
+                      {t('financial.clear')}
                     </Button>
                   </div>
                 </SheetContent>
@@ -201,8 +203,8 @@ export default function FinancialAccounts() {
           ) : accountsData?.accounts.length === 0 ? (
             <div className="text-center py-12">
               <Wallet className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No financial accounts found</h3>
-              <p className="text-gray-600 mb-4">Get started by creating your first account.</p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('financial.noAccountsFound')}</h3>
+              <p className="text-gray-600 mb-4">{t('financial.getStartedCreateAccount')}</p>
               <AddFinancialAccountDialog />
             </div>
           ) : (
@@ -233,7 +235,7 @@ export default function FinancialAccounts() {
                             <span>{formatDate(account.created_at)}</span>
                           </div>
                           <Badge variant={account.is_deleted ? "destructive" : "default"}>
-                            {account.is_deleted ? "Deleted" : "Active"}
+                            {account.is_deleted ? t('financial.statusDeleted') : t('financial.statusActive')}
                           </Badge>
                         </div>
                       </CardContent>
@@ -246,8 +248,11 @@ export default function FinancialAccounts() {
               {accountsData && accountsData.pages > 1 && (
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-700">
-                    Showing page {currentPage} of {accountsData.pages} 
-                    ({accountsData.total_count} total accounts)
+                    {t('financial.showingPage', {
+                      page: currentPage,
+                      pages: accountsData.pages,
+                      total: accountsData.total_count,
+                    })}
                   </p>
                   <div className="flex items-center gap-2">
                     <Button
@@ -256,8 +261,8 @@ export default function FinancialAccounts() {
                       onClick={handlePreviousPage}
                       disabled={currentPage <= 1}
                     >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Previous
+                      <ChevronLeft className="h-4 w-4 me-1" />
+                      {t('common.previous')}
                     </Button>
                     <Button
                       variant="outline"
@@ -265,8 +270,8 @@ export default function FinancialAccounts() {
                       onClick={handleNextPage}
                       disabled={currentPage >= accountsData.pages}
                     >
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
+                      {t('common.next')}
+                      <ChevronRight className="h-4 w-4 ms-1" />
                     </Button>
                   </div>
                 </div>
