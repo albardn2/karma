@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { LANGUAGE_LABELS } from "@/i18n";
 import { UserLocationMap } from "@/components/location/UserLocationMap";
 import { PermissionsEditor } from "@/components/users/PermissionsEditor";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -578,9 +579,20 @@ export default function UserDetail() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>{t("common.language")}</FormLabel>
-                              <FormControl>
-                                <Input placeholder={t("users.enterLanguage")} {...field} />
-                              </FormControl>
+                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="user-language">
+                                    <SelectValue placeholder={t("users.selectLanguage")} />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {Object.entries(LANGUAGE_LABELS).map(([code, label]) => (
+                                    <SelectItem key={code} value={code}>
+                                      {label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -783,7 +795,11 @@ export default function UserDetail() {
                             </Button>
                           )}
                         </div>
-                        <p className="font-medium">{user.language || t("users.notProvided")}</p>
+                        <p className="font-medium">
+                          {user.language
+                            ? (LANGUAGE_LABELS as Record<string, string>)[user.language] || user.language
+                            : t("users.notProvided")}
+                        </p>
                       </div>
 
                       <div className="space-y-2">

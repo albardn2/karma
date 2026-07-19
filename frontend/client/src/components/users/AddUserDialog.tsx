@@ -28,6 +28,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PermissionsEditor } from "@/components/users/PermissionsEditor";
 import { PermissionScope, type UserFormData, type UserPermissions } from "@/lib/types";
+import { LANGUAGE_LABELS } from "@/i18n";
 
 const makeUserSchema = (t: (key: string) => string) =>
   z.object({
@@ -286,9 +287,20 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("common.language")}</FormLabel>
-                    <FormControl>
-                      <Input placeholder={t("users.enterLanguage")} {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="user-language">
+                          <SelectValue placeholder={t("users.selectLanguage")} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.entries(LANGUAGE_LABELS).map(([code, label]) => (
+                          <SelectItem key={code} value={code}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
