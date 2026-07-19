@@ -6,7 +6,7 @@ import {
   useState,
   ReactNode,
 } from 'react';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { Lang, translations } from '@/i18n';
 import { enumLabel, enumLabelPretty } from '@/i18n/enums';
@@ -71,7 +71,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       // trigger the 401 reload logic)
       if (localStorage.getItem('auth_token')) {
         setUserLanguage(l);
-        apiRequest('/auth/me', { method: 'PUT', body: { language: l } }).catch(() => {});
+        apiRequest('/auth/me', { method: 'PUT', body: { language: l } })
+          .then(() => {
+            // refresh any user views so their shown language stays in sync
+            queryClient.invalidateQueries({ queryKey: ['/auth/user'], exact: false });
+            queryClient.invalidateQueries({ queryKey: ['/auth/users'], exact: false });
+          })
+          .catch(() => {});
       }
     },
     [setUserLanguage]
