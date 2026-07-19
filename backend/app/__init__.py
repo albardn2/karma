@@ -137,6 +137,9 @@ def create_app(config_object=Config):
             else:
                 g.account_uuid = user.account_uuid
             g.is_admin = user.is_admin
+            # DB-fresh scopes: role changes apply to live sessions immediately
+            # (the JWT scopes claim is only a fallback, it goes stale)
+            g.user_scopes = set((user.permission_scope or "").split(","))
             # effective perms: explicit checklist or role preset (None = admin)
             g.user_acl = effective_permissions(user)
 

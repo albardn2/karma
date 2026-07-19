@@ -26,7 +26,11 @@ def scopes_required(*required_scopes: str):
         def decorated(*args, **kwargs):
             verify_jwt_in_request()
             claims = get_jwt()
-            user_scopes = set(claims.get("scopes", []))
+            from flask import g
+            # prefer the DB-fresh scopes loaded by the request chokepoint —
+            # the token's scopes claim goes stale when an admin changes a
+            # user's role mid-session
+            user_scopes = getattr(g, "user_scopes", None) or set(claims.get("scopes", []))
             required = set(required_scopes)
             # platform-owner routes: ONLY superuser may pass — the tenant-admin
             # bypass below must not open the super-admin console to tenants
@@ -37,7 +41,6 @@ def scopes_required(*required_scopes: str):
             if user_scopes.intersection(_ADMIN_SCOPES):
                 return fn(*args, **kwargs)
 
-            from flask import g
             if getattr(g, "user_acl", None) is not None:
                 # fine-grained user (explicit checklist OR role preset): the
                 # endpoint grant is already enforced in before_request, which
