@@ -24,6 +24,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { PermissionsEditor } from "@/components/users/PermissionsEditor";
+import type { UserPermissions } from "@/lib/types";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDate, formatCurrency } from "@/lib/utils";
 
@@ -44,6 +46,7 @@ interface SuperAccount {
   subscription_currency: string | null;
   user_count: number;
   subscription_type?: string;
+  permissions?: { modules?: string[]; endpoints?: Record<string, string[]> } | null;
   balances: Balances;
   is_deleted: boolean;
 }
@@ -112,6 +115,10 @@ export default function AccountsAdmin() {
   const [rate, setRate] = useState("");
   const [rateCurrency, setRateCurrency] = useState("");
   const [subType, setSubType] = useState<"flat" | "per_user">("flat");
+
+  // tenant feature cap editor
+  const [restrictFeatures, setRestrictFeatures] = useState(false);
+  const [accountPerms, setAccountPerms] = useState<UserPermissions>({ modules: [], endpoints: {} });
 
   // add-ledger-entry form
   const [entryType, setEntryType] = useState<LedgerEntryType>("payment");
@@ -226,6 +233,13 @@ export default function AccountsAdmin() {
     setRate(account.subscription_rate != null ? String(account.subscription_rate) : "");
     setRateCurrency(account.subscription_currency ?? "");
     setSubType((account.subscription_type as "flat" | "per_user") ?? "flat");
+    const cap = (account as any).permissions;
+    setRestrictFeatures(!!cap);
+    setAccountPerms(
+      cap
+        ? { modules: cap.modules ?? [], endpoints: cap.endpoints ?? {} }
+        : { modules: [], endpoints: {} }
+    );
     setEntryType("payment");
     setEntryAmount("");
     setEntryCurrency(account.subscription_currency ?? "");
@@ -543,6 +557,43 @@ export default function AccountsAdmin() {
                         })}
                       </p>
                     )}
+                  </CardContent>
+                </Card>
+
+                {/* Tenant feature cap */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">
+                      {t("misc.accounts.featureAccess")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm text-gray-500">
+                        {t("misc.accounts.featureAccessHint")}
+                      </p>
+                      <Switch
+                        data-testid="account-restrict-switch"
+                        checked={restrictFeatures}
+                        onCheckedChange={setRestrictFeatures}
+                      />
+                    </div>
+                    {restrictFeatures && (
+                      <PermissionsEditor value={accountPerms} onChange={setAccountPerms} />
+                    )}
+                    <div className="flex justify-end">
+                      <Button
+                        data-testid="account-save-permissions"
+                        disabled={updateMutation.isPending}
+                        onClick={() =>
+                          updateMutation.mutate({
+                            permissions: restrictFeatures ? accountPerms : null,
+                          })
+                        }
+                      >
+                        {t("misc.accounts.saveFeatureAccess")}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
 

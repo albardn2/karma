@@ -80,12 +80,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const permissionScope = (user as any)?.permissionScope ?? (user as any)?.permission_scope ?? '';
   const isAdmin = permissionScope.includes('admin') || permissionScope.includes('superuser');
   const isSuperuser = permissionScope.includes('superuser');
-  // effective permissions govern menu visibility: non-admins only see the
-  // modules their role preset (or explicit override) grants; admins see all
-  const grantedModules: string[] | null =
+  // menu visibility = user-level grants (admins exempt) intersected with the
+  // tenant feature cap (binds admins too; platform owner exempt)
+  const userModules: string[] | null =
     !isAdmin && Array.isArray((user as any)?.effective_permissions?.modules)
       ? (user as any).effective_permissions.modules
       : null;
+  const accountModules: string[] | null = Array.isArray(
+    (user as any)?.account_permissions?.modules
+  )
+    ? (user as any).account_permissions.modules
+    : null;
+  const grantedModules: string[] | null =
+    userModules && accountModules
+      ? userModules.filter((m: string) => accountModules.includes(m))
+      : userModules ?? accountModules;
   const visibleNavigation = navigation.filter((item: any) => {
     if (item.superOnly && !isSuperuser) return false;
     if (item.adminOnly && !isAdmin) return false;

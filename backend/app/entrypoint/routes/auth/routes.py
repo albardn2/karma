@@ -285,6 +285,13 @@ def me():
         if not user:
             raise NotFoundError("User not found")
         dto = UserRead.from_orm(user).model_dump(mode="json")
+        # tenant feature cap: the frontend hides non-granted menu modules for
+        # every user of the account, admins included (platform owner exempt)
+        if not user.is_superuser:
+            account = uow.account_repository.find_one(uuid=user.account_uuid)
+            dto["account_permissions"] = account.permissions if account else None
+        else:
+            dto["account_permissions"] = None
         # impersonation (platform owner operating inside a tenant): tell the
         # frontend which company so it can show a banner + exit control
         imp_account = get_jwt().get("imp_account_uuid")

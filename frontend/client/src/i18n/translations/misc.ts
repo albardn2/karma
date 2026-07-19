@@ -193,6 +193,9 @@ export const en: Record<string, string> = {
   'misc.accounts.ratePerUser': 'Rate per user / month',
   'misc.accounts.usersCount': '{count} users',
   'misc.accounts.estMonthly': 'Estimated monthly charge: {amount} {currency} ({count} users × {rate})',
+  'misc.accounts.featureAccess': 'Feature Access (Permission Scope)',
+  'misc.accounts.featureAccessHint': 'Restrict which menu modules and endpoint actions this company can use. Applies to all of its users, including admins. Off = all features.',
+  'misc.accounts.saveFeatureAccess': 'Save Feature Access',
 };
 
 export const ar: Record<string, string> = {
@@ -385,4 +388,7 @@ export const ar: Record<string, string> = {
   'misc.accounts.ratePerUser': 'السعر لكل مستخدم / شهرياً',
   'misc.accounts.usersCount': '{count} مستخدم',
   'misc.accounts.estMonthly': 'الرسم الشهري التقديري: {amount} {currency} ({count} مستخدم × {rate})',
+  'misc.accounts.featureAccess': 'الوصول إلى الميزات (نطاق الصلاحيات)',
+  'misc.accounts.featureAccessHint': 'حدّد الوحدات وإجراءات نقاط النهاية المتاحة لهذه الشركة. يسري على جميع مستخدميها بمن فيهم المدراء. إيقافه = جميع الميزات.',
+  'misc.accounts.saveFeatureAccess': 'حفظ الوصول إلى الميزات',
 };

@@ -118,21 +118,25 @@ def create_app(config_object=Config):
             )
             if not user:
                 return None
-            # blocked account: cut off every request from its users
-            # immediately (the platform owner is exempt)
+            # blocked account / tenant feature cap: resolved fresh per
+            # request (the platform owner is exempt from both)
+            g.account_perms = None
             if not user.is_superuser:
                 from models.common import Account as AccountModel
-                blocked = (
-                    uow.session.query(AccountModel.is_blocked)
+                acct = (
+                    uow.session.query(
+                        AccountModel.is_blocked, AccountModel.permissions
+                    )
                     .filter(AccountModel.uuid == user.account_uuid)
-                    .scalar()
+                    .first()
                 )
-                if blocked:
+                if acct and acct[0]:
                     # 401 (not 403) so both clients' auto-logout machinery
                     # kicks in: web clears the token and reloads to the login
                     # page; the app fails its refresh and signs out — active
                     # sessions are revoked on their next request
                     return jsonify({"msg": "This account is blocked"}), 401
+                g.account_perms = acct[1] if acct else None
             # impersonation: a superuser token may carry a target account —
             # the platform owner operates inside that tenant's scope
             imp_account = claims.get("imp_account_uuid")
@@ -147,13 +151,22 @@ def create_app(config_object=Config):
             # effective perms: explicit checklist or role preset (None = admin)
             g.user_acl = effective_permissions(user)
 
-        if (
-            not g.is_admin
-            and g.user_acl is not None
-            and request.blueprint in RESOURCE_SET
-            and not endpoint_allowed(g.user_acl, request.blueprint, request.method)
-        ):
-            return jsonify({"msg": "Forbidden — missing endpoint permission"}), 403
+        if request.blueprint in RESOURCE_SET:
+            # tenant feature cap binds EVERYONE in the account, admins
+            # included (the platform owner is exempt — g.account_perms None)
+            if g.account_perms is not None and not endpoint_allowed(
+                g.account_perms, request.blueprint, request.method
+            ):
+                return jsonify(
+                    {"msg": "Forbidden — feature not enabled for this account"}
+                ), 403
+            # per-user fine-grained grant (admins bypass)
+            if (
+                not g.is_admin
+                and g.user_acl is not None
+                and not endpoint_allowed(g.user_acl, request.blueprint, request.method)
+            ):
+                return jsonify({"msg": "Forbidden — missing endpoint permission"}), 403
         return None
 
     # Register blueprints

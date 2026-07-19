@@ -4,6 +4,8 @@ from typing import Optional, List
 import pydantic
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.dto.auth import UserPermissions
+
 
 class AccountUpdate(BaseModel):
     """Platform-owner edits to a tenant account."""
@@ -15,6 +17,10 @@ class AccountUpdate(BaseModel):
     subscription_rate: Optional[float] = Field(None, ge=0)
     subscription_currency: Optional[str] = Field(None, max_length=10)
     subscription_type: Optional[str] = None
+
+    # tenant-wide feature cap (same schema as per-user permissions);
+    # explicit null clears the cap (all features)
+    permissions: Optional[UserPermissions] = None
 
     @pydantic.field_validator("subscription_type")
     def known_subscription_type(cls, v):
@@ -69,7 +75,8 @@ class AccountRead(BaseModel):
     is_blocked: bool
     subscription_rate: Optional[float]
     subscription_currency: Optional[str]
-    subscription_type: Optional[str] = 'flat' 
+    subscription_type: Optional[str] = 'flat'
+    permissions: Optional[dict] = None
     # enriched by the routes:
     user_count: Optional[int] = None
     balances: Optional[dict] = None  # {currency: signed sum}

@@ -46,6 +46,10 @@ class Account(Base):
     subscription_currency = Column(String(10), nullable=True)
     # 'flat' = rate per month; 'per_user' = rate x active users per month
     subscription_type = Column(String(20), nullable=False, default='flat')
+    # platform-managed feature cap for the WHOLE tenant (same shape as user
+    # permissions: {modules, endpoints}); NULL = all features enabled. Binds
+    # every user of the account including its admins.
+    permissions = Column(MutableDict.as_mutable(JSONB), nullable=True)
 
 
 class AccountLedgerEntry(Base):
