@@ -26,15 +26,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [lang, setLangState] = useState<Lang>('en');
 
-  // initial language: locally stored choice wins, else the user's saved
-  // profile preference, else English
+  // the signed-in user's PROFILE language is the source of truth: adopt it
+  // whenever it changes (e.g. login, or an admin changed it on the web).
+  // AsyncStorage is only a pre-auth cache for the very first paint.
   useEffect(() => {
     (async () => {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored === 'en' || stored === 'ar') {
-        setLangState(stored);
-      } else if (user?.language === 'ar' || user?.language === 'en') {
+      if (user?.language === 'ar' || user?.language === 'en') {
         setLangState(user.language);
+        await AsyncStorage.setItem(STORAGE_KEY, user.language);
+      } else {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored === 'en' || stored === 'ar') setLangState(stored);
       }
     })();
   }, [user?.language]);

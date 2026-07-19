@@ -36,6 +36,9 @@ interface AuthContextType {
   login: (emailOrRfid: string, password?: string) => Promise<boolean>;
   signup: (data: SignupData) => Promise<SignupResult>;
   logout: () => void;
+  /** update the signed-in user's language in memory (keeps the profile the
+   *  single source of truth for the UI language) */
+  setUserLanguage: (language: string) => void;
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -208,11 +211,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  const setUserLanguage = (language: string) => {
+    setUser((u) => (u ? { ...u, language } : u));
+  };
+
   const value: AuthContextType = {
     user,
     login,
     signup,
     logout,
+    setUserLanguage,
     isLoading,
     isAuthenticated: !!user,
     isAdmin: scopes.includes('admin') || scopes.includes('superuser'),

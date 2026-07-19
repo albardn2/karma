@@ -93,8 +93,8 @@ export default function UserDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [finePermissions, setFinePermissions] = useState<UserPermissions>({ modules: [], endpoints: {} });
   const { toast } = useToast();
-  const { t, te, lang, setLang } = useLanguage();
-  const { user: authUser } = useAuth();
+  const { t, te, lang } = useLanguage();
+  const { user: authUser, setUserLanguage } = useAuth();
 
   const userUpdateSchema = useMemo(() => makeUserUpdateSchema(t), [t]);
 
@@ -201,14 +201,15 @@ export default function UserDetail() {
         exact: false
       });
       // editing your own language preference switches the app live, like the
-      // sidebar/dashboard language toggle
+      // sidebar toggle — the form already persisted it, so just sync the
+      // in-memory profile (the single source of truth) which flips the UI
       const newLang = (variables as UserUpdateData).language;
       if (
         (newLang === "en" || newLang === "ar") &&
         authUser?.uuid === uuid &&
         newLang !== lang
       ) {
-        setLang(newLang);
+        setUserLanguage(newLang);
       }
       toast({
         title: t("common.success"),
