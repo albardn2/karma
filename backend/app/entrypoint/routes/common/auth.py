@@ -7,11 +7,19 @@ from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWo
 from app.entrypoint.routes.common.errors import NotFoundError
 
 
+_ADMIN_SCOPES = {"admin", "superuser"}
+
+
 def scopes_required(*required_scopes: str):
     """
     Decorator factory: pass in one or more scope strings.
     The endpoint is allowed if *any* scope in `required_scopes`
     appears in the JWT’s "scopes" claim.
+
+    Users carrying a fine-grained permissions object (g.user_acl, loaded by
+    the before_request chokepoint which already enforced their per-endpoint
+    CRUD grant) bypass the role check — their checklist is authoritative —
+    EXCEPT on admin-only routes, which stay admin-only.
     """
     def wrapper(fn):
         @wraps(fn)
@@ -19,10 +27,26 @@ def scopes_required(*required_scopes: str):
             verify_jwt_in_request()
             claims = get_jwt()
             user_scopes = set(claims.get("scopes", []))
-            # If there's any overlap, we're good
+            if user_scopes.intersection(_ADMIN_SCOPES):
+                return fn(*args, **kwargs)
+
+            from flask import g
+            if getattr(g, "user_acl", None) is not None:
+                # fine-grained user (explicit checklist OR role preset): the
+                # endpoint grant is already enforced in before_request, which
+                # is the source of truth. Only admin-only routes stay locked.
+                if set(required_scopes) <= _ADMIN_SCOPES:
+                    return jsonify({"msg": "Forbidden — admins only"}), 403
+                return fn(*args, **kwargs)
+
+            # no effective perms at all (shouldn't happen for a valid user):
+            # fall back to the role-overlap check
             if not user_scopes.intersection(required_scopes):
                 return jsonify({"msg": "Forbidden — missing required scope"}), 403
             return fn(*args, **kwargs)
+        # record the required scopes so role presets can be derived from the
+        # actual route decorators (see scripts/gen_role_presets.py)
+        decorated._required_scopes = tuple(required_scopes)
         return decorated
     return wrapper
 

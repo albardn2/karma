@@ -45,6 +45,12 @@ export enum PermissionScope {
   SALES = "sales"
 }
 
+// fine-grained per-user permissions (non-admin scopes only)
+export interface UserPermissions {
+  modules: string[];
+  endpoints: Record<string, string[]>;
+}
+
 export interface User {
   uuid: string;
   username: string;
@@ -58,6 +64,7 @@ export interface User {
   is_deleted: boolean;
   track_location?: boolean;
   location_ping_seconds?: number;
+  permissions?: UserPermissions | null;
 }
 
 export interface UserFormData {
@@ -70,6 +77,7 @@ export interface UserFormData {
   language?: string;
   permission_scope?: string;
   rfid_token?: string;
+  permissions?: UserPermissions;
 }
 
 export interface UserUpdateData {
@@ -84,6 +92,8 @@ export interface UserUpdateData {
   rfid_token?: string;
   track_location?: boolean;
   location_ping_seconds?: number;
+  /** null explicitly clears fine-grained permissions back to role behavior */
+  permissions?: UserPermissions | null;
 }
 
 export interface UserFilters {

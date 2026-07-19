@@ -35,8 +35,13 @@ def register_error_handlers(app):
 
     @app.errorhandler(PydanticValidationError)
     def handle_validation_error(exc: PydanticValidationError):
-        # e.errors() is a list of field errors
-        return jsonify({"error": "Validation error", "details": exc.errors()}), 422
+        # e.errors() is a list of field errors; ctx may contain raw exception
+        # objects (e.g. ValueError from model_validators) that jsonify chokes
+        # on — strip the non-serializable context
+        details = [
+            {k: v for k, v in err.items() if k != "ctx"} for err in exc.errors()
+        ]
+        return jsonify({"error": "Validation error", "details": details}), 422
 
     @app.errorhandler(404)
     def not_found(e):

@@ -16,6 +16,41 @@ class PermissionScope(str, Enum):
     DRIVER = "driver"
     SALES = "sales"
 
+class UserPermissions(BaseModel):
+    """Fine-grained ACL for a non-admin user: frontend menu modules plus
+    per-resource CRUD grants, validated against the backend registry."""
+    model_config = ConfigDict(extra="forbid")
+    modules: List[str] = []
+    endpoints: dict[str, List[str]] = {}
+
+    @pydantic.model_validator(mode="after")
+    def known_keys_only(cls, values):
+        from app.entrypoint.routes.common.permissions import (
+            MODULE_SET,
+            RESOURCE_SET,
+            ACTION_SET,
+        )
+        unknown_modules = set(values.modules) - MODULE_SET
+        if unknown_modules:
+            raise ValueError(f"unknown modules: {sorted(unknown_modules)}")
+        unknown_resources = set(values.endpoints) - RESOURCE_SET
+        if unknown_resources:
+            raise ValueError(f"unknown resources: {sorted(unknown_resources)}")
+        for resource, actions in values.endpoints.items():
+            bad = set(actions) - ACTION_SET
+            if bad:
+                raise ValueError(f"unknown actions for {resource}: {sorted(bad)}")
+        return values
+
+
+def _forbid_admin_permissions(permission_scope: Optional[str], permissions) -> None:
+    if permissions is None:
+        return
+    scopes = set((permission_scope or "").split(","))
+    if scopes & {PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value}:
+        raise ValueError("admins have full access — permissions apply to non-admin users only")
+
+
 class RegisterRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     username: str
@@ -27,12 +62,33 @@ class RegisterRequest(BaseModel):
     phone_number: Optional[str] = None
     language: Optional[str] = None
     rfid_token: Optional[str] = None  # RFID token for user identification
+    permissions: Optional[UserPermissions] = None
 
     @pydantic.model_validator(mode="after")
     def username_not_email(cls, values):
         username = values.username
         # crude check – you can tighten this regex if you like
         if "@" in username:
+            raise ValueError("username must not be an email address")
+        _forbid_admin_permissions(values.permission_scope, values.permissions)
+        return values
+
+
+class SignupRequest(BaseModel):
+    """Public signup: creates a company (account) plus its first admin user."""
+    model_config = ConfigDict(extra="forbid")
+    company_name: str = Field(min_length=1, max_length=256)
+    username: str
+    first_name: str
+    last_name: str
+    password: str = Field(min_length=6)
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    language: Optional[str] = None
+
+    @pydantic.model_validator(mode="after")
+    def username_not_email(cls, values):
+        if "@" in values.username:
             raise ValueError("username must not be an email address")
         return values
 
@@ -52,6 +108,9 @@ class UserUpdate(BaseModel):
     location_ping_seconds: Optional[int] = pydantic.Field(None, gt=0, le=3600)
     # only admins may change this:
     permission_scope: Optional[str] = None
+    # fine-grained ACL (admin-managed); explicit null clears it back to
+    # legacy role behavior
+    permissions: Optional[UserPermissions] = None
 
 class MeUpdate(BaseModel):
     """Self-service profile update — only safe, user-owned preferences."""
@@ -100,6 +159,24 @@ class UserRead(BaseModel):
     created_at: datetime
     permission_scope: Optional[str]
     is_deleted: bool
+    account_uuid: Optional[str] = None
+    # explicit per-user override (None = follow the role preset)
+    permissions: Optional[dict] = None
+    # what actually governs the user: explicit override or role preset
+    # (None for admins = full access). Frontends filter menus on this.
+    effective_permissions: Optional[dict] = None
+
+    @pydantic.model_validator(mode="after")
+    def resolve_effective(cls, values):
+        from app.entrypoint.routes.common.permissions import preset_for_scope
+        scopes = set((values.permission_scope or "").split(","))
+        if scopes & {"admin", "superuser"}:
+            values.effective_permissions = None
+        elif values.permissions:
+            values.effective_permissions = values.permissions
+        else:
+            values.effective_permissions = preset_for_scope(values.permission_scope)
+        return values
 
 
 class UserListParams(BaseModel):

@@ -1,0 +1,691 @@
+{
+    "operation_manager": {
+        "modules": [
+            "customers",
+            "dashboard",
+            "employees",
+            "expenses",
+            "inventory",
+            "inventory-events",
+            "materials",
+            "payments",
+            "payouts",
+            "processes",
+            "purchase-orders",
+            "service-areas",
+            "trips",
+            "vehicles",
+            "vendors",
+            "warehouses",
+            "workflow-execution",
+            "workflows"
+        ],
+        "endpoints": {
+            "customer": [
+                "read"
+            ],
+            "customer_order_item": [
+                "create"
+            ],
+            "dashboard": [
+                "read"
+            ],
+            "employee": [
+                "read"
+            ],
+            "expense": [
+                "create",
+                "read",
+                "update"
+            ],
+            "inventory": [
+                "create",
+                "read",
+                "update"
+            ],
+            "inventory_event": [
+                "create",
+                "read",
+                "update"
+            ],
+            "invoice": [
+                "read"
+            ],
+            "location": [
+                "read"
+            ],
+            "material": [
+                "create",
+                "read",
+                "update",
+                "delete"
+            ],
+            "payment": [
+                "read"
+            ],
+            "payout": [
+                "create",
+                "read",
+                "update"
+            ],
+            "process": [
+                "create",
+                "read",
+                "update",
+                "delete"
+            ],
+            "process_template": [
+                "create",
+                "read",
+                "delete"
+            ],
+            "purchase_order": [
+                "create",
+                "read",
+                "update"
+            ],
+            "purchase_order_item": [
+                "create",
+                "read",
+                "update"
+            ],
+            "quality_control": [
+                "create",
+                "read"
+            ],
+            "service_area": [
+                "read"
+            ],
+            "task": [
+                "create",
+                "read",
+                "update"
+            ],
+            "task_execution": [
+                "create",
+                "read"
+            ],
+            "trip": [
+                "create",
+                "read",
+                "update"
+            ],
+            "trip_stop": [
+                "create",
+                "read",
+                "update",
+                "delete"
+            ],
+            "vehicle": [
+                "read"
+            ],
+            "vehicle_inventory": [
+                "create",
+                "read",
+                "update"
+            ],
+            "vehicle_inventory_event": [
+                "create",
+                "read"
+            ],
+            "vendor": [
+                "create",
+                "read",
+                "update"
+            ],
+            "warehouse": [
+                "create",
+                "read",
+                "update"
+            ],
+            "workflow": [
+                "read",
+                "update"
+            ],
+            "workflow_execution": [
+                "create",
+                "read"
+            ]
+        }
+    },
+    "accountant": {
+        "modules": [
+            "credit-note-items",
+            "customer-orders",
+            "customers",
+            "dashboard",
+            "debit-note-items",
+            "employees",
+            "expenses",
+            "financial-accounts",
+            "fixed-assets",
+            "inventory",
+            "inventory-events",
+            "materials",
+            "payments",
+            "payouts",
+            "pricing",
+            "processes",
+            "purchase-orders",
+            "transactions",
+            "vehicles",
+            "vendors",
+            "warehouses",
+            "workflow-execution",
+            "workflows"
+        ],
+        "endpoints": {
+            "credit_note_item": [
+                "read"
+            ],
+            "customer": [
+                "read"
+            ],
+            "customer_order": [
+                "read"
+            ],
+            "customer_order_item": [
+                "create",
+                "read"
+            ],
+            "dashboard": [
+                "read"
+            ],
+            "debit_note_item": [
+                "read"
+            ],
+            "employee": [
+                "read"
+            ],
+            "expense": [
+                "create",
+                "read",
+                "update"
+            ],
+            "financial_account": [
+                "read"
+            ],
+            "fixed_asset": [
+                "create",
+                "read",
+                "update",
+                "delete"
+            ],
+            "inventory": [
+                "create",
+                "read",
+                "update"
+            ],
+            "inventory_event": [
+                "create",
+                "read",
+                "update"
+            ],
+            "invoice": [
+                "create",
+                "read",
+                "update"
+            ],
+            "invoice_item": [
+                "create",
+                "read"
+            ],
+            "location": [
+                "read"
+            ],
+            "material": [
+                "read"
+            ],
+            "payment": [
+                "create",
+                "read",
+                "update"
+            ],
+            "payout": [
+                "create",
+                "read",
+                "update"
+            ],
+            "pricing": [
+                "read"
+            ],
+            "process": [
+                "read"
+            ],
+            "purchase_order": [
+                "read"
+            ],
+            "purchase_order_item": [
+                "read"
+            ],
+            "quality_control": [
+                "read"
+            ],
+            "task_execution": [
+                "create",
+                "read"
+            ],
+            "transaction": [
+                "create",
+                "read",
+                "update"
+            ],
+            "vehicle": [
+                "read"
+            ],
+            "vehicle_inventory": [
+                "create",
+                "read",
+                "update"
+            ],
+            "vehicle_inventory_event": [
+                "create",
+                "read"
+            ],
+            "vendor": [
+                "read"
+            ],
+            "warehouse": [
+                "create",
+                "read",
+                "update"
+            ],
+            "workflow": [
+                "read"
+            ],
+            "workflow_execution": [
+                "create",
+                "read"
+            ]
+        }
+    },
+    "operator": {
+        "modules": [
+            "customers",
+            "employees",
+            "expenses",
+            "inventory",
+            "inventory-events",
+            "materials",
+            "payments",
+            "processes",
+            "purchase-orders",
+            "service-areas",
+            "trips",
+            "vehicles",
+            "vendors",
+            "warehouses",
+            "workflow-execution",
+            "workflows"
+        ],
+        "endpoints": {
+            "customer": [
+                "read"
+            ],
+            "employee": [
+                "read"
+            ],
+            "expense": [
+                "read"
+            ],
+            "inventory": [
+                "create",
+                "read",
+                "update"
+            ],
+            "inventory_event": [
+                "create",
+                "read",
+                "update"
+            ],
+            "invoice": [
+                "read"
+            ],
+            "location": [
+                "read"
+            ],
+            "material": [
+                "read"
+            ],
+            "payment": [
+                "read"
+            ],
+            "process": [
+                "create",
+                "read",
+                "update",
+                "delete"
+            ],
+            "process_template": [
+                "create",
+                "read",
+                "delete"
+            ],
+            "purchase_order": [
+                "read"
+            ],
+            "quality_control": [
+                "create",
+                "read"
+            ],
+            "service_area": [
+                "read"
+            ],
+            "task": [
+                "read"
+            ],
+            "task_execution": [
+                "create",
+                "read"
+            ],
+            "trip": [
+                "create",
+                "read",
+                "update"
+            ],
+            "trip_stop": [
+                "create",
+                "read",
+                "update",
+                "delete"
+            ],
+            "vehicle": [
+                "read"
+            ],
+            "vehicle_inventory": [
+                "create",
+                "read",
+                "update"
+            ],
+            "vehicle_inventory_event": [
+                "create",
+                "read"
+            ],
+            "vendor": [
+                "read"
+            ],
+            "warehouse": [
+                "create",
+                "read",
+                "update"
+            ],
+            "workflow": [
+                "read"
+            ],
+            "workflow_execution": [
+                "create",
+                "read"
+            ]
+        }
+    },
+    "driver": {
+        "modules": [
+            "customers",
+            "employees",
+            "expenses",
+            "inventory",
+            "inventory-events",
+            "materials",
+            "payments",
+            "pricing",
+            "processes",
+            "purchase-orders",
+            "service-areas",
+            "trips",
+            "vehicles",
+            "vendors",
+            "warehouses",
+            "workflow-execution",
+            "workflows"
+        ],
+        "endpoints": {
+            "customer": [
+                "create",
+                "read"
+            ],
+            "customer_order_item": [
+                "create",
+                "read"
+            ],
+            "employee": [
+                "read"
+            ],
+            "expense": [
+                "create",
+                "read",
+                "update"
+            ],
+            "inventory": [
+                "create",
+                "read",
+                "update"
+            ],
+            "inventory_event": [
+                "create",
+                "read",
+                "update"
+            ],
+            "invoice": [
+                "create",
+                "read",
+                "update"
+            ],
+            "invoice_item": [
+                "create",
+                "read"
+            ],
+            "location": [
+                "read"
+            ],
+            "material": [
+                "read"
+            ],
+            "payment": [
+                "create",
+                "read",
+                "update"
+            ],
+            "pricing": [
+                "read"
+            ],
+            "process": [
+                "read"
+            ],
+            "purchase_order": [
+                "read"
+            ],
+            "quality_control": [
+                "read"
+            ],
+            "service_area": [
+                "read"
+            ],
+            "task": [
+                "read"
+            ],
+            "task_execution": [
+                "create",
+                "read"
+            ],
+            "trip": [
+                "create",
+                "read",
+                "update"
+            ],
+            "trip_stop": [
+                "create",
+                "read",
+                "update",
+                "delete"
+            ],
+            "vehicle": [
+                "read"
+            ],
+            "vehicle_inventory": [
+                "create",
+                "read",
+                "update"
+            ],
+            "vehicle_inventory_event": [
+                "create",
+                "read"
+            ],
+            "vendor": [
+                "read"
+            ],
+            "warehouse": [
+                "create",
+                "read",
+                "update"
+            ],
+            "workflow": [
+                "read"
+            ],
+            "workflow_execution": [
+                "create",
+                "read"
+            ]
+        }
+    },
+    "sales": {
+        "modules": [
+            "customer-orders",
+            "customers",
+            "employees",
+            "expenses",
+            "inventory",
+            "inventory-events",
+            "materials",
+            "payments",
+            "payouts",
+            "pricing",
+            "processes",
+            "purchase-orders",
+            "service-areas",
+            "trips",
+            "vehicles",
+            "vendors",
+            "warehouses",
+            "workflow-execution",
+            "workflows"
+        ],
+        "endpoints": {
+            "customer": [
+                "create",
+                "read"
+            ],
+            "customer_order": [
+                "create",
+                "read",
+                "update"
+            ],
+            "customer_order_item": [
+                "create",
+                "read"
+            ],
+            "employee": [
+                "read"
+            ],
+            "expense": [
+                "create",
+                "read",
+                "update"
+            ],
+            "inventory": [
+                "create",
+                "read",
+                "update"
+            ],
+            "inventory_event": [
+                "create",
+                "read",
+                "update"
+            ],
+            "invoice": [
+                "create",
+                "read",
+                "update"
+            ],
+            "invoice_item": [
+                "create",
+                "read"
+            ],
+            "location": [
+                "read"
+            ],
+            "material": [
+                "read"
+            ],
+            "payment": [
+                "create",
+                "read",
+                "update"
+            ],
+            "payout": [
+                "create",
+                "read",
+                "update"
+            ],
+            "pricing": [
+                "read"
+            ],
+            "process": [
+                "read"
+            ],
+            "purchase_order": [
+                "read"
+            ],
+            "quality_control": [
+                "read"
+            ],
+            "service_area": [
+                "read"
+            ],
+            "task": [
+                "read"
+            ],
+            "task_execution": [
+                "create",
+                "read"
+            ],
+            "trip": [
+                "create",
+                "read",
+                "update"
+            ],
+            "trip_stop": [
+                "create",
+                "read",
+                "update",
+                "delete"
+            ],
+            "vehicle": [
+                "read"
+            ],
+            "vehicle_inventory": [
+                "create",
+                "read",
+                "update"
+            ],
+            "vehicle_inventory_event": [
+                "create",
+                "read"
+            ],
+            "vendor": [
+                "read"
+            ],
+            "warehouse": [
+                "create",
+                "read",
+                "update"
+            ],
+            "workflow": [
+                "read"
+            ],
+            "workflow_execution": [
+                "create",
+                "read"
+            ]
+        }
+    }
+}

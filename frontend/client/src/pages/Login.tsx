@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitch } from '@/components/LanguageSwitch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -141,15 +142,7 @@ export default function Login() {
         <CardContent className="p-8">
           {/* Language toggle */}
           <div className="flex justify-end mb-2">
-            <button
-              type="button"
-              onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}
-              className="flex items-center px-2 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              data-testid="login-language-toggle"
-            >
-              <Globe className="w-4 h-4 me-2" />
-              {lang === 'en' ? 'العربية' : 'English'}
-            </button>
+            <LanguageSwitch testId="login-language-toggle" />
           </div>
 
           {/* Logo and Title */}
@@ -287,6 +280,19 @@ export default function Login() {
               </button>
             </div>
           )}
+
+          {/* Company signup */}
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => setLocation('/signup')}
+              className="text-sm text-gray-600 hover:text-gray-900 underline"
+              disabled={isLoading}
+              data-testid="login-signup-link"
+            >
+              {t('misc.login.createCompanyAccount')}
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>

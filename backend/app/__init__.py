@@ -77,6 +77,60 @@ def create_app(config_object=Config):
     app.config["JWT_COOKIE_CSRF_PROTECT"] = False # TESTING
     jwt.init_app(app)
 
+    @app.before_request
+    def _load_request_identity():
+        # Request chokepoint: resolve the caller's user row once and put the
+        # tenant scope + fine-grained ACL on flask.g.
+        #  - g.account_uuid: the UnitOfWork picks it up and every repository
+        #    read/write is filtered/stamped with it.
+        #  - g.user_acl / g.is_admin: the caller's EFFECTIVE fine-grained
+        #    permissions — their explicit checklist, or their role's preset
+        #    (roles are shortcuts for a pre-defined permission set). This is
+        #    the source of truth: a non-admin must be granted the matching
+        #    CRUD action on the resource blueprint or the request is rejected
+        #    right here. Admins bypass (g.user_acl None).
+        # Invalid or absent tokens leave g unset — protected routes still
+        # reject them via their own decorators; unauthenticated routes
+        # (login/signup) run unscoped, which is correct since no tenant is
+        # known yet.
+        from flask import g, jsonify, request
+        from flask_jwt_extended import verify_jwt_in_request, get_jwt
+        from app.entrypoint.routes.common.permissions import (
+            RESOURCE_SET,
+            endpoint_allowed,
+            effective_permissions,
+        )
+        try:
+            verify_jwt_in_request(optional=True)
+            claims = get_jwt()
+        except Exception:
+            return None
+        if not claims:
+            return None
+
+        from app.adapters.unit_of_work.sqlalchemy_unit_of_work import (
+            SqlAlchemyUnitOfWork,
+        )
+        with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+            user = uow.user_repository.find_one(
+                uuid=claims.get("sub"), is_deleted=False
+            )
+            if not user:
+                return None
+            g.account_uuid = user.account_uuid
+            g.is_admin = user.is_admin
+            # effective perms: explicit checklist or role preset (None = admin)
+            g.user_acl = effective_permissions(user)
+
+        if (
+            not g.is_admin
+            and g.user_acl is not None
+            and request.blueprint in RESOURCE_SET
+            and not endpoint_allowed(g.user_acl, request.blueprint, request.method)
+        ):
+            return jsonify({"msg": "Forbidden — missing endpoint permission"}), 403
+        return None
+
     # Register blueprints
     app.register_blueprint(customer_blueprint, url_prefix='/customer')
     app.register_blueprint(material_blueprint, url_prefix='/material')

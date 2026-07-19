@@ -149,6 +149,7 @@ def material_inventory_summary(uuid: str):
             uow.session.query(InventoryEventModel.created_at, InventoryEventModel.quantity)
             .filter(
                 InventoryEventModel.material_uuid == uuid,
+                InventoryEventModel.account_uuid == uow.account_uuid,
                 InventoryEventModel.is_deleted.is_(False),
             )
             .order_by(InventoryEventModel.created_at.asc())

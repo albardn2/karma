@@ -35,9 +35,17 @@ def _broker_config():
 
 
 def _get_config(uow):
-    config = uow.session.query(LocationTrackingConfigModel).first()
+    # per-account config; lazily created with defaults for new accounts
+    config = (
+        uow.session.query(LocationTrackingConfigModel)
+        .filter(LocationTrackingConfigModel.account_uuid == uow.account_uuid)
+        .first()
+    )
     if not config:
-        raise NotFoundError("Location tracking config not found (run migrations)")
+        config = LocationTrackingConfigModel(account_uuid=uow.account_uuid)
+        uow.session.add(config)
+        uow.session.flush()
+        uow.commit()
     return config
 
 
@@ -97,7 +105,10 @@ def trip_series(trip_uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         rows = (
             uow.session.query(LocationPingModel)
-            .filter(LocationPingModel.trip_uuid == trip_uuid)
+            .filter(
+                LocationPingModel.trip_uuid == trip_uuid,
+                LocationPingModel.account_uuid == uow.account_uuid,
+            )
             .order_by(LocationPingModel.recorded_at.asc())
             .limit(20000)
             .all()
@@ -116,7 +127,8 @@ def user_series(user_uuid: str):
     params = LocationHistoryParams(**request.args)
     with SqlAlchemyUnitOfWork() as uow:
         q = uow.session.query(LocationPingModel).filter(
-            LocationPingModel.user_uuid == user_uuid
+            LocationPingModel.user_uuid == user_uuid,
+            LocationPingModel.account_uuid == uow.account_uuid,
         )
         if params.from_time:
             q = q.filter(LocationPingModel.recorded_at >= params.from_time)

@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { useEffect } from "react";
 import { 
   LayoutDashboard, 
@@ -28,8 +29,7 @@ import {
   LogOut,
   Play,
   Car,
-  Truck,
-  Globe
+  Truck
 } from "lucide-react";
 
 interface SidebarProps {
@@ -72,11 +72,24 @@ const navigation = [
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
-  const { t, lang, setLang } = useLanguage();
+  const { t } = useLanguage();
   // /auth/me returns snake_case; the typed camelCase field is never populated
   const permissionScope = (user as any)?.permissionScope ?? (user as any)?.permission_scope ?? '';
   const isAdmin = permissionScope.includes('admin') || permissionScope.includes('superuser');
-  const visibleNavigation = navigation.filter((item: any) => !item.adminOnly || isAdmin);
+  // effective permissions govern menu visibility: non-admins only see the
+  // modules their role preset (or explicit override) grants; admins see all
+  const grantedModules: string[] | null =
+    !isAdmin && Array.isArray((user as any)?.effective_permissions?.modules)
+      ? (user as any).effective_permissions.modules
+      : null;
+  const visibleNavigation = navigation.filter((item: any) => {
+    if (item.adminOnly && !isAdmin) return false;
+    if (grantedModules) {
+      const moduleId = item.href === '/' ? 'dashboard' : item.href.slice(1);
+      return grantedModules.includes(moduleId);
+    }
+    return true;
+  });
 
   // Prevent body scroll when mobile sidebar is open
   useEffect(() => {
@@ -192,14 +205,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         
         {/* Fixed Footer */}
         <div className="px-4 py-4 border-t border-gray-200 flex-shrink-0 space-y-3">
-          <button
-            onClick={() => setLang(lang === "en" ? "ar" : "en")}
-            className="flex items-center w-full px-2 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-            data-testid="language-toggle"
-          >
-            <Globe className="w-4 h-4 me-2" />
-            {lang === "en" ? "العربية" : "English"}
-          </button>
+          <LanguageSwitch className="px-2 py-1" />
           <div className="flex items-center space-x-3 rtl:space-x-reverse">
             <div className="w-8 h-8 brand-gradient rounded-full flex items-center justify-center">
               <span className="text-sm font-medium text-white">{getUserInitials(user)}</span>

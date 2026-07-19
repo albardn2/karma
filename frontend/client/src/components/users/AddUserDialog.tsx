@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import {
   Dialog,
@@ -21,11 +21,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { PermissionScope, type UserFormData } from "@/lib/types";
+import { PermissionsEditor } from "@/components/users/PermissionsEditor";
+import { PermissionScope, type UserFormData, type UserPermissions } from "@/lib/types";
+import { LANGUAGE_LABELS } from "@/i18n";
 
 const makeUserSchema = (t: (key: string) => string) =>
   z.object({
@@ -48,6 +51,26 @@ interface AddUserDialogProps {
 
 export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
   const [open, setOpen] = useState(false);
+  const [permissionsOpen, setPermissionsOpen] = useState(false);
+  const [permissions, setPermissions] = useState<UserPermissions>({ modules: [], endpoints: {} });
+
+  // role presets: picking a role is a shortcut that fills the checklist
+  const { data: catalog } = useQuery<any>({
+    queryKey: ["/auth/permission-catalog"],
+    queryFn: () => apiRequest("/auth/permission-catalog"),
+  });
+  const applyRolePreset = (scope: string) => {
+    const preset = catalog?.role_presets?.[scope];
+    if (preset) {
+      setPermissions({
+        modules: [...(preset.modules ?? [])],
+        endpoints: Object.fromEntries(
+          Object.entries(preset.endpoints ?? {}).map(([k, v]) => [k, [...(v as string[])]])
+        ),
+      });
+      setPermissionsOpen(true);
+    }
+  };
   const { toast } = useToast();
   const { t, te } = useLanguage();
 
@@ -101,6 +124,8 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
       });
       setOpen(false);
       form.reset();
+      setPermissions({ modules: [], endpoints: {} });
+      setPermissionsOpen(false);
     },
     onError: (error: any) => {
       toast({
@@ -111,8 +136,19 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
     },
   });
 
+  // fine-grained permissions are only valid for non-admin scopes
+  const selectedScope = form.watch("permission_scope") ?? "";
+  const isAdminScope = selectedScope.includes("admin") || selectedScope.includes("superuser");
+
   const onSubmit = (data: UserFormValues) => {
-    createUserMutation.mutate(data as UserFormData);
+    const payload = { ...(data as UserFormData) };
+    const hasSelection =
+      permissions.modules.length > 0 ||
+      Object.values(permissions.endpoints).some((actions) => actions.length > 0);
+    if (!isAdminScope && hasSelection) {
+      payload.permissions = permissions;
+    }
+    createUserMutation.mutate(payload);
   };
 
   return (
@@ -220,7 +256,13 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("users.permissionScope")}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={(v) => {
+                        field.onChange(v);
+                        applyRolePreset(v);
+                      }}
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder={t("users.selectPermissionScope")} />
@@ -245,9 +287,20 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("common.language")}</FormLabel>
-                    <FormControl>
-                      <Input placeholder={t("users.enterLanguage")} {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="user-language">
+                          <SelectValue placeholder={t("users.selectLanguage")} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.entries(LANGUAGE_LABELS).map(([code, label]) => (
+                          <SelectItem key={code} value={code}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -267,6 +320,26 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 )}
               />
             </div>
+
+            {!isAdminScope && (
+              <Collapsible open={permissionsOpen} onOpenChange={setPermissionsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between"
+                  >
+                    <span>{t("users.finePermissions")}</span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${permissionsOpen ? "rotate-180" : ""}`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3">
+                  <PermissionsEditor value={permissions} onChange={setPermissions} />
+                </CollapsibleContent>
+              </Collapsible>
+            )}
 
             <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
               <Button

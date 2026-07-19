@@ -42,9 +42,12 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { LANGUAGE_LABELS } from "@/i18n";
 import { UserLocationMap } from "@/components/location/UserLocationMap";
+import { PermissionsEditor } from "@/components/users/PermissionsEditor";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { User, UserUpdateData, PermissionScope } from "@/lib/types";
+import type { User, UserUpdateData, PermissionScope, UserPermissions } from "@/lib/types";
 
 const makeUserUpdateSchema = (t: (key: string) => string) =>
   z.object({
@@ -71,13 +74,27 @@ const makeUserUpdateSchema = (t: (key: string) => string) =>
 
 type UserUpdateFormValues = z.infer<ReturnType<typeof makeUserUpdateSchema>>;
 
+// canonical string form so two permission sets compare regardless of order
+const normalizePerms = (p: UserPermissions): string =>
+  JSON.stringify({
+    modules: [...(p.modules ?? [])].sort(),
+    endpoints: Object.fromEntries(
+      Object.entries(p.endpoints ?? {})
+        .filter(([, a]) => (a ?? []).length > 0)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => [k, [...v].sort()])
+    ),
+  });
+
 export default function UserDetail() {
   const [, params] = useRoute("/users/:uuid");
   const uuid = params?.uuid;
   const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
+  const [finePermissions, setFinePermissions] = useState<UserPermissions>({ modules: [], endpoints: {} });
   const { toast } = useToast();
-  const { t, te } = useLanguage();
+  const { t, te, lang } = useLanguage();
+  const { user: authUser, setUserLanguage } = useAuth();
 
   const userUpdateSchema = useMemo(() => makeUserUpdateSchema(t), [t]);
 
@@ -99,6 +116,28 @@ export default function UserDetail() {
     },
   });
 
+  // role presets: a role is a shortcut for a pre-defined permission set
+  const { data: catalog } = useQuery<any>({
+    queryKey: ["/auth/permission-catalog"],
+    queryFn: () => apiRequest("/auth/permission-catalog"),
+  });
+  const presetFor = (scope: string): UserPermissions | null => {
+    const preset = catalog?.role_presets?.[(scope || "").split(",")[0]];
+    if (!preset) return null;
+    return {
+      modules: [...(preset.modules ?? [])],
+      endpoints: Object.fromEntries(
+        Object.entries(preset.endpoints ?? {}).map(([k, v]) => [k, [...(v as string[])]])
+      ),
+    };
+  };
+  // changing the role auto-loads that role's pre-defined permissions into the
+  // checklist; the admin can then modify them freely
+  const onRoleChange = (scope: string) => {
+    const preset = presetFor(scope);
+    if (preset) setFinePermissions(preset);
+  };
+
   const form = useForm<UserUpdateFormValues>({
     resolver: zodResolver(userUpdateSchema),
     defaultValues: {
@@ -116,9 +155,11 @@ export default function UserDetail() {
     },
   });
 
-  // Update form when user data loads
+  // Update form when user data loads — but never while the admin is mid-edit
+  // (a background refetch, e.g. after a sidebar language toggle, must not
+  // wipe in-progress changes)
   useEffect(() => {
-    if (user) {
+    if (user && !isEditing) {
       form.reset({
         username: user.username || "",
         first_name: user.first_name || "",
@@ -132,8 +173,16 @@ export default function UserDetail() {
         track_location: user.track_location,
         location_ping_seconds: user.location_ping_seconds,
       });
+      // seed the checklist from what actually governs the user: their
+      // explicit override, else their role preset
+      const eff = (user as any).effective_permissions || user.permissions;
+      setFinePermissions(
+        eff
+          ? { modules: eff.modules ?? [], endpoints: eff.endpoints ?? {} }
+          : { modules: [], endpoints: {} }
+      );
     }
-  }, [user, form]);
+  }, [user, form, isEditing]);
 
   // Update user mutation
   const updateUserMutation = useMutation({
@@ -147,12 +196,23 @@ export default function UserDetail() {
       
       return await apiRequest(`/auth/user/${uuid}`, { method: "PUT", body: cleanData });
     },
-    onSuccess: () => {
+    onSuccess: (_res, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/auth/user", uuid] });
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["/auth/users"],
-        exact: false 
+        exact: false
       });
+      // editing your own language preference switches the app live, like the
+      // sidebar toggle — the form already persisted it, so just sync the
+      // in-memory profile (the single source of truth) which flips the UI
+      const newLang = (variables as UserUpdateData).language;
+      if (
+        (newLang === "en" || newLang === "ar") &&
+        authUser?.uuid === uuid &&
+        newLang !== lang
+      ) {
+        setUserLanguage(newLang);
+      }
       toast({
         title: t("common.success"),
         description: t("users.updatedSuccess"),
@@ -206,8 +266,55 @@ export default function UserDetail() {
     },
   });
 
+  // fine-grained permissions are only valid for non-admin scopes; while
+  // editing, follow the in-progress role selection so switching to/from an
+  // admin role updates the card live
+  const watchedScope = form.watch("permission_scope") || "";
+  const cardScope = isEditing ? watchedScope : (user?.permission_scope || "");
+  const userIsAdminScope =
+    cardScope.includes("admin") || cardScope.includes("superuser");
+
+  // permissions are saved from their own card, independent of the profile form
+  const savePermissionsMutation = useMutation({
+    mutationFn: async () => {
+      if (!uuid) throw new Error("User UUID is required");
+      // admins have full access; for a non-admin, keep the user following
+      // their role (null) if the checklist is unchanged from the preset,
+      // else persist the explicit override
+      const preset = presetFor(cardScope);
+      const unchanged = preset && normalizePerms(preset) === normalizePerms(finePermissions);
+      const permissions = userIsAdminScope || unchanged ? null : finePermissions;
+      return await apiRequest(`/auth/user/${uuid}`, {
+        method: "PUT",
+        body: { permissions },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/auth/user", uuid] });
+      queryClient.invalidateQueries({ queryKey: ["/auth/users"], exact: false });
+      toast({
+        title: t("common.success"),
+        description: t("users.permissionsSaved"),
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("common.error"),
+        description: error.message || t("users.updateFailed"),
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: UserUpdateFormValues) => {
-    updateUserMutation.mutate(data as UserUpdateData);
+    const payload = { ...(data as UserUpdateData) };
+    // only send language when the admin deliberately changed it here — a
+    // stale form value must not silently overwrite a preference set
+    // elsewhere (e.g. via the sidebar language switch)
+    if (!form.formState.dirtyFields.language) {
+      delete payload.language;
+    }
+    updateUserMutation.mutate(payload);
   };
 
   const formatDate = (dateString: string) => {
@@ -407,7 +514,13 @@ export default function UserDetail() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>{t("users.permissionScope")}</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <Select
+                                onValueChange={(v) => {
+                                  field.onChange(v);
+                                  onRoleChange(v);
+                                }}
+                                value={field.value || ""}
+                              >
                                 <FormControl>
                                   <SelectTrigger>
                                     <SelectValue placeholder={t("users.selectPermissionScope")} />
@@ -488,9 +601,20 @@ export default function UserDetail() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>{t("common.language")}</FormLabel>
-                              <FormControl>
-                                <Input placeholder={t("users.enterLanguage")} {...field} />
-                              </FormControl>
+                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="user-language">
+                                    <SelectValue placeholder={t("users.selectLanguage")} />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {Object.entries(LANGUAGE_LABELS).map(([code, label]) => (
+                                    <SelectItem key={code} value={code}>
+                                      {label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -568,6 +692,7 @@ export default function UserDetail() {
                             </FormItem>
                           )}
                         />
+
                       </div>
                     </div>
                   </Form>
@@ -692,7 +817,11 @@ export default function UserDetail() {
                             </Button>
                           )}
                         </div>
-                        <p className="font-medium">{user.language || t("users.notProvided")}</p>
+                        <p className="font-medium">
+                          {user.language
+                            ? (LANGUAGE_LABELS as Record<string, string>)[user.language] || user.language
+                            : t("users.notProvided")}
+                        </p>
                       </div>
 
                       <div className="space-y-2">
@@ -716,6 +845,44 @@ export default function UserDetail() {
                             : t("users.notSet")}
                         </p>
                       </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Dedicated permissions section */}
+            <Card data-testid="permissions-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  {t("users.finePermissions")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {userIsAdminScope ? (
+                  <p className="text-sm text-gray-500">{t("users.adminFullAccess")}</p>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-500">
+                      {t("users.finePermissionsDesc", {
+                        role: te((cardScope || "").split(",")[0]),
+                      })}
+                    </p>
+                    <PermissionsEditor
+                      value={finePermissions}
+                      onChange={setFinePermissions}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={() => savePermissionsMutation.mutate()}
+                        disabled={savePermissionsMutation.isPending}
+                        data-testid="perm-save"
+                      >
+                        {savePermissionsMutation.isPending
+                          ? t("common.saving")
+                          : t("users.savePermissions")}
+                      </Button>
                     </div>
                   </div>
                 )}

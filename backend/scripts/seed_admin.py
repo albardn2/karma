@@ -10,12 +10,13 @@ Credentials are taken from env (with local defaults):
 import os
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
-from models.common import User
+from models.common import User, Account
 
 
 USERNAME = os.getenv("SEED_ADMIN_USERNAME", "admin")
 PASSWORD = os.getenv("SEED_ADMIN_PASSWORD", "admin")
 EMAIL = os.getenv("SEED_ADMIN_EMAIL", "admin@karma.local")
+COMPANY = os.getenv("SEED_ADMIN_COMPANY", "Karma Group")
 
 
 def main() -> None:
@@ -25,6 +26,12 @@ def main() -> None:
             print(f"[seed] user {USERNAME!r} already exists, skipping")
             return
 
+        account = uow.account_repository.find_first(company_name=COMPANY, is_deleted=False)
+        if not account:
+            account = Account(company_name=COMPANY, email=EMAIL)
+            uow.account_repository.save(model=account, commit=False)
+            print(f"[seed] created account {COMPANY!r}")
+
         user = User(
             username=USERNAME,
             first_name="Admin",
@@ -32,6 +39,7 @@ def main() -> None:
             # full access: is_admin checks for "admin"/"superuser" in this list
             permission_scope="superuser,admin",
             email=EMAIL,
+            account_uuid=account.uuid,
         )
         user.set_password(PASSWORD)
         uow.user_repository.save(model=user, commit=True)
