@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.adapters.repositories.customer_repository import CustomerRepository
 from app.adapters.repositories.account_repository import AccountRepository
+from app.adapters.repositories.account_ledger_repository import AccountLedgerRepository
 from app.adapters.unit_of_work._abstract_unit_of_work import AbstractUnitOfWork
 from app.adapters.repositories.material_repository import MaterialRepository
 from app.adapters.repositories.vendor_repository import VendorRepository
@@ -74,6 +75,8 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         )
         self.session = self.session_factory()
         self.account_repository = AccountRepository(session=self.session, account_uuid=None)
+        # platform-level ledger: superuser console only, never tenant-scoped
+        self.account_ledger_repository = AccountLedgerRepository(session=self.session, account_uuid=None)
         self.customer_repository = CustomerRepository(session=self.session, account_uuid=self.account_uuid)
         self.material_repository = MaterialRepository(session=self.session, account_uuid=self.account_uuid)
         self.vendor_repository = VendorRepository(session=self.session, account_uuid=self.account_uuid)

@@ -26,11 +26,21 @@ def scopes_required(*required_scopes: str):
         def decorated(*args, **kwargs):
             verify_jwt_in_request()
             claims = get_jwt()
-            user_scopes = set(claims.get("scopes", []))
+            from flask import g
+            # prefer the DB-fresh scopes loaded by the request chokepoint —
+            # the token's scopes claim goes stale when an admin changes a
+            # user's role mid-session
+            user_scopes = getattr(g, "user_scopes", None) or set(claims.get("scopes", []))
+            required = set(required_scopes)
+            # platform-owner routes: ONLY superuser may pass — the tenant-admin
+            # bypass below must not open the super-admin console to tenants
+            if required == {"superuser"}:
+                if "superuser" in user_scopes:
+                    return fn(*args, **kwargs)
+                return jsonify({"msg": "Forbidden — platform owner only"}), 403
             if user_scopes.intersection(_ADMIN_SCOPES):
                 return fn(*args, **kwargs)
 
-            from flask import g
             if getattr(g, "user_acl", None) is not None:
                 # fine-grained user (explicit checklist OR role preset): the
                 # endpoint grant is already enforced in before_request, which
@@ -55,7 +65,11 @@ def add_logged_user_to_payload(uow:SqlAlchemyUnitOfWork,user_uuid:str, payload:B
     """
     Add the logged in user to the payload
     """
-    current_user = uow.user_repository.find_one(uuid=user_uuid, is_deleted=False)
+    # unscoped self-lookup: user_uuid comes from the verified JWT, and during
+    # impersonation the superuser's row lives outside the tenant scope
+    from models.common import User as UserModel
+    current_user = uow.session.query(UserModel).filter_by(
+        uuid=user_uuid, is_deleted=False).one_or_none()
     if not current_user:
         raise NotFoundError("Current user not found")
 

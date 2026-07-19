@@ -7,7 +7,8 @@ from flask_jwt_extended import (
     set_access_cookies,
     unset_jwt_cookies,
     jwt_required,
-    get_jwt_identity, create_refresh_token, set_refresh_cookies, get_jwt
+    get_jwt_identity, create_refresh_token, set_refresh_cookies, get_jwt,
+    verify_jwt_in_request,
 )
 from app.entrypoint.routes.common.errors import NotFoundError
 from app.dto.auth import (
@@ -35,6 +36,11 @@ from app.dto.auth import PermissionScope
 @scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def register():
     payload = RegisterRequest(**request.json)
+    # privilege-escalation guard: only the platform owner can create
+    # superuser accounts
+    if "superuser" in (payload.permission_scope or ""):
+        if "superuser" not in get_jwt().get("scopes", []):
+            return jsonify({"msg": "Only the platform owner can grant the superuser scope"}), 403
     with SqlAlchemyUnitOfWork() as uow:
         user_read = UserDomain.create_user(uow=uow, payload=payload)
         result = user_read.model_dump(mode="json")
@@ -101,6 +107,12 @@ def login():
         else:
             raise BadRequestError("username_or_email or rfid_token must be provided")
 
+        # blocked accounts cannot sign in (platform owner exempt)
+        if not user.is_superuser:
+            account = uow.account_repository.find_one(uuid=user.account_uuid)
+            if account and account.is_blocked:
+                raise Unauthorized("This account is blocked")
+
         scopes = user.permission_scope.split(",")  # e.g. "read,write,admin"
         access_token = create_access_token(
             identity=user.uuid,
@@ -129,6 +141,10 @@ def refresh():
         user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
         if not user:
             raise Unauthorized("User not found")
+        if not user.is_superuser:
+            account = uow.account_repository.find_one(uuid=user.account_uuid)
+            if account and account.is_blocked:
+                raise Unauthorized("This account is blocked")
         scopes = user.permission_scope.split(",")
         access_token = create_access_token(
             identity=user.uuid,
@@ -154,7 +170,8 @@ def profile(user_uuid: str):
         user = uow.user_repository.find_one(uuid=user_uuid, is_deleted=False)
         if not user:
             raise NotFoundError("User not found")
-        current_user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
+        current_user = uow.session.query(UserModel).filter_by(
+            uuid=current_uuid, is_deleted=False).one_or_none()
         if not current_user:
             raise NotFoundError("Current user not found")
         if user_uuid != current_uuid and not current_user.is_admin:
@@ -241,7 +258,17 @@ def delete_user(user_uuid: str):
 # route to list permission scope enums
 @auth_blueprint.route("/permissions", methods=["GET"])
 def list_permissions():
+    """Roles the caller may assign. Only the platform owner may grant the
+    superuser scope, so tenant admins don't see it at all."""
     permissions = [p.value for p in PermissionScope]
+    try:
+        verify_jwt_in_request(optional=True)
+        from flask import g
+        caller_scopes = getattr(g, "user_scopes", None) or set(get_jwt().get("scopes", []))
+    except Exception:
+        caller_scopes = set()
+    if PermissionScope.SUPER_ADMIN.value not in caller_scopes:
+        permissions = [p for p in permissions if p != PermissionScope.SUPER_ADMIN.value]
     return jsonify(permissions), 200
 
 
@@ -251,10 +278,27 @@ def list_permissions():
 def me():
     current_uuid = get_jwt_identity()
     with SqlAlchemyUnitOfWork() as uow:
-        user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
+        # self-lookup by verified JWT identity — unscoped so impersonation
+        # (superuser row outside the target account) still resolves
+        user = uow.session.query(UserModel).filter_by(
+            uuid=current_uuid, is_deleted=False).one_or_none()
         if not user:
             raise NotFoundError("User not found")
         dto = UserRead.from_orm(user).model_dump(mode="json")
+        # tenant feature cap: the frontend hides non-granted menu modules for
+        # every user of the account, admins included (platform owner exempt)
+        if not user.is_superuser:
+            account = uow.account_repository.find_one(uuid=user.account_uuid)
+            dto["account_permissions"] = account.permissions if account else None
+        else:
+            dto["account_permissions"] = None
+        # impersonation (platform owner operating inside a tenant): tell the
+        # frontend which company so it can show a banner + exit control
+        imp_account = get_jwt().get("imp_account_uuid")
+        if imp_account and user.is_superuser:
+            account = uow.account_repository.find_one(uuid=imp_account)
+            dto["impersonating_account_uuid"] = imp_account
+            dto["impersonating_company"] = account.company_name if account else None
         return jsonify(dto), 200
 
 
@@ -269,7 +313,8 @@ def update_me():
     req = MeUpdate(**request.json)
     current_uuid = get_jwt_identity()
     with SqlAlchemyUnitOfWork() as uow:
-        user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
+        user = uow.session.query(UserModel).filter_by(
+            uuid=current_uuid, is_deleted=False).one_or_none()
         if not user:
             raise NotFoundError("User not found")
         for key, value in req.model_dump(exclude_unset=True).items():

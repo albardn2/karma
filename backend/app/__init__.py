@@ -32,6 +32,7 @@ from app.entrypoint.routes.credit_note import credit_note_item_blueprint
 from app.entrypoint.routes.process import process_blueprint
 from app.entrypoint.routes.process_template import process_template_blueprint
 from app.entrypoint.routes.dashboard import dashboard_blueprint
+from app.entrypoint.routes.super_admin import super_admin_blueprint
 from app.entrypoint.routes.auth import auth_blueprint
 from app.entrypoint.routes.workflow import workflow_blueprint
 from app.entrypoint.routes.task import task_blueprint
@@ -117,18 +118,55 @@ def create_app(config_object=Config):
             )
             if not user:
                 return None
-            g.account_uuid = user.account_uuid
+            # blocked account / tenant feature cap: resolved fresh per
+            # request (the platform owner is exempt from both)
+            g.account_perms = None
+            if not user.is_superuser:
+                from models.common import Account as AccountModel
+                acct = (
+                    uow.session.query(
+                        AccountModel.is_blocked, AccountModel.permissions
+                    )
+                    .filter(AccountModel.uuid == user.account_uuid)
+                    .first()
+                )
+                if acct and acct[0]:
+                    # 401 (not 403) so both clients' auto-logout machinery
+                    # kicks in: web clears the token and reloads to the login
+                    # page; the app fails its refresh and signs out — active
+                    # sessions are revoked on their next request
+                    return jsonify({"msg": "This account is blocked"}), 401
+                g.account_perms = acct[1] if acct else None
+            # impersonation: a superuser token may carry a target account —
+            # the platform owner operates inside that tenant's scope
+            imp_account = claims.get("imp_account_uuid")
+            if imp_account and user.is_superuser:
+                g.account_uuid = imp_account
+            else:
+                g.account_uuid = user.account_uuid
             g.is_admin = user.is_admin
+            # DB-fresh scopes: role changes apply to live sessions immediately
+            # (the JWT scopes claim is only a fallback, it goes stale)
+            g.user_scopes = set((user.permission_scope or "").split(","))
             # effective perms: explicit checklist or role preset (None = admin)
             g.user_acl = effective_permissions(user)
 
-        if (
-            not g.is_admin
-            and g.user_acl is not None
-            and request.blueprint in RESOURCE_SET
-            and not endpoint_allowed(g.user_acl, request.blueprint, request.method)
-        ):
-            return jsonify({"msg": "Forbidden — missing endpoint permission"}), 403
+        if request.blueprint in RESOURCE_SET:
+            # tenant feature cap binds EVERYONE in the account, admins
+            # included (the platform owner is exempt — g.account_perms None)
+            if g.account_perms is not None and not endpoint_allowed(
+                g.account_perms, request.blueprint, request.method
+            ):
+                return jsonify(
+                    {"msg": "Forbidden — feature not enabled for this account"}
+                ), 403
+            # per-user fine-grained grant (admins bypass)
+            if (
+                not g.is_admin
+                and g.user_acl is not None
+                and not endpoint_allowed(g.user_acl, request.blueprint, request.method)
+            ):
+                return jsonify({"msg": "Forbidden — missing endpoint permission"}), 403
         return None
 
     # Register blueprints
@@ -157,6 +195,7 @@ def create_app(config_object=Config):
     app.register_blueprint(process_blueprint, url_prefix='/process')
     app.register_blueprint(process_template_blueprint, url_prefix='/process-template')
     app.register_blueprint(dashboard_blueprint, url_prefix='/dashboard')
+    app.register_blueprint(super_admin_blueprint, url_prefix='/super-admin')
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
     app.register_blueprint(workflow_blueprint, url_prefix='/workflow')
     app.register_blueprint(task_blueprint, url_prefix='/task')

@@ -83,6 +83,7 @@ import WorkflowExecutionDetail from "@/pages/WorkflowExecutionDetail";
 import WorkflowExecutionTaskDetail from "@/pages/WorkflowExecutionTaskDetail";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import AccountsAdmin from "@/pages/AccountsAdmin";
 
 function HomeRoute() {
   // "/" is the public landing page for visitors and the dashboard for
@@ -176,6 +177,7 @@ function Router() {
       <Route path="/reports" component={() => <ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/live-map" component={() => <ProtectedRoute><LiveMap /></ProtectedRoute>} />
       <Route path="/location-tracking" component={() => <ProtectedRoute><LocationTrackingSettings /></ProtectedRoute>} />
+      <Route path="/accounts-admin" component={() => <ProtectedRoute><AccountsAdmin /></ProtectedRoute>} />
       <Route component={NotFound} />
     </Switch>
   );

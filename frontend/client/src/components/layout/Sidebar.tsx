@@ -29,7 +29,8 @@ import {
   LogOut,
   Play,
   Car,
-  Truck
+  Truck,
+  Landmark
 } from "lucide-react";
 
 interface SidebarProps {
@@ -39,6 +40,8 @@ interface SidebarProps {
 
 const navigation = [
   { key: "nav.dashboard", href: "/", icon: LayoutDashboard },
+  // superOnly: platform-owner console, visible to superusers only
+  { key: "nav.accounts", href: "/accounts-admin", icon: Landmark, superOnly: true },
   { key: "nav.customers", href: "/customers", icon: Users },
   { key: "nav.vendors", href: "/vendors", icon: Building2 },
   { key: "nav.warehouses", href: "/warehouses", icon: Warehouse },
@@ -76,13 +79,24 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   // /auth/me returns snake_case; the typed camelCase field is never populated
   const permissionScope = (user as any)?.permissionScope ?? (user as any)?.permission_scope ?? '';
   const isAdmin = permissionScope.includes('admin') || permissionScope.includes('superuser');
-  // effective permissions govern menu visibility: non-admins only see the
-  // modules their role preset (or explicit override) grants; admins see all
-  const grantedModules: string[] | null =
+  const isSuperuser = permissionScope.includes('superuser');
+  // menu visibility = user-level grants (admins exempt) intersected with the
+  // tenant feature cap (binds admins too; platform owner exempt)
+  const userModules: string[] | null =
     !isAdmin && Array.isArray((user as any)?.effective_permissions?.modules)
       ? (user as any).effective_permissions.modules
       : null;
+  const accountModules: string[] | null = Array.isArray(
+    (user as any)?.account_permissions?.modules
+  )
+    ? (user as any).account_permissions.modules
+    : null;
+  const grantedModules: string[] | null =
+    userModules && accountModules
+      ? userModules.filter((m: string) => accountModules.includes(m))
+      : userModules ?? accountModules;
   const visibleNavigation = navigation.filter((item: any) => {
+    if (item.superOnly && !isSuperuser) return false;
     if (item.adminOnly && !isAdmin) return false;
     if (grantedModules) {
       const moduleId = item.href === '/' ? 'dashboard' : item.href.slice(1);

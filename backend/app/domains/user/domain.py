@@ -20,6 +20,12 @@ class UserDomain:
             email=payload.email,
             phone_number=payload.phone_number,
         )
+        # platform default feature cap for new accounts (snapshot at signup)
+        from models.common import PlatformSetting
+        default_cap = uow.session.query(PlatformSetting).filter_by(
+            key="default_account_permissions").one_or_none()
+        if default_cap and default_cap.value:
+            account.permissions = dict(default_cap.value)
         uow.account_repository.save(model=account, commit=False)
 
         user = UserModel(
@@ -66,7 +72,9 @@ class UserDomain:
         if not user:
             raise NotFoundError("User not found")
 
-        current_user = uow.user_repository.find_one(uuid=current_user_uuid, is_deleted=False)
+        # unscoped self-lookup (JWT identity; superuser may be impersonating)
+        current_user = uow.session.query(UserModel).filter_by(
+            uuid=current_user_uuid, is_deleted=False).one_or_none()
         if not current_user:
             raise NotFoundError("Current user not found")
         if current_user_uuid != user_uuid and not current_user.is_admin:
@@ -75,6 +83,15 @@ class UserDomain:
 
         if payload.permission_scope and not current_user.is_admin:
             raise BadRequestError("You are not authorized to change permission scope")
+        # privilege-escalation guard: only the platform owner can grant the
+        # superuser scope (a tenant admin must not promote anyone — including
+        # themselves — to platform owner)
+        if (
+            payload.permission_scope
+            and "superuser" in payload.permission_scope
+            and not current_user.is_superuser
+        ):
+            raise BadRequestError("Only the platform owner can grant the superuser scope")
 
         if payload.permissions is not None:
             if not current_user.is_admin:

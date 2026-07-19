@@ -40,6 +40,46 @@ class Account(Base):
     phone_number = Column(String(256), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     is_deleted = Column(Boolean, default=False)
+    # platform-owner (superuser) managed:
+    is_blocked = Column(Boolean, nullable=False, default=False)
+    subscription_rate = Column(Float, nullable=True)   # per month
+    subscription_currency = Column(String(10), nullable=True)
+    # 'flat' = rate per month; 'per_user' = rate x active users per month
+    subscription_type = Column(String(20), nullable=False, default='flat')
+    # platform-managed feature cap for the WHOLE tenant (same shape as user
+    # permissions: {modules, endpoints}); NULL = all features enabled. Binds
+    # every user of the account including its admins.
+    permissions = Column(MutableDict.as_mutable(JSONB), nullable=True)
+
+
+class PlatformSetting(Base):
+    """Platform-level key/value settings (superuser console). e.g.
+    'default_account_permissions': the feature cap stamped onto NEW accounts
+    at signup (existing accounts are not affected by later changes)."""
+    __tablename__ = 'platform_setting'
+
+    key = Column(String(64), primary_key=True)
+    value = Column(MutableDict.as_mutable(JSONB), nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AccountLedgerEntry(Base):
+    """Platform-level subscription ledger per account (NOT tenant data —
+    accessed only through the superuser console with an unscoped UoW).
+    Signed amounts: payments positive, monthly charges negative,
+    manual adjustments either. Balance = SUM(amount) per currency."""
+    __tablename__ = 'account_ledger_entry'
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
+    entry_type = Column(String(20), nullable=False)  # payment | charge | adjustment
+    amount = Column(Float, nullable=False)           # signed
+    currency = Column(String(10), nullable=False)
+    period = Column(String(7), nullable=True)        # 'YYYY-MM' for charges
+    notes = Column(Text, nullable=True)
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    is_deleted = Column(Boolean, default=False)
 
 
 class User(Base):
@@ -84,6 +124,10 @@ class User(Base):
     def is_admin(self):
         scopes= self.permission_scope.split(",")
         return any(scope in ["admin", "superuser"] for scope in scopes)
+
+    @property
+    def is_superuser(self):
+        return "superuser" in (self.permission_scope or "").split(",")
 
 
 class Customer(Base):
