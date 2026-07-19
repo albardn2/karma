@@ -218,22 +218,41 @@ export default function UserDetail() {
     },
   });
 
-  // fine-grained permissions are only valid for non-admin scopes
-  const selectedScope = form.watch("permission_scope") || "";
-  const isAdminScope =
-    selectedScope.includes("admin") || selectedScope.includes("superuser");
+  // fine-grained permissions are only valid for non-admin scopes; the
+  // dedicated Permissions card below goes by the user's SAVED scope
+  const userIsAdminScope =
+    (user?.permission_scope || "").includes("admin") ||
+    (user?.permission_scope || "").includes("superuser");
+
+  // permissions are saved from their own card, independent of the profile form
+  const savePermissionsMutation = useMutation({
+    mutationFn: async () => {
+      if (!uuid) throw new Error("User UUID is required");
+      const permissions = useFinePermissions ? finePermissions : null;
+      return await apiRequest(`/auth/user/${uuid}`, {
+        method: "PUT",
+        body: { permissions },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/auth/user", uuid] });
+      queryClient.invalidateQueries({ queryKey: ["/auth/users"], exact: false });
+      toast({
+        title: t("common.success"),
+        description: t("users.permissionsSaved"),
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("common.error"),
+        description: error.message || t("users.updateFailed"),
+        variant: "destructive",
+      });
+    },
+  });
 
   const onSubmit = (data: UserUpdateFormValues) => {
-    const payload = { ...(data as UserUpdateData) };
-    if (!isAdminScope) {
-      if (useFinePermissions) {
-        payload.permissions = finePermissions;
-      } else if (user?.permissions) {
-        // toggled off for a user that had permissions: clear back to role behavior
-        payload.permissions = null;
-      }
-    }
-    updateUserMutation.mutate(payload);
+    updateUserMutation.mutate(data as UserUpdateData);
   };
 
   const formatDate = (dateString: string) => {
@@ -595,31 +614,6 @@ export default function UserDetail() {
                           )}
                         />
 
-                        {!isAdminScope && (
-                          <div className="rounded-lg border p-3 md:col-span-2 space-y-3">
-                            <div className="flex flex-row items-center justify-between gap-2">
-                              <div className="space-y-0.5">
-                                <p className="text-sm font-medium">
-                                  {t("users.useFinePermissions")}
-                                </p>
-                                <p className="text-sm text-gray-500">
-                                  {t("users.useFinePermissionsDesc")}
-                                </p>
-                              </div>
-                              <Switch
-                                checked={useFinePermissions}
-                                onCheckedChange={setUseFinePermissions}
-                                data-testid="perm-use-fine"
-                              />
-                            </div>
-                            {useFinePermissions && (
-                              <PermissionsEditor
-                                value={finePermissions}
-                                onChange={setFinePermissions}
-                              />
-                            )}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </Form>
@@ -768,6 +762,56 @@ export default function UserDetail() {
                             : t("users.notSet")}
                         </p>
                       </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Dedicated permissions section */}
+            <Card data-testid="permissions-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  {t("users.finePermissions")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {userIsAdminScope ? (
+                  <p className="text-sm text-gray-500">{t("users.adminFullAccess")}</p>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex flex-row items-center justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium">
+                          {t("users.useFinePermissions")}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {t("users.useFinePermissionsDesc")}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={useFinePermissions}
+                        onCheckedChange={setUseFinePermissions}
+                        data-testid="perm-use-fine"
+                      />
+                    </div>
+                    {useFinePermissions && (
+                      <PermissionsEditor
+                        value={finePermissions}
+                        onChange={setFinePermissions}
+                      />
+                    )}
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={() => savePermissionsMutation.mutate()}
+                        disabled={savePermissionsMutation.isPending}
+                        data-testid="perm-save"
+                      >
+                        {savePermissionsMutation.isPending
+                          ? t("common.saving")
+                          : t("users.savePermissions")}
+                      </Button>
                     </div>
                   </div>
                 )}

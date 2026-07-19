@@ -166,6 +166,9 @@ export const en: Record<string, string> = {
   'enum.operator': 'Operator',
   'enum.driver': 'Driver',
   'enum.sales': 'Sales',
+  'users.adminFullAccess': 'Administrators have full access to everything — no checklist needed.',
+  'users.savePermissions': 'Save Permissions',
+  'users.permissionsSaved': 'Permissions updated successfully',
 };
 
 export const ar: Record<string, string> = {
@@ -333,4 +336,7 @@ export const ar: Record<string, string> = {
   'enum.operator': 'مشغّل',
   'enum.driver': 'سائق',
   'enum.sales': 'مبيعات',
+  'users.adminFullAccess': 'لمديري النظام صلاحية كاملة على كل شيء — لا حاجة لقائمة صلاحيات.',
+  'users.savePermissions': 'حفظ الصلاحيات',
+  'users.permissionsSaved': 'تم تحديث الصلاحيات بنجاح',
 };
