@@ -72,12 +72,23 @@ const makeUserUpdateSchema = (t: (key: string) => string) =>
 
 type UserUpdateFormValues = z.infer<ReturnType<typeof makeUserUpdateSchema>>;
 
+// canonical string form so two permission sets compare regardless of order
+const normalizePerms = (p: UserPermissions): string =>
+  JSON.stringify({
+    modules: [...(p.modules ?? [])].sort(),
+    endpoints: Object.fromEntries(
+      Object.entries(p.endpoints ?? {})
+        .filter(([, a]) => (a ?? []).length > 0)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => [k, [...v].sort()])
+    ),
+  });
+
 export default function UserDetail() {
   const [, params] = useRoute("/users/:uuid");
   const uuid = params?.uuid;
   const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
-  const [useFinePermissions, setUseFinePermissions] = useState(false);
   const [finePermissions, setFinePermissions] = useState<UserPermissions>({ modules: [], endpoints: {} });
   const { toast } = useToast();
   const { t, te } = useLanguage();
@@ -107,33 +118,21 @@ export default function UserDetail() {
     queryKey: ["/auth/permission-catalog"],
     queryFn: () => apiRequest("/auth/permission-catalog"),
   });
-  const loadRolePreset = (scopeArg?: string) => {
-    const scope = (scopeArg ?? user?.permission_scope ?? "").split(",")[0];
-    const preset = catalog?.role_presets?.[scope];
-    if (preset) {
-      setFinePermissions({
-        modules: [...(preset.modules ?? [])],
-        endpoints: Object.fromEntries(
-          Object.entries(preset.endpoints ?? {}).map(([k, v]) => [k, [...(v as string[])]])
-        ),
-      });
-    }
-  };
-  const onToggleFinePermissions = (on: boolean) => {
-    setUseFinePermissions(on);
-    // turning it on with an empty checklist starts from the role's preset
-    if (on && !user?.permissions) loadRolePreset();
+  const presetFor = (scope: string): UserPermissions | null => {
+    const preset = catalog?.role_presets?.[(scope || "").split(",")[0]];
+    if (!preset) return null;
+    return {
+      modules: [...(preset.modules ?? [])],
+      endpoints: Object.fromEntries(
+        Object.entries(preset.endpoints ?? {}).map(([k, v]) => [k, [...(v as string[])]])
+      ),
+    };
   };
   // changing the role auto-loads that role's pre-defined permissions into the
-  // checklist (admin scopes have full access, so no checklist)
+  // checklist; the admin can then modify them freely
   const onRoleChange = (scope: string) => {
-    const isAdmin = scope.includes("admin") || scope.includes("superuser");
-    if (isAdmin) {
-      setUseFinePermissions(false);
-    } else {
-      setUseFinePermissions(true);
-      loadRolePreset(scope);
-    }
+    const preset = presetFor(scope);
+    if (preset) setFinePermissions(preset);
   };
 
   const form = useForm<UserUpdateFormValues>({
@@ -169,13 +168,12 @@ export default function UserDetail() {
         track_location: user.track_location,
         location_ping_seconds: user.location_ping_seconds,
       });
-      setUseFinePermissions(!!user.permissions);
+      // seed the checklist from what actually governs the user: their
+      // explicit override, else their role preset
+      const eff = (user as any).effective_permissions || user.permissions;
       setFinePermissions(
-        user.permissions
-          ? {
-              modules: user.permissions.modules ?? [],
-              endpoints: user.permissions.endpoints ?? {},
-            }
+        eff
+          ? { modules: eff.modules ?? [], endpoints: eff.endpoints ?? {} }
           : { modules: [], endpoints: {} }
       );
     }
@@ -264,7 +262,12 @@ export default function UserDetail() {
   const savePermissionsMutation = useMutation({
     mutationFn: async () => {
       if (!uuid) throw new Error("User UUID is required");
-      const permissions = useFinePermissions ? finePermissions : null;
+      // admins have full access; for a non-admin, keep the user following
+      // their role (null) if the checklist is unchanged from the preset,
+      // else persist the explicit override
+      const preset = presetFor(cardScope);
+      const unchanged = preset && normalizePerms(preset) === normalizePerms(finePermissions);
+      const permissions = userIsAdminScope || unchanged ? null : finePermissions;
       return await apiRequest(`/auth/user/${uuid}`, {
         method: "PUT",
         body: { permissions },
@@ -823,45 +826,15 @@ export default function UserDetail() {
                   <p className="text-sm text-gray-500">{t("users.adminFullAccess")}</p>
                 ) : (
                   <div className="space-y-4">
-                    <div className="flex flex-row items-center justify-between gap-2">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-medium">
-                          {t("users.useFinePermissions")}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {t("users.useFinePermissionsDesc")}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={useFinePermissions}
-                        onCheckedChange={onToggleFinePermissions}
-                        data-testid="perm-use-fine"
-                      />
-                    </div>
-                    {useFinePermissions && (
-                      <>
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs text-gray-500">
-                            {t("users.rolePresetHint", {
-                              role: te((cardScope || "").split(",")[0]),
-                            })}
-                          </p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => loadRolePreset(cardScope)}
-                            data-testid="perm-load-preset"
-                          >
-                            {t("users.loadRolePreset")}
-                          </Button>
-                        </div>
-                        <PermissionsEditor
-                          value={finePermissions}
-                          onChange={setFinePermissions}
-                        />
-                      </>
-                    )}
+                    <p className="text-sm text-gray-500">
+                      {t("users.finePermissionsDesc", {
+                        role: te((cardScope || "").split(",")[0]),
+                      })}
+                    </p>
+                    <PermissionsEditor
+                      value={finePermissions}
+                      onChange={setFinePermissions}
+                    />
                     <div className="flex justify-end">
                       <Button
                         onClick={() => savePermissionsMutation.mutate()}

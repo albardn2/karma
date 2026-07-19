@@ -171,6 +171,7 @@ export const en: Record<string, string> = {
   'users.permissionsSaved': 'Permissions updated successfully',
   'users.loadRolePreset': 'Load role preset',
   'users.rolePresetHint': 'Started from the {role} role preset — customize as needed.',
+  'users.finePermissionsDesc': 'Loaded from the {role} role preset. Modify the menu modules and endpoint actions below, then save.',
 };
 
 export const ar: Record<string, string> = {
@@ -343,4 +344,5 @@ export const ar: Record<string, string> = {
   'users.permissionsSaved': 'تم تحديث الصلاحيات بنجاح',
   'users.loadRolePreset': 'تحميل إعداد الدور',
   'users.rolePresetHint': 'بدأنا من إعداد دور {role} — عدّله حسب الحاجة.',
+  'users.finePermissionsDesc': 'محمّلة من إعداد دور {role}. عدّل الوحدات وإجراءات نقاط النهاية أدناه ثم احفظ.',
 };
