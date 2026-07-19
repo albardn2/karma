@@ -107,8 +107,8 @@ export default function UserDetail() {
     queryKey: ["/auth/permission-catalog"],
     queryFn: () => apiRequest("/auth/permission-catalog"),
   });
-  const loadRolePreset = () => {
-    const scope = (user?.permission_scope || "").split(",")[0];
+  const loadRolePreset = (scopeArg?: string) => {
+    const scope = (scopeArg ?? user?.permission_scope ?? "").split(",")[0];
     const preset = catalog?.role_presets?.[scope];
     if (preset) {
       setFinePermissions({
@@ -123,6 +123,17 @@ export default function UserDetail() {
     setUseFinePermissions(on);
     // turning it on with an empty checklist starts from the role's preset
     if (on && !user?.permissions) loadRolePreset();
+  };
+  // changing the role auto-loads that role's pre-defined permissions into the
+  // checklist (admin scopes have full access, so no checklist)
+  const onRoleChange = (scope: string) => {
+    const isAdmin = scope.includes("admin") || scope.includes("superuser");
+    if (isAdmin) {
+      setUseFinePermissions(false);
+    } else {
+      setUseFinePermissions(true);
+      loadRolePreset(scope);
+    }
   };
 
   const form = useForm<UserUpdateFormValues>({
@@ -241,11 +252,13 @@ export default function UserDetail() {
     },
   });
 
-  // fine-grained permissions are only valid for non-admin scopes; the
-  // dedicated Permissions card below goes by the user's SAVED scope
+  // fine-grained permissions are only valid for non-admin scopes; while
+  // editing, follow the in-progress role selection so switching to/from an
+  // admin role updates the card live
+  const watchedScope = form.watch("permission_scope") || "";
+  const cardScope = isEditing ? watchedScope : (user?.permission_scope || "");
   const userIsAdminScope =
-    (user?.permission_scope || "").includes("admin") ||
-    (user?.permission_scope || "").includes("superuser");
+    cardScope.includes("admin") || cardScope.includes("superuser");
 
   // permissions are saved from their own card, independent of the profile form
   const savePermissionsMutation = useMutation({
@@ -475,7 +488,13 @@ export default function UserDetail() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>{t("users.permissionScope")}</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <Select
+                                onValueChange={(v) => {
+                                  field.onChange(v);
+                                  onRoleChange(v);
+                                }}
+                                value={field.value || ""}
+                              >
                                 <FormControl>
                                   <SelectTrigger>
                                     <SelectValue placeholder={t("users.selectPermissionScope")} />
@@ -824,14 +843,14 @@ export default function UserDetail() {
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-xs text-gray-500">
                             {t("users.rolePresetHint", {
-                              role: te((user?.permission_scope || "").split(",")[0]),
+                              role: te((cardScope || "").split(",")[0]),
                             })}
                           </p>
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={loadRolePreset}
+                            onClick={() => loadRolePreset(cardScope)}
                             data-testid="perm-load-preset"
                           >
                             {t("users.loadRolePreset")}
