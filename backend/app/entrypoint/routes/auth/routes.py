@@ -101,6 +101,12 @@ def login():
         else:
             raise BadRequestError("username_or_email or rfid_token must be provided")
 
+        # blocked accounts cannot sign in (platform owner exempt)
+        if not user.is_superuser:
+            account = uow.account_repository.find_one(uuid=user.account_uuid)
+            if account and account.is_blocked:
+                raise Unauthorized("This account is blocked")
+
         scopes = user.permission_scope.split(",")  # e.g. "read,write,admin"
         access_token = create_access_token(
             identity=user.uuid,
@@ -129,6 +135,10 @@ def refresh():
         user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
         if not user:
             raise Unauthorized("User not found")
+        if not user.is_superuser:
+            account = uow.account_repository.find_one(uuid=user.account_uuid)
+            if account and account.is_blocked:
+                raise Unauthorized("This account is blocked")
         scopes = user.permission_scope.split(",")
         access_token = create_access_token(
             identity=user.uuid,
@@ -154,7 +164,8 @@ def profile(user_uuid: str):
         user = uow.user_repository.find_one(uuid=user_uuid, is_deleted=False)
         if not user:
             raise NotFoundError("User not found")
-        current_user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
+        current_user = uow.session.query(UserModel).filter_by(
+            uuid=current_uuid, is_deleted=False).one_or_none()
         if not current_user:
             raise NotFoundError("Current user not found")
         if user_uuid != current_uuid and not current_user.is_admin:
@@ -251,10 +262,20 @@ def list_permissions():
 def me():
     current_uuid = get_jwt_identity()
     with SqlAlchemyUnitOfWork() as uow:
-        user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
+        # self-lookup by verified JWT identity — unscoped so impersonation
+        # (superuser row outside the target account) still resolves
+        user = uow.session.query(UserModel).filter_by(
+            uuid=current_uuid, is_deleted=False).one_or_none()
         if not user:
             raise NotFoundError("User not found")
         dto = UserRead.from_orm(user).model_dump(mode="json")
+        # impersonation (platform owner operating inside a tenant): tell the
+        # frontend which company so it can show a banner + exit control
+        imp_account = get_jwt().get("imp_account_uuid")
+        if imp_account and user.is_superuser:
+            account = uow.account_repository.find_one(uuid=imp_account)
+            dto["impersonating_account_uuid"] = imp_account
+            dto["impersonating_company"] = account.company_name if account else None
         return jsonify(dto), 200
 
 
@@ -269,7 +290,8 @@ def update_me():
     req = MeUpdate(**request.json)
     current_uuid = get_jwt_identity()
     with SqlAlchemyUnitOfWork() as uow:
-        user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
+        user = uow.session.query(UserModel).filter_by(
+            uuid=current_uuid, is_deleted=False).one_or_none()
         if not user:
             raise NotFoundError("User not found")
         for key, value in req.model_dump(exclude_unset=True).items():

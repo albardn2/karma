@@ -66,7 +66,9 @@ class UserDomain:
         if not user:
             raise NotFoundError("User not found")
 
-        current_user = uow.user_repository.find_one(uuid=current_user_uuid, is_deleted=False)
+        # unscoped self-lookup (JWT identity; superuser may be impersonating)
+        current_user = uow.session.query(UserModel).filter_by(
+            uuid=current_user_uuid, is_deleted=False).one_or_none()
         if not current_user:
             raise NotFoundError("Current user not found")
         if current_user_uuid != user_uuid and not current_user.is_admin:

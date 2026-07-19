@@ -40,6 +40,29 @@ class Account(Base):
     phone_number = Column(String(256), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     is_deleted = Column(Boolean, default=False)
+    # platform-owner (superuser) managed:
+    is_blocked = Column(Boolean, nullable=False, default=False)
+    subscription_rate = Column(Float, nullable=True)   # per month
+    subscription_currency = Column(String(10), nullable=True)
+
+
+class AccountLedgerEntry(Base):
+    """Platform-level subscription ledger per account (NOT tenant data —
+    accessed only through the superuser console with an unscoped UoW).
+    Signed amounts: payments positive, monthly charges negative,
+    manual adjustments either. Balance = SUM(amount) per currency."""
+    __tablename__ = 'account_ledger_entry'
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
+    entry_type = Column(String(20), nullable=False)  # payment | charge | adjustment
+    amount = Column(Float, nullable=False)           # signed
+    currency = Column(String(10), nullable=False)
+    period = Column(String(7), nullable=True)        # 'YYYY-MM' for charges
+    notes = Column(Text, nullable=True)
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    is_deleted = Column(Boolean, default=False)
 
 
 class User(Base):
@@ -84,6 +107,10 @@ class User(Base):
     def is_admin(self):
         scopes= self.permission_scope.split(",")
         return any(scope in ["admin", "superuser"] for scope in scopes)
+
+    @property
+    def is_superuser(self):
+        return "superuser" in (self.permission_scope or "").split(",")
 
 
 class Customer(Base):
