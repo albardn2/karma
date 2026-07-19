@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { LANGUAGE_LABELS } from "@/i18n";
 import { UserLocationMap } from "@/components/location/UserLocationMap";
 import { PermissionsEditor } from "@/components/users/PermissionsEditor";
@@ -92,7 +93,8 @@ export default function UserDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [finePermissions, setFinePermissions] = useState<UserPermissions>({ modules: [], endpoints: {} });
   const { toast } = useToast();
-  const { t, te } = useLanguage();
+  const { t, te, lang, setLang } = useLanguage();
+  const { user: authUser } = useAuth();
 
   const userUpdateSchema = useMemo(() => makeUserUpdateSchema(t), [t]);
 
@@ -192,12 +194,22 @@ export default function UserDetail() {
       
       return await apiRequest(`/auth/user/${uuid}`, { method: "PUT", body: cleanData });
     },
-    onSuccess: () => {
+    onSuccess: (_res, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/auth/user", uuid] });
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["/auth/users"],
-        exact: false 
+        exact: false
       });
+      // editing your own language preference switches the app live, like the
+      // sidebar/dashboard language toggle
+      const newLang = (variables as UserUpdateData).language;
+      if (
+        (newLang === "en" || newLang === "ar") &&
+        authUser?.uuid === uuid &&
+        newLang !== lang
+      ) {
+        setLang(newLang);
+      }
       toast({
         title: t("common.success"),
         description: t("users.updatedSuccess"),
