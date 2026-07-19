@@ -32,16 +32,21 @@ def scopes_required(*required_scopes: str):
 
             from flask import g
             if getattr(g, "user_acl", None) is not None:
-                # fine-grained user: endpoint grant already checked in
-                # before_request; only admin-only routes remain off-limits
+                # fine-grained user (explicit checklist OR role preset): the
+                # endpoint grant is already enforced in before_request, which
+                # is the source of truth. Only admin-only routes stay locked.
                 if set(required_scopes) <= _ADMIN_SCOPES:
                     return jsonify({"msg": "Forbidden — admins only"}), 403
                 return fn(*args, **kwargs)
 
-            # legacy role user: any overlap passes
+            # no effective perms at all (shouldn't happen for a valid user):
+            # fall back to the role-overlap check
             if not user_scopes.intersection(required_scopes):
                 return jsonify({"msg": "Forbidden — missing required scope"}), 403
             return fn(*args, **kwargs)
+        # record the required scopes so role presets can be derived from the
+        # actual route decorators (see scripts/gen_role_presets.py)
+        decorated._required_scopes = tuple(required_scopes)
         return decorated
     return wrapper
 

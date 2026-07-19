@@ -34,11 +34,11 @@ export function MobileBottomNav() {
 
   const permissionScope = (user as any)?.permissionScope ?? (user as any)?.permission_scope ?? '';
   const isAdmin = permissionScope.includes('admin') || permissionScope.includes('superuser');
-  // fine-grained module grants: non-admins with a permissions object only see
-  // the granted menu modules; admins and null-permissions users keep everything
+  // effective permissions govern menu visibility: non-admins only see the
+  // modules their role preset (or explicit override) grants; admins see all
   const grantedModules: string[] | null =
-    !isAdmin && Array.isArray((user as any)?.permissions?.modules)
-      ? (user as any).permissions.modules
+    !isAdmin && Array.isArray((user as any)?.effective_permissions?.modules)
+      ? (user as any).effective_permissions.modules
       : null;
   const visibleNavigation = grantedModules
     ? navigation.filter((item) => {

@@ -44,9 +44,17 @@ def register():
 @auth_blueprint.route("/permission-catalog", methods=["GET"])
 @scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def permission_catalog():
-    """The checklists an admin can grant: menu modules + per-resource CRUD."""
-    from app.entrypoint.routes.common.permissions import MODULES, RESOURCES, ACTIONS
-    return jsonify({"modules": MODULES, "resources": RESOURCES, "actions": ACTIONS}), 200
+    """The checklists an admin can grant: menu modules + per-resource CRUD,
+    plus each role's preset so the UI can apply a role as a shortcut."""
+    from app.entrypoint.routes.common.permissions import (
+        MODULES, RESOURCES, ACTIONS, ROLE_PRESETS,
+    )
+    return jsonify({
+        "modules": MODULES,
+        "resources": RESOURCES,
+        "actions": ACTIONS,
+        "role_presets": ROLE_PRESETS,
+    }), 200
 
 
 @auth_blueprint.route("/signup", methods=["POST"])

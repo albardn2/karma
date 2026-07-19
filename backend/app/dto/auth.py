@@ -160,7 +160,23 @@ class UserRead(BaseModel):
     permission_scope: Optional[str]
     is_deleted: bool
     account_uuid: Optional[str] = None
+    # explicit per-user override (None = follow the role preset)
     permissions: Optional[dict] = None
+    # what actually governs the user: explicit override or role preset
+    # (None for admins = full access). Frontends filter menus on this.
+    effective_permissions: Optional[dict] = None
+
+    @pydantic.model_validator(mode="after")
+    def resolve_effective(cls, values):
+        from app.entrypoint.routes.common.permissions import preset_for_scope
+        scopes = set((values.permission_scope or "").split(","))
+        if scopes & {"admin", "superuser"}:
+            values.effective_permissions = None
+        elif values.permissions:
+            values.effective_permissions = values.permissions
+        else:
+            values.effective_permissions = preset_for_scope(values.permission_scope)
+        return values
 
 
 class UserListParams(BaseModel):

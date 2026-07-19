@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import {
   Dialog,
@@ -52,6 +52,24 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const [permissions, setPermissions] = useState<UserPermissions>({ modules: [], endpoints: {} });
+
+  // role presets: picking a role is a shortcut that fills the checklist
+  const { data: catalog } = useQuery<any>({
+    queryKey: ["/auth/permission-catalog"],
+    queryFn: () => apiRequest("/auth/permission-catalog"),
+  });
+  const applyRolePreset = (scope: string) => {
+    const preset = catalog?.role_presets?.[scope];
+    if (preset) {
+      setPermissions({
+        modules: [...(preset.modules ?? [])],
+        endpoints: Object.fromEntries(
+          Object.entries(preset.endpoints ?? {}).map(([k, v]) => [k, [...(v as string[])]])
+        ),
+      });
+      setPermissionsOpen(true);
+    }
+  };
   const { toast } = useToast();
   const { t, te } = useLanguage();
 
@@ -237,7 +255,13 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("users.permissionScope")}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={(v) => {
+                        field.onChange(v);
+                        applyRolePreset(v);
+                      }}
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder={t("users.selectPermissionScope")} />

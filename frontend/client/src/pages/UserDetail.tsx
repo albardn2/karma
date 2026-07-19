@@ -102,6 +102,29 @@ export default function UserDetail() {
     },
   });
 
+  // role presets: a role is a shortcut for a pre-defined permission set
+  const { data: catalog } = useQuery<any>({
+    queryKey: ["/auth/permission-catalog"],
+    queryFn: () => apiRequest("/auth/permission-catalog"),
+  });
+  const loadRolePreset = () => {
+    const scope = (user?.permission_scope || "").split(",")[0];
+    const preset = catalog?.role_presets?.[scope];
+    if (preset) {
+      setFinePermissions({
+        modules: [...(preset.modules ?? [])],
+        endpoints: Object.fromEntries(
+          Object.entries(preset.endpoints ?? {}).map(([k, v]) => [k, [...(v as string[])]])
+        ),
+      });
+    }
+  };
+  const onToggleFinePermissions = (on: boolean) => {
+    setUseFinePermissions(on);
+    // turning it on with an empty checklist starts from the role's preset
+    if (on && !user?.permissions) loadRolePreset();
+  };
+
   const form = useForm<UserUpdateFormValues>({
     resolver: zodResolver(userUpdateSchema),
     defaultValues: {
@@ -792,15 +815,33 @@ export default function UserDetail() {
                       </div>
                       <Switch
                         checked={useFinePermissions}
-                        onCheckedChange={setUseFinePermissions}
+                        onCheckedChange={onToggleFinePermissions}
                         data-testid="perm-use-fine"
                       />
                     </div>
                     {useFinePermissions && (
-                      <PermissionsEditor
-                        value={finePermissions}
-                        onChange={setFinePermissions}
-                      />
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-gray-500">
+                            {t("users.rolePresetHint", {
+                              role: te((user?.permission_scope || "").split(",")[0]),
+                            })}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={loadRolePreset}
+                            data-testid="perm-load-preset"
+                          >
+                            {t("users.loadRolePreset")}
+                          </Button>
+                        </div>
+                        <PermissionsEditor
+                          value={finePermissions}
+                          onChange={setFinePermissions}
+                        />
+                      </>
                     )}
                     <div className="flex justify-end">
                       <Button

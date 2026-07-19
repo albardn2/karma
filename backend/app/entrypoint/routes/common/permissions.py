@@ -1,23 +1,35 @@
-"""Fine-grained per-user permissions.
+"""Fine-grained per-user permissions — the source of truth for non-admin
+authorization.
 
-Non-admin users may carry a `permissions` JSON object:
+Every non-admin user has an EFFECTIVE permissions object:
 
     {
       "modules":   ["customers", "trips", ...],          # frontend menu tabs
       "endpoints": {"customer": ["create", "read"], ...} # per-blueprint CRUD
     }
 
-- `modules` only drives menu visibility in the frontends.
+- If the user has an explicit `permissions` column it is used as-is.
+- Otherwise their role (permission_scope) expands to a preset from
+  ROLE_PRESETS below. Roles are simply named shortcuts for a pre-defined
+  set of fine-grained permissions; the fine-grained set is what's enforced.
 - `endpoints` is enforced server-side at the request chokepoint
-  (see app/__init__.py): for a user WITH a permissions object, access to a
-  resource blueprint requires the matching CRUD action; role scopes are
-  bypassed except that admin-only routes stay admin-only.
-- Users WITHOUT a permissions object (legacy role users: drivers, sales...)
-  keep the existing role-scope behavior untouched. Admins always have
-  full access and cannot carry a permissions object.
+  (see app/__init__.py): access to a resource blueprint requires the
+  matching CRUD action. `modules` drives menu visibility in the frontends.
+- Admins (admin / superuser) always have full access and carry no
+  permissions object.
+
+ROLE_PRESETS was generated from the actual route decorators
+(scripts/gen_role_presets.py) so presets preserve each role's existing
+access; edit role_presets.json to change a role's defaults.
 """
+import json
+import os
 
 ACTIONS = ["create", "read", "update", "delete"]
+
+_PRESETS_PATH = os.path.join(os.path.dirname(__file__), "role_presets.json")
+with open(_PRESETS_PATH, encoding="utf-8") as _f:
+    ROLE_PRESETS: dict = json.load(_f)
 
 # HTTP method -> CRUD action
 METHOD_ACTIONS = {
@@ -57,6 +69,40 @@ MODULES = [
 RESOURCE_SET = set(RESOURCES)
 MODULE_SET = set(MODULES)
 ACTION_SET = set(ACTIONS)
+
+
+_ADMIN_SCOPES = {"admin", "superuser"}
+
+
+def preset_for_scope(permission_scope: str | None) -> dict:
+    """The role preset for a permission_scope string (may be comma-joined).
+    Union of every matched role's preset. Unknown/empty scope -> empty."""
+    scopes = [s.strip() for s in (permission_scope or "").split(",") if s.strip()]
+    modules: set = set()
+    endpoints: dict = {}
+    for scope in scopes:
+        preset = ROLE_PRESETS.get(scope)
+        if not preset:
+            continue
+        modules.update(preset.get("modules", []))
+        for res, acts in (preset.get("endpoints") or {}).items():
+            endpoints.setdefault(res, set()).update(acts)
+    return {
+        "modules": sorted(modules),
+        "endpoints": {r: sorted(a) for r, a in sorted(endpoints.items())},
+    }
+
+
+def effective_permissions(user) -> dict | None:
+    """Resolve the permissions that actually govern a user:
+    explicit `permissions` column if set, else the role preset. Admins get
+    None (full access, no checklist)."""
+    scopes = set((user.permission_scope or "").split(","))
+    if scopes & _ADMIN_SCOPES:
+        return None
+    if getattr(user, "permissions", None):
+        return user.permissions
+    return preset_for_scope(user.permission_scope)
 
 
 def endpoint_allowed(permissions: dict, blueprint: str, method: str) -> bool:

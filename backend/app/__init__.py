@@ -83,10 +83,12 @@ def create_app(config_object=Config):
         # tenant scope + fine-grained ACL on flask.g.
         #  - g.account_uuid: the UnitOfWork picks it up and every repository
         #    read/write is filtered/stamped with it.
-        #  - g.user_acl / g.is_admin: fine-grained per-endpoint permissions.
-        #    Non-admin users WITH a permissions object must be granted the
-        #    matching CRUD action on the resource blueprint or the request is
-        #    rejected right here — regardless of role decorators.
+        #  - g.user_acl / g.is_admin: the caller's EFFECTIVE fine-grained
+        #    permissions — their explicit checklist, or their role's preset
+        #    (roles are shortcuts for a pre-defined permission set). This is
+        #    the source of truth: a non-admin must be granted the matching
+        #    CRUD action on the resource blueprint or the request is rejected
+        #    right here. Admins bypass (g.user_acl None).
         # Invalid or absent tokens leave g unset — protected routes still
         # reject them via their own decorators; unauthenticated routes
         # (login/signup) run unscoped, which is correct since no tenant is
@@ -96,6 +98,7 @@ def create_app(config_object=Config):
         from app.entrypoint.routes.common.permissions import (
             RESOURCE_SET,
             endpoint_allowed,
+            effective_permissions,
         )
         try:
             verify_jwt_in_request(optional=True)
@@ -116,7 +119,8 @@ def create_app(config_object=Config):
                 return None
             g.account_uuid = user.account_uuid
             g.is_admin = user.is_admin
-            g.user_acl = user.permissions
+            # effective perms: explicit checklist or role preset (None = admin)
+            g.user_acl = effective_permissions(user)
 
         if (
             not g.is_admin

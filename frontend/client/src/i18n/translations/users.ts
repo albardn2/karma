@@ -169,6 +169,8 @@ export const en: Record<string, string> = {
   'users.adminFullAccess': 'Administrators have full access to everything — no checklist needed.',
   'users.savePermissions': 'Save Permissions',
   'users.permissionsSaved': 'Permissions updated successfully',
+  'users.loadRolePreset': 'Load role preset',
+  'users.rolePresetHint': 'Started from the {role} role preset — customize as needed.',
 };
 
 export const ar: Record<string, string> = {
@@ -339,4 +341,6 @@ export const ar: Record<string, string> = {
   'users.adminFullAccess': 'لمديري النظام صلاحية كاملة على كل شيء — لا حاجة لقائمة صلاحيات.',
   'users.savePermissions': 'حفظ الصلاحيات',
   'users.permissionsSaved': 'تم تحديث الصلاحيات بنجاح',
+  'users.loadRolePreset': 'تحميل إعداد الدور',
+  'users.rolePresetHint': 'بدأنا من إعداد دور {role} — عدّله حسب الحاجة.',
 };
