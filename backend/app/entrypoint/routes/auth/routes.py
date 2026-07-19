@@ -7,7 +7,8 @@ from flask_jwt_extended import (
     set_access_cookies,
     unset_jwt_cookies,
     jwt_required,
-    get_jwt_identity, create_refresh_token, set_refresh_cookies, get_jwt
+    get_jwt_identity, create_refresh_token, set_refresh_cookies, get_jwt,
+    verify_jwt_in_request,
 )
 from app.entrypoint.routes.common.errors import NotFoundError
 from app.dto.auth import (
@@ -257,7 +258,17 @@ def delete_user(user_uuid: str):
 # route to list permission scope enums
 @auth_blueprint.route("/permissions", methods=["GET"])
 def list_permissions():
+    """Roles the caller may assign. Only the platform owner may grant the
+    superuser scope, so tenant admins don't see it at all."""
     permissions = [p.value for p in PermissionScope]
+    try:
+        verify_jwt_in_request(optional=True)
+        from flask import g
+        caller_scopes = getattr(g, "user_scopes", None) or set(get_jwt().get("scopes", []))
+    except Exception:
+        caller_scopes = set()
+    if PermissionScope.SUPER_ADMIN.value not in caller_scopes:
+        permissions = [p for p in permissions if p != PermissionScope.SUPER_ADMIN.value]
     return jsonify(permissions), 200
 
 

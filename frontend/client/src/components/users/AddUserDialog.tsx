@@ -25,6 +25,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronDown, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PermissionsEditor } from "@/components/users/PermissionsEditor";
 import { PermissionScope, type UserFormData, type UserPermissions } from "@/lib/types";
@@ -137,6 +138,14 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
   });
 
   // fine-grained permissions are only valid for non-admin scopes
+  const { user: currentUser } = useAuth();
+  const callerIsSuperuser = (
+    (currentUser as any)?.permission_scope ?? ""
+  ).includes("superuser");
+  const assignableScopes = Object.values(PermissionScope).filter(
+    (scope) => scope !== PermissionScope.SUPER_ADMIN || callerIsSuperuser
+  );
+
   const selectedScope = form.watch("permission_scope") ?? "";
   const isAdminScope = selectedScope.includes("admin") || selectedScope.includes("superuser");
 
@@ -269,7 +278,7 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {Object.values(PermissionScope).map((scope) => (
+                        {assignableScopes.map((scope) => (
                           <SelectItem key={scope} value={scope}>
                             {te(scope)}
                           </SelectItem>
