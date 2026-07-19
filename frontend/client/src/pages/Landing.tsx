@@ -10,6 +10,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
 
 // Public marketing page shown at "/" when nobody is signed in — the karma
 // counterpart of kintaar's LandingPage: top nav, gradient hero with a product
@@ -78,14 +79,7 @@ export default function Landing() {
             {t("misc.landing.brand")}
           </span>
           <nav className="flex items-center gap-2 sm:gap-4">
-            <button
-              onClick={() => setLang(lang === "en" ? "ar" : "en")}
-              className="flex items-center gap-1.5 px-2 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-900 rounded-lg transition-colors"
-              data-testid="landing-language-toggle"
-            >
-              <Globe className="w-4 h-4" />
-              {lang === "en" ? "العربية" : "English"}
-            </button>
+            <LanguageSwitch testId="landing-language-toggle" />
             <Link
               href="/login"
               className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"

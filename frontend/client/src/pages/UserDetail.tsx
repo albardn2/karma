@@ -155,9 +155,11 @@ export default function UserDetail() {
     },
   });
 
-  // Update form when user data loads
+  // Update form when user data loads — but never while the admin is mid-edit
+  // (a background refetch, e.g. after a sidebar language toggle, must not
+  // wipe in-progress changes)
   useEffect(() => {
-    if (user) {
+    if (user && !isEditing) {
       form.reset({
         username: user.username || "",
         first_name: user.first_name || "",
@@ -180,7 +182,7 @@ export default function UserDetail() {
           : { modules: [], endpoints: {} }
       );
     }
-  }, [user, form]);
+  }, [user, form, isEditing]);
 
   // Update user mutation
   const updateUserMutation = useMutation({
@@ -305,7 +307,14 @@ export default function UserDetail() {
   });
 
   const onSubmit = (data: UserUpdateFormValues) => {
-    updateUserMutation.mutate(data as UserUpdateData);
+    const payload = { ...(data as UserUpdateData) };
+    // only send language when the admin deliberately changed it here — a
+    // stale form value must not silently overwrite a preference set
+    // elsewhere (e.g. via the sidebar language switch)
+    if (!form.formState.dirtyFields.language) {
+      delete payload.language;
+    }
+    updateUserMutation.mutate(payload);
   };
 
   const formatDate = (dateString: string) => {
