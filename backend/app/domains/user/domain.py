@@ -77,6 +77,15 @@ class UserDomain:
 
         if payload.permission_scope and not current_user.is_admin:
             raise BadRequestError("You are not authorized to change permission scope")
+        # privilege-escalation guard: only the platform owner can grant the
+        # superuser scope (a tenant admin must not promote anyone — including
+        # themselves — to platform owner)
+        if (
+            payload.permission_scope
+            and "superuser" in payload.permission_scope
+            and not current_user.is_superuser
+        ):
+            raise BadRequestError("Only the platform owner can grant the superuser scope")
 
         if payload.permissions is not None:
             if not current_user.is_admin:

@@ -35,6 +35,11 @@ from app.dto.auth import PermissionScope
 @scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def register():
     payload = RegisterRequest(**request.json)
+    # privilege-escalation guard: only the platform owner can create
+    # superuser accounts
+    if "superuser" in (payload.permission_scope or ""):
+        if "superuser" not in get_jwt().get("scopes", []):
+            return jsonify({"msg": "Only the platform owner can grant the superuser scope"}), 403
     with SqlAlchemyUnitOfWork() as uow:
         user_read = UserDomain.create_user(uow=uow, payload=payload)
         result = user_read.model_dump(mode="json")
