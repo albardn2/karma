@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Landmark, LogIn } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -120,6 +120,11 @@ export default function AccountsAdmin() {
   const [restrictFeatures, setRestrictFeatures] = useState(false);
   const [accountPerms, setAccountPerms] = useState<UserPermissions>({ modules: [], endpoints: {} });
 
+  // platform default cap for NEW accounts
+  const [defaultsOpen, setDefaultsOpen] = useState(false);
+  const [defaultRestrict, setDefaultRestrict] = useState(false);
+  const [defaultPerms, setDefaultPerms] = useState<UserPermissions>({ modules: [], endpoints: {} });
+
   // add-ledger-entry form
   const [entryType, setEntryType] = useState<LedgerEntryType>("payment");
   const [entryAmount, setEntryAmount] = useState("");
@@ -173,6 +178,42 @@ export default function AccountsAdmin() {
     onSuccess: () => {
       invalidateAccounts();
       toast({ title: t("common.success"), description: t("misc.accounts.updated") });
+    },
+    onError: () => {
+      toast({
+        title: t("common.error"),
+        description: t("misc.accounts.updateFailed"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const { data: defaultsData } = useQuery<any>({
+    queryKey: ["/super-admin/settings/default-account-permissions"],
+    queryFn: () => apiRequest("/super-admin/settings/default-account-permissions"),
+    enabled: isSuperuser,
+  });
+  useEffect(() => {
+    const cap = defaultsData?.permissions;
+    setDefaultRestrict(!!cap);
+    setDefaultPerms(
+      cap
+        ? { modules: cap.modules ?? [], endpoints: cap.endpoints ?? {} }
+        : { modules: [], endpoints: {} }
+    );
+  }, [defaultsData]);
+  const saveDefaultsMutation = useMutation({
+    mutationFn: async () =>
+      apiRequest("/super-admin/settings/default-account-permissions", {
+        method: "PUT",
+        body: { permissions: defaultRestrict ? defaultPerms : null },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/super-admin/settings/default-account-permissions"],
+      });
+      toast({ title: t("common.success"), description: t("misc.accounts.defaultsSaved") });
+      setDefaultsOpen(false);
     },
     onError: () => {
       toast({
@@ -307,13 +348,22 @@ export default function AccountsAdmin() {
       <div className="flex-1 overflow-auto p-4 lg:p-6">
         <div className="space-y-6">
           {/* Header */}
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t("misc.accounts.title")}</h1>
-            <p className="text-gray-600">
-              {accountsData
-                ? t("misc.accounts.count", { count: accountsData.total_count })
-                : t("common.loading")}
-            </p>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">{t("misc.accounts.title")}</h1>
+              <p className="text-gray-600">
+                {accountsData
+                  ? t("misc.accounts.count", { count: accountsData.total_count })
+                  : t("common.loading")}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              data-testid="account-defaults-button"
+              onClick={() => setDefaultsOpen(true)}
+            >
+              {t("misc.accounts.newAccountDefaults")}
+            </Button>
           </div>
 
           {/* Accounts table */}
@@ -797,6 +847,37 @@ export default function AccountsAdmin() {
       </Dialog>
 
       {/* Block confirmation */}
+      <Dialog open={defaultsOpen} onOpenChange={setDefaultsOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("misc.accounts.newAccountDefaults")}</DialogTitle>
+            <DialogDescription>{t("misc.accounts.newAccountDefaultsHint")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm text-gray-500">{t("misc.accounts.featureAccessHint")}</p>
+              <Switch
+                data-testid="defaults-restrict-switch"
+                checked={defaultRestrict}
+                onCheckedChange={setDefaultRestrict}
+              />
+            </div>
+            {defaultRestrict && (
+              <PermissionsEditor value={defaultPerms} onChange={setDefaultPerms} />
+            )}
+            <div className="flex justify-end">
+              <Button
+                data-testid="defaults-save"
+                disabled={saveDefaultsMutation.isPending}
+                onClick={() => saveDefaultsMutation.mutate()}
+              >
+                {saveDefaultsMutation.isPending ? t("common.saving") : t("common.save")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={blockConfirmOpen} onOpenChange={setBlockConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

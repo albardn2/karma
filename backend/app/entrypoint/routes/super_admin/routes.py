@@ -190,6 +190,47 @@ def create_ledger_entry(account_uuid: str):
     return jsonify(result), 201
 
 
+@super_admin_blueprint.route("/settings/default-account-permissions", methods=["GET"])
+@scopes_required(SUPER)
+def get_default_account_permissions():
+    from models.common import PlatformSetting
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        row = uow.session.query(PlatformSetting).filter_by(
+            key="default_account_permissions").one_or_none()
+        result = {"permissions": row.value if row else None}
+    return jsonify(result), 200
+
+
+@super_admin_blueprint.route("/settings/default-account-permissions", methods=["PUT"])
+@scopes_required(SUPER)
+def set_default_account_permissions():
+    """Feature cap stamped onto NEW accounts at signup. Explicit null means
+    new accounts start unrestricted. Existing accounts are never touched."""
+    from pydantic import BaseModel, ConfigDict
+    from typing import Optional
+    from app.dto.auth import UserPermissions
+    from models.common import PlatformSetting
+
+    class _Body(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        permissions: Optional[UserPermissions] = None
+
+    payload = _Body(**request.json)
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        row = uow.session.query(PlatformSetting).filter_by(
+            key="default_account_permissions").one_or_none()
+        value = payload.permissions.model_dump() if payload.permissions else None
+        if row:
+            row.value = value
+        else:
+            row = PlatformSetting(key="default_account_permissions", value=value)
+            uow.session.add(row)
+        uow.session.flush()
+        result = {"permissions": row.value}
+        uow.commit()
+    return jsonify(result), 200
+
+
 @super_admin_blueprint.route("/accounts/<string:account_uuid>/impersonate", methods=["POST"])
 @scopes_required(SUPER)
 def impersonate(account_uuid: str):

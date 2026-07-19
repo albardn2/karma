@@ -52,6 +52,17 @@ class Account(Base):
     permissions = Column(MutableDict.as_mutable(JSONB), nullable=True)
 
 
+class PlatformSetting(Base):
+    """Platform-level key/value settings (superuser console). e.g.
+    'default_account_permissions': the feature cap stamped onto NEW accounts
+    at signup (existing accounts are not affected by later changes)."""
+    __tablename__ = 'platform_setting'
+
+    key = Column(String(64), primary_key=True)
+    value = Column(MutableDict.as_mutable(JSONB), nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class AccountLedgerEntry(Base):
     """Platform-level subscription ledger per account (NOT tenant data —
     accessed only through the superuser console with an unscoped UoW).

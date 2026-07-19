@@ -196,6 +196,9 @@ export const en: Record<string, string> = {
   'misc.accounts.featureAccess': 'Feature Access (Permission Scope)',
   'misc.accounts.featureAccessHint': 'Restrict which menu modules and endpoint actions this company can use. Applies to all of its users, including admins. Off = all features.',
   'misc.accounts.saveFeatureAccess': 'Save Feature Access',
+  'misc.accounts.newAccountDefaults': 'New Account Defaults',
+  'misc.accounts.newAccountDefaultsHint': 'The feature scope applied to every NEW company at signup. Existing accounts are not affected.',
+  'misc.accounts.defaultsSaved': 'Defaults for new accounts saved',
 };
 
 export const ar: Record<string, string> = {
@@ -391,4 +394,7 @@ export const ar: Record<string, string> = {
   'misc.accounts.featureAccess': 'الوصول إلى الميزات (نطاق الصلاحيات)',
   'misc.accounts.featureAccessHint': 'حدّد الوحدات وإجراءات نقاط النهاية المتاحة لهذه الشركة. يسري على جميع مستخدميها بمن فيهم المدراء. إيقافه = جميع الميزات.',
   'misc.accounts.saveFeatureAccess': 'حفظ الوصول إلى الميزات',
+  'misc.accounts.newAccountDefaults': 'إعدادات الحسابات الجديدة',
+  'misc.accounts.newAccountDefaultsHint': 'نطاق الميزات المطبق على كل شركة جديدة عند التسجيل. الحسابات الحالية لا تتأثر.',
+  'misc.accounts.defaultsSaved': 'تم حفظ إعدادات الحسابات الجديدة',
 };

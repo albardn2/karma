@@ -20,6 +20,12 @@ class UserDomain:
             email=payload.email,
             phone_number=payload.phone_number,
         )
+        # platform default feature cap for new accounts (snapshot at signup)
+        from models.common import PlatformSetting
+        default_cap = uow.session.query(PlatformSetting).filter_by(
+            key="default_account_permissions").one_or_none()
+        if default_cap and default_cap.value:
+            account.permissions = dict(default_cap.value)
         uow.account_repository.save(model=account, commit=False)
 
         user = UserModel(
