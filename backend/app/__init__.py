@@ -128,7 +128,11 @@ def create_app(config_object=Config):
                     .scalar()
                 )
                 if blocked:
-                    return jsonify({"msg": "This account is blocked"}), 403
+                    # 401 (not 403) so both clients' auto-logout machinery
+                    # kicks in: web clears the token and reloads to the login
+                    # page; the app fails its refresh and signs out — active
+                    # sessions are revoked on their next request
+                    return jsonify({"msg": "This account is blocked"}), 401
             # impersonation: a superuser token may carry a target account —
             # the platform owner operates inside that tenant's scope
             imp_account = claims.get("imp_account_uuid")
