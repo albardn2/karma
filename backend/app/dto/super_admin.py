@@ -14,6 +14,13 @@ class AccountUpdate(BaseModel):
     is_blocked: Optional[bool] = None
     subscription_rate: Optional[float] = Field(None, ge=0)
     subscription_currency: Optional[str] = Field(None, max_length=10)
+    subscription_type: Optional[str] = None
+
+    @pydantic.field_validator("subscription_type")
+    def known_subscription_type(cls, v):
+        if v is not None and v not in ("flat", "per_user"):
+            raise ValueError("subscription_type must be flat or per_user")
+        return v
 
 
 class LedgerEntryCreate(BaseModel):
@@ -62,6 +69,7 @@ class AccountRead(BaseModel):
     is_blocked: bool
     subscription_rate: Optional[float]
     subscription_currency: Optional[str]
+    subscription_type: Optional[str] = 'flat' 
     # enriched by the routes:
     user_count: Optional[int] = None
     balances: Optional[dict] = None  # {currency: signed sum}

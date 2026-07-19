@@ -187,6 +187,12 @@ export const en: Record<string, string> = {
   'misc.landing.bandTitle': 'Ready to get started?',
   'misc.landing.bandSub': 'Create your company account in under a minute. You stay in control: invite your team and your data stays yours.',
   'misc.landing.footer': 'All rights reserved.',
+  'misc.accounts.billingModel': 'Billing model',
+  'misc.accounts.flatRate': 'Monthly flat rate',
+  'misc.accounts.perUser': 'Monthly per user',
+  'misc.accounts.ratePerUser': 'Rate per user / month',
+  'misc.accounts.usersCount': '{count} users',
+  'misc.accounts.estMonthly': 'Estimated monthly charge: {amount} {currency} ({count} users × {rate})',
 };
 
 export const ar: Record<string, string> = {
@@ -373,4 +379,10 @@ export const ar: Record<string, string> = {
   'misc.landing.bandTitle': 'جاهز للانطلاق؟',
   'misc.landing.bandSub': 'أنشئ حساب شركتك في أقل من دقيقة. أنت المتحكم: ادعُ فريقك وتبقى بياناتك ملكاً لك.',
   'misc.landing.footer': 'جميع الحقوق محفوظة.',
+  'misc.accounts.billingModel': 'نموذج الفوترة',
+  'misc.accounts.flatRate': 'اشتراك شهري ثابت',
+  'misc.accounts.perUser': 'شهرياً لكل مستخدم',
+  'misc.accounts.ratePerUser': 'السعر لكل مستخدم / شهرياً',
+  'misc.accounts.usersCount': '{count} مستخدم',
+  'misc.accounts.estMonthly': 'الرسم الشهري التقديري: {amount} {currency} ({count} مستخدم × {rate})',
 };

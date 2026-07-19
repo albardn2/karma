@@ -43,6 +43,7 @@ interface SuperAccount {
   subscription_rate: number | null;
   subscription_currency: string | null;
   user_count: number;
+  subscription_type?: string;
   balances: Balances;
   is_deleted: boolean;
 }
@@ -110,6 +111,7 @@ export default function AccountsAdmin() {
   // subscription form
   const [rate, setRate] = useState("");
   const [rateCurrency, setRateCurrency] = useState("");
+  const [subType, setSubType] = useState<"flat" | "per_user">("flat");
 
   // add-ledger-entry form
   const [entryType, setEntryType] = useState<LedgerEntryType>("payment");
@@ -223,6 +225,7 @@ export default function AccountsAdmin() {
     setSelectedUuid(account.uuid);
     setRate(account.subscription_rate != null ? String(account.subscription_rate) : "");
     setRateCurrency(account.subscription_currency ?? "");
+    setSubType((account.subscription_type as "flat" | "per_user") ?? "flat");
     setEntryType("payment");
     setEntryAmount("");
     setEntryCurrency(account.subscription_currency ?? "");
@@ -433,8 +436,10 @@ export default function AccountsAdmin() {
                   )}
                 </DialogTitle>
                 <DialogDescription>
-                  {[selected.email, selected.phone_number].filter(Boolean).join(" · ") ||
-                    formatDate(selected.created_at)}
+                  {[
+                    t("misc.accounts.usersCount", { count: selected.user_count }),
+                    ...[selected.email, selected.phone_number].filter(Boolean),
+                  ].join(" · ")}
                 </DialogDescription>
               </DialogHeader>
 
@@ -469,7 +474,26 @@ export default function AccountsAdmin() {
                   <CardContent>
                     <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
                       <div className="flex-1 space-y-2">
-                        <Label htmlFor="account-rate">{t("misc.accounts.monthlyRate")}</Label>
+                        <Label>{t("misc.accounts.billingModel")}</Label>
+                        <Select
+                          value={subType}
+                          onValueChange={(v) => setSubType(v as "flat" | "per_user")}
+                        >
+                          <SelectTrigger data-testid="account-subtype-select">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="flat">{t("misc.accounts.flatRate")}</SelectItem>
+                            <SelectItem value="per_user">{t("misc.accounts.perUser")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label htmlFor="account-rate">
+                          {subType === "per_user"
+                            ? t("misc.accounts.ratePerUser")
+                            : t("misc.accounts.monthlyRate")}
+                        </Label>
                         <Input
                           id="account-rate"
                           data-testid="account-rate-input"
@@ -502,12 +526,23 @@ export default function AccountsAdmin() {
                           updateMutation.mutate({
                             subscription_rate: Number(rate),
                             subscription_currency: rateCurrency,
+                            subscription_type: subType,
                           })
                         }
                       >
                         {t("common.save")}
                       </Button>
                     </div>
+                    {subType === "per_user" && rate && Number(rate) > 0 && (
+                      <p className="mt-3 text-xs text-gray-500">
+                        {t("misc.accounts.estMonthly", {
+                          amount: (Number(rate) * selected.user_count).toLocaleString(),
+                          currency: rateCurrency || selected.subscription_currency || "",
+                          count: selected.user_count,
+                          rate: Number(rate).toLocaleString(),
+                        })}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 

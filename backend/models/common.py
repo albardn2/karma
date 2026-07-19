@@ -44,6 +44,8 @@ class Account(Base):
     is_blocked = Column(Boolean, nullable=False, default=False)
     subscription_rate = Column(Float, nullable=True)   # per month
     subscription_currency = Column(String(10), nullable=True)
+    # 'flat' = rate per month; 'per_user' = rate x active users per month
+    subscription_type = Column(String(20), nullable=False, default='flat')
 
 
 class AccountLedgerEntry(Base):

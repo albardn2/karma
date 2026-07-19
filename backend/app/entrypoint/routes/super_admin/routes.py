@@ -145,14 +145,28 @@ def create_ledger_entry(account_uuid: str):
                 "currency is required (the account has no subscription currency set)"
             )
 
+        auto_note = None
         if payload.entry_type == "payment":
             amount = abs(payload.amount)
         elif payload.entry_type == "charge":
-            base = payload.amount if payload.amount is not None else account.subscription_rate
+            base = payload.amount
             if base is None:
-                raise BadRequestError(
-                    "amount is required (the account has no subscription rate set)"
-                )
+                if account.subscription_rate is None:
+                    raise BadRequestError(
+                        "amount is required (the account has no subscription rate set)"
+                    )
+                base = account.subscription_rate
+                if (account.subscription_type or "flat") == "per_user":
+                    user_count = (
+                        uow.session.query(func.count(UserModel.uuid))
+                        .filter(
+                            UserModel.account_uuid == account.uuid,
+                            UserModel.is_deleted.is_(False),
+                        )
+                        .scalar()
+                    )
+                    base = account.subscription_rate * user_count
+                    auto_note = f"{user_count} users x {account.subscription_rate}"
             amount = -abs(base)
         else:  # adjustment — signed as given
             amount = payload.amount
@@ -164,7 +178,7 @@ def create_ledger_entry(account_uuid: str):
             currency=currency,
             period=payload.period
             or (datetime.utcnow().strftime("%Y-%m") if payload.entry_type == "charge" else None),
-            notes=payload.notes,
+            notes=payload.notes or auto_note,
             created_by_uuid=get_jwt_identity(),
         )
         uow.account_ledger_repository.save(model=entry, commit=False)
