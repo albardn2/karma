@@ -76,7 +76,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   // /auth/me returns snake_case; the typed camelCase field is never populated
   const permissionScope = (user as any)?.permissionScope ?? (user as any)?.permission_scope ?? '';
   const isAdmin = permissionScope.includes('admin') || permissionScope.includes('superuser');
-  const visibleNavigation = navigation.filter((item: any) => !item.adminOnly || isAdmin);
+  // fine-grained module grants: non-admins with a permissions object only see
+  // the granted menu modules; admins and null-permissions users keep everything
+  const grantedModules: string[] | null =
+    !isAdmin && Array.isArray((user as any)?.permissions?.modules)
+      ? (user as any).permissions.modules
+      : null;
+  const visibleNavigation = navigation.filter((item: any) => {
+    if (item.adminOnly && !isAdmin) return false;
+    if (grantedModules) {
+      const moduleId = item.href === '/' ? 'dashboard' : item.href.slice(1);
+      return grantedModules.includes(moduleId);
+    }
+    return true;
+  });
 
   // Prevent body scroll when mobile sidebar is open
   useEffect(() => {

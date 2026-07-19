@@ -41,6 +41,14 @@ def register():
         uow.commit()
     return jsonify(result), 201
 
+@auth_blueprint.route("/permission-catalog", methods=["GET"])
+@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
+def permission_catalog():
+    """The checklists an admin can grant: menu modules + per-resource CRUD."""
+    from app.entrypoint.routes.common.permissions import MODULES, RESOURCES, ACTIONS
+    return jsonify({"modules": MODULES, "resources": RESOURCES, "actions": ACTIONS}), 200
+
+
 @auth_blueprint.route("/signup", methods=["POST"])
 def signup():
     """Public signup: create a company (account) + its first admin user,

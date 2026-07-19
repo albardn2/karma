@@ -21,11 +21,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { PermissionScope, type UserFormData } from "@/lib/types";
+import { PermissionsEditor } from "@/components/users/PermissionsEditor";
+import { PermissionScope, type UserFormData, type UserPermissions } from "@/lib/types";
 
 const makeUserSchema = (t: (key: string) => string) =>
   z.object({
@@ -48,6 +50,8 @@ interface AddUserDialogProps {
 
 export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
   const [open, setOpen] = useState(false);
+  const [permissionsOpen, setPermissionsOpen] = useState(false);
+  const [permissions, setPermissions] = useState<UserPermissions>({ modules: [], endpoints: {} });
   const { toast } = useToast();
   const { t, te } = useLanguage();
 
@@ -101,6 +105,8 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
       });
       setOpen(false);
       form.reset();
+      setPermissions({ modules: [], endpoints: {} });
+      setPermissionsOpen(false);
     },
     onError: (error: any) => {
       toast({
@@ -111,8 +117,19 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
     },
   });
 
+  // fine-grained permissions are only valid for non-admin scopes
+  const selectedScope = form.watch("permission_scope") ?? "";
+  const isAdminScope = selectedScope.includes("admin") || selectedScope.includes("superuser");
+
   const onSubmit = (data: UserFormValues) => {
-    createUserMutation.mutate(data as UserFormData);
+    const payload = { ...(data as UserFormData) };
+    const hasSelection =
+      permissions.modules.length > 0 ||
+      Object.values(permissions.endpoints).some((actions) => actions.length > 0);
+    if (!isAdminScope && hasSelection) {
+      payload.permissions = permissions;
+    }
+    createUserMutation.mutate(payload);
   };
 
   return (
@@ -267,6 +284,26 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                 )}
               />
             </div>
+
+            {!isAdminScope && (
+              <Collapsible open={permissionsOpen} onOpenChange={setPermissionsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between"
+                  >
+                    <span>{t("users.finePermissions")}</span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${permissionsOpen ? "rotate-180" : ""}`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3">
+                  <PermissionsEditor value={permissions} onChange={setPermissions} />
+                </CollapsibleContent>
+              </Collapsible>
+            )}
 
             <div className="flex justify-end space-x-2 rtl:space-x-reverse pt-4">
               <Button

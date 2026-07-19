@@ -76,6 +76,15 @@ class UserDomain:
         if payload.permission_scope and not current_user.is_admin:
             raise BadRequestError("You are not authorized to change permission scope")
 
+        if payload.permissions is not None:
+            if not current_user.is_admin:
+                raise BadRequestError("You are not authorized to change permissions")
+            final_scope = payload.permission_scope or user.permission_scope or ""
+            if set(final_scope.split(",")) & {"admin", "superuser"}:
+                raise BadRequestError(
+                    "admins have full access — permissions apply to non-admin users only"
+                )
+
         updates = payload.model_dump(exclude_unset=True)
         # these columns are NOT NULL; an explicit null in the payload means
         # "leave unchanged" (email/phone may still be cleared via null)

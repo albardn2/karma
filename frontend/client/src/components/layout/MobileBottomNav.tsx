@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { 
   LayoutDashboard, 
@@ -28,12 +29,28 @@ const navigation = [
 
 export function MobileBottomNav() {
   const [location] = useLocation();
+  const { user } = useAuth();
   const { t } = useLanguage();
+
+  const permissionScope = (user as any)?.permissionScope ?? (user as any)?.permission_scope ?? '';
+  const isAdmin = permissionScope.includes('admin') || permissionScope.includes('superuser');
+  // fine-grained module grants: non-admins with a permissions object only see
+  // the granted menu modules; admins and null-permissions users keep everything
+  const grantedModules: string[] | null =
+    !isAdmin && Array.isArray((user as any)?.permissions?.modules)
+      ? (user as any).permissions.modules
+      : null;
+  const visibleNavigation = grantedModules
+    ? navigation.filter((item) => {
+        const moduleId = item.href === '/' ? 'dashboard' : item.href.slice(1);
+        return grantedModules.includes(moduleId);
+      })
+    : navigation;
 
   return (
     <nav className="lg:hidden fixed bottom-0 start-0 end-0 bg-white border-t border-gray-200 px-4 py-2">
       <div className="flex items-center justify-around">
-        {navigation.map((item) => {
+        {visibleNavigation.map((item) => {
           const isActive = location === item.href;
           return (
             <Link

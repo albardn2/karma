@@ -57,6 +57,9 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     phone_number = Column(String(256), nullable=True)
     language = Column(String(10), nullable=True)
+    # fine-grained ACL for non-admin users: {"modules": [...], "endpoints":
+    # {resource: [crud actions]}}. NULL = legacy role-scope behavior.
+    permissions = Column(MutableDict.as_mutable(JSONB), nullable=True)
     is_deleted = Column(Boolean, default=False)
     # location tracking: master switch + live publish cadence (seconds)
     track_location = Column(Boolean, nullable=False, default=False, server_default=false())

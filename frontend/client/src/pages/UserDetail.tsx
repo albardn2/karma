@@ -43,8 +43,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { UserLocationMap } from "@/components/location/UserLocationMap";
+import { PermissionsEditor } from "@/components/users/PermissionsEditor";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { User, UserUpdateData, PermissionScope } from "@/lib/types";
+import type { User, UserUpdateData, PermissionScope, UserPermissions } from "@/lib/types";
 
 const makeUserUpdateSchema = (t: (key: string) => string) =>
   z.object({
@@ -76,6 +77,8 @@ export default function UserDetail() {
   const uuid = params?.uuid;
   const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
+  const [useFinePermissions, setUseFinePermissions] = useState(false);
+  const [finePermissions, setFinePermissions] = useState<UserPermissions>({ modules: [], endpoints: {} });
   const { toast } = useToast();
   const { t, te } = useLanguage();
 
@@ -132,6 +135,15 @@ export default function UserDetail() {
         track_location: user.track_location,
         location_ping_seconds: user.location_ping_seconds,
       });
+      setUseFinePermissions(!!user.permissions);
+      setFinePermissions(
+        user.permissions
+          ? {
+              modules: user.permissions.modules ?? [],
+              endpoints: user.permissions.endpoints ?? {},
+            }
+          : { modules: [], endpoints: {} }
+      );
     }
   }, [user, form]);
 
@@ -206,8 +218,22 @@ export default function UserDetail() {
     },
   });
 
+  // fine-grained permissions are only valid for non-admin scopes
+  const selectedScope = form.watch("permission_scope") || "";
+  const isAdminScope =
+    selectedScope.includes("admin") || selectedScope.includes("superuser");
+
   const onSubmit = (data: UserUpdateFormValues) => {
-    updateUserMutation.mutate(data as UserUpdateData);
+    const payload = { ...(data as UserUpdateData) };
+    if (!isAdminScope) {
+      if (useFinePermissions) {
+        payload.permissions = finePermissions;
+      } else if (user?.permissions) {
+        // toggled off for a user that had permissions: clear back to role behavior
+        payload.permissions = null;
+      }
+    }
+    updateUserMutation.mutate(payload);
   };
 
   const formatDate = (dateString: string) => {
@@ -568,6 +594,32 @@ export default function UserDetail() {
                             </FormItem>
                           )}
                         />
+
+                        {!isAdminScope && (
+                          <div className="rounded-lg border p-3 md:col-span-2 space-y-3">
+                            <div className="flex flex-row items-center justify-between gap-2">
+                              <div className="space-y-0.5">
+                                <p className="text-sm font-medium">
+                                  {t("users.useFinePermissions")}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  {t("users.useFinePermissionsDesc")}
+                                </p>
+                              </div>
+                              <Switch
+                                checked={useFinePermissions}
+                                onCheckedChange={setUseFinePermissions}
+                                data-testid="perm-use-fine"
+                              />
+                            </div>
+                            {useFinePermissions && (
+                              <PermissionsEditor
+                                value={finePermissions}
+                                onChange={setFinePermissions}
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </Form>

@@ -78,32 +78,54 @@ def create_app(config_object=Config):
     jwt.init_app(app)
 
     @app.before_request
-    def _load_account_scope():
-        # Tenant scope for this request: read account_uuid from the JWT (if
-        # any) into flask.g. The UnitOfWork picks it up and every repository
-        # read/write is filtered/stamped with it. Invalid or absent tokens
-        # leave g.account_uuid unset — protected routes still reject them via
-        # their own decorators; unauthenticated routes (login/signup) run
-        # unscoped, which is correct since no tenant is known yet.
-        from flask import g
+    def _load_request_identity():
+        # Request chokepoint: resolve the caller's user row once and put the
+        # tenant scope + fine-grained ACL on flask.g.
+        #  - g.account_uuid: the UnitOfWork picks it up and every repository
+        #    read/write is filtered/stamped with it.
+        #  - g.user_acl / g.is_admin: fine-grained per-endpoint permissions.
+        #    Non-admin users WITH a permissions object must be granted the
+        #    matching CRUD action on the resource blueprint or the request is
+        #    rejected right here — regardless of role decorators.
+        # Invalid or absent tokens leave g unset — protected routes still
+        # reject them via their own decorators; unauthenticated routes
+        # (login/signup) run unscoped, which is correct since no tenant is
+        # known yet.
+        from flask import g, jsonify, request
         from flask_jwt_extended import verify_jwt_in_request, get_jwt
+        from app.entrypoint.routes.common.permissions import (
+            RESOURCE_SET,
+            endpoint_allowed,
+        )
         try:
             verify_jwt_in_request(optional=True)
             claims = get_jwt()
-            if claims:
-                account_uuid = claims.get("account_uuid")
-                if not account_uuid:
-                    # token minted before multi-tenancy — resolve the scope
-                    # from the user row instead of running unscoped
-                    from app.adapters.unit_of_work.sqlalchemy_unit_of_work import (
-                        SqlAlchemyUnitOfWork,
-                    )
-                    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
-                        user = uow.user_repository.find_one(uuid=claims.get("sub"))
-                        account_uuid = user.account_uuid if user else None
-                g.account_uuid = account_uuid
         except Exception:
-            pass
+            return None
+        if not claims:
+            return None
+
+        from app.adapters.unit_of_work.sqlalchemy_unit_of_work import (
+            SqlAlchemyUnitOfWork,
+        )
+        with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+            user = uow.user_repository.find_one(
+                uuid=claims.get("sub"), is_deleted=False
+            )
+            if not user:
+                return None
+            g.account_uuid = user.account_uuid
+            g.is_admin = user.is_admin
+            g.user_acl = user.permissions
+
+        if (
+            not g.is_admin
+            and g.user_acl is not None
+            and request.blueprint in RESOURCE_SET
+            and not endpoint_allowed(g.user_acl, request.blueprint, request.method)
+        ):
+            return jsonify({"msg": "Forbidden — missing endpoint permission"}), 403
+        return None
 
     # Register blueprints
     app.register_blueprint(customer_blueprint, url_prefix='/customer')
