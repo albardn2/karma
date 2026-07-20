@@ -36,7 +36,6 @@ import Invoices from "@/pages/Invoices";
 import Reports from "@/pages/Reports";
 import LiveMap from "@/pages/LiveMap";
 import UserLocationHistory from "@/pages/UserLocationHistory";
-import LocationTrackingSettings from "@/pages/LocationTrackingSettings";
 import Pricing from "@/pages/Pricing";
 import PricingDetail from "@/pages/PricingDetail";
 import FixedAssets from "@/pages/FixedAssets";
@@ -176,7 +175,7 @@ function Router() {
       <Route path="/invoices" component={() => <ProtectedRoute><Invoices /></ProtectedRoute>} />
       <Route path="/reports" component={() => <ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/live-map" component={() => <ProtectedRoute><LiveMap /></ProtectedRoute>} />
-      <Route path="/location-tracking" component={() => <ProtectedRoute><LocationTrackingSettings /></ProtectedRoute>} />
+      <Route path="/location-tracking" component={() => <ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
       <Route path="/super-admin" component={() => <ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
       <Route path="/accounts-admin" component={() => <ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
       <Route component={NotFound} />

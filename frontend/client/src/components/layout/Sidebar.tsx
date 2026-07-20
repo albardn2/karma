@@ -69,7 +69,6 @@ const navigation = [
   { key: "nav.workflowExecution", href: "/workflow-execution", icon: Play },
   // adminOnly entries are filtered out for non-admin users below
   { key: "nav.liveMap", href: "/live-map", icon: MapPin, adminOnly: true },
-  { key: "nav.locationTracking", href: "/location-tracking", icon: MapPin, adminOnly: true },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {

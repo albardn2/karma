@@ -51,7 +51,7 @@ def _get_config(uow):
 
 @location_blueprint.route("/config", methods=["GET"])
 @jwt_required()
-@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
+@scopes_required(PermissionScope.SUPER_ADMIN.value)
 def get_config():
     with SqlAlchemyUnitOfWork() as uow:
         config = _get_config(uow)
@@ -61,7 +61,7 @@ def get_config():
 
 @location_blueprint.route("/config", methods=["PUT"])
 @jwt_required()
-@scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
+@scopes_required(PermissionScope.SUPER_ADMIN.value)
 def update_config():
     payload = LocationTrackingConfigUpdate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
