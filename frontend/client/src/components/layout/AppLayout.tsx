@@ -25,7 +25,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       localStorage.removeItem('auth_token');
     }
     localStorage.removeItem('auth_token_original');
-    window.location.href = '/accounts-admin';
+    window.location.href = '/super-admin';
   };
 
   return (

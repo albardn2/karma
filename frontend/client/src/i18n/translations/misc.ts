@@ -199,6 +199,8 @@ export const en: Record<string, string> = {
   'misc.accounts.newAccountDefaults': 'New Account Defaults',
   'misc.accounts.newAccountDefaultsHint': 'The feature scope applied to every NEW company at signup. Existing accounts are not affected.',
   'misc.accounts.defaultsSaved': 'Defaults for new accounts saved',
+  'misc.superAdmin.title': 'Super Admin',
+  'misc.superAdmin.subtitle': 'Platform-owner tools for managing company accounts.',
 };
 
 export const ar: Record<string, string> = {
@@ -397,4 +399,6 @@ export const ar: Record<string, string> = {
   'misc.accounts.newAccountDefaults': 'إعدادات الحسابات الجديدة',
   'misc.accounts.newAccountDefaultsHint': 'نطاق الميزات المطبق على كل شركة جديدة عند التسجيل. الحسابات الحالية لا تتأثر.',
   'misc.accounts.defaultsSaved': 'تم حفظ إعدادات الحسابات الجديدة',
+  'misc.superAdmin.title': 'المشرف العام',
+  'misc.superAdmin.subtitle': 'أدوات مالك المنصة لإدارة حسابات الشركات.',
 };

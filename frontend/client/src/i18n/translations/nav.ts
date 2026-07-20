@@ -31,6 +31,7 @@ export const en: Record<string, string> = {
   'nav.liveMap': 'Live Map',
   'nav.locationTracking': 'Location Tracking',
   'nav.purchase': 'Purchase',
+  'nav.superAdmin': 'Super Admin',
 };
 
 export const ar: Record<string, string> = {
@@ -64,4 +65,5 @@ export const ar: Record<string, string> = {
   'nav.liveMap': 'الخريطة المباشرة',
   'nav.locationTracking': 'تتبع الموقع',
   'nav.purchase': 'المشتريات',
+  'nav.superAdmin': 'المشرف العام',
 };

@@ -41,7 +41,7 @@ interface SidebarProps {
 const navigation = [
   { key: "nav.dashboard", href: "/", icon: LayoutDashboard },
   // superOnly: platform-owner console, visible to superusers only
-  { key: "nav.accounts", href: "/accounts-admin", icon: Landmark, superOnly: true },
+  { key: "nav.superAdmin", href: "/super-admin", icon: Landmark, superOnly: true },
   { key: "nav.customers", href: "/customers", icon: Users },
   { key: "nav.vendors", href: "/vendors", icon: Building2 },
   { key: "nav.warehouses", href: "/warehouses", icon: Warehouse },
