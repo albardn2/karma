@@ -21,7 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AppLayout } from "@/components/layout/AppLayout";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { Workflow } from "@shared/schema";
@@ -41,7 +40,8 @@ interface WorkflowFilters {
   per_page: number;
 }
 
-export default function Workflows() {
+// Rendered as the "Workflows" tab inside the Super Admin page.
+export function WorkflowsPanel() {
   const { t } = useLanguage();
   const [filters, setFilters] = useState<WorkflowFilters>({
     page: 1,
@@ -74,17 +74,12 @@ export default function Workflows() {
   };
 
   return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto p-4 lg:p-6">
-        <div className="container mx-auto space-y-6">
-        {/* Header */}
+        <div className="space-y-6">
+        {/* Toolbar */}
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('nav.workflows')}</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
-              {t('workflows.subtitle')}
-            </p>
-          </div>
+          <p className="text-gray-500 dark:text-gray-400">
+            {t('workflows.subtitle')}
+          </p>
           <Link href="/workflows/new">
             <Button data-testid="button-create-workflow">
               <Plus className="me-2 h-4 w-4" />
@@ -241,7 +236,5 @@ export default function Workflows() {
           )}
         </Card>
         </div>
-      </div>
-    </AppLayout>
   );
 }

@@ -1799,7 +1799,8 @@ class Workflow(Base):
     __tablename__ = "workflow"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
+    # platform-global definition — deliberately NOT tenant-scoped: every
+    # account shares the same workflow/task definitions (superuser-managed)
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     name = Column(String(120), nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -1818,7 +1819,8 @@ class Task(Base):
     __tablename__ = "task"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
+    # platform-global definition — deliberately NOT tenant-scoped: every
+    # account shares the same workflow/task definitions (superuser-managed)
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     workflow_uuid = Column(String(36), ForeignKey("workflow.uuid"), nullable=True)
     parent_task_uuid = Column(String(36), ForeignKey("task.uuid"), nullable=True)  # Self-referencing foreign key

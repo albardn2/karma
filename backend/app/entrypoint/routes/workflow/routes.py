@@ -21,9 +21,7 @@ from app.dto.workflow import WorkflowTags
 
 @workflow_blueprint.route("/", methods=["POST"])
 @jwt_required()
-@scopes_required(
-    PermissionScope.ADMIN.value,
-    PermissionScope.SUPER_ADMIN.value)
+@scopes_required(PermissionScope.SUPER_ADMIN.value)
 def create_workflow():
     current_user_uuid = get_jwt_identity()
     payload = WorkflowCreate(**request.json)
@@ -55,11 +53,7 @@ def get_workflow(uuid: str):
 # Route to update a Workflow
 @workflow_blueprint.route("/<string:uuid>", methods=["PUT"])
 @jwt_required()
-@scopes_required(
-    PermissionScope.ADMIN.value,
-    PermissionScope.SUPER_ADMIN.value,
-    PermissionScope.OPERATION_MANAGER.value,
-)
+@scopes_required(PermissionScope.SUPER_ADMIN.value)
 def update_workflow(uuid: str):
     payload = WorkflowUpdate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
@@ -72,10 +66,7 @@ def update_workflow(uuid: str):
 # Route to delete a Workflow
 @workflow_blueprint.route("/<string:uuid>", methods=["DELETE"])
 @jwt_required()
-@scopes_required(
-    PermissionScope.ADMIN.value,
-    PermissionScope.SUPER_ADMIN.value,
-)
+@scopes_required(PermissionScope.SUPER_ADMIN.value)
 def delete_workflow(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         dto = WorkflowDomain.delete_workflow(uow=uow, uuid=uuid)

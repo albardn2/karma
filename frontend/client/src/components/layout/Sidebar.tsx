@@ -65,7 +65,6 @@ const navigation = [
   { key: "nav.creditNoteItems", href: "/credit-note-items", icon: FileText },
   { key: "nav.debitNoteItems", href: "/debit-note-items", icon: FileText },
   { key: "nav.processes", href: "/processes", icon: Factory },
-  { key: "nav.workflows", href: "/workflows", icon: GitBranch },
   { key: "nav.workflowExecution", href: "/workflow-execution", icon: Play },
   // adminOnly entries are filtered out for non-admin users below
   { key: "nav.liveMap", href: "/live-map", icon: MapPin, adminOnly: true },

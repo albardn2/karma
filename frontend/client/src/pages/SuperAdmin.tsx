@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AccountsPanel } from "@/pages/AccountsAdmin";
 import { LocationTrackingPanel } from "@/pages/LocationTrackingSettings";
+import { WorkflowsPanel } from "@/pages/Workflows";
 
 // Platform-owner console shell: one page, tabbed sections. Superuser only —
 // future superuser tools land here as additional tabs.
@@ -39,12 +40,18 @@ export default function SuperAdmin() {
                 >
                   {t("nav.locationTracking")}
                 </TabsTrigger>
+                <TabsTrigger value="workflows" data-testid="superadmin-tab-workflows">
+                  {t("nav.workflows")}
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="accounts" className="mt-4">
                 <AccountsPanel />
               </TabsContent>
               <TabsContent value="location-tracking" className="mt-4">
                 <LocationTrackingPanel />
+              </TabsContent>
+              <TabsContent value="workflows" className="mt-4">
+                <WorkflowsPanel />
               </TabsContent>
             </Tabs>
           </div>

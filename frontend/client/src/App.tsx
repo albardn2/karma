@@ -74,7 +74,6 @@ import TransactionCreate from "@/pages/TransactionCreate";
 import Processes from "@/pages/Processes";
 import ProcessCreate from "@/pages/ProcessCreate";
 import ProcessDetail from "@/pages/ProcessDetail";
-import Workflows from "@/pages/Workflows";
 import WorkflowDetail from "@/pages/WorkflowDetail";
 import WorkflowCreate from "@/pages/WorkflowCreate";
 import WorkflowExecution from "@/pages/WorkflowExecution";
@@ -155,7 +154,7 @@ function Router() {
       <Route path="/processes" component={() => <ProtectedRoute><Processes /></ProtectedRoute>} />
       <Route path="/processes/create" component={() => <ProtectedRoute><ProcessCreate /></ProtectedRoute>} />
       <Route path="/processes/:uuid" component={() => <ProtectedRoute><ProcessDetail /></ProtectedRoute>} />
-      <Route path="/workflows" component={() => <ProtectedRoute><Workflows /></ProtectedRoute>} />
+      <Route path="/workflows" component={() => <ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
       <Route path="/workflows/new" component={() => <ProtectedRoute><WorkflowCreate /></ProtectedRoute>} />
       <Route path="/workflows/:uuid" component={() => <ProtectedRoute><WorkflowDetail /></ProtectedRoute>} />
       <Route path="/workflow-execution" component={() => <ProtectedRoute><WorkflowExecution /></ProtectedRoute>} />
