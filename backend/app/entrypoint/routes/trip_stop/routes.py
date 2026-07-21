@@ -126,8 +126,55 @@ def list_trip_stops():
             page=params.page,
             per_page=params.per_page,
         )
-        items = [TripStopRead.from_orm(m).model_dump(mode="json") for m in page.items]
-        print(items)
+        # enrich each stop with the driver assigned to its trip (stop -> trip
+        # -> workflow execution -> start_trip operator result), batched
+        from models.common import (
+            TaskExecution as TaskExecutionModel,
+            Task as TaskModel,
+            User as UserModel,
+        )
+        trip_uuids = list({m.trip_uuid for m in page.items if m.trip_uuid})
+        trip_to_wfe = dict(
+            uow.session.query(TripModel.uuid, TripModel.workflow_execution_uuid)
+            .filter(TripModel.uuid.in_(trip_uuids))
+            .all()
+        ) if trip_uuids else {}
+        wfe_uuids = [w for w in trip_to_wfe.values() if w]
+        assigned_by_wfe: dict = {}
+        if wfe_uuids:
+            rows = (
+                uow.session.query(
+                    TaskExecutionModel.workflow_execution_uuid,
+                    TaskExecutionModel.result["assigned_user_uuid"].astext,
+                )
+                .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
+                .filter(
+                    TaskExecutionModel.workflow_execution_uuid.in_(wfe_uuids),
+                    TaskExecutionModel.account_uuid == uow.account_uuid,
+                    TaskModel.operator == "start_trip_operator",
+                )
+                .all()
+            )
+            values = {v for _, v in rows if v}
+            users = (
+                uow.session.query(UserModel.uuid, UserModel.username)
+                .filter(
+                    UserModel.uuid.in_(values) | UserModel.username.in_(values),
+                    UserModel.account_uuid == uow.account_uuid,
+                )
+                .all()
+            ) if values else []
+            uuid_to_name = {u[0]: u[1] for u in users}
+            usernames = {u[1] for u in users}
+            for wfe_uuid, v in rows:
+                if v:
+                    assigned_by_wfe[wfe_uuid] = uuid_to_name.get(v) or v
+
+        items = []
+        for m in page.items:
+            dto = TripStopRead.from_orm(m)
+            dto.assigned_username = assigned_by_wfe.get(trip_to_wfe.get(m.trip_uuid))
+            items.append(dto.model_dump(mode="json"))
         result = TripStopPage(
             items=items,
             total_count=page.total,

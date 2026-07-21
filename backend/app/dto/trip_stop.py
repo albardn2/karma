@@ -116,6 +116,9 @@ class TripStopRead(BaseModel):
     index: Optional[int] = None
     outcome: Optional[str] = None
     sales: Optional[dict] = None
+    # resolved from the stop's trip -> workflow execution -> start_trip
+    # operator; the driver assigned to the trip (enriched by the list route)
+    assigned_username: Optional[str] = None
 
 
     @field_validator("coordinates", mode="before")
