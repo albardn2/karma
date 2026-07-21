@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,7 +47,8 @@ const buildLocationConfigSchema = (
 
 type LocationConfigFormValues = z.infer<ReturnType<typeof buildLocationConfigSchema>>;
 
-export default function LocationTrackingSettings() {
+// Rendered as the "Location Tracking" tab inside the Super Admin page.
+export function LocationTrackingPanel() {
   const { toast } = useToast();
   const { t } = useLanguage();
   const locationConfigSchema = useMemo(() => buildLocationConfigSchema(t), [t]);
@@ -124,20 +124,14 @@ export default function LocationTrackingSettings() {
 
   if (isLoading) {
     return (
-      <AppLayout>
-        <div className="flex-1 overflow-auto p-4 lg:p-6">
-          <div className="text-center py-12">
-            <p className="text-gray-600">{t("location.loadingSettings")}</p>
-          </div>
-        </div>
-      </AppLayout>
+      <div className="text-center py-12">
+        <p className="text-gray-600">{t("location.loadingSettings")}</p>
+      </div>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto p-4 lg:p-6">
-        <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-3xl">
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
@@ -248,8 +242,6 @@ export default function LocationTrackingSettings() {
               </Form>
             </CardContent>
           </Card>
-        </div>
       </div>
-    </AppLayout>
   );
 }

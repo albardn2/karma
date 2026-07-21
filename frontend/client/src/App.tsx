@@ -36,7 +36,6 @@ import Invoices from "@/pages/Invoices";
 import Reports from "@/pages/Reports";
 import LiveMap from "@/pages/LiveMap";
 import UserLocationHistory from "@/pages/UserLocationHistory";
-import LocationTrackingSettings from "@/pages/LocationTrackingSettings";
 import Pricing from "@/pages/Pricing";
 import PricingDetail from "@/pages/PricingDetail";
 import FixedAssets from "@/pages/FixedAssets";
@@ -75,7 +74,6 @@ import TransactionCreate from "@/pages/TransactionCreate";
 import Processes from "@/pages/Processes";
 import ProcessCreate from "@/pages/ProcessCreate";
 import ProcessDetail from "@/pages/ProcessDetail";
-import Workflows from "@/pages/Workflows";
 import WorkflowDetail from "@/pages/WorkflowDetail";
 import WorkflowCreate from "@/pages/WorkflowCreate";
 import WorkflowExecution from "@/pages/WorkflowExecution";
@@ -83,7 +81,7 @@ import WorkflowExecutionDetail from "@/pages/WorkflowExecutionDetail";
 import WorkflowExecutionTaskDetail from "@/pages/WorkflowExecutionTaskDetail";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
-import AccountsAdmin from "@/pages/AccountsAdmin";
+import SuperAdmin from "@/pages/SuperAdmin";
 
 function HomeRoute() {
   // "/" is the public landing page for visitors and the dashboard for
@@ -156,7 +154,7 @@ function Router() {
       <Route path="/processes" component={() => <ProtectedRoute><Processes /></ProtectedRoute>} />
       <Route path="/processes/create" component={() => <ProtectedRoute><ProcessCreate /></ProtectedRoute>} />
       <Route path="/processes/:uuid" component={() => <ProtectedRoute><ProcessDetail /></ProtectedRoute>} />
-      <Route path="/workflows" component={() => <ProtectedRoute><Workflows /></ProtectedRoute>} />
+      <Route path="/workflows" component={() => <ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
       <Route path="/workflows/new" component={() => <ProtectedRoute><WorkflowCreate /></ProtectedRoute>} />
       <Route path="/workflows/:uuid" component={() => <ProtectedRoute><WorkflowDetail /></ProtectedRoute>} />
       <Route path="/workflow-execution" component={() => <ProtectedRoute><WorkflowExecution /></ProtectedRoute>} />
@@ -176,8 +174,9 @@ function Router() {
       <Route path="/invoices" component={() => <ProtectedRoute><Invoices /></ProtectedRoute>} />
       <Route path="/reports" component={() => <ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/live-map" component={() => <ProtectedRoute><LiveMap /></ProtectedRoute>} />
-      <Route path="/location-tracking" component={() => <ProtectedRoute><LocationTrackingSettings /></ProtectedRoute>} />
-      <Route path="/accounts-admin" component={() => <ProtectedRoute><AccountsAdmin /></ProtectedRoute>} />
+      <Route path="/location-tracking" component={() => <ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
+      <Route path="/super-admin" component={() => <ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
+      <Route path="/accounts-admin" component={() => <ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
       <Route component={NotFound} />
     </Switch>
   );

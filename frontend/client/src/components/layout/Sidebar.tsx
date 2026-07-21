@@ -41,7 +41,7 @@ interface SidebarProps {
 const navigation = [
   { key: "nav.dashboard", href: "/", icon: LayoutDashboard },
   // superOnly: platform-owner console, visible to superusers only
-  { key: "nav.accounts", href: "/accounts-admin", icon: Landmark, superOnly: true },
+  { key: "nav.superAdmin", href: "/super-admin", icon: Landmark, superOnly: true },
   { key: "nav.customers", href: "/customers", icon: Users },
   { key: "nav.vendors", href: "/vendors", icon: Building2 },
   { key: "nav.warehouses", href: "/warehouses", icon: Warehouse },
@@ -65,11 +65,9 @@ const navigation = [
   { key: "nav.creditNoteItems", href: "/credit-note-items", icon: FileText },
   { key: "nav.debitNoteItems", href: "/debit-note-items", icon: FileText },
   { key: "nav.processes", href: "/processes", icon: Factory },
-  { key: "nav.workflows", href: "/workflows", icon: GitBranch },
   { key: "nav.workflowExecution", href: "/workflow-execution", icon: Play },
   // adminOnly entries are filtered out for non-admin users below
   { key: "nav.liveMap", href: "/live-map", icon: MapPin, adminOnly: true },
-  { key: "nav.locationTracking", href: "/location-tracking", icon: MapPin, adminOnly: true },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {

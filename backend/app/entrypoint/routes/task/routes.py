@@ -21,11 +21,7 @@ from app.domains.task.domain import TaskDomain
 # Route to create a new Task
 @task_blueprint.route("/", methods=["POST"])
 @jwt_required()
-@scopes_required(
-    PermissionScope.ADMIN.value,
-    PermissionScope.SUPER_ADMIN.value,
-    PermissionScope.OPERATION_MANAGER.value
-)
+@scopes_required(PermissionScope.SUPER_ADMIN.value)
 def create_task():
     current_user_uuid = get_jwt_identity()
     payload = TaskCreate(**request.json)
@@ -59,11 +55,7 @@ def get_task(uuid: str):
 # Route to update a Task
 @task_blueprint.route("/<string:uuid>", methods=["PUT"])
 @jwt_required()
-@scopes_required(
-    PermissionScope.ADMIN.value,
-    PermissionScope.SUPER_ADMIN.value,
-    PermissionScope.OPERATION_MANAGER.value,
-)
+@scopes_required(PermissionScope.SUPER_ADMIN.value)
 def update_task(uuid: str):
     payload = TaskUpdate(**request.json)
 
@@ -76,10 +68,7 @@ def update_task(uuid: str):
 # Route to delete a Task
 @task_blueprint.route("/<string:uuid>", methods=["DELETE"])
 @jwt_required()
-@scopes_required(
-    PermissionScope.ADMIN.value,
-    PermissionScope.SUPER_ADMIN.value,
-)
+@scopes_required(PermissionScope.SUPER_ADMIN.value)
 def delete_task(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         dto = TaskDomain.delete_task(uow=uow, uuid=uuid)

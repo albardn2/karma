@@ -102,7 +102,8 @@ function BalancesCell({ balances }: { balances: Balances | undefined }) {
   );
 }
 
-export default function AccountsAdmin() {
+// Rendered as the "Accounts" tab inside the Super Admin page.
+export function AccountsPanel() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -319,44 +320,32 @@ export default function AccountsAdmin() {
 
   if (!isSuperuser) {
     return (
-      <AppLayout>
-        <div className="flex-1 overflow-auto p-4 lg:p-6">
-          <div className="text-center py-12">
-            <p className="text-gray-600">{t("common.accessDenied")}</p>
-          </div>
-        </div>
-      </AppLayout>
+      <div className="text-center py-12">
+        <p className="text-gray-600">{t("common.accessDenied")}</p>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <AppLayout>
-        <div className="flex-1 overflow-auto p-4 lg:p-6">
-          <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {t("misc.accounts.loadError")}
-            </h3>
-          </div>
-        </div>
-      </AppLayout>
+      <div className="text-center py-12">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          {t("misc.accounts.loadError")}
+        </h3>
+      </div>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto p-4 lg:p-6">
+    <>
         <div className="space-y-6">
-          {/* Header */}
+          {/* Panel toolbar */}
           <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{t("misc.accounts.title")}</h1>
-              <p className="text-gray-600">
-                {accountsData
-                  ? t("misc.accounts.count", { count: accountsData.total_count })
-                  : t("common.loading")}
-              </p>
-            </div>
+            <p className="text-gray-600">
+              {accountsData
+                ? t("misc.accounts.count", { count: accountsData.total_count })
+                : t("common.loading")}
+            </p>
             <Button
               variant="outline"
               data-testid="account-defaults-button"
@@ -480,7 +469,6 @@ export default function AccountsAdmin() {
             </div>
           )}
         </div>
-      </div>
 
       {/* Account detail dialog */}
       <Dialog
@@ -897,6 +885,6 @@ export default function AccountsAdmin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AppLayout>
+    </>
   );
 }
