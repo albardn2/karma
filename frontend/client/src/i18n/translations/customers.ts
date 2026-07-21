@@ -87,6 +87,16 @@ export const en: Record<string, string> = {
   'customers.resultsPerPage': 'Results per page',
   'customers.applyFilters': 'Apply Filters',
   'customers.clear': 'Clear',
+  'customers.ordersSection': 'Orders',
+  'customers.tripStopsSection': 'Trip Stops',
+  'customers.payment': 'Payment',
+  'customers.fulfillment': 'Fulfillment',
+  'customers.assignedUser': 'Assigned User',
+  'customers.result': 'Result',
+  'customers.comments': 'Comments',
+  'customers.noOrders': 'No orders yet.',
+  'customers.noTripStops': 'No trip stops yet.',
+  'customers.tablePageOf': 'Page {page} of {pages} · {total} total',
 };
 
 export const ar: Record<string, string> = {
@@ -174,4 +184,14 @@ export const ar: Record<string, string> = {
   'customers.resultsPerPage': 'عدد النتائج في الصفحة',
   'customers.applyFilters': 'تطبيق عوامل التصفية',
   'customers.clear': 'مسح',
+  'customers.ordersSection': 'الطلبات',
+  'customers.tripStopsSection': 'محطات الرحلات',
+  'customers.payment': 'الدفع',
+  'customers.fulfillment': 'التسليم',
+  'customers.assignedUser': 'المستخدم المسؤول',
+  'customers.result': 'النتيجة',
+  'customers.comments': 'الملاحظات',
+  'customers.noOrders': 'لا توجد طلبات بعد.',
+  'customers.noTripStops': 'لا توجد محطات رحلات بعد.',
+  'customers.tablePageOf': 'صفحة {page} من {pages} · {total} إجمالاً',
 };
