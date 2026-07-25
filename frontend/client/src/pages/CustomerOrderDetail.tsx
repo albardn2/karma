@@ -88,6 +88,12 @@ export default function CustomerOrderDetail() {
   const { t, te } = useLanguage();
   const params = useParams();
   const [, setLocation] = useLocation();
+  // where "Back" returns to: honor a ?back= param (e.g. from the customer
+  // detail page), else the orders list
+  const backTo =
+    new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : ""
+    ).get("back") || "/customer-orders";
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotes, setEditedNotes] = useState("");
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -163,7 +169,7 @@ export default function CustomerOrderDetail() {
         title: t('common.success'),
         description: t('customerOrders.deleteSuccess'),
       });
-      setLocation("/customer-orders");
+      setLocation(backTo);
     },
     onError: (error: any) => {
       toast({
@@ -319,7 +325,7 @@ export default function CustomerOrderDetail() {
           <p className="text-red-600 dark:text-red-400">
             {t('customerOrders.failedLoadOrder', { message: error?.message })}
           </p>
-          <Button onClick={() => setLocation("/customer-orders")} variant="outline">
+          <Button onClick={() => setLocation(backTo)} variant="outline">
             <ArrowLeft className="h-4 w-4 me-2" />
             {t('customerOrders.backToOrders')}
           </Button>
@@ -335,7 +341,7 @@ export default function CustomerOrderDetail() {
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
             {t('customerOrders.orderNotFound')}
           </h1>
-          <Button onClick={() => setLocation("/customer-orders")} variant="outline">
+          <Button onClick={() => setLocation(backTo)} variant="outline">
             <ArrowLeft className="h-4 w-4 me-2" />
             {t('customerOrders.backToOrders')}
           </Button>
@@ -374,7 +380,7 @@ export default function CustomerOrderDetail() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setLocation("/customer-orders")}
+              onClick={() => setLocation(backTo)}
             >
               <ArrowLeft className="h-4 w-4 me-2" />
               {t('common.back')}

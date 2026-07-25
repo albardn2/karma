@@ -97,9 +97,7 @@
                 "read"
             ],
             "task": [
-                "create",
-                "read",
-                "update"
+                "read"
             ],
             "task_execution": [
                 "create",
@@ -139,8 +137,7 @@
                 "update"
             ],
             "workflow": [
-                "read",
-                "update"
+                "read"
             ],
             "workflow_execution": [
                 "create",

@@ -11,10 +11,18 @@ class TripStopDomain:
 
     @staticmethod
     def create_trip_stop(uow: SqlAlchemyUnitOfWork, payload: TripStopCreate) -> TripStopRead:
+        # the repo is account-scoped, so an unknown OR cross-tenant trip 404s
+        # here instead of silently attaching a stop to another tenant's trip
+        trip = uow.trip_repository.find_one(uuid=payload.trip_uuid, is_deleted=False)
+        if not trip:
+            raise NotFoundError("Trip not found")
+
         if payload.customer_uuid:
             customer = uow.customer_repository.find_one(uuid=payload.customer_uuid, is_deleted=False)
             if not customer:
                 raise NotFoundError("Customer not found")
+            if customer.coordinates is None:
+                raise BadRequestError("Customer has no coordinates")
 
             coordinates_wkt = to_shape(customer.coordinates).wkt # to lat,ln
             payload.coordinates = coordinates_wkt

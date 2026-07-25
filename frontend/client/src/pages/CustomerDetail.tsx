@@ -25,6 +25,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CustomerActivity } from "@/components/customers/CustomerActivity";
 import type { Customer } from "@/lib/types";
 import { EditCustomerDialog } from "@/components/customers/EditCustomerDialog";
 import { CustomerDetailMap } from "@/components/map/CustomerDetailMap";
@@ -420,6 +421,9 @@ export default function CustomerDetail() {
             )}
           </div>
         </div>
+
+        {/* Orders + trip stops */}
+        <CustomerActivity customerUuid={customer.uuid} />
 
         {/* Customer Location Map */}
         <div className="mt-8">

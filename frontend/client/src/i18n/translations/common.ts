@@ -116,6 +116,7 @@ export const en: Record<string, string> = {
   'enum.overdue': 'Overdue',
   'enum.cash': 'Cash',
   'enum.bank_transfer': 'Bank Transfer',
+  'common.clear': 'Clear',
 };
 
 export const ar: Record<string, string> = {
@@ -233,4 +234,5 @@ export const ar: Record<string, string> = {
   'enum.overdue': 'متأخر',
   'enum.cash': 'نقداً',
   'enum.bank_transfer': 'حوالة مصرفية',
+  'common.clear': 'مسح',
 };

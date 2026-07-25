@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from flask import  request, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from geoalchemy2 import WKTElement
@@ -16,6 +17,7 @@ from app.entrypoint.routes.common.errors import BadRequestError
 from app.entrypoint.routes.common.errors import NotFoundError
 
 from app.dto.customer import CustomerCategory
+from app.dto.trip_stop import TripStopStatus
 from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.auth import add_logged_user_to_payload
@@ -203,3 +205,341 @@ def list_customers():
 def list_customer_categories():
     categories = [category.value for category in CustomerCategory]
     return jsonify(categories), 200
+
+
+# ----------------------- CUSTOMER ANALYTICS -----------------------
+# Read-only aggregates for the Customers > Analytics tab. Raw session
+# queries here MUST scope by uow.account_uuid (they bypass the repos).
+
+def _parse_dt(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        raise BadRequestError(f"Invalid date: {value}")
+
+
+def _csv_arg(name):
+    raw = request.args.get(name)
+    return [v for v in raw.split(",") if v] if raw else []
+
+
+def _bucket_arg():
+    bucket = request.args.get("bucket", "day")
+    if bucket not in ("day", "week", "month"):
+        raise BadRequestError("bucket must be day, week or month")
+    return bucket
+
+
+def _int_arg(name, default, minimum, maximum=None):
+    raw = request.args.get(name)
+    if raw in (None, ""):
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        raise BadRequestError(f"{name} must be an integer")
+    if value < minimum:
+        raise BadRequestError(f"{name} must be >= {minimum}")
+    return min(value, maximum) if maximum is not None else value
+
+
+def _like_escape(value):
+    """Treat user input as a literal: % and _ are wildcards in LIKE."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _sales_join(uow, start, end, material_uuids):
+    """Base query joining orders -> items -> invoice items -> invoice (revenue
+    rows), filtered by window + materials. Amount = price_per_unit * quantity.
+    The invoice join matters: soft-deleting an invoice does NOT cascade to its
+    items, so without it voided invoices would still count as revenue."""
+    from models.common import (
+        CustomerOrder as CO,
+        CustomerOrderItem as COI,
+        InvoiceItem as II,
+        Invoice as INV,
+    )
+    q = (
+        uow.session.query(CO, COI, II, INV)
+        .select_from(CO)
+        .join(COI, COI.customer_order_uuid == CO.uuid)
+        .join(II, II.customer_order_item_uuid == COI.uuid)
+        .join(INV, INV.uuid == II.invoice_uuid)
+        .filter(
+            CO.account_uuid == uow.account_uuid,
+            CO.is_deleted == False,
+            COI.is_deleted == False,
+            II.is_deleted == False,
+            INV.is_deleted == False,
+        )
+    )
+    if start:
+        q = q.filter(CO.created_at >= start)
+    if end:
+        q = q.filter(CO.created_at <= end)
+    if material_uuids:
+        q = q.filter(COI.material_uuid.in_(material_uuids))
+    return q, CO, COI, II, INV
+
+
+@customer_blueprint.route("/analytics/new-customers", methods=["GET"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value)
+def analytics_new_customers():
+    bucket = _bucket_arg()
+    start = _parse_dt(request.args.get("start_date"))
+    end = _parse_dt(request.args.get("end_date"))
+    with SqlAlchemyUnitOfWork() as uow:
+        base = [
+            CustomerModel.account_uuid == uow.account_uuid,
+            CustomerModel.is_deleted == False,
+        ]
+        expr = func.date_trunc(bucket, CustomerModel.created_at)
+        f = list(base)
+        if start:
+            f.append(CustomerModel.created_at >= start)
+        if end:
+            f.append(CustomerModel.created_at <= end)
+        rows = (
+            uow.session.query(expr, func.count(CustomerModel.uuid))
+            .filter(*f)
+            .group_by(expr)
+            .order_by(expr)
+            .all()
+        )
+        # customers that existed before the window: the cumulative baseline
+        baseline = 0
+        if start:
+            baseline = (
+                uow.session.query(func.count(CustomerModel.uuid))
+                .filter(*base, CustomerModel.created_at < start)
+                .scalar()
+            )
+        result = {
+            "buckets": [{"period": p.isoformat(), "count": int(c)} for p, c in rows],
+            "baseline": int(baseline or 0),
+        }
+    return jsonify(result), 200
+
+
+@customer_blueprint.route("/analytics/customers-sold", methods=["GET"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value)
+def analytics_customers_sold():
+    """Distinct customers with at least one order per bucket, filterable by
+    material(s) bought and customer category(ies)."""
+    from models.common import (
+        CustomerOrder as CO,
+        CustomerOrderItem as COI,
+    )
+    bucket = _bucket_arg()
+    start = _parse_dt(request.args.get("start_date"))
+    end = _parse_dt(request.args.get("end_date"))
+    material_uuids = _csv_arg("material_uuids")
+    categories = _csv_arg("categories")
+    with SqlAlchemyUnitOfWork() as uow:
+        expr = func.date_trunc(bucket, CO.created_at)
+        q = (
+            uow.session.query(expr, func.count(func.distinct(CO.customer_uuid)))
+            .filter(
+                CO.account_uuid == uow.account_uuid,
+                CO.is_deleted == False,
+            )
+        )
+        if start:
+            q = q.filter(CO.created_at >= start)
+        if end:
+            q = q.filter(CO.created_at <= end)
+        # always join the customer so soft-deleted ones are excluded, matching
+        # the table and the new-customers chart
+        q = q.join(CustomerModel, CustomerModel.uuid == CO.customer_uuid).filter(
+            CustomerModel.is_deleted == False
+        )
+        if categories:
+            q = q.filter(CustomerModel.category.in_(categories))
+        if material_uuids:
+            q = q.join(COI, COI.customer_order_uuid == CO.uuid).filter(
+                COI.material_uuid.in_(material_uuids),
+                COI.is_deleted == False,
+            )
+        rows = q.group_by(expr).order_by(expr).all()
+        result = {
+            "buckets": [{"period": p.isoformat(), "count": int(c)} for p, c in rows]
+        }
+    return jsonify(result), 200
+
+
+@customer_blueprint.route("/analytics/sold-customers", methods=["GET"])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value)
+def analytics_sold_customers():
+    """Per-customer sales + last-visit table. Revenue is summed across
+    currencies for sorting (revenue_total); the per-currency breakdown is
+    returned in `revenue`."""
+    from math import ceil
+    from sqlalchemy import and_, or_
+    from models.common import (
+        Trip as TR,
+        TripStop as TS,
+    )
+    start = _parse_dt(request.args.get("start_date"))
+    end = _parse_dt(request.args.get("end_date"))
+    material_uuids = _csv_arg("material_uuids")
+    categories = _csv_arg("categories")
+    outcome = request.args.get("outcome")
+    comments = request.args.get("comments")
+    min_days = _int_arg("min_days_since_visit", None, 0)
+    only_sold = request.args.get("only_sold", "true").lower() != "false"
+    sort_by = request.args.get("sort_by", "revenue")
+    if sort_by not in ("revenue", "last_stop", "name"):
+        raise BadRequestError("sort_by must be revenue, last_stop or name")
+    desc = request.args.get("sort_dir", "desc") != "asc"
+    page = _int_arg("page", 1, 1)
+    per_page = _int_arg("per_page", 20, 1, 100)
+
+    with SqlAlchemyUnitOfWork() as uow:
+        sales_q, CO, COI, II, INV = _sales_join(uow, start, end, material_uuids)
+        rev_sq = (
+            sales_q.with_entities(
+                CO.customer_uuid.label("customer_uuid"),
+                func.sum(II.price_per_unit * COI.quantity).label("revenue"),
+                func.count(func.distinct(CO.uuid)).label("orders_count"),
+            )
+            .group_by(CO.customer_uuid)
+            .subquery()
+        )
+        # latest ACTUAL visit per customer: stops on deleted trips are excluded,
+        # and so are stops that never happened — a stop still 'planned' (or
+        # cancelled) is a future intention, not a visit, and counting it would
+        # silently reset "days since last visit" the moment a stop is queued.
+        rn = func.row_number().over(
+            partition_by=TS.customer_uuid, order_by=TS.created_at.desc()
+        ).label("rn")
+        stops_sq = (
+            uow.session.query(
+                TS.customer_uuid.label("customer_uuid"),
+                TS.created_at.label("last_stop_date"),
+                TS.outcome.label("last_outcome"),
+                TS.notes.label("last_notes"),
+                rn,
+            )
+            .join(TR, TR.uuid == TS.trip_uuid)
+            .filter(
+                TS.account_uuid == uow.account_uuid,
+                TR.is_deleted == False,
+                TS.customer_uuid.isnot(None),
+                TS.status.notin_(
+                    [TripStopStatus.PLANNED.value, TripStopStatus.CANCELLED.value]
+                ),
+            )
+            .subquery()
+        )
+        q = (
+            uow.session.query(
+                CustomerModel,
+                rev_sq.c.revenue,
+                rev_sq.c.orders_count,
+                stops_sq.c.last_stop_date,
+                stops_sq.c.last_outcome,
+                stops_sq.c.last_notes,
+            )
+            .outerjoin(rev_sq, rev_sq.c.customer_uuid == CustomerModel.uuid)
+            .outerjoin(
+                stops_sq,
+                and_(
+                    stops_sq.c.customer_uuid == CustomerModel.uuid,
+                    stops_sq.c.rn == 1,
+                ),
+            )
+            .filter(
+                CustomerModel.account_uuid == uow.account_uuid,
+                CustomerModel.is_deleted == False,
+            )
+        )
+        if categories:
+            q = q.filter(CustomerModel.category.in_(categories))
+        if only_sold:
+            q = q.filter(rev_sq.c.revenue.isnot(None))
+        if outcome:
+            q = q.filter(
+                stops_sq.c.last_outcome.ilike(f"{_like_escape(outcome)}%", escape="\\")
+            )
+        if comments:
+            q = q.filter(
+                stops_sq.c.last_notes.ilike(f"%{_like_escape(comments)}%", escape="\\")
+            )
+        if min_days is not None:
+            cutoff = datetime.utcnow() - timedelta(days=min_days)
+            q = q.filter(
+                or_(
+                    stops_sq.c.last_stop_date <= cutoff,
+                    stops_sq.c.last_stop_date.is_(None),
+                )
+            )
+        if sort_by == "last_stop":
+            col = stops_sq.c.last_stop_date
+            q = q.order_by(col.desc().nullslast() if desc else col.asc().nullsfirst())
+        elif sort_by == "name":
+            col = CustomerModel.company_name
+            q = q.order_by(col.desc() if desc else col.asc())
+        else:
+            col = func.coalesce(rev_sq.c.revenue, 0)
+            q = q.order_by(col.desc() if desc else col.asc(), CustomerModel.company_name.asc())
+
+        total = q.count()
+        rows = q.limit(per_page).offset((page - 1) * per_page).all()
+
+        # per-currency revenue for just this page's customers
+        cust_uuids = [c.uuid for c, *_ in rows]
+        cur_map: dict = {}
+        if cust_uuids:
+            cur_q, CO2, COI2, II2, INV2 = _sales_join(uow, start, end, material_uuids)
+            cur_rows = (
+                cur_q.filter(CO2.customer_uuid.in_(cust_uuids))
+                .with_entities(
+                    CO2.customer_uuid,
+                    INV2.currency,
+                    func.sum(II2.price_per_unit * COI2.quantity),
+                )
+                .group_by(CO2.customer_uuid, INV2.currency)
+                .all()
+            )
+            for cu, cur, amt in cur_rows:
+                cur_map.setdefault(cu, {})[cur] = round(float(amt or 0), 2)
+
+        now = datetime.utcnow()
+        items = [
+            {
+                "uuid": c.uuid,
+                "company_name": c.company_name,
+                "full_name": c.full_name,
+                "category": c.category,
+                "revenue": cur_map.get(c.uuid, {}),
+                "revenue_total": round(float(rev or 0), 2),
+                "orders_count": int(oc or 0),
+                "last_stop_date": lsd.isoformat() if lsd else None,
+                "last_stop_outcome": lo,
+                "last_stop_notes": ln,
+                "days_since_visit": (now - lsd).days if lsd else None,
+            }
+            for c, rev, oc, lsd, lo, ln in rows
+        ]
+        result = {
+            "items": items,
+            "total_count": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": ceil(total / per_page) if total else 0,
+        }
+    return jsonify(result), 200
