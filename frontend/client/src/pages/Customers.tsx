@@ -5,9 +5,10 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, List, Map } from "lucide-react";
+import { Trash2, List, Map, BarChart3 } from "lucide-react";
 import { AddCustomerDialog } from "@/components/customers/AddCustomerDialog";
 import { CustomerFiltersComponent, type CustomerFilters } from "@/components/customers/CustomerFilters";
+import { CustomersAnalytics } from "@/components/customers/CustomersAnalytics";
 import { CustomerMap } from "@/components/map/CustomerMap";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -17,7 +18,7 @@ import type { Customer, CustomerPage } from "@/lib/types";
 export default function Customers() {
   const { t, te } = useLanguage();
   const [, setLocation] = useLocation();
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'map' | 'analytics'>('list');
   const [filters, setFilters] = useState<CustomerFilters>({
     page: 1,
     per_page: 20,
@@ -121,16 +122,23 @@ export default function Customers() {
   const [mapKey, setMapKey] = useState(0);
 
   // Trigger initial map load when switching to map view
-  const handleViewModeChange = (mode: 'list' | 'map') => {
+  const handleViewModeChange = (mode: 'list' | 'map' | 'analytics') => {
     console.log(`Switching to ${mode} view`);
-    
+
+    // Analytics owns its own queries and filters: don't clear the cache (that
+    // would wipe its charts) and don't run the list reset below.
+    if (mode === 'analytics') {
+      setViewMode(mode);
+      return;
+    }
+
     // Immediately set view mode to stop all queries
     setViewMode(mode);
-    
+
     // Clear all cached data completely
     queryClient.clear();
     queryClient.removeQueries();
-    
+
     if (mode === 'map') {
       // Inherit current list filters for map view
       const inheritedFilters = { ...filters, per_page: 100 };
@@ -245,8 +253,8 @@ export default function Customers() {
           <AddCustomerDialog categories={categories || []} />
         </div>
 
-        {/* Total Customers Banner */}
-        {(displayCount > 0 || isLoading || isMapLoading) ? (
+        {/* Total Customers Banner (list/map views only) */}
+        {viewMode !== 'analytics' && (displayCount > 0 || isLoading || isMapLoading) ? (
           <div className="mb-6">
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg px-4 py-3">
               <div className="flex items-center">
@@ -281,21 +289,35 @@ export default function Customers() {
               <Map className="w-4 h-4 me-2" />
               {t('customers.map')}
             </Button>
+            <Button
+              variant={viewMode === 'analytics' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => handleViewModeChange('analytics')}
+              className={viewMode === 'analytics' ? 'brand-gradient' : ''}
+              data-testid="customers-analytics-tab"
+            >
+              <BarChart3 className="w-4 h-4 me-2" />
+              {t('customers.analytics')}
+            </Button>
           </div>
 
-          {/* Filters */}
-          <div className="relative z-10">
-            <CustomerFiltersComponent
-              filters={filters}
-              categories={categories || []}
-              onFiltersChange={handleFiltersChange}
-              onClearFilters={handleClearFilters}
-            />
-          </div>
+          {/* Filters (list/map views only) */}
+          {viewMode !== 'analytics' && (
+            <div className="relative z-10">
+              <CustomerFiltersComponent
+                filters={filters}
+                categories={categories || []}
+                onFiltersChange={handleFiltersChange}
+                onClearFilters={handleClearFilters}
+              />
+            </div>
+          )}
         </div>
 
         {/* Content Area */}
-        {viewMode === 'list' ? (
+        {viewMode === 'analytics' ? (
+          <CustomersAnalytics />
+        ) : viewMode === 'list' ? (
           /* Customer List View */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayCustomers.map((customer: Customer) => (
