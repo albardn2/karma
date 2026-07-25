@@ -172,7 +172,19 @@ def list_customer_orders():
             page=params.page,
             per_page=params.per_page
         )
-        items = [CustomerOrderRead.from_orm(o).model_dump(mode="json") for o in page_obj.items]
+        # enrich each order with its trip stop's date (if linked)
+        from models.common import TripStop as TripStopModel
+        stop_uuids = list({o.trip_stop_uuid for o in page_obj.items if o.trip_stop_uuid})
+        stop_dates = dict(
+            uow.session.query(TripStopModel.uuid, TripStopModel.created_at)
+            .filter(TripStopModel.uuid.in_(stop_uuids))
+            .all()
+        ) if stop_uuids else {}
+        items = []
+        for o in page_obj.items:
+            dto = CustomerOrderRead.from_orm(o)
+            dto.trip_stop_date = stop_dates.get(o.trip_stop_uuid)
+            items.append(dto.model_dump(mode="json"))
         result = CustomerOrderPage(
             orders=items,
             total_count=page_obj.total,

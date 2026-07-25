@@ -170,10 +170,28 @@ def list_trip_stops():
                 if v:
                     assigned_by_wfe[wfe_uuid] = uuid_to_name.get(v) or v
 
+        # orders placed at each stop (non-deleted), batched
+        from models.common import CustomerOrder as CustomerOrderModel
+        stop_uuids = [m.uuid for m in page.items]
+        orders_by_stop: dict = {}
+        if stop_uuids:
+            for stop_uuid, order_uuid in (
+                uow.session.query(
+                    CustomerOrderModel.trip_stop_uuid, CustomerOrderModel.uuid
+                )
+                .filter(
+                    CustomerOrderModel.trip_stop_uuid.in_(stop_uuids),
+                    CustomerOrderModel.is_deleted.is_(False),
+                )
+                .all()
+            ):
+                orders_by_stop.setdefault(stop_uuid, []).append(order_uuid)
+
         items = []
         for m in page.items:
             dto = TripStopRead.from_orm(m)
             dto.assigned_username = assigned_by_wfe.get(trip_to_wfe.get(m.trip_uuid))
+            dto.order_uuids = orders_by_stop.get(m.uuid, [])
             items.append(dto.model_dump(mode="json"))
         result = TripStopPage(
             items=items,

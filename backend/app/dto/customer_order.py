@@ -49,6 +49,7 @@ class CustomerOrderRead(CustomerOrderBase):
     net_amount_due: Optional[float] = None
     net_amount_paid: Optional[float] = None
     trip_stop_uuid: Optional[str] = None
+    trip_stop_date: Optional[datetime] = None  # enriched by the list route
     # display names resolved from the customer relationship
     customer_company_name: Optional[str] = Field(
         None,

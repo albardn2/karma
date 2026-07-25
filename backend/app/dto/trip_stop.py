@@ -119,6 +119,8 @@ class TripStopRead(BaseModel):
     # resolved from the stop's trip -> workflow execution -> start_trip
     # operator; the driver assigned to the trip (enriched by the list route)
     assigned_username: Optional[str] = None
+    # customer orders placed at this stop (enriched by the list route)
+    order_uuids: List[str] = []
 
 
     @field_validator("coordinates", mode="before")

@@ -119,18 +119,19 @@ export function CustomerActivity({ customerUuid }: { customerUuid: string }) {
                   <TableHead>{t("common.total")}</TableHead>
                   <TableHead>{t("customers.payment")}</TableHead>
                   <TableHead>{t("customers.fulfillment")}</TableHead>
+                  <TableHead>{t("customers.tripStop")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {!orders ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-gray-400 py-6">
+                    <TableCell colSpan={5} className="text-center text-gray-400 py-6">
                       {t("common.loading")}
                     </TableCell>
                   </TableRow>
                 ) : orders.orders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-gray-400 py-6">
+                    <TableCell colSpan={5} className="text-center text-gray-400 py-6">
                       {t("customers.noOrders")}
                     </TableCell>
                   </TableRow>
@@ -139,7 +140,7 @@ export function CustomerActivity({ customerUuid }: { customerUuid: string }) {
                     <TableRow key={o.uuid} className="hover:bg-gray-50">
                       <TableCell>
                         <Link
-                          href={`/customer-orders/${o.uuid}`}
+                          href={`/customer-orders/${o.uuid}?back=/customers/${customerUuid}`}
                           className="text-[hsl(245,58%,57%)] hover:underline"
                         >
                           {fmtDate(o.created_at)}
@@ -158,6 +159,9 @@ export function CustomerActivity({ customerUuid }: { customerUuid: string }) {
                         <Badge variant="secondary" className={o.is_fulfilled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}>
                           {o.is_fulfilled ? te("fulfilled") : te("pending")}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-600">
+                        {o.trip_stop_date ? fmtDate(o.trip_stop_date) : "—"}
                       </TableCell>
                     </TableRow>
                   ))
@@ -194,18 +198,19 @@ export function CustomerActivity({ customerUuid }: { customerUuid: string }) {
                   <TableHead>{t("customers.assignedUser")}</TableHead>
                   <TableHead>{t("customers.result")}</TableHead>
                   <TableHead>{t("customers.comments")}</TableHead>
+                  <TableHead>{t("customers.order")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {!stops ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-gray-400 py-6">
+                    <TableCell colSpan={5} className="text-center text-gray-400 py-6">
                       {t("common.loading")}
                     </TableCell>
                   </TableRow>
                 ) : stops.items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-gray-400 py-6">
+                    <TableCell colSpan={5} className="text-center text-gray-400 py-6">
                       {t("customers.noTripStops")}
                     </TableCell>
                   </TableRow>
@@ -217,6 +222,20 @@ export function CustomerActivity({ customerUuid }: { customerUuid: string }) {
                       <TableCell>{s.outcome ? te(s.outcome) : "—"}</TableCell>
                       <TableCell className="max-w-xs truncate text-gray-600">
                         {s.notes || "—"}
+                      </TableCell>
+                      <TableCell>
+                        {(s.order_uuids?.length ?? 0) === 0 ? (
+                          "—"
+                        ) : (
+                          <Link
+                            href={`/customer-orders/${s.order_uuids[0]}?back=/customers/${customerUuid}`}
+                            className="text-[hsl(245,58%,57%)] hover:underline"
+                          >
+                            {s.order_uuids.length > 1
+                              ? t("customers.nOrders", { count: s.order_uuids.length })
+                              : t("customers.viewOrder")}
+                          </Link>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

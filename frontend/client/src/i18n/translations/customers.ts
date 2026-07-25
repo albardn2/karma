@@ -97,6 +97,10 @@ export const en: Record<string, string> = {
   'customers.noOrders': 'No orders yet.',
   'customers.noTripStops': 'No trip stops yet.',
   'customers.tablePageOf': 'Page {page} of {pages} · {total} total',
+  'customers.tripStop': 'Trip Stop',
+  'customers.order': 'Order',
+  'customers.viewOrder': 'View',
+  'customers.nOrders': '{count} orders',
 };
 
 export const ar: Record<string, string> = {
@@ -194,4 +198,8 @@ export const ar: Record<string, string> = {
   'customers.noOrders': 'لا توجد طلبات بعد.',
   'customers.noTripStops': 'لا توجد محطات رحلات بعد.',
   'customers.tablePageOf': 'صفحة {page} من {pages} · {total} إجمالاً',
+  'customers.tripStop': 'محطة الرحلة',
+  'customers.order': 'الطلب',
+  'customers.viewOrder': 'عرض',
+  'customers.nOrders': '{count} طلبات',
 };
