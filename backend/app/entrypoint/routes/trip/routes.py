@@ -142,6 +142,7 @@ def get_trip_activity(uuid: str):
                 "customer_name": customer_name(stop.customer),
                 "status": task_exe.status if task_exe else stop.status,
                 "outcome": stop.outcome,
+                "notes": stop.notes,
                 "coordinates": latlon,  # "lat,lon"
                 "created_at": stop.created_at.isoformat() if stop.created_at else None,
                 "completed_at": task_exe.end_time.isoformat() if task_exe and task_exe.end_time else None,
