@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Building, MapPin, Calendar, User, Copy, Edit, Trash2, StickyNote } from "lucide-react";
 import { WarehouseDetailMap } from "@/components/map/WarehouseDetailMap";
+import { WarehouseInventory } from "@/components/warehouses/WarehouseInventory";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Warehouse } from "@/lib/types";
@@ -342,6 +343,12 @@ export default function WarehouseDetail() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Inventory: current stock per material + stock over time */}
+          <WarehouseInventory
+            warehouseUuid={warehouse.uuid}
+            warehouseName={warehouse.name}
+          />
         </div>
       </div>
     </AppLayout>
