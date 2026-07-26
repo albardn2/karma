@@ -7,6 +7,7 @@ from app.dto.inventory import (
     InventoryUpdate,
     InventoryListParams,
     InventoryPage,
+    InventoryManualAdd,
 )
 from models.common import Inventory as InventoryModel
 from app.domains.inventory.domain import InventoryDomain
@@ -130,6 +131,69 @@ def list_inventories():
             pages=page_obj.pages
         ).model_dump(mode='json')
     return jsonify(result), 200
+
+@inventory_blueprint.route('/manual-add', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.OPERATION_MANAGER.value,
+                 PermissionScope.OPERATOR.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value)
+def manual_add_inventory():
+    """Add stock to a warehouse by hand: creates the lot AND its opening
+    manual event in ONE transaction.
+
+    Doing this as two client calls can leave a quantity-less lot behind when
+    the second call fails, and such a lot is invisible in every stock view
+    (quantity lives only in events) yet still occupies its unique lot_id.
+    """
+    from app.dto.inventory_event import InventoryEventCreate, InventoryEventType
+    from app.domains.inventory_event.domain import InventoryEventDomain
+
+    current_user_uuid = get_jwt_identity()
+    payload = InventoryManualAdd(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        # scoped lookups: another tenant's warehouse/material is simply absent
+        warehouse = uow.warehouse_repository.find_one(
+            uuid=payload.warehouse_uuid, is_deleted=False
+        )
+        if not warehouse:
+            raise NotFoundError("Warehouse not found")
+
+        create = InventoryCreate(
+            material_uuid=payload.material_uuid,
+            warehouse_uuid=payload.warehouse_uuid,
+            notes=payload.notes,
+            lot_id=payload.lot_id,
+            expiration_date=payload.expiration_date,
+        )
+        add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=create)
+        # validates the material (scoped) and derives unit from it
+        inventory = InventoryDomain.create_inventory(uow=uow, payload=create)
+
+        event = InventoryEventCreate(
+            inventory_uuid=inventory.uuid,
+            event_type=InventoryEventType.MANUAL.value,
+            quantity=payload.quantity,
+            notes=payload.notes,
+            cost_per_unit=payload.cost_per_unit,
+            currency=payload.currency,
+            # this IS the lot's opening quantity, so it counts as original
+            affect_original=True,
+        )
+        add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=event)
+        event_read = InventoryEventDomain.create_inventory_event(uow=uow, payload=event)
+
+        result = {
+            "inventory": inventory.model_dump(mode="json"),
+            "inventory_event": event_read.model_dump(mode="json"),
+        }
+        uow.commit()
+    return jsonify(result), 201
+
+
 
 # ----------------------- WAREHOUSE INVENTORY ANALYTICS -----------------------
 # Stock is the running sum of SIGNED inventory events (purchases/returns are

@@ -1,4 +1,5 @@
-from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, model_validator
+from app.entrypoint.routes.common.errors import BadRequestError
 from typing import Optional, List
 from datetime import datetime
 from app.dto.common_enums import UnitOfMeasure, Currency
@@ -28,6 +29,28 @@ class InventoryCreate(BaseModel):
     lot_id: Optional[str] = None
     expiration_date: Optional[datetime] = None
     is_active: bool = True
+
+class InventoryManualAdd(BaseModel):
+    """Create a lot AND its opening quantity in one atomic request. Quantity on
+    a lot only exists as inventory events, so a lot created without one is an
+    invisible empty lot."""
+    model_config = ConfigDict(extra="forbid")
+    material_uuid: str
+    warehouse_uuid: str
+    quantity: float = Field(..., gt=0, description="Opening quantity, must be positive")
+    notes: Optional[str] = None
+    lot_id: Optional[str] = None
+    expiration_date: Optional[datetime] = None
+    cost_per_unit: Optional[float] = Field(None, ge=0)
+    currency: Optional[Currency] = None
+
+    @model_validator(mode="after")
+    def check_cost_pair(self):
+        # the inventory-event validator rejects a cost without a currency
+        if (self.cost_per_unit is not None) and (self.currency is None):
+            raise BadRequestError("currency is required when cost_per_unit is set")
+        return self
+
 
 class InventoryUpdate(BaseModel):
     """Fields optional for partial updates."""

@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { AddInventoryToWarehouseDialog } from "@/components/warehouses/AddInventoryToWarehouseDialog";
 
 type RangeKey = "30d" | "90d" | "6m" | "12m" | "all";
 
@@ -90,7 +91,13 @@ function fmtQty(v: number) {
   return v.toLocaleString(undefined, { maximumFractionDigits: 3 });
 }
 
-export function WarehouseInventory({ warehouseUuid }: { warehouseUuid: string }) {
+export function WarehouseInventory({
+  warehouseUuid,
+  warehouseName,
+}: {
+  warehouseUuid: string;
+  warehouseName?: string;
+}) {
   const { t, te } = useLanguage();
   const [range, setRange] = useState<RangeKey>("12m");
   const [selected, setSelected] = useState<string[]>([]);
@@ -183,15 +190,21 @@ export function WarehouseInventory({ warehouseUuid }: { warehouseUuid: string })
       {/* current stock */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <Boxes className="h-5 w-5" />
-            {t("warehouses.currentInventory")}
-            {state && (
-              <Badge variant="secondary" className="ms-1">
-                {state.total_count}
-              </Badge>
-            )}
-          </CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <Boxes className="h-5 w-5" />
+              {t("warehouses.currentInventory")}
+              {state && (
+                <Badge variant="secondary" className="ms-1">
+                  {state.total_count}
+                </Badge>
+              )}
+            </CardTitle>
+            <AddInventoryToWarehouseDialog
+              warehouseUuid={warehouseUuid}
+              warehouseName={warehouseName}
+            />
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">

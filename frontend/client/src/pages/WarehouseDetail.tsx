@@ -345,7 +345,10 @@ export default function WarehouseDetail() {
           </div>
 
           {/* Inventory: current stock per material + stock over time */}
-          <WarehouseInventory warehouseUuid={warehouse.uuid} />
+          <WarehouseInventory
+            warehouseUuid={warehouse.uuid}
+            warehouseName={warehouse.name}
+          />
         </div>
       </div>
     </AppLayout>
