@@ -5,6 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UserAnalytics } from "@/components/users/UserAnalytics";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -482,6 +484,17 @@ export default function UserDetail() {
             </div>
           </div>
 
+        <Tabs defaultValue="overview">
+          <TabsList data-testid="user-detail-tabs">
+            <TabsTrigger value="overview" data-testid="user-tab-overview">
+              {t("users.overviewTab")}
+            </TabsTrigger>
+            <TabsTrigger value="analytics" data-testid="user-tab-analytics">
+              {t("customers.analytics")}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="mt-4 space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* User Information Card */}
           <div className="lg:col-span-2">
@@ -954,6 +967,12 @@ export default function UserDetail() {
           username={user.username}
           trackLocation={user.track_location}
         />
+          </TabsContent>
+
+          <TabsContent value="analytics" className="mt-4">
+            <UserAnalytics userUuid={user.uuid} />
+          </TabsContent>
+        </Tabs>
         </div>
       </div>
     </AppLayout>
