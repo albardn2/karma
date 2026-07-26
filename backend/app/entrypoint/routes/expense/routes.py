@@ -209,14 +209,18 @@ def expense_analytics_over_time():
             )
         }
         if not per_currency:
+            # every key the populated response has, or the client reads
+            # undefined off the "no expenses yet" case and blows up
             return jsonify({
                 "bucket": bucket,
                 "currency": currency,
                 "currencies": {},
                 "categories": [],
+                "category_totals": {},
                 "buckets": [],
                 "total": 0.0,
                 "paid": 0.0,
+                "unpaid": 0.0,
                 "count": 0,
             }), 200
 

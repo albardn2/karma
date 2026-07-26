@@ -60,7 +60,13 @@ export function fmtDate(v?: string | null) {
   return v ? new Date(v).toLocaleDateString() : "—";
 }
 
-export function fmtMoney(v: number) {
+/**
+ * Tolerates undefined/null/NaN on purpose: these tiles read straight off API
+ * payloads, and one missing field should show a dash, not white-screen the
+ * whole page.
+ */
+export function fmtMoney(v: number | null | undefined) {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—";
   return v.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
