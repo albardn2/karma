@@ -26,26 +26,40 @@ import { cn } from "@/lib/utils";
 
 const CURRENCIES = ["USD", "SYP", "EUR", "TRY"];
 
-interface Material {
+interface Entity {
   uuid: string;
   name: string;
   sku?: string;
   measure_unit?: string;
 }
 
-export function AddInventoryToWarehouseDialog({
-  warehouseUuid,
+/**
+ * Manually add stock: creates a lot plus its opening quantity in one request.
+ *
+ * One side is fixed by where it is opened from and the other is picked:
+ * pass `warehouseUuid` on a warehouse page (the user picks the material), or
+ * `materialUuid` on a material page (the user picks the warehouse).
+ */
+export function ManualAddInventoryDialog({
+  warehouseUuid: fixedWarehouseUuid,
   warehouseName,
+  materialUuid: fixedMaterialUuid,
+  materialName,
+  materialUnit,
 }: {
-  warehouseUuid: string;
+  warehouseUuid?: string;
   warehouseName?: string;
+  materialUuid?: string;
+  materialName?: string;
+  materialUnit?: string;
 }) {
   const { t, te } = useLanguage();
   const queryClient = useQueryClient();
+  const pickingMaterial = !fixedMaterialUuid;
   const [open, setOpen] = useState(false);
   const [materialOpen, setMaterialOpen] = useState(false);
   const [materialSearch, setMaterialSearch] = useState("");
-  const [materialUuid, setMaterialUuid] = useState("");
+  const [pickedUuid, setPickedUuid] = useState("");
   const [quantity, setQuantity] = useState("");
   const [costPerUnit, setCostPerUnit] = useState("");
   const [currency, setCurrency] = useState("");
@@ -53,29 +67,38 @@ export function AddInventoryToWarehouseDialog({
   const [expiration, setExpiration] = useState("");
   const [notes, setNotes] = useState("");
 
-  const { data: materialsData } = useQuery<any>({
-    queryKey: ["/material/", "for-manual-add"],
-    queryFn: () => apiRequest("/material/?per_page=100"),
+  // only the side that is NOT fixed needs a list to choose from
+  const { data: optionsData } = useQuery<any>({
+    queryKey: [pickingMaterial ? "/material/" : "/warehouse/", "for-manual-add"],
+    queryFn: () =>
+      apiRequest(
+        pickingMaterial ? "/material/?per_page=100" : "/warehouse/?per_page=100"
+      ),
     enabled: open,
   });
-  const materials: Material[] = materialsData?.materials ?? [];
-  const selected = useMemo(
-    () => materials.find((m) => m.uuid === materialUuid),
-    [materials, materialUuid]
+  const options: Entity[] = pickingMaterial
+    ? optionsData?.materials ?? []
+    : optionsData?.warehouses ?? [];
+  const picked = useMemo(
+    () => options.find((o) => o.uuid === pickedUuid),
+    [options, pickedUuid]
   );
 
-  const filteredMaterials = useMemo(() => {
+  // the unit always comes from the material, never from a free choice
+  const unit = pickingMaterial ? picked?.measure_unit : materialUnit;
+
+  const filteredOptions = useMemo(() => {
     const q = materialSearch.trim().toLowerCase();
-    if (!q) return materials;
-    return materials.filter(
-      (m) =>
-        m.name?.toLowerCase().includes(q) || m.sku?.toLowerCase().includes(q)
+    if (!q) return options;
+    return options.filter(
+      (o) =>
+        o.name?.toLowerCase().includes(q) || o.sku?.toLowerCase().includes(q)
     );
-  }, [materials, materialSearch]);
+  }, [options, materialSearch]);
 
   const reset = () => {
     setMaterialSearch("");
-    setMaterialUuid("");
+    setPickedUuid("");
     setQuantity("");
     setCostPerUnit("");
     setCurrency("");
@@ -88,15 +111,18 @@ export function AddInventoryToWarehouseDialog({
   const qtyValid = quantity !== "" && Number.isFinite(qtyNumber) && qtyNumber > 0;
   // the backend rejects a cost without a currency, so mirror that here
   const costValid = costPerUnit === "" || currency !== "";
-  const canSubmit = !!materialUuid && qtyValid && costValid;
+  const canSubmit = !!pickedUuid && qtyValid && costValid;
+
+  const materialUuidToSend = pickingMaterial ? pickedUuid : fixedMaterialUuid!;
+  const warehouseUuidToSend = pickingMaterial ? fixedWarehouseUuid! : pickedUuid;
 
   const addStock = useMutation({
     mutationFn: () =>
       apiRequest("/inventory/manual-add", {
         method: "POST",
         body: {
-          material_uuid: materialUuid,
-          warehouse_uuid: warehouseUuid,
+          material_uuid: materialUuidToSend,
+          warehouse_uuid: warehouseUuidToSend,
           quantity: qtyNumber,
           ...(notes ? { notes } : {}),
           ...(lotId ? { lot_id: lotId } : {}),
@@ -107,14 +133,18 @@ export function AddInventoryToWarehouseDialog({
         },
       }),
     onSuccess: () => {
-      // the warehouse stock table + chart are keyed under "/inventory/"
+      // the warehouse stock table + chart are keyed under "/inventory/", and
+      // the material page's own inventory summary under "/material/" — without
+      // the latter the material page keeps showing pre-add quantities for the
+      // whole staleTime
       queryClient.invalidateQueries({ queryKey: ["/inventory/"] });
       queryClient.invalidateQueries({ queryKey: ["/inventory-event/"] });
+      queryClient.invalidateQueries({ queryKey: ["/material/"] });
       toast({
         title: t("warehouses.stockAdded"),
-        description: `${qtyNumber} ${selected?.measure_unit ?? ""} · ${
-          selected?.name ?? ""
-        }`,
+        description: `${qtyNumber} ${unit ?? ""} · ${
+          pickingMaterial ? picked?.name ?? "" : materialName ?? ""
+        }${pickingMaterial ? "" : ` → ${picked?.name ?? ""}`}`,
       });
       reset();
       setOpen(false);
@@ -145,16 +175,27 @@ export function AddInventoryToWarehouseDialog({
         <DialogHeader>
           <DialogTitle>
             {t("warehouses.addInventory")}
-            {warehouseName ? ` — ${warehouseName}` : ""}
+            {pickingMaterial
+              ? warehouseName
+                ? ` — ${warehouseName}`
+                : ""
+              : materialName
+              ? ` — ${materialName}`
+              : ""}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* material — a plain inline dropdown, matching AddInventoryDialog.
-              A Radix Popover/Command here would be unreachable: the Dialog
-              traps focus and blocks pointer events on portalled content. */}
+          {/* The fixed side is shown read-only so it is obvious what stock is
+              being added to; the other side is picked here.
+
+              A plain inline dropdown, matching AddInventoryDialog: a Radix
+              Popover/Command would be unreachable, since the Dialog traps focus
+              and blocks pointer events on portalled content. */}
           <div className="space-y-1.5">
-            <Label>{t("materials.materialName")} *</Label>
+            <Label>
+              {pickingMaterial ? t("materials.materialName") : t("inventory.warehouse")} *
+            </Label>
             <div className="relative">
               <Button
                 variant="outline"
@@ -163,8 +204,12 @@ export function AddInventoryToWarehouseDialog({
                 onClick={() => setMaterialOpen((o) => !o)}
                 data-testid="material-combobox"
               >
-                <span className={selected ? "" : "text-gray-500"}>
-                  {selected ? selected.name : t("inventory.searchMaterials")}
+                <span className={picked ? "" : "text-gray-500"}>
+                  {picked
+                    ? picked.name
+                    : pickingMaterial
+                    ? t("inventory.searchMaterials")
+                    : t("inventory.searchWarehouses")}
                 </span>
                 <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
@@ -175,39 +220,43 @@ export function AddInventoryToWarehouseDialog({
                       autoFocus
                       value={materialSearch}
                       onChange={(e) => setMaterialSearch(e.target.value)}
-                      placeholder={t("inventory.searchMaterials")}
+                      placeholder={
+                        pickingMaterial
+                          ? t("inventory.searchMaterials")
+                          : t("inventory.searchWarehouses")
+                      }
                       data-testid="material-search"
                     />
                   </div>
                   <div className="max-h-48 overflow-y-auto pb-1">
-                    {filteredMaterials.length === 0 ? (
+                    {filteredOptions.length === 0 ? (
                       <p className="px-3 py-2 text-sm text-gray-400">
                         {t("common.noResults")}
                       </p>
                     ) : (
-                      filteredMaterials.map((m) => (
+                      filteredOptions.map((o) => (
                         <div
-                          key={m.uuid}
+                          key={o.uuid}
                           role="option"
-                          aria-selected={materialUuid === m.uuid}
+                          aria-selected={pickedUuid === o.uuid}
                           className="flex items-center px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
                           onClick={() => {
-                            setMaterialUuid(m.uuid);
+                            setPickedUuid(o.uuid);
                             setMaterialOpen(false);
                             setMaterialSearch("");
                           }}
-                          data-testid={`material-option-${m.uuid}`}
+                          data-testid={`material-option-${o.uuid}`}
                         >
                           <Check
                             className={cn(
                               "me-2 h-4 w-4 shrink-0",
-                              materialUuid === m.uuid ? "opacity-100" : "opacity-0"
+                              pickedUuid === o.uuid ? "opacity-100" : "opacity-0"
                             )}
                           />
-                          <span className="truncate">{m.name}</span>
-                          {m.measure_unit && (
+                          <span className="truncate">{o.name}</span>
+                          {o.measure_unit && (
                             <span className="ms-auto ps-2 text-xs text-gray-400">
-                              {te(m.measure_unit)}
+                              {te(o.measure_unit)}
                             </span>
                           )}
                         </div>
@@ -218,6 +267,22 @@ export function AddInventoryToWarehouseDialog({
               )}
             </div>
           </div>
+
+          {/* the fixed side, read-only */}
+          {!pickingMaterial && (
+            <div className="space-y-1.5">
+              <Label>{t("materials.materialName")}</Label>
+              <p
+                className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+                data-testid="fixed-material"
+              >
+                {materialName ?? "—"}
+                {materialUnit && (
+                  <span className="ms-2 text-xs text-gray-500">{te(materialUnit)}</span>
+                )}
+              </p>
+            </div>
+          )}
 
           {/* quantity — unit comes from the material, it is not a free choice */}
           <div className="space-y-1.5">
@@ -233,7 +298,7 @@ export function AddInventoryToWarehouseDialog({
                 data-testid="quantity-input"
               />
               <span className="text-sm text-gray-500 whitespace-nowrap min-w-14">
-                {selected?.measure_unit ? te(selected.measure_unit) : "—"}
+                {unit ? te(unit) : "—"}
               </span>
             </div>
             {quantity !== "" && !qtyValid && (
