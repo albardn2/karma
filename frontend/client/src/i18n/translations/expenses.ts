@@ -93,6 +93,16 @@ export const en: Record<string, string> = {
   'enum.travel': 'Travel',
   'enum.meals': 'Meals',
   'enum.other': 'Other',
+  'expenses.categoriesFilter': 'Categories',
+  'expenses.totalSpend': 'Total Spend',
+  'expenses.paidOut': 'Paid Out',
+  'expenses.stillOwed': 'Still Owed',
+  'expenses.entryCount': 'Expenses',
+  'expenses.otherCurrencies': 'Also: {list}',
+  'expenses.overTime': 'Expenses Over Time',
+  'expenses.byCategory': 'Spend by Category',
+  'expenses.barsNote': 'Each bar is one period, split by category.',
+  'expenses.cumulativeNote': 'Running total from the start of the window, split by category.',
 };
 
 export const ar: Record<string, string> = {
@@ -184,4 +194,14 @@ export const ar: Record<string, string> = {
   'enum.travel': 'سفر',
   'enum.meals': 'وجبات',
   'enum.other': 'أخرى',
+  'expenses.categoriesFilter': 'الفئات',
+  'expenses.totalSpend': 'إجمالي المصروف',
+  'expenses.paidOut': 'المدفوع',
+  'expenses.stillOwed': 'المتبقي',
+  'expenses.entryCount': 'المصروفات',
+  'expenses.otherCurrencies': 'كذلك: {list}',
+  'expenses.overTime': 'المصروفات عبر الزمن',
+  'expenses.byCategory': 'المصروف حسب الفئة',
+  'expenses.barsNote': 'كل عمود يمثل فترة واحدة، مقسّماً حسب الفئة.',
+  'expenses.cumulativeNote': 'الإجمالي التراكمي من بداية الفترة، مقسّماً حسب الفئة.',
 };

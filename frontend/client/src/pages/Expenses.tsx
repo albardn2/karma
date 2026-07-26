@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ExpenseFilters } from "@/components/expenses/ExpenseFilters";
+import { ExpensesAnalytics } from "@/components/expenses/ExpensesAnalytics";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 
 interface Expense {
@@ -184,6 +186,21 @@ export default function Expenses() {
           </Button>
         </div>
 
+        <Tabs defaultValue="list">
+          <TabsList>
+            <TabsTrigger value="list" data-testid="expenses-tab-list">
+              {t('nav.expenses')}
+            </TabsTrigger>
+            <TabsTrigger value="analytics" data-testid="expenses-tab-analytics">
+              {t('customers.analytics')}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="analytics" className="mt-6">
+            <ExpensesAnalytics />
+          </TabsContent>
+
+          <TabsContent value="list" className="mt-6 space-y-8">
         {/* Filters */}
         <ExpenseFilters 
           filters={filters} 
@@ -334,6 +351,8 @@ export default function Expenses() {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
