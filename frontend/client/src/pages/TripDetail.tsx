@@ -513,6 +513,7 @@ export default function TripDetail() {
                       <th className="py-2 pe-4 font-medium">{t('trips.customer')}</th>
                       <th className="py-2 pe-4 font-medium">{t('common.status')}</th>
                       <th className="py-2 pe-4 font-medium">{t('trips.outcome')}</th>
+                      <th className="py-2 pe-4 font-medium">{t('customers.comments')}</th>
                       <th className="py-2 font-medium">{t('trips.colCompleted')}</th>
                     </tr>
                   </thead>
@@ -527,6 +528,12 @@ export default function TripDetail() {
                           </Badge>
                         </td>
                         <td className="py-2 pe-4 max-w-[240px] truncate">{s.outcome ? te(s.outcome) : "—"}</td>
+                        <td
+                          className="py-2 pe-4 max-w-[260px] truncate text-gray-600"
+                          title={s.notes || undefined}
+                        >
+                          {s.notes || "—"}
+                        </td>
                         <td className="py-2 whitespace-nowrap">{s.completed_at ? formatDateTime(s.completed_at) : "—"}</td>
                       </tr>
                     ))}
