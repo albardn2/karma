@@ -152,3 +152,135 @@ def list_expenses():
 def list_expense_categories():
     categories = [category.value for category in ExpenseCategory]
     return jsonify(categories), 200
+
+# ----------------------------- EXPENSE ANALYTICS -----------------------------
+# Read-only aggregates for the Expenses > Analytics tab. Raw session queries
+# here bypass repository scoping, so each one filters account_uuid itself.
+#
+# Amounts are NEVER summed across currencies: the caller picks one currency and
+# every series is in it. `currencies` reports the totals per currency so the UI
+# can offer the picker and default to the busiest one.
+
+@expense_blueprint.route('/analytics/over-time', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value)
+def expense_analytics_over_time():
+    from sqlalchemy import func
+    from app.entrypoint.routes.common.analytics import (
+        bucket_arg,
+        csv_arg,
+        parse_dt,
+    )
+
+    bucket = bucket_arg("month")
+    start = parse_dt(request.args.get("start_date"))
+    end = parse_dt(request.args.get("end_date"), end_of_day=True)
+    categories = csv_arg("categories")
+    vendor_uuid = request.args.get("vendor_uuid")
+    currency = request.args.get("currency")
+
+    with SqlAlchemyUnitOfWork() as uow:
+        base = [
+            ExpenseModel.account_uuid == uow.account_uuid,
+            ExpenseModel.is_deleted == False,
+        ]
+        if start:
+            base.append(ExpenseModel.created_at >= start)
+        if end:
+            base.append(ExpenseModel.created_at <= end)
+        if categories:
+            base.append(ExpenseModel.category.in_(categories))
+        if vendor_uuid:
+            base.append(ExpenseModel.vendor_uuid == vendor_uuid)
+
+        # totals per currency drive the picker; also the honest answer to
+        # "how much did we spend" when several currencies are in play
+        per_currency = {
+            cur: round(float(total or 0), 2)
+            for cur, total in (
+                uow.session.query(
+                    ExpenseModel.currency, func.sum(ExpenseModel.amount)
+                )
+                .filter(*base)
+                .group_by(ExpenseModel.currency)
+                .all()
+            )
+        }
+        if not per_currency:
+            return jsonify({
+                "bucket": bucket,
+                "currency": currency,
+                "currencies": {},
+                "categories": [],
+                "buckets": [],
+                "total": 0.0,
+                "paid": 0.0,
+                "count": 0,
+            }), 200
+
+        # default to the currency carrying the most spend, so the first paint
+        # shows the meaningful chart rather than an arbitrary one
+        if currency not in per_currency:
+            currency = max(per_currency, key=lambda c: per_currency[c])
+        scoped = base + [ExpenseModel.currency == currency]
+
+        period = func.date_trunc(bucket, ExpenseModel.created_at)
+        rows = (
+            uow.session.query(
+                period.label("period"),
+                ExpenseModel.category,
+                func.sum(ExpenseModel.amount),
+            )
+            .filter(*scoped)
+            .group_by(period, ExpenseModel.category)
+            .order_by(period)
+            .all()
+        )
+
+        by_period: dict = {}
+        cat_totals: dict = {}
+        for p, cat, amount in rows:
+            amount = round(float(amount or 0), 2)
+            key = p.isoformat()
+            entry = by_period.setdefault(key, {})
+            entry[cat] = round(entry.get(cat, 0.0) + amount, 2)
+            cat_totals[cat] = round(cat_totals.get(cat, 0.0) + amount, 2)
+
+        # biggest spend first, so the stack order and the legend agree and the
+        # colours stay stable as the window changes
+        ordered_categories = sorted(cat_totals, key=lambda c: cat_totals[c], reverse=True)
+
+        buckets = [
+            {
+                "period": key,
+                "amounts": amounts,
+                "total": round(sum(amounts.values()), 2),
+            }
+            for key, amounts in sorted(by_period.items())
+        ]
+
+        paid, count = (
+            uow.session.query(
+                func.coalesce(func.sum(ExpenseModel.amount_paid), 0),
+                func.count(ExpenseModel.uuid),
+            )
+            .filter(*scoped)
+            .first()
+        )
+
+        total = round(sum(b["total"] for b in buckets), 2)
+        result = {
+            "bucket": bucket,
+            "currency": currency,
+            "currencies": per_currency,
+            "categories": ordered_categories,
+            "category_totals": cat_totals,
+            "buckets": buckets,
+            "total": total,
+            "paid": round(float(paid or 0), 2),
+            "unpaid": round(total - float(paid or 0), 2),
+            "count": int(count or 0),
+        }
+    return jsonify(result), 200
