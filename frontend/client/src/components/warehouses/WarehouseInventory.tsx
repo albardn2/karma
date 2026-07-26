@@ -38,7 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { AddInventoryToWarehouseDialog } from "@/components/warehouses/AddInventoryToWarehouseDialog";
+import { ManualAddInventoryDialog } from "@/components/inventory/ManualAddInventoryDialog";
 
 type RangeKey = "30d" | "90d" | "6m" | "12m" | "all";
 
@@ -200,7 +200,7 @@ export function WarehouseInventory({
                 </Badge>
               )}
             </CardTitle>
-            <AddInventoryToWarehouseDialog
+            <ManualAddInventoryDialog
               warehouseUuid={warehouseUuid}
               warehouseName={warehouseName}
             />

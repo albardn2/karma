@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MaterialInventorySection } from "@/components/materials/MaterialInventorySection";
 import { Button } from "@/components/ui/button";
+import { ManualAddInventoryDialog } from "@/components/inventory/ManualAddInventoryDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -245,6 +246,11 @@ export default function MaterialDetail() {
         <div className="flex items-center gap-2">
           {!isEditing ? (
             <>
+              <ManualAddInventoryDialog
+                materialUuid={material.uuid}
+                materialName={material.name}
+                materialUnit={material.measure_unit ?? undefined}
+              />
               <Button variant="outline" size="sm" onClick={handleEdit}>
                 <Edit className="h-4 w-4 me-2" />
                 {t('common.edit')}
