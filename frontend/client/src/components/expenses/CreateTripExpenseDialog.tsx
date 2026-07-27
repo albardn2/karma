@@ -86,9 +86,12 @@ export function CreateTripExpenseDialog({
         },
       }),
     onSuccess: () => {
-      // the trip's expense list and the expense analytics both read these
       queryClient.invalidateQueries({ queryKey: ["/expense/"] });
       queryClient.invalidateQueries({ queryKey: ["/payout/"] });
+      // trip_expenses / net_expected_cash live on the trip itself, and the trip
+      // query has a staleTime, so without this the cash table on the trip
+      // detail page keeps showing the pre-expense figures.
+      queryClient.invalidateQueries({ queryKey: ["/trip/"] });
       toast({
         title: t("expenses.tripExpenseCreated"),
         description: `${amountNumber} ${currency} · ${te(category)}`,

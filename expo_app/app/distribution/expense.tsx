@@ -33,7 +33,7 @@ interface TripRow {
  */
 export default function TripExpenseScreen() {
   const router = useRouter();
-  const { t, te } = useLanguage();
+  const { t, te, tef } = useLanguage();
   const { executionUuid } = useLocalSearchParams<{ executionUuid?: string }>();
 
   const [trip, setTrip] = useState<TripRow | null>(null);
@@ -94,14 +94,14 @@ export default function TripExpenseScreen() {
       if (res.status !== 201 && res.status !== 200) {
         throw new Error(res.error || t('tripExpense.failed'));
       }
-      Alert.alert(t('tripExpense.recorded'), `${amountNumber} ${currency} · ${te(category)}`);
+      Alert.alert(t('tripExpense.recorded'), `${amountNumber} ${currency} · ${tef(category)}`);
       router.back();
     } catch (e: any) {
       Alert.alert(t('tripExpense.failed'), e?.message || '');
     } finally {
       setSubmitting(false);
     }
-  }, [canSubmit, trip, amountNumber, currency, category, description, router, t, te]);
+  }, [canSubmit, trip, amountNumber, currency, category, description, router, t, tef]);
 
   if (loading) {
     return (
@@ -169,7 +169,9 @@ export default function TripExpenseScreen() {
               testID={`expense-category-${c}`}
             >
               <ThemedText style={[styles.chipText, category === c && styles.chipTextActive]}>
-                {te(c)}
+                {/* tef, not te: in English the app has no label map, so te
+                    would render the raw lowercase enum value */}
+                {tef(c)}
               </ThemedText>
             </TouchableOpacity>
           ))}

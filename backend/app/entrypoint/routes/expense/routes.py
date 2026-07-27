@@ -74,6 +74,15 @@ def update_expense(uuid: str):
         if not exp:
             raise NotFoundError(f"Expense with uuid {uuid} not found")
 
+        # Same guard the create path uses: the FK alone would accept another
+        # tenant's (or a soft-deleted) trip, and Trip.expenses is not
+        # account-scoped, so a foreign expense would land in that trip's cash
+        # reconciliation. A null trip_uuid is an unlink and stays allowed.
+        if data.get('trip_uuid'):
+            trip = uow.trip_repository.find_one(uuid=data['trip_uuid'], is_deleted=False)
+            if not trip:
+                raise NotFoundError('Trip not found')
+
         for field, val in data.items():
             setattr(exp, field, val)
         uow.expense_repository.save(model=exp, commit=True)

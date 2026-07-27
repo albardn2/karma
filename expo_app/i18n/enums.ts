@@ -16,14 +16,16 @@ const ENUM_AR: Record<string, string> = {
   // currencies (Currency)
   USD: 'دولار',
   SYP: 'ل.س',
-  // expense categories (ExpenseCategory) — drivers pick these on the road
+  // expense categories (ExpenseCategory) — drivers pick these on the road.
+  // Wording copied verbatim from the web's shipped enum.* labels so the two
+  // surfaces name the same category identically.
   electricity: 'كهرباء',
-  water: 'ماء',
+  water: 'مياه',
   rent: 'إيجار',
   maintenance: 'صيانة',
   equipment: 'معدات',
   supplies: 'مستلزمات',
-  travel: 'مواصلات',
+  travel: 'سفر',
   meals: 'وجبات',
   other: 'أخرى',
   // units of measure (UnitOfMeasure)
