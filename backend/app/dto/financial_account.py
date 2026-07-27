@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import field_validator, BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -25,6 +25,14 @@ class FinancialAccountUpdate(BaseModel):
     notes:        Optional[str]   = None
     currency:     Optional[Currency] = None
     is_external: Optional[bool] = None
+
+    @field_validator('is_external')
+    @classmethod
+    def _no_explicit_null(cls, v):
+        # the column is NOT NULL now; an explicit null would be a 500 at commit
+        if v is None:
+            raise ValueError('is_external cannot be null')
+        return v
 
 class FinancialAccountRead(FinancialAccountBase):
     model_config = ConfigDict(from_attributes=True,extra="forbid")

@@ -2,6 +2,7 @@ from app.dto.payout import PayoutRead
 from app.dto.payout import PayoutCreate
 from models.common import Payout as PayoutModel
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+from app.domains.financial_account.domain import FinancialAccountDomain
 from app.entrypoint.routes.common.errors import NotFoundError
 
 from app.dto.invoice import InvoiceStatus
@@ -14,10 +15,15 @@ class PayoutDomain:
         data = payload.model_dump(mode='json')
         po = PayoutModel(**data)
 
-        financial_account = uow.financial_account_repository.find_one(currency=payload.currency,
-                                                                      is_deleted=False,
-                                                                      is_external=False
-                                                                      )
+        financial_account = FinancialAccountDomain.resolve_default(
+            uow=uow, currency=payload.currency
+        )
+        # without this the NULL FK reaches the DB as an IntegrityError 500; a
+        # tenant with no account for the currency deserves to be told so
+        if not financial_account:
+            raise NotFoundError(
+                f'No financial account for {getattr(payload.currency, "value", payload.currency)}'
+            )
         po.financial_account = financial_account
         uow.payout_repository.save(model=po, commit=False)
         PayoutDomain.validate_currencies(payout=po)

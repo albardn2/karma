@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 # app/core/errors.py
 
 class ApiError(Exception):
@@ -42,6 +43,21 @@ def register_error_handlers(app):
             {k: v for k, v in err.items() if k != "ctx"} for err in exc.errors()
         ]
         return jsonify({"error": "Validation error", "details": details}), 422
+
+    @app.errorhandler(IntegrityError)
+    def integrity_error(e):
+        # A DB constraint is the last line of defence — the domains validate
+        # first and return a 400 with a useful message. Reaching here means a
+        # race or a path that skipped validation, and it should not read as a
+        # server fault.
+        message = "Conflicts with an existing record"
+        detail = str(getattr(e, 'orig', e))
+        if 'uq_financial_account_internal_currency' in detail:
+            message = (
+                "This currency already has a non-external financial account. "
+                "Only one is allowed per currency."
+            )
+        return jsonify({"error": message}), 409
 
     @app.errorhandler(404)
     def not_found(e):

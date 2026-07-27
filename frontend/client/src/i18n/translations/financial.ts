@@ -150,6 +150,9 @@ export const en: Record<string, string> = {
   'financial.transactionInformation': 'Transaction Information',
   'financial.enterTransactionNotes': 'Enter transaction notes...',
   'financial.noNotesProvided': 'No notes provided',
+  'financial.currencyTaken': '{name} is already the {currency} account — only one non-external account per currency is allowed. Turn on External, or edit that account.',
+  'financial.currencyTakenShort': '(taken)',
+  'financial.defaultForCurrency': 'Default for {currency}',
 };
 
 export const ar: Record<string, string> = {
@@ -300,4 +303,7 @@ export const ar: Record<string, string> = {
   'financial.transactionInformation': 'معلومات المعاملة',
   'financial.enterTransactionNotes': 'أدخل ملاحظات المعاملة...',
   'financial.noNotesProvided': 'لا توجد ملاحظات',
+  'financial.currencyTaken': '{name} هو حساب {currency} بالفعل — يُسمح بحساب واحد غير خارجي لكل عملة. شغّل "خارجي" أو عدّل ذلك الحساب.',
+  'financial.currencyTakenShort': '(محجوز)',
+  'financial.defaultForCurrency': 'الافتراضي لـ {currency}',
 };

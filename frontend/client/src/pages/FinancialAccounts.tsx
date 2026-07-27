@@ -234,9 +234,25 @@ export default function FinancialAccounts() {
                             <Calendar className="h-3 w-3" />
                             <span>{formatDate(account.created_at)}</span>
                           </div>
-                          <Badge variant={account.is_deleted ? "destructive" : "default"}>
-                            {account.is_deleted ? t('financial.statusDeleted') : t('financial.statusActive')}
-                          </Badge>
+                          <div className="flex items-center gap-1.5">
+                            {/* the one non-external account per currency is what
+                                payments, payouts and orders flow through */}
+                            {!account.is_deleted && !account.is_external && (
+                              <Badge
+                                variant="secondary"
+                                className="bg-indigo-100 text-indigo-700"
+                                data-testid={`default-badge-${account.currency}`}
+                              >
+                                {t('financial.defaultForCurrency', { currency: account.currency })}
+                              </Badge>
+                            )}
+                            {account.is_external && (
+                              <Badge variant="outline">{t('financial.externalAccount')}</Badge>
+                            )}
+                            <Badge variant={account.is_deleted ? "destructive" : "default"}>
+                              {account.is_deleted ? t('financial.statusDeleted') : t('financial.statusActive')}
+                            </Badge>
+                          </div>
                         </div>
                       </CardContent>
                     </Link>

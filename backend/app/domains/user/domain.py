@@ -41,6 +41,27 @@ class UserDomain:
         )
         user.set_password(payload.password)
         uow.user_repository.save(model=user, commit=False)
+
+        # Give the tenant its default financial account per currency. Payments,
+        # payouts and order checkouts resolve the non-external account for their
+        # currency, so without these a new company's first payment fails with
+        # "no financial account" and an admin has to guess that they must create
+        # one by hand first.
+        from app.dto.common_enums import Currency
+        from models.common import FinancialAccount as FinancialAccountModel
+        for currency in Currency:
+            uow.financial_account_repository.save(
+                model=FinancialAccountModel(
+                    account_uuid=account.uuid,
+                    created_by_uuid=user.uuid,
+                    account_name=f"Main {currency.value}",
+                    currency=currency.value,
+                    is_external=False,
+                    notes="Created automatically at signup",
+                ),
+                commit=False,
+            )
+
         return user
 
     @staticmethod

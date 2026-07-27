@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+from app.domains.financial_account.domain import FinancialAccountDomain
 
 from app.dto.payment import PaymentCreate, PaymentRead
 from models.common import Payment as PaymentModel
@@ -19,11 +20,8 @@ class PaymentDomain:
         Create a payment in the database.
         """
         if not payload.financial_account_uuid:
-            financial_account = uow.financial_account_repository.find_one(
-                currency=payload.currency.value,
-                is_deleted=False,
-                is_external=False
-            )
+            financial_account = FinancialAccountDomain.resolve_default(
+                uow=uow, currency=payload.currency)
             if not financial_account:
                 raise NotFoundError('Financial account not found')
             payload.financial_account_uuid = financial_account.uuid
