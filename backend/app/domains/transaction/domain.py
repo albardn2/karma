@@ -45,10 +45,28 @@ class TransactionDomain:
     # point, so 3.3 * 14500.5 is 47851.649999999994 and an exact == rejects the
     # correct answer of 47851.65
     MONEY_DP = 2
+    # half a cent: the widest a correctly-rounded amount can sit from the exact
+    # product, plus a hair for float representation error at the boundary
+    MONEY_TOLERANCE = 0.005 + 1e-9
 
     @staticmethod
     def _same_money(a: float, b: float) -> bool:
-        return round(a, TransactionDomain.MONEY_DP) == round(b, TransactionDomain.MONEY_DP)
+        """Do these two amounts agree to the cent?
+
+        Rounding BOTH sides and comparing looks equivalent but is not, because
+        the caller and we do not round the same way. The web form derives its
+        amount with JS `Math.round`, which breaks exact halves upward; Python's
+        `round` breaks them to even. A rate ending in .5 — which is exactly what
+        the midpoint of a buy/sell pair gives, and what the exchange-rate
+        feature now pre-fills — lands on those halves constantly: at 13387.5,
+        22.7% of cent amounts between 1.00 and 2000.00 produce a one-cent
+        disagreement, and every one of them was rejected with "Amount must add
+        up to the exchange rate" while being correct to the penny.
+
+        So compare distance instead. One side is always the exact product, and
+        any honestly-rounded amount is within half a cent of it.
+        """
+        return abs(a - b) <= TransactionDomain.MONEY_TOLERANCE
 
     @staticmethod
     def validate_create_payload(
