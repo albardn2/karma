@@ -12,6 +12,21 @@ class ExchangeRateSource(str, Enum):
     MANUAL = "manual"
 
 
+class BackfillRange(str, Enum):
+    """How far back to pull. Mirrors the ranges sp-today's chart offers.
+
+    An enum rather than a free string on purpose: the source answers 200 with
+    about a month for any value it does not recognise, so an unvalidated range
+    would look like a successful year-long backfill that quietly fetched 26 days.
+    """
+    TODAY = "today"
+    ONE_WEEK = "1w"
+    ONE_MONTH = "1m"
+    THREE_MONTHS = "3m"
+    SIX_MONTHS = "6m"
+    ONE_YEAR = "1y"
+
+
 class ExchangeRateBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -96,6 +111,8 @@ class ExchangeRatePullParams(BaseModel):
 
     from_currency: Currency = Currency.USD
     to_currency: Currency = Currency.SYP
+    # how far back to ask the source for; start/end still clip what comes back
+    range: BackfillRange = BackfillRange.ONE_MONTH
     start: Optional[date] = None
     end: Optional[date] = None
 
@@ -116,6 +133,7 @@ class ExchangeRatePullResult(BaseModel):
     from_currency: Currency
     to_currency: Currency
     source: str
+    range: Optional[BackfillRange] = None
     first_date: Optional[date] = None
     last_date: Optional[date] = None
     exchange_rates: List[ExchangeRateRead]

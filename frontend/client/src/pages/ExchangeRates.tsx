@@ -47,10 +47,17 @@ interface PullResult {
   from_currency: string;
   to_currency: string;
   source: string;
+  range?: string | null;
   first_date?: string | null;
   last_date?: string | null;
   exchange_rates: ExchangeRate[];
 }
+
+// How far back a backfill reaches. These are the ranges sp-today's own chart
+// offers; the backend validates against the same set, because the source answers
+// 200 with about a month for anything it does not recognise.
+const BACKFILL_RANGES = ['today', '1w', '1m', '3m', '6m', '1y'] as const;
+type BackfillRange = (typeof BACKFILL_RANGES)[number];
 
 // apiRequest throws Error("<status>: <raw body>"), and the backend error body is
 // {"error": "..."}. Dig the readable sentence out so a failed scrape reads as
@@ -92,6 +99,9 @@ export default function ExchangeRates() {
     page: 1,
     per_page: 50,
   });
+  // a year by default: it is the deepest the source goes, and re-ingesting a day
+  // already stored is an update, not a duplicate
+  const [backfillRange, setBackfillRange] = useState<BackfillRange>('1y');
 
   const { data: ratePage, isLoading, error } = useQuery<ExchangeRatePage>({
     queryKey: ["/exchange-rate/", filters],
@@ -142,8 +152,8 @@ export default function ExchangeRates() {
   });
 
   const backfillMutation = useMutation({
-    mutationFn: (): Promise<PullResult> =>
-      apiRequest("/exchange-rate/backfill", { method: "POST", body: {} }),
+    mutationFn: (range: BackfillRange): Promise<PullResult> =>
+      apiRequest("/exchange-rate/backfill", { method: "POST", body: { range } }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/exchange-rate/"] });
       // sibling key, not a prefix match: react-query compares key elements with
@@ -190,8 +200,23 @@ export default function ExchangeRates() {
   // first-ever empty table can still be filled from the page it fails on.
   const headerActions = (
     <div className="flex items-center gap-3">
+      {/* Plain select, like the per-page control: Radix Select cannot hold an
+          empty value and this needs no placeholder state. */}
+      <select
+        value={backfillRange}
+        onChange={(e) => setBackfillRange(e.target.value as BackfillRange)}
+        className="h-9 rounded-md border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+        aria-label={t('exchangeRates.backfillRangeLabel')}
+        data-testid="exchange-rates-backfill-range"
+      >
+        {BACKFILL_RANGES.map((range) => (
+          <option key={range} value={range}>
+            {t(`exchangeRates.range_${range}`)}
+          </option>
+        ))}
+      </select>
       <Button
-        onClick={() => backfillMutation.mutate()}
+        onClick={() => backfillMutation.mutate(backfillRange)}
         disabled={backfillMutation.isPending}
         variant="outline"
         data-testid="exchange-rates-backfill"

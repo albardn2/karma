@@ -131,7 +131,7 @@ def pull_exchange_rate():
 @jwt_required()
 @scopes_required(*WRITERS)
 def backfill_exchange_rates():
-    """Ingest the daily series sp-today publishes (about the last 30 days)."""
+    """Ingest sp-today's daily history for a range, up to a year back."""
     current_uuid = get_jwt_identity()
     params = ExchangeRatePullParams(**(request.json or {}))
 
@@ -141,6 +141,7 @@ def backfill_exchange_rates():
             created_by_uuid=current_uuid,
             from_currency=params.from_currency,
             to_currency=params.to_currency,
+            backfill_range=params.range,
             start=params.start,
             end=params.end,
         ).model_dump(mode='json')

@@ -1,92 +1,167 @@
-"""Parser tests for the sp-today rate source.
+"""Tests for the sp-today rate source.
 
-Both hazards these lock down were hit while building the scraper against the
-live page, so they are not hypothetical:
+Every hazard here was hit for real while building against the live endpoint:
 
-1. The page headlines the REDENOMINATED pound (133.50) and gives the old pound
-   in parentheses (13,350). Every SYP amount in this database is an old pound,
-   so reading the wrong one misprices conversions by exactly 100x.
-2. An unanchored buy/sell regex matches 103 pairs on the real page instead of
-   26, because the per-city blocks lower down use the same keys. The series
-   regex has to be anchored on the date key.
+1. The site headlines the REDENOMINATED pound (133.50) while this endpoint
+   returns the OLD one (13,350). Every SYP amount in this database is an old
+   pound, so reading the wrong unit misprices conversions by exactly 100x.
+2. An unrecognised range does NOT error — /api/historical answers 200 with about
+   a month of data. `range=2y` and `range=5y` both return 26 points. So a range
+   must never be forwarded from a caller unchecked, or a "year" backfill quietly
+   stores a month.
+3. The same endpoint returns two date shapes: "2026-07-27T23:59:02+03:00" and
+   "2026-07-28 00:02:03".
+4. A day can carry several intraday points; the last is that day's close.
 """
+import json
+from datetime import date
+
 import pytest
 
-from app.domains.exchange_rate.sp_today import (
-    ScrapeError,
-    parse_series,
-    parse_today,
-)
-
-# Mirrors the real page's shapes: the headline sentence, the date-anchored chart
-# series, and — deliberately — a per-city block using the same buy/sell keys
-# with no date, which must NOT be picked up as a data point.
-PAGE = """
-<p>The current US Dollar (USD) exchange rate in General is 133.50 new SYP
-(13,350 old) for buying and 134.25 new SYP (13,425 old) for selling. Rates are
-updated continuously.</p>
-<script>self.__next_f.push([1,"{\\"ChartData\\":[
-{\\"date\\":\\"2026-06-28T23:59:03+03:00\\",\\"timestamp\\":1782680343000,\\"buy\\":12850,\\"sell\\":12950},
-{\\"date\\":\\"2026-06-29T23:59:02+03:00\\",\\"timestamp\\":1782766742000,\\"buy\\":13250,\\"sell\\":13350},
-{\\"date\\":\\"2026-07-27T23:59:02+03:00\\",\\"timestamp\\":1783198742000,\\"buy\\":13350,\\"sell\\":13425}],
-\\"Cities\\":[{\\"name\\":\\"Aleppo\\",\\"buy\\":13300,\\"sell\\":13400},
-{\\"name\\":\\"Damascus\\",\\"buy\\":13350,\\"sell\\":13425}]}"])</script>
-"""
+from app.domains.exchange_rate import sp_today
+from app.domains.exchange_rate.sp_today import RANGES, ScrapeError, fetch_history
 
 
-def test_parse_today_reads_the_old_pound_not_the_headline():
-    quote = parse_today(PAGE)
-    assert quote.buy_rate == 13350.0
-    assert quote.sell_rate == 13425.0
-    # not 133.50 / 134.25 — that would be the redenominated pound
-    assert quote.buy_rate > 1000
+def _payload(points):
+    return json.dumps(points).encode("utf-8")
 
 
-def test_mid_rate_is_the_midpoint():
-    assert parse_today(PAGE).mid_rate == 13387.5
+class _FakeResponse:
+    def __init__(self, body):
+        self._body = body
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
 
 
-def test_new_pound_value_is_refused():
-    """If the site drops the old-pound figure, fail loudly rather than store 100x off."""
-    page = PAGE.replace("(13,350 old)", "(133 old)").replace("(13,425 old)", "(134 old)")
+@pytest.fixture
+def source(monkeypatch):
+    """Serve a canned payload and record the URL that was requested."""
+    calls = []
+
+    def fake_urlopen(request, timeout=None):
+        calls.append(request.full_url)
+        return _FakeResponse(fake_urlopen.body)
+
+    fake_urlopen.body = _payload([])
+    monkeypatch.setattr(sp_today.urllib.request, "urlopen", fake_urlopen)
+    return fake_urlopen, calls
+
+
+def test_reads_the_old_pound(source):
+    serve, _ = source
+    serve.body = _payload(
+        [{"date": "2026-07-27T23:59:02+03:00", "buy": 13350, "sell": 13425}]
+    )
+    quote = fetch_history("today")[0]
+    assert (quote.buy_rate, quote.sell_rate) == (13350.0, 13425.0)
+    assert quote.mid_rate == 13387.5
+
+
+def test_new_pound_values_are_refused(source):
+    """If the endpoint ever switches to the redenominated pound, fail loudly."""
+    serve, _ = source
+    serve.body = _payload(
+        [{"date": "2026-07-27T23:59:02+03:00", "buy": 133.50, "sell": 134.25}]
+    )
     with pytest.raises(ScrapeError, match="plausible old-pound band"):
-        parse_today(page)
+        fetch_history("today")
 
 
-def test_layout_change_raises_rather_than_guessing():
-    with pytest.raises(ScrapeError, match="page layout changed"):
-        parse_today("<html><body>redesigned</body></html>")
+def test_unknown_range_is_refused_before_the_request(source):
+    """The source would answer 200 with ~1 month, which is worse than an error."""
+    _, calls = source
+    with pytest.raises(ScrapeError, match="unsupported range"):
+        fetch_history("2y")
+    assert calls == [], "must not reach the network with a range it cannot honour"
 
 
-def test_series_ignores_the_per_city_pairs():
-    """The Cities block shares the buy/sell keys but has no date; it is not data."""
-    series = parse_series(PAGE)
-    assert len(series) == 3
-    assert [q.rate_date.isoformat() for q in series] == [
-        "2026-06-28",
-        "2026-06-29",
-        "2026-07-27",
+def test_every_supported_range_is_sent_verbatim(source):
+    serve, calls = source
+    serve.body = _payload(
+        [{"date": "2026-07-27T23:59:02+03:00", "buy": 13350, "sell": 13425}]
+    )
+    for key in RANGES:
+        fetch_history(key)
+    for key, url in zip(RANGES, calls):
+        assert f"range={key}" in url
+        assert "code=USD" in url
+
+
+def test_both_date_shapes_parse(source):
+    serve, _ = source
+    serve.body = _payload(
+        [
+            {"date": "2026-07-27T23:59:02+03:00", "buy": 13350, "sell": 13425},
+            {"date": "2026-07-28 00:02:03", "buy": 13300, "sell": 13375},
+        ]
+    )
+    assert [q.rate_date for q in fetch_history("today")] == [
+        date(2026, 7, 27),
+        date(2026, 7, 28),
     ]
 
 
-def test_series_is_sorted_oldest_first():
-    series = parse_series(PAGE)
-    assert series == sorted(series, key=lambda q: q.rate_date)
-
-
-def test_series_keeps_one_quote_per_date():
-    doubled = PAGE.replace(
-        '{\\"date\\":\\"2026-06-28T23:59:03+03:00\\",\\"timestamp\\":1782680343000,\\"buy\\":12850,\\"sell\\":12950},',
-        '{\\"date\\":\\"2026-06-28T23:59:03+03:00\\",\\"timestamp\\":1782680343000,\\"buy\\":12850,\\"sell\\":12950},'
-        '{\\"date\\":\\"2026-06-28T23:59:59+03:00\\",\\"timestamp\\":1782680399000,\\"buy\\":12800,\\"sell\\":12900},',
+def test_last_point_of_a_day_wins(source):
+    """Intraday updates collapse to the day's closing rate."""
+    serve, _ = source
+    serve.body = _payload(
+        [
+            {"date": "2026-07-28 00:02:03", "buy": 13300, "sell": 13375},
+            {"date": "2026-07-28T14:11:29+03:00", "buy": 13350, "sell": 13425},
+        ]
     )
-    series = parse_series(doubled)
-    dates = [q.rate_date.isoformat() for q in series]
-    assert dates.count("2026-06-28") == 1
-    # last occurrence wins, matching how the page orders intraday updates
-    assert next(q for q in series if q.rate_date.isoformat() == "2026-06-28").buy_rate == 12800.0
+    quotes = fetch_history("today")
+    assert len(quotes) == 1
+    assert quotes[0].buy_rate == 13350.0
 
 
-def test_series_missing_entirely_raises():
-    with pytest.raises(ScrapeError, match="no daily series"):
-        parse_series("<html>no chart here</html>")
+def test_results_are_sorted_oldest_first(source):
+    serve, _ = source
+    serve.body = _payload(
+        [
+            {"date": "2026-07-27T23:59:02+03:00", "buy": 13350, "sell": 13425},
+            {"date": "2026-06-28T23:59:02+03:00", "buy": 12850, "sell": 12950},
+        ]
+    )
+    quotes = fetch_history("1m")
+    assert [q.rate_date for q in quotes] == [date(2026, 6, 28), date(2026, 7, 27)]
+
+
+def test_html_instead_of_json_raises(source):
+    """A Cloudflare interstitial answers 200 with a page, not an error."""
+    serve, _ = source
+    serve.body = b"<html><body>Just a moment...</body></html>"
+    with pytest.raises(ScrapeError, match="did not return JSON"):
+        fetch_history("1m")
+
+
+def test_empty_history_raises(source):
+    serve, _ = source
+    serve.body = _payload([])
+    with pytest.raises(ScrapeError, match="no history"):
+        fetch_history("1y")
+
+
+def test_unreadable_point_raises_rather_than_skipping(source):
+    serve, _ = source
+    serve.body = _payload([{"date": "2026-07-27T23:59:02+03:00", "buy": None, "sell": 13425}])
+    with pytest.raises(ScrapeError, match="unreadable buy/sell"):
+        fetch_history("today")
+
+
+def test_fetch_today_takes_the_most_recent_point(source):
+    serve, _ = source
+    serve.body = _payload(
+        [
+            {"date": "2026-07-28 00:02:03", "buy": 13300, "sell": 13375},
+            {"date": "2026-07-28T14:11:29+03:00", "buy": 13350, "sell": 13425},
+        ]
+    )
+    assert sp_today.fetch_today().buy_rate == 13350.0

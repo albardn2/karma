@@ -5,6 +5,7 @@ from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWo
 from app.domains.exchange_rate import sp_today
 from app.dto.common_enums import Currency
 from app.dto.exchange_rate import (
+    BackfillRange,
     ExchangeRateCreate,
     ExchangeRatePullResult,
     ExchangeRateRead,
@@ -88,6 +89,7 @@ class ExchangeRateDomain:
         uow: SqlAlchemyUnitOfWork,
         quotes,
         created_by_uuid: Optional[str],
+        range_used: Optional[BackfillRange] = None,
     ) -> ExchangeRatePullResult:
         from_currency, to_currency = PULLABLE_PAIR
         created = updated = 0
@@ -115,6 +117,7 @@ class ExchangeRateDomain:
             from_currency=from_currency,
             to_currency=to_currency,
             source=ExchangeRateSource.SP_TODAY.value,
+            range=range_used,
             first_date=dates[0] if dates else None,
             last_date=dates[-1] if dates else None,
             exchange_rates=[ExchangeRateRead.from_orm(r) for r in rows],
@@ -142,21 +145,21 @@ class ExchangeRateDomain:
         created_by_uuid: Optional[str] = None,
         from_currency: Currency = Currency.USD,
         to_currency: Currency = Currency.SYP,
+        backfill_range: BackfillRange = BackfillRange.ONE_MONTH,
         start: Optional[date] = None,
         end: Optional[date] = None,
     ) -> ExchangeRatePullResult:
-        """Ingest every day sp-today still publishes, optionally clipped.
+        """Ingest the daily history for a range, optionally clipped further.
 
-        The page carries the series behind its chart — roughly the last 30 days,
-        with gaps on days the market did not move. That is the whole history the
-        site exposes without a paid API key, so this cannot reach back further
-        no matter what `start` says.
+        `backfill_range` decides how far back the source is asked to go (a year
+        at most); `start`/`end` then narrow what came back. Days the market did
+        not move are simply absent, so a year is ~299 points, not 365.
         """
         ExchangeRateDomain._pullable_or_raise(from_currency, to_currency)
         try:
-            quotes = sp_today.fetch_series()
+            quotes = sp_today.fetch_history(backfill_range.value)
         except sp_today.ScrapeError as exc:
-            raise BadRequestError(f"Could not read the series from sp-today: {exc}")
+            raise BadRequestError(f"Could not read the history from sp-today: {exc}")
 
         if start:
             quotes = [q for q in quotes if q.rate_date >= start]
@@ -164,10 +167,12 @@ class ExchangeRateDomain:
             quotes = [q for q in quotes if q.rate_date <= end]
         if not quotes:
             raise BadRequestError(
-                "sp-today published no rates in that window — it only keeps about "
-                "the last 30 days"
+                f"sp-today published no rates for range {backfill_range.value} "
+                f"within that start/end window"
             )
-        return ExchangeRateDomain._ingest(uow, quotes, created_by_uuid)
+        return ExchangeRateDomain._ingest(
+            uow, quotes, created_by_uuid, range_used=backfill_range
+        )
 
     @staticmethod
     def delete(uow: SqlAlchemyUnitOfWork, uuid: str) -> ExchangeRateRead:

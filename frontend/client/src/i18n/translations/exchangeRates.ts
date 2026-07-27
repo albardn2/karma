@@ -36,6 +36,15 @@ export const en: Record<string, string> = {
   'exchangeRates.backfillNoData': 'sp-today published no days to backfill',
   'exchangeRates.backfillFailed': 'Could not backfill from sp-today',
 
+  // how far back to backfill — the ranges sp-today's own chart offers
+  'exchangeRates.backfillRangeLabel': 'How far back to backfill',
+  'exchangeRates.range_today': 'Today',
+  'exchangeRates.range_1w': '1 week',
+  'exchangeRates.range_1m': '1 month',
+  'exchangeRates.range_3m': '3 months',
+  'exchangeRates.range_6m': '6 months',
+  'exchangeRates.range_1y': '1 year',
+
   // filters
   'exchangeRates.countRates': '{count} exchange rates',
   'exchangeRates.filterTitle': 'Filter Exchange Rates',
@@ -89,6 +98,15 @@ export const ar: Record<string, string> = {
     '{created} يوم جديد، {updated} محدّث (من {first} إلى {last})',
   'exchangeRates.backfillNoData': 'لا توجد أيام لتعبئتها من sp-today',
   'exchangeRates.backfillFailed': 'تعذرت تعبئة السجل من sp-today',
+
+  // how far back to backfill
+  'exchangeRates.backfillRangeLabel': 'مدة التعبئة',
+  'exchangeRates.range_today': 'اليوم',
+  'exchangeRates.range_1w': 'أسبوع',
+  'exchangeRates.range_1m': 'شهر',
+  'exchangeRates.range_3m': '3 أشهر',
+  'exchangeRates.range_6m': '6 أشهر',
+  'exchangeRates.range_1y': 'سنة',
 
   // filters
   'exchangeRates.countRates': '{count} سعر صرف',
