@@ -56,6 +56,18 @@ export default function Transactions() {
     per_page: 20,
   });
 
+  // Transactions only carry account uuids; showing a truncated uuid told the
+  // reader nothing about which account moved money.
+  const { data: accountsPage } = useQuery<any>({
+    queryKey: ["/financial-account/", "name-lookup"],
+    queryFn: () => apiRequest("/financial-account/?per_page=100"),
+  });
+  const accountName = (uuid?: string) => {
+    if (!uuid) return "—";
+    const hit = (accountsPage?.accounts ?? []).find((a: any) => a.uuid === uuid);
+    return hit ? `${hit.account_name} (${hit.currency})` : `${uuid.substring(0, 8)}…`;
+  };
+
   const { data: transactionPage, isLoading, error } = useQuery({
     queryKey: ["/transaction/", filters],
     queryFn: () => {
@@ -107,7 +119,8 @@ export default function Transactions() {
   };
 
   const formatCurrency = (amount?: number, currency?: string) => {
-    if (!amount || !currency) return "—";
+    // `!amount` also swallowed a legitimate 0, rendering it as an em dash
+    if (amount === undefined || amount === null || !currency) return "—";
     const currencySymbols: { [key: string]: string } = {
       'USD': '$',
       'EUR': '€',
@@ -237,13 +250,13 @@ export default function Transactions() {
                           )}
                         </TableCell>
                         <TableCell onClick={() => setLocation(`/transactions/${transaction.uuid}`)}>
-                          <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
-                            {transaction.from_account_uuid ? transaction.from_account_uuid.substring(0, 8) + '...' : '—'}
+                          <span className="text-xs text-gray-700 dark:text-gray-300">
+                            {accountName(transaction.from_account_uuid)}
                           </span>
                         </TableCell>
                         <TableCell onClick={() => setLocation(`/transactions/${transaction.uuid}`)}>
-                          <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
-                            {transaction.to_account_uuid ? transaction.to_account_uuid.substring(0, 8) + '...' : '—'}
+                          <span className="text-xs text-gray-700 dark:text-gray-300">
+                            {accountName(transaction.to_account_uuid)}
                           </span>
                         </TableCell>
                         <TableCell onClick={() => setLocation(`/transactions/${transaction.uuid}`)}>

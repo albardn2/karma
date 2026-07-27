@@ -8,13 +8,16 @@ from app.dto.common_enums import Currency
 class TransactionBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    from_amount: Optional[float] = None
+    # gt=0 is the whole ballgame: balance is computed as (money in - money out),
+    # so a NEGATIVE from_amount is subtracted and silently INVENTS money, and a
+    # negative to_amount destroys it. Payments already guard this the same way.
+    from_amount: Optional[float] = Field(None, gt=0)
     from_currency: Optional[Currency] = None
     from_account_uuid: str | None = None
     to_account_uuid:   str | None = None
     to_currency: Optional[Currency] = None
-    to_amount:   Optional[float] = None
-    usd_to_syp_exchange_rate: Optional[float] = None
+    to_amount:   Optional[float] = Field(None, gt=0)
+    usd_to_syp_exchange_rate: Optional[float] = Field(None, gt=0)
     notes: Optional[str] = None
 
 class TransactionCreate(TransactionBase):

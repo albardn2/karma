@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ArrowLeft, Save, ArrowRightLeft, RefreshCw, Building2, Wallet } from "lucide-react";
+import { ArrowLeft, Save, ArrowRightLeft, Building2, Wallet } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -97,10 +97,27 @@ export default function TransactionCreate() {
 
   const handleSubmit = () => {
     // Basic validation
-    if (!formData.from_account_uuid || !formData.to_account_uuid) {
+    // One side is enough: a from-only transaction is money out, a to-only one is
+    // money in. Requiring both made those flows unreachable from the UI even
+    // though the API supports them.
+    if (!formData.from_account_uuid && !formData.to_account_uuid) {
       toast({
         title: t('financial.validationError'),
-        description: t('financial.fromToRequired'),
+        description: t('financial.oneAccountRequired'),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const fromAmt = formData.from_account_uuid ? formData.from_amount : undefined;
+    const toAmt = formData.to_account_uuid ? formData.to_amount : undefined;
+    if (
+      (formData.from_account_uuid && !(fromAmt && fromAmt > 0)) ||
+      (formData.to_account_uuid && !(toAmt && toAmt > 0))
+    ) {
+      toast({
+        title: t('financial.validationError'),
+        description: t('financial.amountMustBePositive'),
         variant: "destructive",
       });
       return;
@@ -115,9 +132,29 @@ export default function TransactionCreate() {
       return;
     }
 
-    // Create the payload, filtering out empty values
+    // Send only the side(s) actually filled in — the API rejects a from-only
+    // transaction that also carries to_* fields, and vice versa.
+    const isExchange =
+      !!formData.from_account_uuid &&
+      !!formData.to_account_uuid &&
+      formData.from_currency !== formData.to_currency;
+    const shaped: Record<string, unknown> = { notes: formData.notes };
+    if (formData.from_account_uuid) {
+      shaped.from_account_uuid = formData.from_account_uuid;
+      shaped.from_amount = formData.from_amount;
+      shaped.from_currency = formData.from_currency;
+    }
+    if (formData.to_account_uuid) {
+      shaped.to_account_uuid = formData.to_account_uuid;
+      shaped.to_amount = formData.to_amount;
+      shaped.to_currency = formData.to_currency;
+    }
+    if (isExchange) {
+      shaped.usd_to_syp_exchange_rate = formData.usd_to_syp_exchange_rate;
+    }
+
     const payload = Object.fromEntries(
-      Object.entries(formData).filter(([_, value]) => value !== "" && value !== undefined && value !== null)
+      Object.entries(shaped).filter(([_, value]) => value !== "" && value !== undefined && value !== null)
     ) as TransactionCreateData;
 
     createMutation.mutate(payload);
@@ -147,14 +184,60 @@ export default function TransactionCreate() {
     }));
   };
 
+  // On a two-sided transfer the destination amount is computed, not typed
+  const isDerivedToAmount = !!formData.from_account_uuid && !!formData.to_account_uuid;
+
+  // A rate is needed whenever the two sides are in DIFFERENT currencies — in
+  // either direction. Gating this on USD->SYP alone hid the field for SYP->USD
+  // and, worse, told the user "no exchange rate needed" while the API refused
+  // the submission without one.
+  const needsRate =
+    !!formData.from_currency &&
+    !!formData.to_currency &&
+    formData.from_currency !== formData.to_currency;
+
   // Calculate to_amount based on exchange rate and from_amount
-  const calculateToAmount = () => {
-    if (formData.from_amount && formData.usd_to_syp_exchange_rate && 
-        formData.from_currency === 'USD' && formData.to_currency === 'SYP') {
-      const toAmount = formData.from_amount * formData.usd_to_syp_exchange_rate;
-      setFormData(prev => ({ ...prev, to_amount: toAmount }));
+  // The destination amount is never a free choice on a transfer: the API
+  // requires it to equal the converted source amount (to 2 decimals), so derive
+  // it from the source amount, the currencies and the rate instead of making
+  // the user compute it and press a button.
+  useEffect(() => {
+    const { from_account_uuid, to_account_uuid, from_amount: amt,
+            usd_to_syp_exchange_rate: rate, from_currency, to_currency } = formData;
+
+    // only a two-sided transfer has a derivable destination amount; on a
+    // deposit (to-only) the user types it directly, so leave it alone
+    if (!from_account_uuid || !to_account_uuid || !from_currency || !to_currency) return;
+    if (!amt) return;
+
+    // 2dp, because that is what the API compares at and an unrounded product
+    // carries float noise (3.3 * 14500.5 = 47851.649999999994)
+    const round2 = (v: number) => Math.round(v * 100) / 100;
+
+    let derived: number | undefined;
+    if (from_currency === to_currency) {
+      derived = round2(amt);
+    } else if (rate) {
+      derived =
+        from_currency === 'USD' && to_currency === 'SYP'
+          ? round2(amt * rate)
+          : from_currency === 'SYP' && to_currency === 'USD'
+          ? round2(amt / rate)
+          : undefined;
     }
-  };
+
+    if (derived !== undefined && derived !== formData.to_amount) {
+      setFormData(prev => ({ ...prev, to_amount: derived }));
+    }
+  }, [
+    formData.from_account_uuid,
+    formData.to_account_uuid,
+    formData.from_amount,
+    formData.from_currency,
+    formData.to_currency,
+    formData.usd_to_syp_exchange_rate,
+    formData.to_amount,
+  ]);
 
   const formatCurrency = (amount: number, currency: string) => {
     const currencySymbols: { [key: string]: string } = {
@@ -279,7 +362,7 @@ export default function TransactionCreate() {
                   id="from_amount"
                   type="number"
                   step="0.01"
-                  min="0"
+                  min="0.01"
                   value={formData.from_amount || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, from_amount: parseFloat(e.target.value) || undefined }))}
                   placeholder={t('financial.enterAmount')}
@@ -323,7 +406,7 @@ export default function TransactionCreate() {
               </CardTitle>
             </div>
             <CardContent className="flex flex-col items-center justify-center space-y-4 pt-16">
-              {formData.from_currency === 'USD' && formData.to_currency === 'SYP' && (
+              {needsRate && (
                 <>
                   <div className="text-center">
                     <Label htmlFor="exchange_rate" className="text-sm font-medium">{t('financial.usdToSypRate')}</Label>
@@ -338,20 +421,22 @@ export default function TransactionCreate() {
                         placeholder={t('financial.rate')}
                         className="text-center"
                       />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={calculateToAmount}
-                        disabled={!formData.from_amount || !formData.usd_to_syp_exchange_rate}
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
                   {formData.from_amount && formData.usd_to_syp_exchange_rate && (
                     <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                       <p className="text-sm text-blue-800 dark:text-blue-200">
-                        ${formData.from_amount.toFixed(2)} × {formData.usd_to_syp_exchange_rate} = SYP {(formData.from_amount * formData.usd_to_syp_exchange_rate).toFixed(2)}
+                        {formData.from_currency === 'USD' ? (
+                          <>
+                            ${formData.from_amount.toFixed(2)} × {formData.usd_to_syp_exchange_rate} = SYP{" "}
+                            {(formData.from_amount * formData.usd_to_syp_exchange_rate).toFixed(2)}
+                          </>
+                        ) : (
+                          <>
+                            SYP {formData.from_amount.toFixed(2)} ÷ {formData.usd_to_syp_exchange_rate} = $
+                            {(formData.from_amount / formData.usd_to_syp_exchange_rate).toFixed(2)}
+                          </>
+                        )}
                       </p>
                     </div>
                   )}
@@ -365,8 +450,7 @@ export default function TransactionCreate() {
                 </div>
               )}
 
-              {formData.from_currency && formData.to_currency &&
-               !(formData.from_currency === 'USD' && formData.to_currency === 'SYP') && (
+              {formData.from_currency && formData.to_currency && !needsRate && (
                 <div className="text-center text-gray-500 dark:text-gray-400">
                   <ArrowRightLeft className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">{t('financial.directTransfer')}</p>
@@ -433,11 +517,18 @@ export default function TransactionCreate() {
                   id="to_amount"
                   type="number"
                   step="0.01"
-                  min="0"
+                  min="0.01"
                   value={formData.to_amount || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, to_amount: parseFloat(e.target.value) || undefined }))}
                   placeholder={t('financial.enterAmount')}
+                  readOnly={isDerivedToAmount}
+                  className={isDerivedToAmount ? 'bg-gray-50 dark:bg-gray-800' : undefined}
                 />
+                {isDerivedToAmount && (
+                  <p className="text-xs text-muted-foreground mt-1" data-testid="to-amount-derived-note">
+                    {t('financial.autoConverted')}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
