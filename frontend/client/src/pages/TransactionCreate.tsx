@@ -97,10 +97,27 @@ export default function TransactionCreate() {
 
   const handleSubmit = () => {
     // Basic validation
-    if (!formData.from_account_uuid || !formData.to_account_uuid) {
+    // One side is enough: a from-only transaction is money out, a to-only one is
+    // money in. Requiring both made those flows unreachable from the UI even
+    // though the API supports them.
+    if (!formData.from_account_uuid && !formData.to_account_uuid) {
       toast({
         title: t('financial.validationError'),
-        description: t('financial.fromToRequired'),
+        description: t('financial.oneAccountRequired'),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const fromAmt = formData.from_account_uuid ? formData.from_amount : undefined;
+    const toAmt = formData.to_account_uuid ? formData.to_amount : undefined;
+    if (
+      (formData.from_account_uuid && !(fromAmt && fromAmt > 0)) ||
+      (formData.to_account_uuid && !(toAmt && toAmt > 0))
+    ) {
+      toast({
+        title: t('financial.validationError'),
+        description: t('financial.amountMustBePositive'),
         variant: "destructive",
       });
       return;
@@ -115,9 +132,29 @@ export default function TransactionCreate() {
       return;
     }
 
-    // Create the payload, filtering out empty values
+    // Send only the side(s) actually filled in — the API rejects a from-only
+    // transaction that also carries to_* fields, and vice versa.
+    const isExchange =
+      !!formData.from_account_uuid &&
+      !!formData.to_account_uuid &&
+      formData.from_currency !== formData.to_currency;
+    const shaped: Record<string, unknown> = { notes: formData.notes };
+    if (formData.from_account_uuid) {
+      shaped.from_account_uuid = formData.from_account_uuid;
+      shaped.from_amount = formData.from_amount;
+      shaped.from_currency = formData.from_currency;
+    }
+    if (formData.to_account_uuid) {
+      shaped.to_account_uuid = formData.to_account_uuid;
+      shaped.to_amount = formData.to_amount;
+      shaped.to_currency = formData.to_currency;
+    }
+    if (isExchange) {
+      shaped.usd_to_syp_exchange_rate = formData.usd_to_syp_exchange_rate;
+    }
+
     const payload = Object.fromEntries(
-      Object.entries(formData).filter(([_, value]) => value !== "" && value !== undefined && value !== null)
+      Object.entries(shaped).filter(([_, value]) => value !== "" && value !== undefined && value !== null)
     ) as TransactionCreateData;
 
     createMutation.mutate(payload);
@@ -149,10 +186,17 @@ export default function TransactionCreate() {
 
   // Calculate to_amount based on exchange rate and from_amount
   const calculateToAmount = () => {
-    if (formData.from_amount && formData.usd_to_syp_exchange_rate && 
-        formData.from_currency === 'USD' && formData.to_currency === 'SYP') {
-      const toAmount = formData.from_amount * formData.usd_to_syp_exchange_rate;
-      setFormData(prev => ({ ...prev, to_amount: toAmount }));
+    const { from_amount: amt, usd_to_syp_exchange_rate: rate, from_currency, to_currency } = formData;
+    if (!amt || !rate) return;
+    // round to 2dp: the API compares money at 2 decimals, and an unrounded
+    // product carries float noise (3.3 * 14500.5 = 47851.649999999994)
+    const round2 = (v: number) => Math.round(v * 100) / 100;
+    if (from_currency === 'USD' && to_currency === 'SYP') {
+      setFormData(prev => ({ ...prev, to_amount: round2(amt * rate) }));
+    } else if (from_currency === 'SYP' && to_currency === 'USD') {
+      setFormData(prev => ({ ...prev, to_amount: round2(amt / rate) }));
+    } else if (from_currency && from_currency === to_currency) {
+      setFormData(prev => ({ ...prev, to_amount: round2(amt) }));
     }
   };
 
@@ -279,7 +323,7 @@ export default function TransactionCreate() {
                   id="from_amount"
                   type="number"
                   step="0.01"
-                  min="0"
+                  min="0.01"
                   value={formData.from_amount || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, from_amount: parseFloat(e.target.value) || undefined }))}
                   placeholder={t('financial.enterAmount')}
@@ -433,7 +477,7 @@ export default function TransactionCreate() {
                   id="to_amount"
                   type="number"
                   step="0.01"
-                  min="0"
+                  min="0.01"
                   value={formData.to_amount || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, to_amount: parseFloat(e.target.value) || undefined }))}
                   placeholder={t('financial.enterAmount')}

@@ -153,6 +153,8 @@ export const en: Record<string, string> = {
   'financial.currencyTaken': '{name} is already the {currency} account — only one non-external account per currency is allowed. Turn on External, or edit that account.',
   'financial.currencyTakenShort': '(taken)',
   'financial.defaultForCurrency': 'Default for {currency}',
+  'financial.oneAccountRequired': 'Choose at least one account — a source, a destination, or both.',
+  'financial.amountMustBePositive': 'Amount must be greater than zero.',
 };
 
 export const ar: Record<string, string> = {
@@ -306,4 +308,6 @@ export const ar: Record<string, string> = {
   'financial.currencyTaken': '{name} هو حساب {currency} بالفعل — يُسمح بحساب واحد غير خارجي لكل عملة. شغّل "خارجي" أو عدّل ذلك الحساب.',
   'financial.currencyTakenShort': '(محجوز)',
   'financial.defaultForCurrency': 'الافتراضي لـ {currency}',
+  'financial.oneAccountRequired': 'اختر حساباً واحداً على الأقل — المصدر أو الوجهة أو كليهما.',
+  'financial.amountMustBePositive': 'يجب أن تكون الكمية أكبر من صفر.',
 };
