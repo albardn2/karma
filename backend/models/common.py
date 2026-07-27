@@ -1271,6 +1271,9 @@ class Expense(Base):
     currency = Column(String(120), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     vendor_uuid = Column(String(36), ForeignKey("vendor.uuid"), nullable=True)
+    # set when the cost belongs to a particular run (fuel, tolls, a driver's
+    # meal); null for the ordinary overheads that are not trip-specific
+    trip_uuid = Column(String(36), ForeignKey("trip.uuid"), nullable=True, index=True)
     category = Column(String(120), nullable=False)  # e.g., salary, etc.
     is_deleted = Column(Boolean, default=False)
     description = Column(Text, nullable=True)
@@ -1279,6 +1282,7 @@ class Expense(Base):
 
     # relations
     vendor = relationship("Vendor", back_populates="expenses")
+    trip = relationship("Trip", back_populates="expenses")
     payouts = relationship("Payout", back_populates="expense")
 
     @hybrid_property
@@ -2022,6 +2026,7 @@ class Trip(Base):
     vehicle = relationship("Vehicle", back_populates="trips")
     workflow_execution = relationship("WorkflowExecution", back_populates="trips")
     stops = relationship("TripStop", back_populates="trip")
+    expenses = relationship("Expense", back_populates="trip")
 
     @hybrid_property
     def expected_cash(self):

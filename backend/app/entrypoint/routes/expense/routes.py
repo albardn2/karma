@@ -112,6 +112,8 @@ def list_expenses():
         filters.append(ExpenseModel.uuid == str(params.uuid))
     if params.vendor_uuid:
         filters.append(ExpenseModel.vendor_uuid == str(params.vendor_uuid))
+    if params.trip_uuid:
+        filters.append(ExpenseModel.trip_uuid == str(params.trip_uuid))
     if params.category:
         filters.append(ExpenseModel.category == params.category.value)
     if params.start:

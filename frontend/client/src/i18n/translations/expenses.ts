@@ -103,6 +103,13 @@ export const en: Record<string, string> = {
   'expenses.byCategory': 'Spend by Category',
   'expenses.barsNote': 'Each bar is one period, split by category.',
   'expenses.cumulativeNote': 'Running total from the start of the window, split by category.',
+  'expenses.createExpense': 'Create expense',
+  'expenses.tripExpenseTitle': 'Expense for this trip',
+  'expenses.tripExpenseCreated': 'Trip expense recorded',
+  'expenses.tripExpenseFailed': 'Could not record the expense',
+  'expenses.tripExpenseNotesPlaceholder': 'Fuel, tolls, a meal on the road…',
+  'expenses.payNow': 'Pay it now',
+  'expenses.payNowHint': 'Books the payout immediately from the default account for this currency.',
 };
 
 export const ar: Record<string, string> = {
@@ -204,4 +211,11 @@ export const ar: Record<string, string> = {
   'expenses.byCategory': 'المصروف حسب الفئة',
   'expenses.barsNote': 'كل عمود يمثل فترة واحدة، مقسّماً حسب الفئة.',
   'expenses.cumulativeNote': 'الإجمالي التراكمي من بداية الفترة، مقسّماً حسب الفئة.',
+  'expenses.createExpense': 'إنشاء مصروف',
+  'expenses.tripExpenseTitle': 'مصروف لهذه الرحلة',
+  'expenses.tripExpenseCreated': 'تم تسجيل مصروف الرحلة',
+  'expenses.tripExpenseFailed': 'تعذر تسجيل المصروف',
+  'expenses.tripExpenseNotesPlaceholder': 'وقود، رسوم طريق، وجبة على الطريق…',
+  'expenses.payNow': 'ادفعه الآن',
+  'expenses.payNowHint': 'يسجّل الدفعة فوراً من الحساب الافتراضي لهذه العملة.',
 };
