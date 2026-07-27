@@ -41,6 +41,20 @@ export function AddFinancialAccountDialog() {
     },
   });
 
+  // Which currencies already have their one non-external account. Only that
+  // account is allowed per currency (it is the default money flows use), so
+  // offering a taken currency here would just earn a 400.
+  const { data: existing } = useQuery<any>({
+    queryKey: ["/financial-account/", "internal-slots"],
+    queryFn: async () => await apiRequest("/financial-account/?per_page=100"),
+    enabled: open,
+  });
+  const takenByInternal: Record<string, string> = {};
+  ((existing?.financial_accounts ?? existing?.accounts ?? []) as any[]).forEach((a) => {
+    if (!a.is_external && !a.is_deleted) takenByInternal[a.currency] = a.account_name;
+  });
+  const currencyTaken = !formData.is_external && !!takenByInternal[formData.currency];
+
   // Set default currency when currencies are loaded
   if (currencies && currencies.length > 0 && !formData.currency) {
     setFormData(prev => ({ ...prev, currency: currencies[0] }));
@@ -101,6 +115,18 @@ export function AddFinancialAccountDialog() {
       return;
     }
 
+    if (currencyTaken) {
+      toast({
+        title: t('financial.validationError'),
+        description: t('financial.currencyTaken', {
+          name: takenByInternal[formData.currency],
+          currency: formData.currency,
+        }),
+        variant: "destructive",
+      });
+      return;
+    }
+
     createAccountMutation.mutate(formData);
   };
 
@@ -151,10 +177,23 @@ export function AddFinancialAccountDialog() {
                 {currencies?.map((currency: string) => (
                   <SelectItem key={currency} value={currency}>
                     {currency}
+                    {takenByInternal[currency] && !formData.is_external && (
+                      <span className="ms-2 text-xs text-muted-foreground">
+                        {t('financial.currencyTakenShort')}
+                      </span>
+                    )}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {currencyTaken && (
+              <p className="text-sm text-amber-700" data-testid="currency-taken-hint">
+                {t('financial.currencyTaken', {
+                  name: takenByInternal[formData.currency],
+                  currency: formData.currency,
+                })}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

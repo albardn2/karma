@@ -738,6 +738,18 @@ class Payment(Base):
 
 class FinancialAccount(Base):
     __tablename__ = "financial_account"
+    __table_args__ = (
+        # At most ONE non-external account per currency per tenant: that account
+        # is the default for its currency, and payment/payout resolution uses
+        # one_or_none(), which would 500 on a second one. External accounts are
+        # excluded on purpose — any number of those is allowed.
+        Index(
+            'uq_financial_account_internal_currency',
+            'account_uuid', 'currency',
+            unique=True,
+            postgresql_where=text('is_external = false AND is_deleted = false'),
+        ),
+    )
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
@@ -748,7 +760,7 @@ class FinancialAccount(Base):
     currency = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False)
-    is_external = Column(Boolean, default=False, nullable=True)
+    is_external = Column(Boolean, default=False, nullable=False, server_default=false())
 
     # relations
     payments = relationship("Payment", back_populates="financial_account")

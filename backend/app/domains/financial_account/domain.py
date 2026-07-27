@@ -14,6 +14,36 @@ class FinancialAccountDomain:
         'currency'
     ]
 
+    @staticmethod
+    def resolve_default(uow: SqlAlchemyUnitOfWork, currency) -> FinancialAccount:
+        """The tenant's single non-external account for a currency.
+
+        This is what payments/payouts fall back to when the caller does not name
+        an account. Callers pass either the Currency enum or a plain string, so
+        normalise here rather than at each call site.
+        """
+        value = getattr(currency, 'value', currency)
+        return uow.financial_account_repository.find_one(
+            currency=value, is_deleted=False, is_external=False
+        )
+
+    @staticmethod
+    def assert_no_internal_duplicate(uow: SqlAlchemyUnitOfWork, currency, exclude_uuid=None):
+        """Guard the one-internal-account-per-currency invariant.
+
+        The DB has a partial unique index for this, but a violation there
+        surfaces at commit time as an IntegrityError (a 500) — this gives the
+        caller a 400 that names the account already holding the slot.
+        """
+        existing = FinancialAccountDomain.resolve_default(uow=uow, currency=currency)
+        if existing and existing.uuid != exclude_uuid:
+            value = getattr(currency, 'value', currency)
+            raise BadRequestError(
+                f"'{existing.account_name}' is already the {value} account. "
+                "Only one non-external account per currency is allowed — mark "
+                "this one external, or edit the existing account."
+            )
+
 
     @staticmethod
     def update_financial_account(uow:SqlAlchemyUnitOfWork, uuid: str, payload: FinancialAccountUpdate) -> FinancialAccountRead:
@@ -27,6 +57,16 @@ class FinancialAccountDomain:
         updates = payload.model_dump(exclude_unset=True,mode='json')
         if any(field in FinancialAccountDomain.UPDATE_SENSITIVE_FIELDS for field in updates.keys()) and not FinancialAccountDomain.validate_no_relation_exists(uow,acc):
             raise BadRequestError('Cannot update currency, relations exist')
+
+        # an update can walk into the internal slot two ways: switching currency,
+        # or flipping external -> internal
+        next_currency = updates.get('currency', acc.currency)
+        next_external = updates.get('is_external', acc.is_external)
+        if not next_external:
+            FinancialAccountDomain.assert_no_internal_duplicate(
+                uow=uow, currency=next_currency, exclude_uuid=acc.uuid
+            )
+
         for field, val in updates.items():
             setattr(acc, field, val)
 

@@ -12,7 +12,7 @@ from app.dto.financial_account import (
 from models.common import FinancialAccount as FinancialAccountModel
 
 from app.entrypoint.routes.financial_account import financial_account_blueprint
-from app.entrypoint.routes.common.errors import NotFoundError
+from app.entrypoint.routes.common.errors import NotFoundError, BadRequestError
 from app.entrypoint.routes.common.auth import scopes_required
 
 from app.domains.financial_account.domain import FinancialAccountDomain
@@ -32,12 +32,37 @@ def create_account():
     with SqlAlchemyUnitOfWork() as uow:
         current_user_uuid = get_jwt_identity()
         add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=payload)
+        if not payload.is_external:
+            FinancialAccountDomain.assert_no_internal_duplicate(
+                uow=uow, currency=payload.currency
+            )
         data = payload.model_dump(mode='json')
         acct = FinancialAccountModel(**data)
         acct.created_by_uuid = current_user_uuid
         uow.financial_account_repository.save(model=acct, commit=True)
         result = FinancialAccountRead.from_orm(acct).model_dump(mode='json')
     return jsonify(result), 201
+
+@financial_account_blueprint.route('/default', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value)
+def get_default_account():
+    """The non-external account a currency's money flows through.
+
+    Declared before /<uuid> so the literal path wins the route match.
+    """
+    currency = request.args.get('currency')
+    if not currency:
+        raise BadRequestError('currency is required')
+    with SqlAlchemyUnitOfWork() as uow:
+        acct = FinancialAccountDomain.resolve_default(uow=uow, currency=currency)
+        if not acct:
+            raise NotFoundError(f'No default account for {currency}')
+        result = FinancialAccountRead.from_orm(acct).model_dump(mode='json')
+    return jsonify(result), 200
+
 
 @financial_account_blueprint.route('/<string:uuid>', methods=['GET'])
 @jwt_required()
