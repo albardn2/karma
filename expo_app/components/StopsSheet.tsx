@@ -41,6 +41,7 @@ export function StopsSheet({
   currentStopUuid,
   onStopPress,
   onAddStop,
+  onAddExpense,
   onSetCurrent,
   armedStopUuid,
   onArm,
@@ -50,6 +51,9 @@ export function StopsSheet({
   currentStopUuid: string | null;
   onStopPress: (stop: SheetStop) => void;
   onAddStop: () => void;
+  // trip-level cost (fuel, tolls); reachable from here as well as the map
+  // corner, since this is where the driver's thumb already is
+  onAddExpense?: () => void;
   onSetCurrent?: (stop: SheetStop) => void;
   // The armed "Set current" selection is lifted to the parent so a tap
   // anywhere else — on the map or in this list — dismisses it.
@@ -128,9 +132,16 @@ export function StopsSheet({
           </TouchableOpacity>
           <View style={styles.header}>
             <ThemedText style={styles.title}>{t('sheet.stopsTitle', { count: stops.length })}</ThemedText>
-            <TouchableOpacity style={styles.addBtn} onPress={onAddStop} testID="sheet-add-stop">
-              <ThemedText style={styles.addBtnText}>{t('sheet.addStop')}</ThemedText>
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              {onAddExpense && (
+                <TouchableOpacity style={styles.expenseBtn} onPress={onAddExpense} testID="sheet-add-expense">
+                  <ThemedText style={styles.expenseBtnText}>{t('tripExpense.button')}</ThemedText>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.addBtn} onPress={onAddStop} testID="sheet-add-stop">
+                <ThemedText style={styles.addBtnText}>{t('sheet.addStop')}</ThemedText>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -212,6 +223,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.08)',
   },
   title: { fontSize: 17, fontWeight: '700' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  expenseBtn: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)', backgroundColor: '#fff',
+  },
+  expenseBtnText: { fontSize: 12, fontWeight: '700', color: '#111827' },
   addBtn: { backgroundColor: '#5469D4', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   list: { paddingHorizontal: 16, paddingTop: 8 },

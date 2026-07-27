@@ -21,6 +21,15 @@
         "frontend"
       ],
       "port": 3000
+    },
+    {
+      "name": "expo-web",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd expo_app && npx expo start --web --port 8081"
+      ],
+      "port": 8081
     }
   ]
 }

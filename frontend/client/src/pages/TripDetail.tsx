@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit3, Save, X, Copy, Check, Truck, Banknote, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit3, Save, X, Copy, Check, Truck, Banknote, ChevronLeft, ChevronRight, Trash2, Receipt } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,6 +82,22 @@ export default function TripDetail() {
   const [activityTab, setActivityTab] = useState("orders");
   const [activityPage, setActivityPage] = useState(0);
   const PAGE_SIZE = 5;
+
+  // costs booked against this trip; the cash table needs every currency that
+  // appears in either collections or spend, since a trip can collect in one and
+  // spend in another
+  const { data: expensePage } = useQuery<any>({
+    queryKey: ["/expense/", "trip", params?.uuid],
+    queryFn: () => apiRequest(`/expense/?trip_uuid=${params?.uuid}&per_page=100`),
+    enabled: !!params?.uuid,
+  });
+  const tripExpenses: any[] = expensePage?.expenses || [];
+  const cashCurrencies = Array.from(
+    new Set([
+      ...Object.keys(trip?.expected_cash || {}),
+      ...Object.keys(trip?.trip_expenses || {}),
+    ])
+  ).sort();
 
   // recorded GPS series for this trip (admin-only endpoint; hide the section on error)
   const { data: locationData } = useQuery<{ points: PlaybackPoint[]; total_count: number }>({
@@ -388,7 +404,8 @@ export default function TripDetail() {
           </Card>
         </div>
 
-        {/* Expected cash collected at this trip's stops */}
+        {/* Cash reconciliation: collected at the stops, less what was spent on
+            the road, giving what should actually come back */}
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -397,17 +414,98 @@ export default function TripDetail() {
             </div>
           </CardHeader>
           <CardContent>
-            {trip.expected_cash && Object.keys(trip.expected_cash).length > 0 ? (
-              <div className="flex flex-wrap gap-3">
-                {Object.entries(trip.expected_cash).map(([cur, amt]) => (
-                  <div key={cur} className="border rounded-md px-4 py-2" data-testid={`expected-cash-${cur}`}>
-                    <div className="text-xs text-gray-500">{te(cur)}</div>
-                    <div className="text-lg font-semibold">{Number(amt).toFixed(2)}</div>
-                  </div>
-                ))}
+            {cashCurrencies.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="table-trip-cash">
+                  <thead>
+                    <tr className="text-start text-gray-500 border-b">
+                      <th className="py-2 pe-4 font-medium">{t('common.currency')}</th>
+                      <th className="py-2 pe-4 font-medium text-end">{t('trips.cashCollected')}</th>
+                      <th className="py-2 pe-4 font-medium text-end">{t('trips.tripSpend')}</th>
+                      <th className="py-2 font-medium text-end">{t('trips.shouldReturn')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cashCurrencies.map((cur) => {
+                      const collected = Number((trip.expected_cash || {})[cur] || 0);
+                      const spent = Number((trip.trip_expenses || {})[cur] || 0);
+                      const net = Number(
+                        (trip.net_expected_cash || {})[cur] ?? collected - spent
+                      );
+                      return (
+                        <tr key={cur} className="border-b last:border-0" data-testid={`trip-cash-${cur}`}>
+                          <td className="py-2 pe-4">{te(cur)}</td>
+                          <td className="py-2 pe-4 text-end tabular-nums">{collected.toFixed(2)}</td>
+                          <td className="py-2 pe-4 text-end tabular-nums text-amber-700">
+                            {spent ? `- ${spent.toFixed(2)}` : "—"}
+                          </td>
+                          <td
+                            className={`py-2 text-end font-semibold tabular-nums ${
+                              net < 0 ? "text-red-600" : ""
+                            }`}
+                          >
+                            {net.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <p className="text-sm text-gray-500" data-testid="expected-cash-empty">{t('trips.noCashCollected')}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Costs booked to this trip */}
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-gray-600" />
+              <CardTitle>{t('trips.tripExpenses')}</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {tripExpenses.length === 0 ? (
+              <p className="text-sm text-gray-500" data-testid="trip-expenses-empty">
+                {t('trips.noTripExpenses')}
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="table-trip-expenses">
+                  <thead>
+                    <tr className="text-start text-gray-500 border-b">
+                      <th className="py-2 pe-4 font-medium">{t('common.date')}</th>
+                      <th className="py-2 pe-4 font-medium">{t('expenses.categoriesFilter')}</th>
+                      <th className="py-2 pe-4 font-medium text-end">{t('common.amount')}</th>
+                      <th className="py-2 pe-4 font-medium">{t('customers.payment')}</th>
+                      <th className="py-2 font-medium">{t('common.notes')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tripExpenses.map((e: any) => (
+                      <tr key={e.uuid} className="border-b last:border-0" data-testid={`trip-expense-row-${e.uuid}`}>
+                        <td className="py-2 pe-4 whitespace-nowrap">{e.created_at ? format(new Date(e.created_at), 'PP') : '—'}</td>
+                        <td className="py-2 pe-4">{te(e.category)}</td>
+                        <td className="py-2 pe-4 text-end tabular-nums">
+                          {Number(e.amount).toFixed(2)}{" "}
+                          <span className="text-xs text-gray-500">{te(e.currency)}</span>
+                        </td>
+                        <td className="py-2 pe-4">
+                          <Badge
+                            variant="secondary"
+                            className={e.is_paid ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}
+                          >
+                            {e.is_paid ? te('paid') : te('unpaid')}
+                          </Badge>
+                        </td>
+                        <td className="py-2 max-w-xs truncate text-gray-600">{e.description || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </CardContent>
         </Card>

@@ -48,6 +48,7 @@ import { TripOperatorMap } from "@/components/map/TripOperatorMap";
 import { CustomerLocationMap } from "@/components/map/CustomerLocationMap";
 import { CreateOrderDialog } from "@/components/customer-orders/CreateOrderDialog";
 import { AddStopDialog } from "@/components/trips/AddStopDialog";
+import { CreateTripExpenseDialog } from "@/components/expenses/CreateTripExpenseDialog";
 import { CustomerRecentOrders } from "@/components/customer-orders/CustomerRecentOrders";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1218,6 +1219,9 @@ export default function WorkflowExecutionTaskDetail() {
                           onCreated={(teUuid) => setSelectedTaskExecutionUuid(teUuid)}
                         />
                       )}
+                      {/* trip-level cost (fuel, tolls, a meal) — belongs to the
+                          run as a whole, not to any single stop */}
+                      <CreateTripExpenseDialog workflowExecutionUuid={executionUuid} />
                       <span className="text-sm text-gray-500">
                         {t('workflows.percentComplete', { percent: Math.round(calculateProgress()) })}
                       </span>

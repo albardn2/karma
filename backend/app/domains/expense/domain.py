@@ -14,6 +14,13 @@ class ExpenseDomain:
     @staticmethod
     def create_expense(uow:SqlAlchemyUnitOfWork, payload: ExpenseCreate) -> ExpenseRead:
         """Creates a new expense."""
+        # The FK alone would accept another tenant's trip uuid; the repo lookup
+        # is account-scoped, so a foreign or unknown trip simply is not found.
+        if payload.trip_uuid:
+            trip = uow.trip_repository.find_one(uuid=payload.trip_uuid, is_deleted=False)
+            if not trip:
+                raise NotFoundError('Trip not found')
+
         data = payload.model_dump(mode='json')
         should_pay = data.pop("should_pay", None)
         exp = ExpenseModel(**data)

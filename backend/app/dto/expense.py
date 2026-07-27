@@ -27,6 +27,7 @@ class ExpenseBase(BaseModel):
     currency: Currency
     category: ExpenseCategory
     vendor_uuid: Optional[str] = None
+    trip_uuid: Optional[str] = None
     description: Optional[str] = None
 
 
@@ -43,6 +44,7 @@ class ExpenseUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     vendor_uuid: Optional[str] = None
+    trip_uuid: Optional[str] = None
     category: Optional[ExpenseCategory] = None
     description: Optional[str] = None
 
@@ -70,6 +72,7 @@ class ExpenseListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
     uuid : Optional[str] = None
     vendor_uuid: Optional[str] = None
+    trip_uuid:   Optional[str] = None
     category:    Optional[ExpenseCategory] = None
     status :    Optional[InvoiceStatus] = None
     is_paid:    Optional[bool] = None

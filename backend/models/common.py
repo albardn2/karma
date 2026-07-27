@@ -1271,6 +1271,9 @@ class Expense(Base):
     currency = Column(String(120), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     vendor_uuid = Column(String(36), ForeignKey("vendor.uuid"), nullable=True)
+    # set when the cost belongs to a particular run (fuel, tolls, a driver's
+    # meal); null for the ordinary overheads that are not trip-specific
+    trip_uuid = Column(String(36), ForeignKey("trip.uuid"), nullable=True, index=True)
     category = Column(String(120), nullable=False)  # e.g., salary, etc.
     is_deleted = Column(Boolean, default=False)
     description = Column(Text, nullable=True)
@@ -1279,6 +1282,7 @@ class Expense(Base):
 
     # relations
     vendor = relationship("Vendor", back_populates="expenses")
+    trip = relationship("Trip", back_populates="expenses")
     payouts = relationship("Payout", back_populates="expense")
 
     @hybrid_property
@@ -2022,6 +2026,7 @@ class Trip(Base):
     vehicle = relationship("Vehicle", back_populates="trips")
     workflow_execution = relationship("WorkflowExecution", back_populates="trips")
     stops = relationship("TripStop", back_populates="trip")
+    expenses = relationship("Expense", back_populates="trip")
 
     @hybrid_property
     def expected_cash(self):
@@ -2040,6 +2045,37 @@ class Trip(Base):
                     continue
                 totals[payment.currency] = totals.get(payment.currency, 0) + payment.amount
         return totals
+
+    @property
+    def trip_expenses(self):
+        """Costs booked against this trip, keyed by currency."""
+        totals: dict[str, float] = {}
+        for expense in self.expenses:
+            if expense.is_deleted:
+                continue
+            totals[expense.currency] = totals.get(expense.currency, 0) + expense.amount
+        return totals
+
+    @property
+    def net_expected_cash(self):
+        """What should actually come back from the run, per currency.
+
+        expected_cash is what was COLLECTED at the stops. Money spent on the
+        road out of that cash — fuel, tolls — is not coming back, so the figure
+        to reconcile a driver against is collected minus trip expenses. Kept
+        separate from expected_cash rather than folded into it, because the
+        mobile app and existing screens read that field with its current
+        meaning.
+
+        A currency can appear in expenses without appearing in collections
+        (spent in USD, collected only in SYP), so the keys are the union.
+        """
+        collected = self.expected_cash
+        spent = self.trip_expenses
+        return {
+            currency: round(collected.get(currency, 0) - spent.get(currency, 0), 2)
+            for currency in set(collected) | set(spent)
+        }
 
     @property
     def sold_inventory_map(self):

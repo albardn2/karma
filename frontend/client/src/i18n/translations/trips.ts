@@ -160,6 +160,11 @@ export const en: Record<string, string> = {
   'trips.locationUnavailable': 'Location unavailable',
   'trips.geolocationNotSupported': 'Geolocation is not supported here.',
   'trips.locationError': 'Location error',
+  'trips.cashCollected': 'Collected',
+  'trips.tripSpend': 'Spent on the trip',
+  'trips.shouldReturn': 'Should return',
+  'trips.tripExpenses': 'Trip Expenses',
+  'trips.noTripExpenses': 'No expenses booked to this trip',
 };
 
 export const ar: Record<string, string> = {
@@ -320,4 +325,9 @@ export const ar: Record<string, string> = {
   'trips.locationUnavailable': 'الموقع غير متاح',
   'trips.geolocationNotSupported': 'تحديد الموقع الجغرافي غير مدعوم هنا.',
   'trips.locationError': 'خطأ في تحديد الموقع',
+  'trips.cashCollected': 'المُحصّل',
+  'trips.tripSpend': 'المصروف على الرحلة',
+  'trips.shouldReturn': 'الواجب إرجاعه',
+  'trips.tripExpenses': 'مصاريف الرحلة',
+  'trips.noTripExpenses': 'لا مصاريف مسجلة على هذه الرحلة',
 };

@@ -471,6 +471,15 @@ export default function ExecutionDetailScreen() {
               <ThemedText style={styles.trackingBtnText}>{t('tracking.button')}</ThemedText>
             </TouchableOpacity>
           )}
+          {/* Trip cost (fuel, tolls) — top-LEFT because the tracking button
+              already owns the top-right corner, and centre is the loader. */}
+          <TouchableOpacity
+            style={styles.expenseBtn}
+            onPress={() => router.push({ pathname: '/distribution/expense', params: { executionUuid: execution.uuid } })}
+            testID="button-trip-expense"
+          >
+            <ThemedText style={styles.expenseBtnText}>{t('tripExpense.button')}</ThemedText>
+          </TouchableOpacity>
           {stopsLoading && (
             <View style={styles.stopsLoading}><ActivityIndicator color="#5469D4" /></View>
           )}
@@ -479,6 +488,7 @@ export default function ExecutionDetailScreen() {
             currentStopUuid={currentStopUuid}
             onStopPress={goToStop}
             onAddStop={() => router.push({ pathname: '/distribution/add-stop', params: { executionUuid: execution.uuid } })}
+            onAddExpense={() => router.push({ pathname: '/distribution/expense', params: { executionUuid: execution.uuid } })}
             onSetCurrent={setCurrentStop}
             armedStopUuid={armedStopUuid}
             onArm={setArmedStopUuid}
@@ -558,6 +568,12 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 14, opacity: 0.6, textAlign: 'center' },
   mapArea: { flex: 1 },
   stopsLoading: { position: 'absolute', top: 12, alignSelf: 'center', backgroundColor: '#fff', borderRadius: 20, padding: 8, elevation: 4 },
+  expenseBtn: {
+    position: 'absolute', top: 12, left: 12, backgroundColor: '#fff', borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
+    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 6,
+  },
+  expenseBtnText: { color: '#111827', fontSize: 13, fontWeight: '700' },
   trackingBtn: {
     position: 'absolute', top: 12, right: 12, backgroundColor: '#111827', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 8,
