@@ -35,6 +35,8 @@ interface Trip {
   created_at: string;
   notes?: string | null;
   expected_cash?: Record<string, number> | null;
+  trip_expenses?: Record<string, number> | null;
+  net_expected_cash?: Record<string, number> | null;
   inventory_reconciliation?: Record<
     string,
     { start: number; sold: number; expected_end: number; actual_end: number | null; variance: number | null }
@@ -98,7 +100,7 @@ const parseLatLng = (s?: string | null): { lat: number | null; lng: number | nul
 
 export default function TripDetailScreen() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, te } = useLanguage();
   const { isAdmin } = useAuth();
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
 
@@ -109,14 +111,17 @@ export default function TripDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activityTab, setActivityTab] = useState<'orders' | 'fulfillments' | 'payments'>('orders');
   const [trackingOn, setTrackingOn] = useState(false);
+  const [tripExpenses, setTripExpenses] = useState<any[]>([]);
 
   const load = async () => {
-    const [tripRes, actRes, matRes] = await Promise.all([
+    const [tripRes, expRes, actRes, matRes] = await Promise.all([
       apiCall<Trip>(`/trip/${uuid}`),
+      apiCall<{ expenses: any[] }>(`/expense/?trip_uuid=${uuid}&per_page=100`),
       apiCall<TripActivity>(`/trip/${uuid}/activity`),
       apiCall<{ materials: { uuid: string; name: string }[] }>('/material/?page=1&per_page=100'),
     ]);
     if (tripRes.data) setTrip(tripRes.data);
+    if (expRes.data) setTripExpenses(expRes.data.expenses || []);
     if (actRes.data) setActivity(actRes.data);
     if (matRes.data)
       setMaterials(Object.fromEntries((matRes.data.materials || []).map((m) => [m.uuid, m.name])));
@@ -162,7 +167,14 @@ export default function TripDetailScreen() {
 
   const badge = STATUS_BADGE[trip?.status || ''] || { bg: '#E5E7EB', fg: '#4B5563', labelKey: '' };
   const recon = Object.entries(trip?.inventory_reconciliation || {});
-  const cash = Object.entries(trip?.expected_cash || {});
+  // every currency that appears in collections OR spend: a trip can collect in
+  // one and pay for fuel in another
+  const cashCurrencies = Array.from(
+    new Set([
+      ...Object.keys(trip?.expected_cash || {}),
+      ...Object.keys(trip?.trip_expenses || {}),
+    ])
+  ).sort();
   const activityRows: any[] =
     activityTab === 'orders'
       ? activity?.orders || []
@@ -255,12 +267,37 @@ export default function TripDetailScreen() {
         {/* analytics */}
         <TripAnalyticsCard activity={activity} />
 
-        {/* expected cash */}
-        {cash.length > 0 && (
+        {/* cash reconciliation: collected at the stops, less what was spent on
+            the road, giving what should actually come back */}
+        {cashCurrencies.length > 0 && (
           <View style={styles.card}>
             <ThemedText style={styles.cardTitle}>{t('trips.expectedCash')}</ThemedText>
-            {cash.map(([cur, amt]) => (
-              <Row key={cur} label={cur} value={fmtNum(amt)} />
+            {cashCurrencies.map((cur) => {
+              const collected = Number((trip?.expected_cash || {})[cur] || 0);
+              const spent = Number((trip?.trip_expenses || {})[cur] || 0);
+              const net = Number((trip?.net_expected_cash || {})[cur] ?? collected - spent);
+              return (
+                <View key={cur} style={styles.cashBlock} testID={`trip-cash-${cur}`}>
+                  <ThemedText style={styles.cashCurrency}>{te(cur)}</ThemedText>
+                  <Row label={t('trips.cashCollected')} value={fmtNum(collected)} />
+                  {spent > 0 && <Row label={t('trips.tripSpend')} value={`- ${fmtNum(spent)}`} />}
+                  <Row label={t('trips.shouldReturn')} value={fmtNum(net)} />
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* costs booked to this trip */}
+        {tripExpenses.length > 0 && (
+          <View style={styles.card}>
+            <ThemedText style={styles.cardTitle}>{t('trips.tripExpenses')}</ThemedText>
+            {tripExpenses.map((e) => (
+              <Row
+                key={e.uuid}
+                label={`${te(e.category)}${e.description ? ` · ${e.description}` : ''}`}
+                value={`${fmtNum(e.amount)} ${te(e.currency)}`}
+              />
             ))}
           </View>
         )}
@@ -406,6 +443,8 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingBottom: 40, gap: 12 },
+  cashBlock: { marginBottom: 10 },
+  cashCurrency: { fontSize: 13, fontWeight: '700', opacity: 0.6, marginBottom: 2 },
   card: {
     backgroundColor: '#fff', borderRadius: 14, padding: 14,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
