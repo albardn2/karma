@@ -184,6 +184,15 @@ export default function TransactionCreate() {
     }));
   };
 
+  // A rate is needed whenever the two sides are in DIFFERENT currencies — in
+  // either direction. Gating this on USD->SYP alone hid the field for SYP->USD
+  // and, worse, told the user "no exchange rate needed" while the API refused
+  // the submission without one.
+  const needsRate =
+    !!formData.from_currency &&
+    !!formData.to_currency &&
+    formData.from_currency !== formData.to_currency;
+
   // Calculate to_amount based on exchange rate and from_amount
   const calculateToAmount = () => {
     const { from_amount: amt, usd_to_syp_exchange_rate: rate, from_currency, to_currency } = formData;
@@ -367,7 +376,7 @@ export default function TransactionCreate() {
               </CardTitle>
             </div>
             <CardContent className="flex flex-col items-center justify-center space-y-4 pt-16">
-              {formData.from_currency === 'USD' && formData.to_currency === 'SYP' && (
+              {needsRate && (
                 <>
                   <div className="text-center">
                     <Label htmlFor="exchange_rate" className="text-sm font-medium">{t('financial.usdToSypRate')}</Label>
@@ -395,7 +404,17 @@ export default function TransactionCreate() {
                   {formData.from_amount && formData.usd_to_syp_exchange_rate && (
                     <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                       <p className="text-sm text-blue-800 dark:text-blue-200">
-                        ${formData.from_amount.toFixed(2)} × {formData.usd_to_syp_exchange_rate} = SYP {(formData.from_amount * formData.usd_to_syp_exchange_rate).toFixed(2)}
+                        {formData.from_currency === 'USD' ? (
+                          <>
+                            ${formData.from_amount.toFixed(2)} × {formData.usd_to_syp_exchange_rate} = SYP{" "}
+                            {(formData.from_amount * formData.usd_to_syp_exchange_rate).toFixed(2)}
+                          </>
+                        ) : (
+                          <>
+                            SYP {formData.from_amount.toFixed(2)} ÷ {formData.usd_to_syp_exchange_rate} = $
+                            {(formData.from_amount / formData.usd_to_syp_exchange_rate).toFixed(2)}
+                          </>
+                        )}
                       </p>
                     </div>
                   )}
@@ -409,8 +428,7 @@ export default function TransactionCreate() {
                 </div>
               )}
 
-              {formData.from_currency && formData.to_currency &&
-               !(formData.from_currency === 'USD' && formData.to_currency === 'SYP') && (
+              {formData.from_currency && formData.to_currency && !needsRate && (
                 <div className="text-center text-gray-500 dark:text-gray-400">
                   <ArrowRightLeft className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">{t('financial.directTransfer')}</p>
