@@ -163,8 +163,11 @@ def material_inventory_summary(uuid: str):
         lots = []
         for inv in uow.inventory_repository.find_all(material_uuid=uuid, is_deleted=False):
             qty = inv.current_quantity
-            if not qty or qty <= 0:
-                continue  # empty lots are noise — hidden by design
+            # Hide lots that are exactly empty — they are noise. NEGATIVE lots
+            # stay visible on purpose: they are a data problem, and hiding them
+            # would also hide the "zero this lot out" action that fixes them.
+            if not qty or abs(qty) < 1e-9:
+                continue
             dto = InventoryRead.from_orm(inv)
             InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=dto)
             currency = inv.currency or next(

@@ -94,6 +94,11 @@ export const en: Record<string, string> = {
   'enum.product': 'Product',
   'enum.machinery_and_equipment': 'Machinery and Equipment',
   'enum.vehicle': 'Vehicle',
+  'materials.zeroOut': 'Zero out',
+  'materials.lotZeroed': 'Lot zeroed out',
+  'materials.zeroOutFailed': 'Could not zero out this lot',
+  'materials.zeroOutConfirmTitle': 'Zero out this lot?',
+  'materials.zeroOutConfirmBody': 'Lot {lot} holds {qty} {unit}. This writes an inventory event that brings it to exactly 0 — it does not delete the lot, and it can be undone by deleting that event.',
 };
 
 export const ar: Record<string, string> = {
@@ -188,4 +193,9 @@ export const ar: Record<string, string> = {
   'enum.product': 'منتج',
   'enum.machinery_and_equipment': 'آلات ومعدات',
   'enum.vehicle': 'مركبة',
+  'materials.zeroOut': 'تصفير',
+  'materials.lotZeroed': 'تم تصفير الدفعة',
+  'materials.zeroOutFailed': 'تعذر تصفير هذه الدفعة',
+  'materials.zeroOutConfirmTitle': 'تصفير هذه الدفعة؟',
+  'materials.zeroOutConfirmBody': 'الدفعة {lot} تحتوي {qty} {unit}. سيتم تسجيل حركة مخزون تجعلها 0 بالضبط — لا يتم حذف الدفعة، ويمكن التراجع بحذف تلك الحركة.',
 };

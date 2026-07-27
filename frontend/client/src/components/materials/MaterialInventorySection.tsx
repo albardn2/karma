@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ResponsiveContainer,
   LineChart,
@@ -9,9 +9,22 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { CircleSlash } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { toast } from "@/hooks/use-toast";
 
 interface SeriesEvent {
   t: string | null;
@@ -59,6 +72,34 @@ export function MaterialInventorySection({ materialUuid }: { materialUuid: strin
       return { t: toMs(e.t as string), total: Math.round(bal * 100) / 100 };
     });
   }, [summary]);
+
+  const queryClient = useQueryClient();
+  const [lotToZero, setLotToZero] = useState<InventoryLot | null>(null);
+
+  // The correcting quantity is worked out server-side from the lot's own
+  // events, so a stale page cannot overshoot; the client only names the lot.
+  const zeroOut = useMutation({
+    mutationFn: (lotUuid: string) =>
+      apiRequest(`/inventory/${lotUuid}/zero-out`, { method: "POST", body: {} }),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/material/"] });
+      queryClient.invalidateQueries({ queryKey: ["/inventory/"] });
+      queryClient.invalidateQueries({ queryKey: ["/inventory-event/"] });
+      toast({
+        title: t("materials.lotZeroed"),
+        description: `${res?.lot_id ?? ""} · ${res?.previous_quantity ?? ""} → 0`,
+      });
+      setLotToZero(null);
+    },
+    onError: (e: any) => {
+      toast({
+        title: t("materials.zeroOutFailed"),
+        description: e?.message,
+        variant: "destructive",
+      });
+      setLotToZero(null);
+    },
+  });
 
   // lots come pre-filtered from the API: only lots with remaining stock
   const lots: InventoryLot[] = summary?.lots || [];
@@ -153,7 +194,8 @@ export function MaterialInventorySection({ materialUuid }: { materialUuid: strin
                       <th className="py-2 pe-4 font-medium text-end">{t('materials.costPerUnit')}</th>
                       <th className="py-2 pe-4 font-medium text-end">{t('materials.stockValue')}</th>
                       <th className="py-2 pe-4 font-medium">{t('materials.received')}</th>
-                      <th className="py-2 font-medium">{t('materials.expires')}</th>
+                      <th className="py-2 pe-4 font-medium">{t('materials.expires')}</th>
+                      <th className="py-2 font-medium" />
                     </tr>
                   </thead>
                   <tbody>
@@ -161,7 +203,11 @@ export function MaterialInventorySection({ materialUuid }: { materialUuid: strin
                       <tr key={l.uuid} className="border-b last:border-0" data-testid={`row-lot-${l.uuid}`}>
                         <td className="py-2 pe-4 font-mono text-xs">{l.lot_id || l.uuid.slice(0, 8)}</td>
                         <td className="py-2 pe-4">{l.warehouse_name || "—"}</td>
-                        <td className="py-2 pe-4 text-end font-semibold tabular-nums">
+                        <td
+                          className={`py-2 pe-4 text-end font-semibold tabular-nums ${
+                            (l.current_quantity || 0) < 0 ? "text-red-600" : ""
+                          }`}
+                        >
                           {fmt(l.current_quantity || 0)}
                         </td>
                         <td className="py-2 pe-4 text-gray-500">{l.unit || "—"}</td>
@@ -174,12 +220,50 @@ export function MaterialInventorySection({ materialUuid }: { materialUuid: strin
                             : "—"}
                         </td>
                         <td className="py-2 pe-4 whitespace-nowrap">{fmtDate(l.created_at)}</td>
-                        <td className="py-2 whitespace-nowrap">{fmtDate(l.expiration_date)}</td>
+                        <td className="py-2 pe-4 whitespace-nowrap">{fmtDate(l.expiration_date)}</td>
+                        <td className="py-2 whitespace-nowrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 gap-1 text-xs"
+                            onClick={() => setLotToZero(l)}
+                            disabled={zeroOut.isPending}
+                            data-testid={`zero-out-${l.uuid}`}
+                          >
+                            <CircleSlash className="h-3.5 w-3.5" />
+                            {t('materials.zeroOut')}
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+
+              <AlertDialog open={!!lotToZero} onOpenChange={(o) => !o && setLotToZero(null)}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t('materials.zeroOutConfirmTitle')}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t('materials.zeroOutConfirmBody', {
+                        lot: lotToZero?.lot_id || lotToZero?.uuid.slice(0, 8) || '',
+                        qty: fmt(lotToZero?.current_quantity || 0),
+                        unit: lotToZero?.unit || '',
+                      })}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => lotToZero && zeroOut.mutate(lotToZero.uuid)}
+                      disabled={zeroOut.isPending}
+                      data-testid="confirm-zero-out"
+                    >
+                      {t('materials.zeroOut')}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
               {/* weighted average cost of remaining stock */}
               <div className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm" data-testid="material-avg-cost">
