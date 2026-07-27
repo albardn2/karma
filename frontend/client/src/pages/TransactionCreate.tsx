@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ArrowLeft, Save, ArrowRightLeft, RefreshCw, Building2, Wallet } from "lucide-react";
+import { ArrowLeft, Save, ArrowRightLeft, Building2, Wallet } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -184,6 +184,9 @@ export default function TransactionCreate() {
     }));
   };
 
+  // On a two-sided transfer the destination amount is computed, not typed
+  const isDerivedToAmount = !!formData.from_account_uuid && !!formData.to_account_uuid;
+
   // A rate is needed whenever the two sides are in DIFFERENT currencies — in
   // either direction. Gating this on USD->SYP alone hid the field for SYP->USD
   // and, worse, told the user "no exchange rate needed" while the API refused
@@ -194,20 +197,47 @@ export default function TransactionCreate() {
     formData.from_currency !== formData.to_currency;
 
   // Calculate to_amount based on exchange rate and from_amount
-  const calculateToAmount = () => {
-    const { from_amount: amt, usd_to_syp_exchange_rate: rate, from_currency, to_currency } = formData;
-    if (!amt || !rate) return;
-    // round to 2dp: the API compares money at 2 decimals, and an unrounded
-    // product carries float noise (3.3 * 14500.5 = 47851.649999999994)
+  // The destination amount is never a free choice on a transfer: the API
+  // requires it to equal the converted source amount (to 2 decimals), so derive
+  // it from the source amount, the currencies and the rate instead of making
+  // the user compute it and press a button.
+  useEffect(() => {
+    const { from_account_uuid, to_account_uuid, from_amount: amt,
+            usd_to_syp_exchange_rate: rate, from_currency, to_currency } = formData;
+
+    // only a two-sided transfer has a derivable destination amount; on a
+    // deposit (to-only) the user types it directly, so leave it alone
+    if (!from_account_uuid || !to_account_uuid || !from_currency || !to_currency) return;
+    if (!amt) return;
+
+    // 2dp, because that is what the API compares at and an unrounded product
+    // carries float noise (3.3 * 14500.5 = 47851.649999999994)
     const round2 = (v: number) => Math.round(v * 100) / 100;
-    if (from_currency === 'USD' && to_currency === 'SYP') {
-      setFormData(prev => ({ ...prev, to_amount: round2(amt * rate) }));
-    } else if (from_currency === 'SYP' && to_currency === 'USD') {
-      setFormData(prev => ({ ...prev, to_amount: round2(amt / rate) }));
-    } else if (from_currency && from_currency === to_currency) {
-      setFormData(prev => ({ ...prev, to_amount: round2(amt) }));
+
+    let derived: number | undefined;
+    if (from_currency === to_currency) {
+      derived = round2(amt);
+    } else if (rate) {
+      derived =
+        from_currency === 'USD' && to_currency === 'SYP'
+          ? round2(amt * rate)
+          : from_currency === 'SYP' && to_currency === 'USD'
+          ? round2(amt / rate)
+          : undefined;
     }
-  };
+
+    if (derived !== undefined && derived !== formData.to_amount) {
+      setFormData(prev => ({ ...prev, to_amount: derived }));
+    }
+  }, [
+    formData.from_account_uuid,
+    formData.to_account_uuid,
+    formData.from_amount,
+    formData.from_currency,
+    formData.to_currency,
+    formData.usd_to_syp_exchange_rate,
+    formData.to_amount,
+  ]);
 
   const formatCurrency = (amount: number, currency: string) => {
     const currencySymbols: { [key: string]: string } = {
@@ -391,14 +421,6 @@ export default function TransactionCreate() {
                         placeholder={t('financial.rate')}
                         className="text-center"
                       />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={calculateToAmount}
-                        disabled={!formData.from_amount || !formData.usd_to_syp_exchange_rate}
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
                   {formData.from_amount && formData.usd_to_syp_exchange_rate && (
@@ -499,7 +521,14 @@ export default function TransactionCreate() {
                   value={formData.to_amount || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, to_amount: parseFloat(e.target.value) || undefined }))}
                   placeholder={t('financial.enterAmount')}
+                  readOnly={isDerivedToAmount}
+                  className={isDerivedToAmount ? 'bg-gray-50 dark:bg-gray-800' : undefined}
                 />
+                {isDerivedToAmount && (
+                  <p className="text-xs text-muted-foreground mt-1" data-testid="to-amount-derived-note">
+                    {t('financial.autoConverted')}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">

@@ -155,6 +155,7 @@ export const en: Record<string, string> = {
   'financial.defaultForCurrency': 'Default for {currency}',
   'financial.oneAccountRequired': 'Choose at least one account — a source, a destination, or both.',
   'financial.amountMustBePositive': 'Amount must be greater than zero.',
+  'financial.autoConverted': 'Converted automatically from the source amount and rate.',
 };
 
 export const ar: Record<string, string> = {
@@ -310,4 +311,5 @@ export const ar: Record<string, string> = {
   'financial.defaultForCurrency': 'الافتراضي لـ {currency}',
   'financial.oneAccountRequired': 'اختر حساباً واحداً على الأقل — المصدر أو الوجهة أو كليهما.',
   'financial.amountMustBePositive': 'يجب أن تكون الكمية أكبر من صفر.',
+  'financial.autoConverted': 'يتم تحويله تلقائياً من المبلغ المصدر وسعر الصرف.',
 };
