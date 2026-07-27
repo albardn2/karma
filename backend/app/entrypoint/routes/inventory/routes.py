@@ -195,6 +195,63 @@ def manual_add_inventory():
 
 
 
+@inventory_blueprint.route('/<string:uuid>/zero-out', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.OPERATION_MANAGER.value,
+                 PermissionScope.OPERATOR.value)
+def zero_out_inventory(uuid: str):
+    """Write the lot's remaining quantity off to exactly zero.
+
+    The correcting quantity is computed HERE, from the lot's own events, rather
+    than taken from the caller: a page that loaded a minute ago may be showing a
+    stale figure, and trusting it would leave the lot slightly off — or worse,
+    push it the wrong side of zero. A negative lot is corrected upwards by the
+    same rule.
+
+    Recorded as a manual event with affect_original=False, so the lot keeps its
+    original received quantity for costing and only the current balance moves.
+    """
+    from app.dto.inventory_event import InventoryEventCreate, InventoryEventType
+    from app.domains.inventory_event.domain import InventoryEventDomain
+
+    current_user_uuid = get_jwt_identity()
+    notes = (request.json or {}).get('notes') if request.is_json else None
+
+    with SqlAlchemyUnitOfWork() as uow:
+        inventory = uow.inventory_repository.find_one(uuid=uuid, is_deleted=False)
+        if not inventory:
+            raise NotFoundError('Inventory not found')
+
+        remaining = inventory.current_quantity or 0
+        # 1e-9 rather than == 0: quantities are floats built by summing events
+        if abs(remaining) < 1e-9:
+            raise BadRequestError('This lot is already at zero')
+
+        event = InventoryEventCreate(
+            inventory_uuid=inventory.uuid,
+            event_type=InventoryEventType.MANUAL.value,
+            quantity=-remaining,
+            notes=notes or f'Zeroed out (was {remaining})',
+            affect_original=False,
+        )
+        add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=event)
+        event_read = InventoryEventDomain.create_inventory_event(uow=uow, payload=event)
+        uow.commit()
+
+        result = {
+            'inventory_uuid': inventory.uuid,
+            'lot_id': inventory.lot_id,
+            'previous_quantity': remaining,
+            'current_quantity': inventory.current_quantity,
+            'inventory_event': event_read.model_dump(mode='json'),
+        }
+    return jsonify(result), 201
+
+
+
 # ----------------------- WAREHOUSE INVENTORY ANALYTICS -----------------------
 # Stock is the running sum of SIGNED inventory events (purchases/returns are
 # positive, sales/process consumption negative) — exactly how
