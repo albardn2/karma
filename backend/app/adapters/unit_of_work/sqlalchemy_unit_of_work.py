@@ -15,6 +15,7 @@ from app.adapters.repositories.pricing_repository import PricingRepository
 from app.adapters.repositories.purchase_order_repository import PurchaseOrderRepository
 from app.adapters.repositories.purchase_order_item_repository import PurchaseOrderItemRepository
 from app.adapters.repositories.financial_account_repository import FinancialAccountRepository
+from app.adapters.repositories.exchange_rate_repository import ExchangeRateRepository
 from app.adapters.repositories.warehouse_repository import WarehouseRepository
 from app.adapters.repositories.transaction_repository import TransactionRepository
 from app.adapters.repositories.customer_order_repository import CustomerOrderRepository
@@ -87,6 +88,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.purchase_order_repository = PurchaseOrderRepository(session=self.session, account_uuid=self.account_uuid)
         self.purchase_order_item_repository = PurchaseOrderItemRepository(session=self.session, account_uuid=self.account_uuid)
         self.financial_account_repository = FinancialAccountRepository(session=self.session, account_uuid=self.account_uuid)
+        self.exchange_rate_repository = ExchangeRateRepository(session=self.session, account_uuid=self.account_uuid)
         self.warehouse_repository = WarehouseRepository(session=self.session, account_uuid=self.account_uuid)  # Placeholder for warehouse repository
         self.transaction_repository = TransactionRepository(session=self.session, account_uuid=self.account_uuid)
         self.customer_order_repository = CustomerOrderRepository(session=self.session, account_uuid=self.account_uuid)

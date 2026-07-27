@@ -36,6 +36,7 @@ MODULE_RESOURCE = {
     "service-areas": "service_area", "purchase-orders": "purchase_order",
     "customer-orders": "customer_order", "payments": "payment",
     "payouts": "payout", "expenses": "expense", "transactions": "transaction",
+    "exchange-rates": "exchange_rate",
     "credit-note-items": "credit_note_item", "debit-note-items": "debit_note_item",
     "processes": "process", "workflows": "workflow",
     "workflow-execution": "workflow_execution",

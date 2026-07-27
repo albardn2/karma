@@ -18,6 +18,7 @@ from sqlalchemy import (
     Column,
     String,
     DateTime,
+    Date,
     Text,
     Float,
     Boolean,
@@ -2295,3 +2296,54 @@ class LocationTrackingConfig(Base):
     history_cadence_seconds = Column(Integer, nullable=False, default=120)
     history_retention_days = Column(Integer, nullable=False, default=14)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ExchangeRate(Base):
+    """One currency pair's rate on one day.
+
+    `rate` is how many units of `to_currency` one unit of `from_currency` buys,
+    so USD→SYP is a number in the thousands. **SYP here is the OLD pound**, the
+    same unit every other SYP amount in this database uses — see
+    app/domains/exchange_rate/sp_today.py for why that distinction is load
+    bearing.
+
+    `buy_rate` / `sell_rate` are the two sides of the market when the source
+    publishes them (an exchange office buys your dollars at one and sells at the
+    other); `rate` is the midpoint we book at. Manual entries may set only
+    `rate`, which is why the two sides are nullable.
+    """
+    __tablename__ = "exchange_rate"
+    __table_args__ = (
+        # One live rate per pair per day per tenant. Without this a repeated
+        # pull would stack duplicates and `find_one` — which uses
+        # one_or_none() — would start raising MultipleResultsFound (a 500).
+        # Re-pulling the same day updates the row instead.
+        Index(
+            'uq_exchange_rate_pair_date',
+            'account_uuid', 'from_currency', 'to_currency', 'rate_date',
+            unique=True,
+            postgresql_where=text('is_deleted = false'),
+        ),
+        # the lookup the transaction form makes: newest rate for a pair
+        Index(
+            'ix_exchange_rate_pair_date',
+            'account_uuid', 'from_currency', 'to_currency', 'rate_date',
+        ),
+    )
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    from_currency = Column(String(12), nullable=False)
+    to_currency = Column(String(12), nullable=False)
+    rate = Column(Float, nullable=False)
+    buy_rate = Column(Float, nullable=True)
+    sell_rate = Column(Float, nullable=True)
+    # the market day this rate belongs to, not the row's insert time
+    rate_date = Column(Date, nullable=False)
+    # 'sp-today' when pulled from the site, 'manual' when a user typed it
+    source = Column(String(60), nullable=False, default='manual')
+    notes = Column(Text, nullable=True)
+    is_deleted = Column(Boolean, default=False, nullable=False)

@@ -12,6 +12,7 @@ from app.entrypoint.routes.material import material_blueprint
 from app.entrypoint.routes.vendor import vendor_blueprint
 from app.entrypoint.routes.employee import employee_blueprint
 from app.entrypoint.routes.expense import expense_blueprint
+from app.entrypoint.routes.exchange_rate import exchange_rate_blueprint
 from app.entrypoint.routes.pricing import pricing_blueprint
 from app.entrypoint.routes.purchase_order import purchase_order_blueprint
 from app.entrypoint.routes.purchase_order_item import poi_blueprint
@@ -175,6 +176,7 @@ def create_app(config_object=Config):
     app.register_blueprint(vendor_blueprint, url_prefix='/vendor')
     app.register_blueprint(employee_blueprint, url_prefix='/employee')
     app.register_blueprint(expense_blueprint, url_prefix='/expense')
+    app.register_blueprint(exchange_rate_blueprint, url_prefix='/exchange-rate')
     app.register_blueprint(pricing_blueprint, url_prefix='/pricing')
     app.register_blueprint(purchase_order_blueprint, url_prefix='/purchase-order')
     app.register_blueprint(poi_blueprint, url_prefix='/purchase-order-item')

@@ -64,6 +64,7 @@ import ExpenseDetail from "@/pages/ExpenseDetail";
 import ExpenseCreate from "@/pages/ExpenseCreate";
 import Transactions from "@/pages/Transactions";
 import TransactionDetail from "@/pages/TransactionDetail";
+import ExchangeRates from "@/pages/ExchangeRates";
 import CreditNoteItems from "@/pages/CreditNoteItems";
 import CreditNoteItemDetail from "@/pages/CreditNoteItemDetail";
 import CreditNoteItemCreate from "@/pages/CreditNoteItemCreate";
@@ -145,6 +146,7 @@ function Router() {
       <Route path="/transactions" component={() => <ProtectedRoute><Transactions /></ProtectedRoute>} />
       <Route path="/transactions/create" component={() => <ProtectedRoute><TransactionCreate /></ProtectedRoute>} />
       <Route path="/transactions/:id" component={() => <ProtectedRoute><TransactionDetail /></ProtectedRoute>} />
+      <Route path="/exchange-rates" component={() => <ProtectedRoute><ExchangeRates /></ProtectedRoute>} />
       <Route path="/credit-note-items" component={() => <ProtectedRoute><CreditNoteItems /></ProtectedRoute>} />
       <Route path="/credit-note-items/create" component={() => <ProtectedRoute><CreditNoteItemCreate /></ProtectedRoute>} />
       <Route path="/credit-note-items/:uuid" component={() => <ProtectedRoute><CreditNoteItemDetail /></ProtectedRoute>} />
