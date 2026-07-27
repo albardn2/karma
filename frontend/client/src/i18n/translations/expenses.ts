@@ -108,8 +108,7 @@ export const en: Record<string, string> = {
   'expenses.tripExpenseCreated': 'Trip expense recorded',
   'expenses.tripExpenseFailed': 'Could not record the expense',
   'expenses.tripExpenseNotesPlaceholder': 'Fuel, tolls, a meal on the road…',
-  'expenses.payNow': 'Pay it now',
-  'expenses.payNowHint': 'Books the payout immediately from the default account for this currency.',
+  'expenses.alwaysPaidNote': 'Recorded as paid — the payout is booked from the default account for this currency.',
 };
 
 export const ar: Record<string, string> = {
@@ -216,6 +215,5 @@ export const ar: Record<string, string> = {
   'expenses.tripExpenseCreated': 'تم تسجيل مصروف الرحلة',
   'expenses.tripExpenseFailed': 'تعذر تسجيل المصروف',
   'expenses.tripExpenseNotesPlaceholder': 'وقود، رسوم طريق، وجبة على الطريق…',
-  'expenses.payNow': 'ادفعه الآن',
-  'expenses.payNowHint': 'يسجّل الدفعة فوراً من الحساب الافتراضي لهذه العملة.',
+  'expenses.alwaysPaidNote': 'يُسجّل كمدفوع — تُحتسب الدفعة من الحساب الافتراضي لهذه العملة.',
 };

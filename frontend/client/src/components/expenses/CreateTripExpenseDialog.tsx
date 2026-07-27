@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "@/hooks/use-toast";
@@ -45,7 +44,6 @@ export function CreateTripExpenseDialog({
   const [currency, setCurrency] = useState("SYP");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
-  const [payNow, setPayNow] = useState(false);
 
   const { data: tripPage } = useQuery<any>({
     queryKey: ["/trip/", "for-expense", workflowExecutionUuid],
@@ -65,7 +63,6 @@ export function CreateTripExpenseDialog({
     setAmount("");
     setCategory("");
     setDescription("");
-    setPayNow(false);
   };
 
   const amountNumber = Number(amount);
@@ -82,7 +79,10 @@ export function CreateTripExpenseDialog({
           category,
           trip_uuid: trip.uuid,
           ...(description ? { description } : {}),
-          should_pay: payNow,
+          // A trip cost is money already spent on the road, so it is always
+          // booked as paid — there is no unpaid state to represent here, and no
+          // switch to get it wrong.
+          should_pay: true,
         },
       }),
     onSuccess: () => {
@@ -201,21 +201,11 @@ export function CreateTripExpenseDialog({
             />
           </div>
 
-          {/* should_pay books the payout immediately, against the default
+          {/* no switch: this always books the payout, against the default
               financial account for the currency */}
-          <label className="flex items-center justify-between rounded-lg border p-3">
-            <span className="text-sm">
-              {t("expenses.payNow")}
-              <span className="block text-xs text-muted-foreground">
-                {t("expenses.payNowHint")}
-              </span>
-            </span>
-            <Switch
-              checked={payNow}
-              onCheckedChange={setPayNow}
-              data-testid="trip-expense-paynow"
-            />
-          </label>
+          <p className="text-xs text-muted-foreground" data-testid="trip-expense-paid-note">
+            {t("expenses.alwaysPaidNote")}
+          </p>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
