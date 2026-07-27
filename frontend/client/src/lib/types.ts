@@ -527,6 +527,8 @@ export interface Trip {
     { start: number; sold: number; expected_end: number; actual_end: number | null; variance: number | null }
   > | null;
   expected_cash?: Record<string, number> | null;
+  trip_expenses?: Record<string, number> | null;
+  net_expected_cash?: Record<string, number> | null;
 }
 
 export interface TripFormData {
