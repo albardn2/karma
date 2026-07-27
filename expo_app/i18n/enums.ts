@@ -16,6 +16,16 @@ const ENUM_AR: Record<string, string> = {
   // currencies (Currency)
   USD: 'دولار',
   SYP: 'ل.س',
+  // expense categories (ExpenseCategory) — drivers pick these on the road
+  electricity: 'كهرباء',
+  water: 'ماء',
+  rent: 'إيجار',
+  maintenance: 'صيانة',
+  equipment: 'معدات',
+  supplies: 'مستلزمات',
+  travel: 'مواصلات',
+  meals: 'وجبات',
+  other: 'أخرى',
   // units of measure (UnitOfMeasure)
   kg: 'كغ',
   liters: 'لتر',
