@@ -17,7 +17,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
-import { Truck, Plus, Trash2 } from "lucide-react";
+import { Truck, Plus, Trash2, ClipboardCheck, Clock } from "lucide-react";
 import { TripFilters } from "@/components/trips/TripFilters";
 import { AddTripDialog } from "@/components/trips/AddTripDialog";
 import { format } from "date-fns";
@@ -330,9 +330,32 @@ export default function Trips() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadgeClass(trip.status)}`}>
-                          {te(trip.status)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadgeClass(trip.status)}`}>
+                            {te(trip.status)}
+                          </span>
+                          {/* audit sign-off, kept compact: a pill once signed off,
+                              a muted icon while it is still awaiting review */}
+                          {trip.is_audited ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300"
+                              title={t('trips.audited')}
+                              data-testid={`badge-trip-audited-${trip.uuid}`}
+                            >
+                              <ClipboardCheck className="h-3 w-3" />
+                              {t('trips.audited')}
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-flex text-gray-400 dark:text-gray-500"
+                              title={t('trips.notAudited')}
+                              aria-label={t('trips.notAudited')}
+                              data-testid={`badge-trip-not-audited-${trip.uuid}`}
+                            >
+                              <Clock className="h-3.5 w-3.5 shrink-0" />
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-900 dark:text-gray-100">

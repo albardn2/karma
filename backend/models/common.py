@@ -2023,11 +2023,31 @@ class Trip(Base):
     start_inventory = Column(MutableDict.as_mutable(JSONB), nullable=True)
     end_inventory = Column(MutableDict.as_mutable(JSONB), nullable=True)
 
+    # Sign-off that someone checked this trip's money and stock. Stored as WHO
+    # and WHEN rather than a bare flag, because that is the substance of an
+    # audit — a boolean cannot answer "who signed this off". `is_audited` below
+    # derives from it.
+    audited_at = Column(DateTime, nullable=True)
+    audited_by_uuid = Column(String(36), ForeignKey("user.uuid"), nullable=True)
+
     # relations
     vehicle = relationship("Vehicle", back_populates="trips")
     workflow_execution = relationship("WorkflowExecution", back_populates="trips")
     stops = relationship("TripStop", back_populates="trip")
     expenses = relationship("Expense", back_populates="trip")
+
+    @hybrid_property
+    def is_audited(self):
+        """Whether this trip has been signed off.
+
+        Derived rather than stored so the flag and the timestamp can never
+        disagree. The expression form lets the list endpoint filter on it in SQL.
+        """
+        return self.audited_at is not None
+
+    @is_audited.expression
+    def is_audited(cls):
+        return cls.audited_at.isnot(None)
 
     @hybrid_property
     def expected_cash(self):

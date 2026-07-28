@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit3, Save, X, Copy, Check, Truck, Banknote, ChevronLeft, ChevronRight, Trash2, Receipt } from "lucide-react";
+import { ArrowLeft, Edit3, Save, X, Copy, Check, Truck, Banknote, ChevronLeft, ChevronRight, Trash2, Receipt, ClipboardCheck, Clock, Undo2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +33,39 @@ import { TripLocationMap } from "@/components/location/TripLocationMap";
 import { TripAnalytics } from "@/components/trips/TripAnalytics";
 import { Table as TableIcon, Map as MapIcon } from "lucide-react";
 
+// apiRequest throws Error("<status>: <raw body>") and the backend error body is
+// {"error": ...}, or {"msg": ...} from the permission layer. Dig the readable
+// sentence out so a refused sign-off reads as "Only a supervisor can audit a
+// trip…" instead of '403: {"error": "..."}'. Same helper as ExchangeRates.tsx,
+// duplicated because that one is a module-local const there, not an export.
+const apiErrorMessage = (error: unknown, fallback: string): string => {
+  const raw = error instanceof Error ? error.message : String(error ?? "");
+  const body = raw.slice(raw.indexOf(":") + 1).trim();
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.error === "string") return parsed.error;
+    if (parsed && typeof parsed.msg === "string") return parsed.msg;
+  } catch {
+    // not JSON — fall through
+  }
+  return fallback || raw;
+};
+
+// Roles allowed to sign a trip off, mirroring the backend's AUDITOR_SCOPES
+// (app/entrypoint/routes/trip/routes.py). Admins are handled separately via
+// useAuth().isAdmin, exactly as the handler's _require_auditor() does.
+const AUDITOR_SCOPES = ["operation_manager", "accountant"];
+
+// audited_at arrives NAIVE — "2026-07-28T12:58:51.392508", no offset — and is
+// UTC. new Date() reads a naive datetime as LOCAL time, so a sign-off stamped at
+// 23:40 UTC would render as that same evening instead of after midnight in the
+// viewer's zone, i.e. a day out. Append 'Z' when no offset is present so it
+// parses as UTC and date-fns renders it locally. Same spirit as
+// ExchangeRates.tsx's formatRateDate: parse explicitly rather than trusting
+// new Date() with an ambiguous string.
+const parseNaiveUtc = (ts: string): Date =>
+  new Date(ts.includes("T") && !/(?:Z|[+-]\d{2}:?\d{2})$/.test(ts) ? `${ts}Z` : ts);
+
 export default function TripDetail() {
   const params = useParams();
   const [, setLocation] = useLocation();
@@ -40,8 +73,21 @@ export default function TripDetail() {
   const [editedNotes, setEditedNotes] = useState("");
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { t, te } = useLanguage();
+
+  // Who may sign a trip off: admins, plus the supervisory roles. The backend
+  // enforces this inside the handler (the ACL gate keys on blueprint+method, and
+  // `trip: create` is held by drivers and salespeople too), so gate on the role
+  // here rather than on an endpoint grant — otherwise a driver would be shown a
+  // button that always 403s. permission_scope is the comma-separated scope
+  // string /auth/me returns; this is the same derivation AuthContext uses for
+  // isAdmin.
+  const scopes = (user?.permission_scope ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const canAudit = isAdmin || scopes.some((s) => AUDITOR_SCOPES.includes(s));
 
   const deleteTripMutation = useMutation({
     mutationFn: () => apiRequest(`/trip/${params?.uuid}`, { method: "DELETE" }),
@@ -144,6 +190,46 @@ export default function TripDetail() {
     },
   });
 
+  // Both audit writes are POSTs: un-audit is /unaudit rather than DELETE /audit
+  // because the ACL gate keys on (blueprint, method), and a DELETE would demand
+  // `trip: delete`, which an operation manager does not hold.
+  const invalidateAfterAudit = () => {
+    // ["/trip/"] already prefix-matches this page's detail key, but name both so
+    // the dependency is obvious if either key is ever changed.
+    queryClient.invalidateQueries({ queryKey: ["/trip/"] });
+    queryClient.invalidateQueries({ queryKey: ["/trip/", params?.uuid] });
+  };
+
+  const auditTripMutation = useMutation({
+    mutationFn: () => apiRequest(`/trip/${params?.uuid}/audit`, { method: "POST", body: {} }),
+    onSuccess: () => {
+      invalidateAfterAudit();
+      toast({ title: t("common.success"), description: t("trips.auditMarked") });
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t("common.error"),
+        description: apiErrorMessage(error, t("trips.failedAudit")),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unauditTripMutation = useMutation({
+    mutationFn: () => apiRequest(`/trip/${params?.uuid}/unaudit`, { method: "POST", body: {} }),
+    onSuccess: () => {
+      invalidateAfterAudit();
+      toast({ title: t("common.success"), description: t("trips.auditCleared") });
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t("common.error"),
+        description: apiErrorMessage(error, t("trips.failedUnaudit")),
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEditClick = () => {
     setEditedNotes(trip?.notes || "");
     setIsEditing(true);
@@ -232,6 +318,18 @@ export default function TripDetail() {
     );
   }
 
+  // "Audited by admin on Jul 28, 2026". Falls back to the date alone when the
+  // auditor's uuid resolves to no username (a uuid from another tenant comes back
+  // unresolved rather than leaking a name).
+  const auditedDate = trip.audited_at ? format(parseNaiveUtc(trip.audited_at), 'MMM d, yyyy') : null;
+  const auditSummary = !trip.is_audited
+    ? t('trips.awaitingReview')
+    : auditedDate
+      ? trip.audited_by_username
+        ? t('trips.auditedByOn', { user: trip.audited_by_username, date: auditedDate })
+        : t('trips.auditedOn', { date: auditedDate })
+      : t('trips.audited');
+
   return (
     <AppLayout>
       <div className="p-8">
@@ -255,21 +353,64 @@ export default function TripDetail() {
               </div>
               <p className="text-gray-500" data-testid="text-header-trip-uuid">{t('trips.headerUuid', { uuid: trip.uuid })}</p>
             </div>
-            <div className="flex items-center gap-3">
-              <Badge className={getStatusBadgeClass(trip.status)} data-testid="badge-status">
-                {te(trip.status)}
-              </Badge>
-              {isAdmin && (
-                <Button
-                  variant="outline"
-                  className="text-red-600 border-red-200 hover:bg-red-50"
-                  onClick={() => setConfirmDelete(true)}
-                  data-testid="button-delete-trip"
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-3">
+                <Badge className={getStatusBadgeClass(trip.status)} data-testid="badge-status">
+                  {te(trip.status)}
+                </Badge>
+                <Badge
+                  className={trip.is_audited ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
+                  data-testid="badge-audit"
                 >
-                  <Trash2 className="h-4 w-4 me-2" />
-                  {t('trips.deleteTrip')}
-                </Button>
-              )}
+                  {trip.is_audited ? (
+                    <ClipboardCheck className="h-3.5 w-3.5 me-1" />
+                  ) : (
+                    <Clock className="h-3.5 w-3.5 me-1" />
+                  )}
+                  {trip.is_audited ? t('trips.audited') : t('trips.notAudited')}
+                </Badge>
+                {/* hidden for roles the backend would refuse, so nobody is offered
+                    a button that can only 403 */}
+                {canAudit && (trip.is_audited ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => unauditTripMutation.mutate()}
+                    disabled={unauditTripMutation.isPending}
+                    data-testid="button-unaudit-trip"
+                  >
+                    <Undo2 className="h-4 w-4 me-2" />
+                    {t('trips.undoAudit')}
+                  </Button>
+                ) : (
+                  <Button
+                    className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
+                    onClick={() => auditTripMutation.mutate()}
+                    disabled={auditTripMutation.isPending}
+                    data-testid="button-audit-trip"
+                  >
+                    <ClipboardCheck className="h-4 w-4 me-2" />
+                    {t('trips.markAudited')}
+                  </Button>
+                ))}
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={() => setConfirmDelete(true)}
+                    data-testid="button-delete-trip"
+                  >
+                    <Trash2 className="h-4 w-4 me-2" />
+                    {t('trips.deleteTrip')}
+                  </Button>
+                )}
+              </div>
+              <p
+                className="text-sm text-gray-500"
+                data-testid="text-audit-detail"
+                title={trip.audited_at ? format(parseNaiveUtc(trip.audited_at), 'PPpp') : undefined}
+              >
+                {auditSummary}
+              </p>
             </div>
           </div>
         </div>

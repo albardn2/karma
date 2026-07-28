@@ -529,6 +529,12 @@ export interface Trip {
   expected_cash?: Record<string, number> | null;
   trip_expenses?: Record<string, number> | null;
   net_expected_cash?: Record<string, number> | null;
+  // audit sign-off. is_audited is derived server-side from audited_at, so the
+  // two never disagree. audited_at is a NAIVE UTC datetime (no offset suffix).
+  is_audited?: boolean;
+  audited_at?: string | null;
+  audited_by_uuid?: string | null;
+  audited_by_username?: string | null;
 }
 
 export interface TripFormData {
@@ -570,6 +576,9 @@ export interface TripFilters {
   service_area_uuid?: string;
   status?: TripStatus;
   intersects_area?: string;
+  // tri-state: true / false / omitted (both). Must never reach the query string
+  // as '' or 'all' — the endpoint answers 422 for anything but true/false.
+  is_audited?: boolean;
   page?: number;
   per_page?: number;
 }

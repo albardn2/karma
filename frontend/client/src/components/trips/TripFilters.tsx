@@ -43,6 +43,10 @@ export function TripFilters({
       vehicle_uuid: filters.vehicle_uuid || undefined,
       service_area_uuid: filters.service_area_uuid || undefined,
       status: filters.status || undefined,
+      // NOT `|| undefined` like the others: is_audited is a boolean, and false
+      // ("not audited") is a real selection that `||` would silently drop back
+      // to "all" on the next render.
+      is_audited: filters.is_audited,
     });
   }, [filters]);
 
@@ -162,6 +166,30 @@ export function TripFilters({
                     <SelectItem value="in_progress">{te('in_progress')}</SelectItem>
                     <SelectItem value="completed">{te('completed')}</SelectItem>
                     <SelectItem value="cancelled">{te('cancelled')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="filter-audited" className="text-sm">{t('trips.auditLabel')}</Label>
+                {/* 'all' is a sentinel, as with the status filter above: Radix
+                    Select cannot hold an empty string value, and an empty
+                    is_audited would 422 the endpoint. It converts back to
+                    undefined so the param is simply omitted. */}
+                <Select
+                  value={localFilters.is_audited === undefined ? 'all' : String(localFilters.is_audited)}
+                  onValueChange={(value) => setLocalFilters({
+                    ...localFilters,
+                    is_audited: value === 'all' ? undefined : value === 'true',
+                  })}
+                >
+                  <SelectTrigger id="filter-audited" data-testid="select-filter-audited">
+                    <SelectValue placeholder={t('trips.selectAuditState')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('trips.allAuditStates')}</SelectItem>
+                    <SelectItem value="true">{t('trips.audited')}</SelectItem>
+                    <SelectItem value="false">{t('trips.notAudited')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

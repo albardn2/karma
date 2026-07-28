@@ -193,6 +193,13 @@ class TripRead(BaseModel):
     expected_cash: Optional[dict] = None  # {currency: amount} collected at this trip's stops
     trip_expenses: Optional[dict] = None  # {currency: amount} costs booked to this trip
     net_expected_cash: Optional[dict] = None  # collected minus those costs
+    # audit sign-off: is_audited derives from audited_at on the model, so the
+    # flag and the timestamp cannot disagree. audited_by_username is resolved by
+    # the routes, like assigned_username.
+    is_audited: bool = False
+    audited_at: Optional[datetime] = None
+    audited_by_uuid: Optional[str] = None
+    audited_by_username: Optional[str] = None
 
     @field_validator("distribution_area", "start_point", "end_point", mode="before")
     def _ensure_wkt(cls, v):
@@ -225,6 +232,9 @@ class TripListParams(BaseModel):
     service_area_uuid: Optional[str] = None
     workflow_execution_uuid: Optional[str] = None
     status: Optional[TripStatus] = None
+    # True -> only signed-off trips, False -> only those still to review.
+    # Omitted means both, so existing callers are unaffected.
+    is_audited: Optional[bool] = None
     intersects_area: Optional[str] = None  # POLYGON WKT to intersect with trip.geometry
 
     page: int = Field(1, gt=0, description="Page number, starting at 1")
