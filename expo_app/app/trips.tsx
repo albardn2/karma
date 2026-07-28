@@ -28,7 +28,16 @@ interface Trip {
   end_time?: string | null;
   created_at: string;
   notes?: string | null;
+  is_audited?: boolean;
 }
+
+// 'all' means "send no is_audited param at all" — the endpoint 422s on an empty
+// value, and omitting it is what returns both kinds.
+const AUDIT_FILTERS = [
+  { value: 'all', labelKey: 'trips.filterAll' },
+  { value: 'true', labelKey: 'trips.audited' },
+  { value: 'false', labelKey: 'trips.notAudited' },
+];
 
 const STATUS_FILTERS = [
   { value: 'all', labelKey: 'trips.filterAll' },
@@ -64,6 +73,7 @@ export default function TripsScreen() {
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [auditFilter, setAuditFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -73,15 +83,16 @@ export default function TripsScreen() {
   const fetchPage = useCallback(
     async (pageNum: number, replace: boolean) => {
       const status = statusFilter === 'all' ? '' : `&status=${statusFilter}`;
+      const audited = auditFilter === 'all' ? '' : `&is_audited=${auditFilter}`;
       const res = await apiCall<{ items: Trip[]; pages: number }>(
-        `/trip/?page=${pageNum}&per_page=${PER_PAGE}${status}`
+        `/trip/?page=${pageNum}&per_page=${PER_PAGE}${status}${audited}`
       );
       if (res.data) {
         setPages(res.data.pages || 1);
         setTrips((prev) => (replace ? res.data!.items : [...prev, ...res.data!.items]));
       }
     },
-    [statusFilter]
+    [statusFilter, auditFilter]
   );
 
   useEffect(() => {
@@ -133,10 +144,22 @@ export default function TripsScreen() {
           <ThemedText style={styles.plate} numberOfLines={1}>
             {item.vehicle_plate || item.uuid.slice(0, 8)}
           </ThemedText>
-          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-            <ThemedText style={[styles.badgeText, { color: badge.fg }]}>
-              {badge.labelKey ? t(badge.labelKey) : item.status}
-            </ThemedText>
+          <View style={styles.badgeGroup}>
+            {item.is_audited && (
+              <View style={[styles.badge, { backgroundColor: '#D1FAE5' }]}>
+                <ThemedText
+                  style={[styles.badgeText, { color: '#047857' }]}
+                  testID={`trip-audited-${item.uuid}`}
+                >
+                  {t('trips.audited')}
+                </ThemedText>
+              </View>
+            )}
+            <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+              <ThemedText style={[styles.badgeText, { color: badge.fg }]}>
+                {badge.labelKey ? t(badge.labelKey) : item.status}
+              </ThemedText>
+            </View>
           </View>
         </View>
         <View style={styles.cardRow}>
@@ -173,6 +196,23 @@ export default function TripsScreen() {
           >
             <ThemedText
               style={[styles.filterText, statusFilter === f.value && styles.filterTextActive]}
+            >
+              {t(f.labelKey)}
+            </ThemedText>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.filterRow}>
+        {AUDIT_FILTERS.map((f) => (
+          <TouchableOpacity
+            key={f.value}
+            style={[styles.filterChip, auditFilter === f.value && styles.filterChipActive]}
+            onPress={() => setAuditFilter(f.value)}
+            testID={`trips-audit-filter-${f.value}`}
+          >
+            <ThemedText
+              style={[styles.filterText, auditFilter === f.value && styles.filterTextActive]}
             >
               {t(f.labelKey)}
             </ThemedText>
@@ -230,6 +270,7 @@ const styles = StyleSheet.create({
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   plate: { fontSize: 16, fontWeight: '700', color: '#111827', flexShrink: 1 },
+  badgeGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   badge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { fontSize: 11, fontWeight: '700' },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },

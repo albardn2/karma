@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -34,6 +35,9 @@ interface Trip {
   end_time?: string | null;
   created_at: string;
   notes?: string | null;
+  is_audited?: boolean;
+  audited_at?: string | null;
+  audited_by_username?: string | null;
   expected_cash?: Record<string, number> | null;
   trip_expenses?: Record<string, number> | null;
   net_expected_cash?: Record<string, number> | null;
@@ -112,6 +116,7 @@ export default function TripDetailScreen() {
   const [activityTab, setActivityTab] = useState<'orders' | 'fulfillments' | 'payments'>('orders');
   const [trackingOn, setTrackingOn] = useState(false);
   const [tripExpenses, setTripExpenses] = useState<any[]>([]);
+  const [savingAudit, setSavingAudit] = useState(false);
 
   const load = async () => {
     const [tripRes, expRes, actRes, matRes] = await Promise.all([
@@ -166,6 +171,36 @@ export default function TripDetailScreen() {
   );
 
   const badge = STATUS_BADGE[trip?.status || ''] || { bg: '#E5E7EB', fg: '#4B5563', labelKey: '' };
+
+  // Sign-off. Un-audit is a POST too, not a DELETE: the backend's permission
+  // gate keys on (blueprint, method), and DELETE would demand a `trip: delete`
+  // grant that an operation manager does not have.
+  const toggleAudit = async () => {
+    if (!trip || savingAudit) return;
+    setSavingAudit(true);
+    try {
+      const path = trip.is_audited ? 'unaudit' : 'audit';
+      const res = await apiCall<Trip>(`/trip/${trip.uuid}/${path}`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      if (res.status !== 200 || !res.data) {
+        throw new Error(res.error || t('trips.auditFailed'));
+      }
+      // Merge only the audit fields. The response is a plain trip read — it does
+      // not carry assigned_username, which the GET route enriches separately, so
+      // replacing the whole object would blank the assignee on screen.
+      const updated = res.data;
+      const { is_audited, audited_at, audited_by_username } = updated;
+      setTrip((prev) =>
+        prev ? { ...prev, is_audited, audited_at, audited_by_username } : updated
+      );
+    } catch (e: any) {
+      Alert.alert(t('trips.auditFailed'), e?.message || '');
+    } finally {
+      setSavingAudit(false);
+    }
+  };
   const recon = Object.entries(trip?.inventory_reconciliation || {});
   // every currency that appears in collections OR spend: a trip can collect in
   // one and pay for fuel in another
@@ -254,6 +289,47 @@ export default function TripDetailScreen() {
           <Row label={t('trips.start')} value={fmt(trip.start_time)} />
           <Row label={t('trips.end')} value={fmt(trip.end_time)} />
           {!!trip.notes && <Row label={t('trips.notes')} value={trip.notes} />}
+
+          {/* audit sign-off: who and when, not just that it happened */}
+          <View style={styles.auditRow}>
+            <View
+              style={[
+                styles.badge,
+                { backgroundColor: trip.is_audited ? '#D1FAE5' : '#E5E7EB' },
+              ]}
+            >
+              <ThemedText
+                style={[styles.badgeText, { color: trip.is_audited ? '#047857' : '#4B5563' }]}
+                testID="trip-audit-badge"
+              >
+                {trip.is_audited ? t('trips.audited') : t('trips.notAudited')}
+              </ThemedText>
+            </View>
+            <TouchableOpacity
+              style={[styles.auditBtn, savingAudit && styles.auditBtnDisabled]}
+              onPress={toggleAudit}
+              disabled={savingAudit}
+              testID="trip-audit-toggle"
+            >
+              {savingAudit ? (
+                <ActivityIndicator size="small" color="#5469D4" />
+              ) : (
+                <ThemedText style={styles.auditBtnText}>
+                  {trip.is_audited ? t('trips.undoAudit') : t('trips.markAudited')}
+                </ThemedText>
+              )}
+            </TouchableOpacity>
+          </View>
+          <ThemedText style={styles.auditNote} testID="trip-audit-note">
+            {!trip.is_audited
+              ? t('trips.awaitingReview')
+              : trip.audited_by_username
+              ? t('trips.auditedByOn', {
+                  user: trip.audited_by_username,
+                  date: fmt(trip.audited_at),
+                })
+              : t('trips.auditedOn', { date: fmt(trip.audited_at) })}
+          </ThemedText>
         </View>
 
         {/* money totals */}
@@ -455,6 +531,17 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 13, color: '#6B7280' },
   rowValue: { fontSize: 13, fontWeight: '600', color: '#111827', flexShrink: 1, textAlign: 'right' },
   badge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
+  auditRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)',
+  },
+  auditBtn: {
+    borderRadius: 10, borderWidth: 1, borderColor: '#5469D4',
+    paddingHorizontal: 14, paddingVertical: 7, minWidth: 118, alignItems: 'center',
+  },
+  auditBtnDisabled: { opacity: 0.5 },
+  auditBtnText: { color: '#5469D4', fontSize: 13, fontWeight: '700' },
+  auditNote: { fontSize: 12, opacity: 0.6, marginTop: 6 },
   badgeText: { fontSize: 11, fontWeight: '700' },
   muted: { fontSize: 13, color: '#9CA3AF', paddingVertical: 8, textAlign: 'center' },
   stopRow: {
