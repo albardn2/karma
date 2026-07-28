@@ -86,8 +86,6 @@ export const translations: Record<Lang, Record<string, string>> = {
     // multi-select + aggregate summary. Wording copied from the web summary so
     // the two products say the same thing; 'trips.summary' is already the trip
     // detail card title, hence summaryButton.
-    'trips.filterStatusLabel': 'Status',
-    'trips.filterAuditLabel': 'Audit',
     'trips.selectHint': 'Hold a trip to select several.',
     'trips.selectedCount': '{count} selected',
     'trips.summaryButton': 'Summary',
@@ -539,8 +537,6 @@ export const translations: Record<Lang, Record<string, string>> = {
     'trips.reconEnd': 'النهاية',
     'trips.reconVariance': 'الفرق',
     // التحديد المتعدد وملخص الرحلات المحددة — نفس صياغة الويب
-    'trips.filterStatusLabel': 'الحالة',
-    'trips.filterAuditLabel': 'التدقيق',
     'trips.selectHint': 'اضغط مطولاً على رحلة لتحديد عدة رحلات.',
     'trips.selectedCount': 'المحدد: {count}',
     'trips.summaryButton': 'الملخص',

@@ -38,20 +38,23 @@ interface Trip {
   is_audited?: boolean;
 }
 
+// One row of chips covering both dimensions. The audit pair are toggles rather
+// than a group with its own "All": tapping the active one clears it back to
+// showing both, which is what a second "All" chip would have done — and two
+// chips reading "All" in the same row is just a duplicate.
+//
 // 'all' means "send no is_audited param at all" — the endpoint 422s on an empty
 // value, and omitting it is what returns both kinds.
-const AUDIT_FILTERS = [
-  { value: 'all', labelKey: 'trips.filterAll' },
-  { value: 'true', labelKey: 'trips.audited' },
-  { value: 'false', labelKey: 'trips.notAudited' },
-];
+type FilterChip = { group: 'status' | 'audit'; value: string; labelKey: string };
 
-const STATUS_FILTERS = [
-  { value: 'all', labelKey: 'trips.filterAll' },
-  { value: 'planned', labelKey: 'trips.filterPlanned' },
-  { value: 'in_progress', labelKey: 'trips.filterInProgress' },
-  { value: 'completed', labelKey: 'trips.filterCompleted' },
-  { value: 'cancelled', labelKey: 'trips.filterCancelled' },
+const FILTER_CHIPS: FilterChip[] = [
+  { group: 'status', value: 'all', labelKey: 'trips.filterAll' },
+  { group: 'status', value: 'planned', labelKey: 'trips.filterPlanned' },
+  { group: 'status', value: 'in_progress', labelKey: 'trips.filterInProgress' },
+  { group: 'status', value: 'completed', labelKey: 'trips.filterCompleted' },
+  { group: 'status', value: 'cancelled', labelKey: 'trips.filterCancelled' },
+  { group: 'audit', value: 'true', labelKey: 'trips.audited' },
+  { group: 'audit', value: 'false', labelKey: 'trips.notAudited' },
 ];
 
 export const STATUS_BADGE: Record<string, { bg: string; fg: string; labelKey: string }> = {
@@ -75,29 +78,15 @@ const PER_PAGE = 20;
 // matches MAX_SUMMARY_TRIPS on the endpoint — saying so here beats a 422
 const MAX_SELECTION = 100;
 
-/** One row of filter chips that scrolls sideways instead of wrapping.
+/** The filter chips on one line that scrolls sideways instead of wrapping.
  *
- * Five status chips do not fit a phone's width, and wrapping left one chip
- * orphaned on a line of its own. A single row keeps the group readable at any
- * label length — which matters because the Arabic labels are a different width
- * again. The arrow appears only while there is something further along, and
- * taps to scroll, so the overflow is not left to be discovered by swiping.
+ * The chips do not fit a phone's width — wrapping left one orphaned on a line of
+ * its own — and the Arabic labels are a different width again, so no amount of
+ * shortening makes them fit for good. The arrow appears only while there is
+ * something further along and taps to scroll, so the overflow is not left to be
+ * found by swiping.
  */
-function ChipRow({
-  options,
-  value,
-  onChange,
-  testIDPrefix,
-  label,
-  title,
-}: {
-  options: { value: string; labelKey: string }[];
-  value: string;
-  onChange: (v: string) => void;
-  testIDPrefix: string;
-  label: (key: string) => string;
-  title: string;
-}) {
+function ScrollingChipRow({ children }: { children: React.ReactNode }) {
   const scrollRef = useRef<ScrollView>(null);
   const geometry = useRef({ content: 0, viewport: 0, offset: 0 });
   const [hasMore, setHasMore] = useState(false);
@@ -109,10 +98,6 @@ function ChipRow({
 
   return (
     <View style={styles.filterRow}>
-      {/* names the dimension, so each row's "All" says what it is all of */}
-      <ThemedText style={styles.filterLabel} numberOfLines={1}>
-        {title}
-      </ThemedText>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -132,21 +117,7 @@ function ChipRow({
         }}
         scrollEventThrottle={32}
       >
-        {options.map((option) => {
-          const active = value === option.value;
-          return (
-            <TouchableOpacity
-              key={option.value}
-              style={[styles.filterChip, active && styles.filterChipActive]}
-              onPress={() => onChange(option.value)}
-              testID={`${testIDPrefix}-${option.value}`}
-            >
-              <ThemedText style={[styles.filterText, active && styles.filterTextActive]}>
-                {label(option.labelKey)}
-              </ThemedText>
-            </TouchableOpacity>
-          );
-        })}
+        {children}
       </ScrollView>
       {hasMore && (
         <TouchableOpacity
@@ -155,7 +126,7 @@ function ChipRow({
             const { viewport, offset } = geometry.current;
             scrollRef.current?.scrollTo({ x: offset + viewport * 0.7, animated: true });
           }}
-          testID={`${testIDPrefix}-more`}
+          testID="trips-filter-more"
         >
           {/* points the way reading goes, so it flips with the layout */}
           <ThemedText style={styles.moreArrow}>{I18nManager.isRTL ? '‹' : '›'}</ThemedText>
@@ -380,23 +351,38 @@ export default function TripsScreen() {
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/?tab=menu'))}
       />
 
-      <ChipRow
-        options={STATUS_FILTERS}
-        value={statusFilter}
-        onChange={(v) => { exitSelection(); setStatusFilter(v); }}
-        testIDPrefix="trips-filter"
-        label={t}
-        title={t('trips.filterStatusLabel')}
-      />
-
-      <ChipRow
-        options={AUDIT_FILTERS}
-        value={auditFilter}
-        onChange={(v) => { exitSelection(); setAuditFilter(v); }}
-        testIDPrefix="trips-audit-filter"
-        label={t}
-        title={t('trips.filterAuditLabel')}
-      />
+      <ScrollingChipRow>
+        {FILTER_CHIPS.map((chip, index) => {
+          const isStatus = chip.group === 'status';
+          const active = isStatus ? statusFilter === chip.value : auditFilter === chip.value;
+          return (
+            <React.Fragment key={`${chip.group}-${chip.value}`}>
+              {/* a hairline where the dimension changes: two chips can be lit at
+                  once, and this shows why without spending a row on labels */}
+              {chip.group === 'audit' && FILTER_CHIPS[index - 1]?.group === 'status' && (
+                <View style={styles.filterDivider} />
+              )}
+              <TouchableOpacity
+                style={[styles.filterChip, active && styles.filterChipActive]}
+                onPress={() => {
+                  exitSelection();
+                  if (isStatus) {
+                    setStatusFilter(chip.value);
+                  } else {
+                    // tapping the lit one clears it, which is the "all" case
+                    setAuditFilter(active ? 'all' : chip.value);
+                  }
+                }}
+                testID={`trips-filter-${chip.group}-${chip.value}`}
+              >
+                <ThemedText style={[styles.filterText, active && styles.filterTextActive]}>
+                  {t(chip.labelKey)}
+                </ThemedText>
+              </TouchableOpacity>
+            </React.Fragment>
+          );
+        })}
+      </ScrollingChipRow>
 
       {/* a long press is invisible, so say it once — and only while it is the
           thing to do */}
@@ -475,15 +461,10 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyText: { fontSize: 14, color: '#6B7280' },
-  filterRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingStart: 16 },
-  // fixed width so both rows' chips start at the same place; the padding lives
-  // on the row, not in here, or it eats the width and truncates the label
-  filterLabel: {
-    fontSize: 11, fontWeight: '700', color: '#9CA3AF',
-    width: 62, textTransform: 'uppercase',
-  },
+  filterRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   // the padding lives on the content so the first and last chip clear the edge
-  filterScroll: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingEnd: 16 },
+  filterScroll: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 },
+  filterDivider: { width: StyleSheet.hairlineWidth, height: 20, backgroundColor: '#D1D5DB', marginHorizontal: 2 },
   moreButton: { paddingHorizontal: 12, paddingVertical: 4 },
   moreArrow: { fontSize: 22, fontWeight: '700', color: '#5469D4', lineHeight: 24 },
   filterChip: {
