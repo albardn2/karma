@@ -2302,10 +2302,10 @@ class ExchangeRate(Base):
     """One currency pair's rate on one day.
 
     `rate` is how many units of `to_currency` one unit of `from_currency` buys,
-    so USD→SYP is a number in the thousands. **SYP here is the OLD pound**, the
-    same unit every other SYP amount in this database uses — see
-    app/domains/exchange_rate/sp_today.py for why that distinction is load
-    bearing.
+    so USD→SYP is a number in the low hundreds. **SYP here is the NEW pound**,
+    the same unit every other SYP amount in this database uses since migration
+    f2a7b3d91c05 restated them — see app/domains/exchange_rate/sp_today.py, whose
+    source still publishes old pounds and divides on the way in.
 
     `buy_rate` / `sell_rate` are the two sides of the market when the source
     publishes them (an exchange office buys your dollars at one and sells at the

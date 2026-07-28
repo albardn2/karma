@@ -58,10 +58,12 @@ class TransactionDomain:
         amount with JS `Math.round`, which breaks exact halves upward; Python's
         `round` breaks them to even. A rate ending in .5 — which is exactly what
         the midpoint of a buy/sell pair gives, and what the exchange-rate
-        feature now pre-fills — lands on those halves constantly: at 13387.5,
-        22.7% of cent amounts between 1.00 and 2000.00 produce a one-cent
-        disagreement, and every one of them was rejected with "Amount must add
-        up to the exchange rate" while being correct to the penny.
+        feature now pre-fills — lands on those halves constantly: measured at
+        an old-pound rate of 13387.5, 22.7% of cent amounts between 1.00 and
+        2000.00 produced a one-cent disagreement, and every one was rejected with
+        "Amount must add up to the exchange rate" while being correct to the
+        penny. Redenomination shrank the rate but not the arithmetic: a
+        fractional rate still breaks halves.
 
         So compare distance instead. One side is always the exact product, and
         any honestly-rounded amount is within half a cent of it.

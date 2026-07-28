@@ -19,7 +19,7 @@ interface ExchangeRate {
   uuid: string;
   from_currency: string;
   to_currency: string;
-  // SYP per 1 USD, in OLD Syrian pounds (~13,387) — same unit as every other
+  // SYP per 1 USD, in NEW Syrian pounds (~133.9) — same unit as every other
   // SYP amount in the app. rate is the midpoint of buy_rate and sell_rate.
   rate: number;
   buy_rate?: number | null;
@@ -79,9 +79,14 @@ const apiErrorMessage = (error: unknown, fallback: string): string => {
 
 // Latin digits with thousands separators everywhere, in both languages: the
 // rate sits alongside other SYP amounts that are all rendered this way.
+//
+// Up to 4 decimals, unlike an amount: a rate is a multiplier, and in new pounds
+// the midpoint of a buy/sell pair often lands on a half — 133.875. Trimming
+// that to 133.88 would have someone reconciling 100 USD by hand arrive at
+// 13,388 instead of the 13,387.50 the app actually computed.
 const RATE_FORMAT = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  maximumFractionDigits: 4,
 });
 
 const formatRate = (value?: number | null) =>

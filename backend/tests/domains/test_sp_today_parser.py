@@ -2,9 +2,10 @@
 
 Every hazard here was hit for real while building against the live endpoint:
 
-1. The site headlines the REDENOMINATED pound (133.50) while this endpoint
-   returns the OLD one (13,350). Every SYP amount in this database is an old
-   pound, so reading the wrong unit misprices conversions by exactly 100x.
+1. This database keeps its books in the NEW pound while the endpoint still
+   returns the OLD one (13,350), so values are divided by 100 on the way in.
+   Getting that wrong in either direction misprices conversions by exactly 100x,
+   so the plausibility band brackets the CONVERTED figure and catches both.
 2. An unrecognised range does NOT error — /api/historical answers 200 with about
    a month of data. `range=2y` and `range=5y` both return 26 points. So a range
    must never be forwarded from a caller unchecked, or a "year" backfill quietly
@@ -54,23 +55,33 @@ def source(monkeypatch):
     return fake_urlopen, calls
 
 
-def test_reads_the_old_pound(source):
+def test_converts_the_source_to_new_pounds(source):
     serve, _ = source
     serve.body = _payload(
         [{"date": "2026-07-27T23:59:02+03:00", "buy": 13350, "sell": 13425}]
     )
     quote = fetch_history("today")[0]
-    assert (quote.buy_rate, quote.sell_rate) == (13350.0, 13425.0)
-    assert quote.mid_rate == 13387.5
+    assert (quote.buy_rate, quote.sell_rate) == (133.50, 134.25)
+    assert quote.mid_rate == 133.875
 
 
-def test_new_pound_values_are_refused(source):
-    """If the endpoint ever switches to the redenominated pound, fail loudly."""
+def test_source_already_in_new_pounds_is_refused(source):
+    """If the endpoint switches units itself, dividing again would be 100x low."""
     serve, _ = source
     serve.body = _payload(
         [{"date": "2026-07-27T23:59:02+03:00", "buy": 133.50, "sell": 134.25}]
     )
-    with pytest.raises(ScrapeError, match="plausible old-pound band"):
+    with pytest.raises(ScrapeError, match="outside the plausible"):
+        fetch_history("today")
+
+
+def test_absurdly_large_value_is_refused(source):
+    """The other side of the band: a value 100x too big must not slip through."""
+    serve, _ = source
+    serve.body = _payload(
+        [{"date": "2026-07-27T23:59:02+03:00", "buy": 1_335_000, "sell": 1_342_500}]
+    )
+    with pytest.raises(ScrapeError, match="outside the plausible"):
         fetch_history("today")
 
 
@@ -119,7 +130,7 @@ def test_last_point_of_a_day_wins(source):
     )
     quotes = fetch_history("today")
     assert len(quotes) == 1
-    assert quotes[0].buy_rate == 13350.0
+    assert quotes[0].buy_rate == 133.50
 
 
 def test_results_are_sorted_oldest_first(source):
@@ -164,4 +175,4 @@ def test_fetch_today_takes_the_most_recent_point(source):
             {"date": "2026-07-28T14:11:29+03:00", "buy": 13350, "sell": 13425},
         ]
     )
-    assert sp_today.fetch_today().buy_rate == 13350.0
+    assert sp_today.fetch_today().buy_rate == 133.50

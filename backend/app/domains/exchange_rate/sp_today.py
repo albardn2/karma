@@ -16,12 +16,15 @@ is just the chart's opening view.
 
 THE ONE THING TO GET RIGHT — old vs new pound
 ---------------------------------------------
-Syria redenominated the pound (two zeros removed). The site's headline now
-quotes the NEW pound (1 USD = 133.50 SYP), but **this endpoint returns the OLD
-pound** (13,350), which is the unit every SYP amount in this database uses.
-Storing a new-pound number where an old-pound one belongs would silently
-misprice every conversion by 100x, so `MIN_PLAUSIBLE_RATE` rejects anything that
-small and the pull fails loudly instead.
+Syria redenominated the pound (two zeros removed). This database keeps its books
+in the NEW pound (1 USD ~ 133.50 SYP), but **this endpoint still returns the OLD
+pound** (13,350), so every value is divided by `OLD_PER_NEW` on the way in.
+
+`PLAUSIBLE_RATE` brackets the converted figure, which catches a mistake in
+either direction: forget the division and 13,350 is far above the ceiling; apply
+it twice, or have the endpoint start quoting new pounds itself, and 1.34 is far
+below the floor. Either way the pull fails loudly instead of mispricing every
+conversion by 100x.
 
 A RANGE MUST NEVER BE PASSED THROUGH FROM A CALLER
 --------------------------------------------------
@@ -64,13 +67,16 @@ RANGES = {
 }
 DEFAULT_RANGE = "1m"
 
-# Old-pound USD/SYP has been in the thousands for years. The band exists to
-# reject a new-pound value (~134) or a stray number, not to predict the market.
-# NOTE: it is calibrated for USD. Turkish lira trades around 280 old pounds, so
-# this floor would reject it — fine while USD is the only pullable pair, but it
-# has to be revisited before adding another.
-MIN_PLAUSIBLE_RATE = 1_000.0
-MAX_PLAUSIBLE_RATE = 1_000_000.0
+# The source publishes old pounds; we store new ones.
+OLD_PER_NEW = 100
+
+# Bounds on the CONVERTED (new-pound) rate. USD/SYP has been in the low
+# hundreds since the redenomination, so this is wide enough for real market
+# moves and narrow enough to catch a units mistake of 100x in either direction.
+# NOTE: calibrated for USD. Turkish lira trades near 2.80 new pounds, below this
+# floor — fine while USD is the only pullable pair, but revisit before adding one.
+MIN_PLAUSIBLE_RATE = 10.0
+MAX_PLAUSIBLE_RATE = 10_000.0
 
 
 class ScrapeError(RuntimeError):
@@ -89,16 +95,22 @@ class Quote(NamedTuple):
         Neither side of a real trade: buy is what an exchange office pays for
         your dollars, sell is what it charges. Bookkeeping uses the midpoint,
         and the transaction form leaves it editable.
+
+        Four decimals, not two: in new pounds a rate is ~133.875 and it
+        multiplies amounts, so trimming it to 133.88 would shift a large
+        conversion by more than a pound.
         """
-        return round((self.buy_rate + self.sell_rate) / 2, 2)
+        return round((self.buy_rate + self.sell_rate) / 2, 4)
 
 
-def _check(value: float, label: str) -> float:
+def _to_new_pound(raw: float, label: str) -> float:
+    """Convert an old-pound figure from the source and sanity-check the result."""
+    value = raw / OLD_PER_NEW
     if not (MIN_PLAUSIBLE_RATE <= value <= MAX_PLAUSIBLE_RATE):
         raise ScrapeError(
-            f"{label} {value} is outside the plausible old-pound band "
-            f"[{MIN_PLAUSIBLE_RATE:,.0f}, {MAX_PLAUSIBLE_RATE:,.0f}] — the source "
-            f"may have switched to the new pound. Refusing to store it."
+            f"{label} {raw} converts to {value} new pounds, outside the plausible "
+            f"band [{MIN_PLAUSIBLE_RATE:,.0f}, {MAX_PLAUSIBLE_RATE:,.0f}] — the "
+            f"source's units may have changed. Refusing to store it."
         )
     return value
 
@@ -176,8 +188,8 @@ def fetch_history(range_key: str = DEFAULT_RANGE, code: str = "USD") -> list[Quo
         day = _parse_day(point["date"])
         by_date[day] = Quote(
             rate_date=day,
-            buy_rate=_check(buy, f"buy rate for {day}"),
-            sell_rate=_check(sell, f"sell rate for {day}"),
+            buy_rate=_to_new_pound(buy, f"buy rate for {day}"),
+            sell_rate=_to_new_pound(sell, f"sell rate for {day}"),
         )
 
     return [by_date[d] for d in sorted(by_date)]

@@ -32,7 +32,7 @@ class ExchangeRateBase(BaseModel):
 
     from_currency: Currency
     to_currency: Currency
-    # units of to_currency per 1 from_currency; SYP is the OLD pound
+    # units of to_currency per 1 from_currency; SYP is the NEW pound (~133.9/USD)
     rate: float = Field(gt=0)
     buy_rate: Optional[float] = Field(None, gt=0)
     sell_rate: Optional[float] = Field(None, gt=0)
