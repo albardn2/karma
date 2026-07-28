@@ -77,7 +77,15 @@ class CustomerOrderItemDomain:
                 inventories: list[InventoryFIFOOutput] = InventoryDomain.get_fifo_inventories_for_material(
                     uow=uow,
                     material_uuid=customer_order_item.material_uuid,
-                    quantity=abs(customer_order_item.quantity)
+                    quantity=abs(customer_order_item.quantity),
+                    # A sale may overdraw. The goods left the van whether or not
+                    # the books had caught up, and refusing the fulfilment would
+                    # lose the record of something that already happened — the
+                    # negative balance is the signal to go and reconcile.
+                    # Naming an explicit lot (the branch above) has never
+                    # checked availability either, so this makes the automatic
+                    # path behave like the manual one.
+                    allow_negative=True,
                 )
 
             for inv in inventories:

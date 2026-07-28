@@ -11,7 +11,12 @@ class InvoiceItemBase(BaseModel):
     created_by_uuid: Optional[str] = None
     invoice_uuid: str
     customer_order_item_uuid: str
-    price_per_unit: float = Field(..., gt=0)
+    # ge, not gt: a line can legitimately be free — a sample, a promotional unit,
+    # a replacement for damaged goods — and it still has to appear on the invoice
+    # so the stock leaves the books and the customer sees what they received.
+    # Negative stays rejected: money goes back to a customer through a credit
+    # note, not through a line item that quietly subtracts from the total.
+    price_per_unit: float = Field(..., ge=0)
 
 class InvoiceItemCreate(InvoiceItemBase):
     """Schema for a single invoice item creation (bulk)."""

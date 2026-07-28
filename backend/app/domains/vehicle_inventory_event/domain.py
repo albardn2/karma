@@ -34,8 +34,14 @@ class VehicleInventoryEventDomain:
 
         delta = VehicleInventoryEventDomain._signed_delta(payload.event_type, payload.quantity)
 
-        # by default a vehicle's stock cannot go negative; trip sales may override
-        if not allow_negative and inventory.current_quantity + delta < 0:
+        # By default a vehicle's stock cannot be DRIVEN negative; trip sales may
+        # override. Only decrements are gated: an already-overdrawn van (trip
+        # sales are allowed to do that) must still accept stock being loaded onto
+        # it. Testing the resulting balance alone refused a load of 3 onto a van
+        # at -10, because -10 + 3 is still negative — leaving the operator to
+        # either not record what they loaded or enter a quantity they know is
+        # false. A load can only ever improve the balance.
+        if not allow_negative and delta < 0 and inventory.current_quantity + delta < 0:
             raise BadRequestError(
                 f"Insufficient vehicle stock: balance {inventory.current_quantity}, "
                 f"requested change {delta}"
@@ -57,8 +63,22 @@ class VehicleInventoryEventDomain:
         inventory = uow.vehicle_inventory_repository.find_one(
             uuid=event_model.vehicle_inventory_uuid, is_deleted=False
         )
-        # deleting an event removes its delta from the balance; guard against negative
-        if inventory and (inventory.current_quantity - event_model.quantity) < 0:
+        # Deleting an event removes its delta from the balance, so only removing
+        # a POSITIVE delta (a load) can make things worse — and refusing that is
+        # right, since the stock may since have been sold.
+        #
+        # Removing a NEGATIVE delta raises the balance and must never be blocked:
+        # a sale is stored as a negative delta, so the old sign-blind test made
+        # an overdrawn van unrepairable. Unfulfilling an order reverses the
+        # warehouse ledger first and then lands here in the same transaction, so
+        # this raising rolled the entire unfulfil back — and with a -70 balance
+        # made of a -40 and a -30, every individual reversal was refused, in any
+        # order. The admin DELETE endpoint hit the same wall.
+        if (
+            inventory
+            and event_model.quantity > 0
+            and (inventory.current_quantity - event_model.quantity) < 0
+        ):
             raise BadRequestError(
                 "Deleting this event would make the vehicle stock negative"
             )
