@@ -1,8 +1,8 @@
 # app/entrypoint/routes/trip/routes.py
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, g, request, jsonify
 from sqlalchemy import func
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
-from app.entrypoint.routes.common.errors import NotFoundError
+from app.entrypoint.routes.common.errors import ApiError, NotFoundError
 from app.dto.trip import (
     TripCreate,
     TripRead,
@@ -56,8 +56,112 @@ def get_trip(uuid: str):
             raise NotFoundError("Trip not found")
         dto = TripRead.from_orm(m)
         dto.assigned_username = _assigned_username_for_wfe(uow, m.workflow_execution_uuid)
+        dto.audited_by_username = _username_for_uuid(uow, m.audited_by_uuid)
         dto = dto.model_dump(mode="json")
     return jsonify(dto), 200
+
+
+def _username_for_uuid(uow, user_uuid):
+    """Display name for an auditor. Account-scoped: a uuid from another tenant
+    resolves to nothing rather than leaking a name."""
+    if not user_uuid:
+        return None
+    from models.common import User as UserModel
+    row = (
+        uow.session.query(UserModel.username)
+        .filter(
+            UserModel.uuid == user_uuid,
+            UserModel.account_uuid == uow.account_uuid,
+        )
+        .first()
+    )
+    return row[0] if row else None
+
+
+# An audit is a supervisory sign-off on a finished trip's money and stock, so
+# the person who ran the trip should not be the person who signs it off.
+#
+# That intent CANNOT be expressed with `scopes_required` here. Two reasons, both
+# load bearing:
+#   - The ACL gate in before_request keys on (blueprint, METHOD), not on the
+#     route. Everything under this blueprint with POST needs `trip: create`,
+#     which drivers and salespeople already hold, so a decorator listing only
+#     supervisory roles would be decorative for them.
+#   - `scopes_required` returns the handler for any fine-grained user whenever
+#     the required scopes are not a subset of the admin scopes, so it cannot
+#     narrow a route to "these non-admin roles".
+# So the role check lives in the handler, where it actually holds.
+#
+# Un-audit is a POST, not a DELETE, for the same (blueprint, method) reason:
+# as a DELETE it would demand `trip: delete`, which an operation manager does
+# not have — they could sign a trip off and then never take it back.
+# Operation manager only, beside the admins. An accountant is arguably the right
+# person to audit, but they cannot be listed here: the ACL gate would refuse them
+# first because the default accountant preset has no `trip` grant at all, and
+# claiming the capability anyway is what made scripts/parity_check.py report two
+# LOST routes. Adding them needs both a `trip` grant and an entry here — see
+# DEFERRED.md.
+AUDITOR_SCOPES = frozenset({
+    PermissionScope.OPERATION_MANAGER.value,
+})
+
+
+def _require_auditor():
+    """Admins always; otherwise the caller must hold a supervisory role.
+
+    NOTE: an accountant also needs a `trip` endpoint grant to get this far, and
+    the default accountant preset has none — see the note in DEFERRED.md.
+    """
+    if getattr(g, "is_admin", False):
+        return
+    scopes = set(getattr(g, "user_scopes", set()) or set())
+    if scopes & {PermissionScope.SUPER_ADMIN.value, PermissionScope.ADMIN.value}:
+        return
+    if scopes & AUDITOR_SCOPES:
+        return
+    raise ApiError(
+        "Only a supervisor can audit a trip — the person who ran it cannot "
+        "sign it off",
+        status_code=403,
+    )
+
+
+@trip_blueprint.route("/<string:uuid>/audit", methods=["POST"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+)
+def audit_trip(uuid: str):
+    """Mark a trip as audited. Idempotent — re-marking keeps the first sign-off."""
+    _require_auditor()
+    current_uuid = get_jwt_identity()
+    with SqlAlchemyUnitOfWork() as uow:
+        dto = TripDomain.set_audited(
+            uow=uow, uuid=uuid, audited=True, audited_by_uuid=current_uuid
+        )
+        dto.audited_by_username = _username_for_uuid(uow, dto.audited_by_uuid)
+        result = dto.model_dump(mode="json")
+        uow.commit()
+    return jsonify(result), 200
+
+
+@trip_blueprint.route("/<string:uuid>/unaudit", methods=["POST"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+)
+def unaudit_trip(uuid: str):
+    """Take a sign-off back, clearing who and when together."""
+    _require_auditor()
+    with SqlAlchemyUnitOfWork() as uow:
+        dto = TripDomain.set_audited(uow=uow, uuid=uuid, audited=False)
+        result = dto.model_dump(mode="json")
+        uow.commit()
+    return jsonify(result), 200
 
 
 def _assigned_username_for_wfe(uow, wfe_uuid):
@@ -261,6 +365,10 @@ def list_trips():
         filters.append(TripModel.workflow_execution_uuid == params.workflow_execution_uuid)
     if params.status:
         filters.append(TripModel.status.ilike(f"%{params.status}%"))
+    if params.is_audited is not None:
+        # is_audited is a hybrid over audited_at, so this filters in SQL
+        filters.append(TripModel.audited_at.isnot(None) if params.is_audited
+                       else TripModel.audited_at.is_(None))
     if params.intersects_area:
         geom_expr = func.ST_GeomFromText(params.intersects_area, 4326)
         filters.append(func.ST_Intersects(TripModel.geometry, geom_expr))
@@ -313,10 +421,22 @@ def list_trips():
                     continue
                 assigned_by_wfe[wfe_uuid] = uuid_to_name.get(v) or (v if v in usernames else v)
 
+        # one extra query for the whole page, not one per trip
+        auditor_uuids = {m.audited_by_uuid for m in page.items if m.audited_by_uuid}
+        auditor_names = dict(
+            uow.session.query(UserModel.uuid, UserModel.username)
+            .filter(
+                UserModel.uuid.in_(auditor_uuids),
+                UserModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        ) if auditor_uuids else {}
+
         items = []
         for m in page.items:
             dto = TripRead.from_orm(m)
             dto.assigned_username = assigned_by_wfe.get(m.workflow_execution_uuid)
+            dto.audited_by_username = auditor_names.get(m.audited_by_uuid)
             items.append(dto.model_dump(mode="json"))
         result = TripPage(
             items=items,

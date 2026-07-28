@@ -93,6 +93,16 @@ These are the rest, in rough order of how much they mislead someone:
 
 ---
 
+## From trip audit sign-off
+
+- **An accountant cannot audit a trip, even though the code lists them as an auditor.** The audit endpoints live on the `trip` blueprint, and the ACL gate keys on (blueprint, HTTP method) rather than on the route — so `POST /trip/<uuid>/audit` requires a `trip: create` grant. The default `accountant` preset has **no `trip` grant at all**, so they are refused by the ACL layer before the handler's role check runs (verified: driver gets the handler's *"Only a supervisor can audit a trip"*, accountant gets the ACL's *"Forbidden — missing endpoint permission"*). Listing accountant anyway is what made `scripts/parity_check.py` report **2 LOST routes** (a decorator promising access the ACL denies), so they are now absent from both the decorator and `AUDITOR_SCOPES` — every layer says the same thing: admins and operation managers audit.
+
+  Two ways out, both deliberate decisions rather than obvious fixes: grant `accountant` `trip: [create]` in `role_presets.json` — which also lets them create and edit trips, probably too broad; or move the two audit routes onto their own blueprint (say `trip_audit`) so "may audit" becomes an independently grantable capability, which is the cleaner model and the reason the current arrangement is awkward. **Small lift either way; needs a call on who should be able to sign a trip off.**
+
+  Related and worth knowing generally: this is the same (blueprint, method) coupling that forced un-audit to be `POST /unaudit` instead of `DELETE /audit` — as a DELETE it would have demanded `trip: delete`, which an operation manager does not have, so they could have signed a trip off and never taken it back.
+
+---
+
 ## Testing
 
 - **The backend test suite is ~92% red and nothing runs it.** As of 2026-07-27: `pytest` gives **234 failed, 20 passed**. Two independent causes, both long-standing: (1) every route test calls `client.put(...)` with no `Authorization` header and gets 401 — those files were last touched 2025-04-23, `jwt_required` arrived on the routes 2025-06-21, and `conftest.py` has an unused `admin_token` fixture sitting right there; (2) `tests/domains/test_transaction_domain.py` constructs `TransactionCreate(amount=…, currency=…, exchange_rate=…)`, a DTO shape that no longer exists (it is `from_amount` / `from_currency` / `usd_to_syp_exchange_rate`, and the model is `extra="forbid"`), so every case dies in validation. No workflow runs pytest, so none of this is visible in CI. **Medium lift** to repair (mostly mechanical: inject the token fixture, update the DTO calls), and until then the suite provides zero protection on a codebase that moves money. Verified the rot predates the transaction-bug PR (#60): the parent commit's DTO already had the current field names.

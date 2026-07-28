@@ -33,6 +33,35 @@ class TripDomain:
         return TripRead.from_orm(trip)
 
     @staticmethod
+    def set_audited(
+        uow: SqlAlchemyUnitOfWork,
+        uuid: str,
+        audited: bool,
+        audited_by_uuid: str = None,
+    ) -> TripRead:
+        """Sign a trip off, or take the sign-off back.
+
+        Marking an already-audited trip keeps the ORIGINAL timestamp and
+        auditor: the record says who first reviewed it, and a stray second click
+        should not quietly reassign that. Un-auditing clears both fields together
+        so `is_audited` can never disagree with them.
+        """
+        trip = uow.trip_repository.find_one(uuid=uuid, is_deleted=False)
+        if not trip:
+            raise NotFoundError('Trip not found')
+
+        if audited:
+            if trip.audited_at is None:
+                trip.audited_at = datetime.utcnow()
+                trip.audited_by_uuid = audited_by_uuid
+        else:
+            trip.audited_at = None
+            trip.audited_by_uuid = None
+
+        uow.trip_repository.save(model=trip, commit=False)
+        return TripRead.from_orm(trip)
+
+    @staticmethod
     def cancel_trip(uow: SqlAlchemyUnitOfWork, uuid: str) -> TripRead:
         trip = uow.trip_repository.find_one(uuid=uuid)
         if not trip:

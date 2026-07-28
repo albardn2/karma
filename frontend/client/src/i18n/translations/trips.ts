@@ -42,6 +42,9 @@ export const en: Record<string, string> = {
   'trips.enterServiceAreaUuid': 'Enter service area UUID',
   'trips.selectStatus': 'Select status',
   'trips.allStatuses': 'All statuses',
+  'trips.auditLabel': 'Audit',
+  'trips.selectAuditState': 'Select audit state',
+  'trips.allAuditStates': 'Audited and not',
   'trips.clear': 'Clear',
 
   // create dialog
@@ -65,6 +68,19 @@ export const en: Record<string, string> = {
   'trips.backToTrips': 'Back to trips',
   'trips.errorLoadingTrip': 'Error loading trip: {message}',
   'trips.tripNotFound': 'Trip not found',
+
+  // audit sign-off
+  'trips.audited': 'Audited',
+  'trips.notAudited': 'Not audited',
+  'trips.markAudited': 'Mark as audited',
+  'trips.undoAudit': 'Undo audit',
+  'trips.awaitingReview': 'Awaiting review',
+  'trips.auditedByOn': 'Audited by {user} on {date}',
+  'trips.auditedOn': 'Audited on {date}',
+  'trips.auditMarked': 'Trip marked as audited',
+  'trips.auditCleared': 'Audit undone',
+  'trips.failedAudit': 'Failed to mark the trip as audited',
+  'trips.failedUnaudit': 'Failed to undo the audit',
 
   // copy-to-clipboard
   'trips.copied': 'Copied',
@@ -207,6 +223,9 @@ export const ar: Record<string, string> = {
   'trips.enterServiceAreaUuid': 'أدخل معرّف منطقة الخدمة',
   'trips.selectStatus': 'اختر الحالة',
   'trips.allStatuses': 'جميع الحالات',
+  'trips.auditLabel': 'المراجعة',
+  'trips.selectAuditState': 'اختر حالة المراجعة',
+  'trips.allAuditStates': 'المُراجَعة وغير المُراجَعة',
   'trips.clear': 'مسح',
 
   // create dialog
@@ -230,6 +249,19 @@ export const ar: Record<string, string> = {
   'trips.backToTrips': 'العودة إلى الرحلات',
   'trips.errorLoadingTrip': 'خطأ في تحميل الرحلة: {message}',
   'trips.tripNotFound': 'الرحلة غير موجودة',
+
+  // audit sign-off
+  'trips.audited': 'مُراجَع',
+  'trips.notAudited': 'غير مُراجَع',
+  'trips.markAudited': 'تحديد كمُراجَع',
+  'trips.undoAudit': 'إلغاء المراجعة',
+  'trips.awaitingReview': 'بانتظار المراجعة',
+  'trips.auditedByOn': 'راجعها {user} بتاريخ {date}',
+  'trips.auditedOn': 'تمت المراجعة بتاريخ {date}',
+  'trips.auditMarked': 'تم تحديد الرحلة كمُراجَعة',
+  'trips.auditCleared': 'تم إلغاء المراجعة',
+  'trips.failedAudit': 'فشل تحديد الرحلة كمُراجَعة',
+  'trips.failedUnaudit': 'فشل إلغاء المراجعة',
 
   // copy-to-clipboard
   'trips.copied': 'تم النسخ',
