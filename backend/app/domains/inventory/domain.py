@@ -4,7 +4,7 @@ from app.dto.inventory import InventoryRead
 from models.common import Inventory as InventoryModel
 from app.dto.inventory import InventoryCreate
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
-from app.entrypoint.routes.common.errors import NotFoundError
+from app.entrypoint.routes.common.errors import BadRequestError, NotFoundError
 from app.dto.inventory import InventoryFIFOOutput
 
 
@@ -87,7 +87,25 @@ class InventoryDomain:
 
 
     @staticmethod
-    def get_fifo_inventories_for_material(uow: SqlAlchemyUnitOfWork, material_uuid:str, quantity:float) -> list[InventoryFIFOOutput]:
+    def get_fifo_inventories_for_material(
+        uow: SqlAlchemyUnitOfWork,
+        material_uuid: str,
+        quantity: float,
+        allow_negative: bool = False,
+    ) -> list[InventoryFIFOOutput]:
+        """Split `quantity` across this material's lots, oldest stock first.
+
+        `allow_negative` decides what happens when the lots do not cover the
+        request. Selling is allowed to overdraw — a driver hands over goods the
+        books have not caught up with, and refusing the sale loses the record of
+        something that physically happened. Production is not: consuming input
+        that does not exist would invent output, so the process path leaves this
+        off and still gets the old error.
+
+        Whatever the answer, the returned quantities always sum to `quantity` —
+        the caller turns each entry into an inventory event, so dropping the
+        shortfall here would silently under-deduct stock.
+        """
         inventories = uow.inventory_repository.get_fifo_inventories_for_material(
             material_uuid=material_uuid,
             quantity=quantity
@@ -95,6 +113,7 @@ class InventoryDomain:
 
         result = []
         remaining_quantity = quantity
+        last_drawn_lot = None
         for inventory in inventories:
             if remaining_quantity <= 0:
                 break
@@ -109,6 +128,7 @@ class InventoryDomain:
                     quantity=remaining_quantity
                 )
                 result.append(dto)
+                last_drawn_lot = inventory
                 remaining_quantity = 0
             else:
                 dto = InventoryFIFOOutput(
@@ -117,12 +137,72 @@ class InventoryDomain:
                     quantity=inventory.current_quantity
                 )
                 result.append(dto)
+                last_drawn_lot = inventory
                 remaining_quantity -= inventory.current_quantity
 
         if remaining_quantity > 0:
-            raise NotFoundError(
-                f"Insufficient inventory for material {material_uuid}: "
-                f"requested {quantity}, available {quantity - remaining_quantity}"
+            if not allow_negative:
+                raise NotFoundError(
+                    f"Insufficient inventory for material {material_uuid}: "
+                    f"requested {quantity}, available {quantity - remaining_quantity}"
+                )
+            InventoryDomain._absorb_shortfall(
+                uow=uow,
+                material_uuid=material_uuid,
+                shortfall=remaining_quantity,
+                last_drawn_lot=last_drawn_lot,
+                result=result,
             )
 
         return result
+
+    @staticmethod
+    def _absorb_shortfall(
+        uow: SqlAlchemyUnitOfWork,
+        material_uuid: str,
+        shortfall: float,
+        last_drawn_lot,
+        result: list[InventoryFIFOOutput],
+    ) -> None:
+        """Charge the uncovered quantity to one lot, pushing it negative.
+
+        Preference is the lot FIFO stopped on, so the overdraft continues from
+        where consumption ran out and stays next to the stock it overdrew. With
+        no positive lots at all — everything already at or below zero — it goes
+        on the newest lot for the material, so repeated overselling accumulates
+        in one place instead of scattering.
+
+        A material with no lot at all is the one case this cannot answer: a lot
+        needs a warehouse, and nothing in a sale says which one. That raises,
+        because inventing a warehouse would put stock somewhere it never was.
+        """
+        target = last_drawn_lot
+        if target is None:
+            target = (
+                uow.session.query(InventoryModel)
+                .filter(
+                    InventoryModel.account_uuid == uow.account_uuid,
+                    InventoryModel.material_uuid == material_uuid,
+                    InventoryModel.is_deleted == False,  # noqa: E712
+                )
+                .order_by(InventoryModel.created_at.desc())
+                .first()
+            )
+        if target is None:
+            raise BadRequestError(
+                f"Cannot record a sale of material {material_uuid}: it has no "
+                f"inventory lot, so there is no warehouse to take the stock from. "
+                f"Add inventory for it first."
+            )
+
+        for dto in result:
+            if dto.inventory_uuid == target.uuid:
+                dto.quantity += shortfall
+                return
+        result.append(
+            InventoryFIFOOutput(
+                inventory_uuid=target.uuid,
+                material_uuid=target.material_uuid,
+                quantity=shortfall,
+            )
+        )
