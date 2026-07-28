@@ -45,7 +45,7 @@ METHOD_ACTIONS = {
 # blueprints except `auth` — user management stays admin-only)
 RESOURCES = [
     "credit_note_item", "customer", "customer_order", "customer_order_item",
-    "dashboard", "debit_note_item", "employee", "expense",
+    "dashboard", "debit_note_item", "employee", "exchange_rate", "expense",
     "financial_account", "fixed_asset", "inventory", "inventory_event",
     "invoice", "invoice_item", "location", "material", "payment", "payout",
     "pricing", "process", "process_template", "purchase_order",
@@ -62,7 +62,7 @@ MODULES = [
     "vehicles", "trips", "financial-accounts", "materials", "pricing",
     "fixed-assets", "inventory", "inventory-events", "service-areas",
     "purchase-orders", "customer-orders", "payments", "payouts", "expenses",
-    "transactions", "credit-note-items", "debit-note-items", "processes",
+    "transactions", "exchange-rates", "credit-note-items", "debit-note-items", "processes",
     "workflows", "workflow-execution", "live-map", "location-tracking",
 ]
 

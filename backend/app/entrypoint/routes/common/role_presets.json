@@ -4,6 +4,7 @@
             "customers",
             "dashboard",
             "employees",
+            "exchange-rates",
             "expenses",
             "inventory",
             "inventory-events",
@@ -32,6 +33,11 @@
             ],
             "employee": [
                 "read"
+            ],
+            "exchange_rate": [
+                "create",
+                "read",
+                "update"
             ],
             "expense": [
                 "create",
@@ -153,6 +159,7 @@
             "dashboard",
             "debit-note-items",
             "employees",
+            "exchange-rates",
             "expenses",
             "financial-accounts",
             "fixed-assets",
@@ -193,6 +200,11 @@
             ],
             "employee": [
                 "read"
+            ],
+            "exchange_rate": [
+                "create",
+                "read",
+                "update"
             ],
             "expense": [
                 "create",

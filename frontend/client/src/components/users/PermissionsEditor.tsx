@@ -38,6 +38,7 @@ const MODULE_NAV_KEYS: Record<string, string> = {
   "payouts": "nav.payouts",
   "expenses": "nav.expenses",
   "transactions": "nav.transactions",
+  "exchange-rates": "nav.exchangeRates",
   "credit-note-items": "nav.creditNoteItems",
   "debit-note-items": "nav.debitNoteItems",
   "processes": "nav.processes",

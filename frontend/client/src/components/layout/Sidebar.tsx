@@ -23,6 +23,7 @@ import {
   ArrowUpRight,
   Receipt,
   ArrowRightLeft,
+  Coins,
   Factory,
   GitBranch,
   BarChart3,
@@ -62,6 +63,9 @@ const navigation = [
   { key: "nav.payouts", href: "/payouts", icon: ArrowUpRight },
   { key: "nav.expenses", href: "/expenses", icon: Receipt },
   { key: "nav.transactions", href: "/transactions", icon: ArrowRightLeft },
+  // href must stay "/exchange-rates": the module id checked against the
+  // backend ACL is derived below as href.slice(1)
+  { key: "nav.exchangeRates", href: "/exchange-rates", icon: Coins },
   { key: "nav.creditNoteItems", href: "/credit-note-items", icon: FileText },
   { key: "nav.debitNoteItems", href: "/debit-note-items", icon: FileText },
   { key: "nav.processes", href: "/processes", icon: Factory },

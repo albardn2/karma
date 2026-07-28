@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { ArrowLeft, Save, ArrowRightLeft, Building2, Wallet } from "lucide-react";
@@ -32,6 +32,13 @@ interface FinancialAccount {
   balance: number;
 }
 
+interface LatestExchangeRate {
+  // SYP per 1 USD, OLD Syrian pounds — the same unit this form's rate field
+  // and every other SYP amount in the app use
+  rate: number;
+  rate_date: string;
+}
+
 export default function TransactionCreate() {
   const { t, te } = useLanguage();
   const [, setLocation] = useLocation();
@@ -59,6 +66,20 @@ export default function TransactionCreate() {
     queryFn: () => apiRequest("/financial-account/?per_page=100"),
     retry: 1,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Most recent recorded USD->SYP rate, used as the default for the rate field.
+  // The pair is always asked for in that direction because that is the
+  // direction the field itself is in (usd_to_syp_exchange_rate); a SYP->USD
+  // transfer divides by the same number.
+  // /exchange-rate/latest answers 404 when nothing has been recorded yet, and
+  // apiRequest turns any non-2xx into a thrown Error — so retry is off and the
+  // rejection is simply left to sit in `error`. `data` stays undefined, which
+  // is exactly the "no default available" case; nothing is surfaced to the user.
+  const { data: latestRate } = useQuery<LatestExchangeRate>({
+    queryKey: ["/exchange-rate/latest"],
+    queryFn: () => apiRequest("/exchange-rate/latest?from_currency=USD&to_currency=SYP"),
+    retry: false,
   });
 
   // Extract accounts from the correct property
@@ -195,6 +216,38 @@ export default function TransactionCreate() {
     !!formData.from_currency &&
     !!formData.to_currency &&
     formData.from_currency !== formData.to_currency;
+
+  // Seed the rate field from the last recorded rate. Deliberately its OWN
+  // effect: folding it into the to_amount derivation below would have that
+  // effect both read and write the rate while listing it as a dependency,
+  // i.e. a write -> dep -> write cycle.
+  //
+  // Two guards, doing two different jobs:
+  //  - the `!== undefined` check keeps a value the user typed from being
+  //    overwritten when the query resolves late;
+  //  - the ref makes the seed happen at most once. The value check alone is
+  //    not enough, because clearing the input sets the field back to
+  //    `undefined`, which re-satisfies it and re-seeds on the very next run —
+  //    the field would be impossible to clear. The ref is what makes an
+  //    explicit clear stick.
+  // The rate stays in the dep list so the guard always reads current state
+  // rather than a stale closure; the ref is what stops the re-seed, not the
+  // dep list.
+  const rateSeededRef = useRef(false);
+  useEffect(() => {
+    if (rateSeededRef.current) return;
+    if (!needsRate) return;
+    if (!latestRate?.rate) return;
+    if (formData.usd_to_syp_exchange_rate !== undefined) return;
+
+    rateSeededRef.current = true;
+    setFormData(prev => ({ ...prev, usd_to_syp_exchange_rate: latestRate.rate }));
+  }, [needsRate, latestRate, formData.usd_to_syp_exchange_rate]);
+
+  // Whether the number currently in the field is the stored one, so the hint
+  // under the input disappears as soon as the user changes it.
+  const rateIsFromStoredRate =
+    !!latestRate && formData.usd_to_syp_exchange_rate === latestRate.rate;
 
   // Calculate to_amount based on exchange rate and from_amount
   // The destination amount is never a free choice on a transfer: the API
@@ -422,6 +475,14 @@ export default function TransactionCreate() {
                         className="text-center"
                       />
                     </div>
+                    {rateIsFromStoredRate && (
+                      <p
+                        className="text-xs text-muted-foreground mt-1"
+                        data-testid="rate-seeded-note"
+                      >
+                        {t('exchangeRates.seededFrom', { date: latestRate!.rate_date })}
+                      </p>
+                    )}
                   </div>
                   {formData.from_amount && formData.usd_to_syp_exchange_rate && (
                     <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">

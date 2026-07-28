@@ -26,6 +26,7 @@ import * as purchaseOrders from './translations/purchaseOrders';
 import * as payments from './translations/payments';
 import * as payouts from './translations/payouts';
 import * as expenses from './translations/expenses';
+import * as exchangeRates from './translations/exchangeRates';
 import * as notes from './translations/notes';
 import * as processes from './translations/processes';
 import * as workflows from './translations/workflows';
@@ -62,6 +63,7 @@ const modules = [
   payments,
   payouts,
   expenses,
+  exchangeRates,
   notes,
   processes,
   workflows,
