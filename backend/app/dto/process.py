@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, Any, Dict, List
 from datetime import datetime
 from app.entrypoint.routes.common.errors import BadRequestError
-from app.dto.common_enums import UnitOfMeasure
+from app.dto.common_enums import UnitOfMeasure, Currency
 from enum import Enum
 
 class ProcessType(str, Enum):
@@ -49,6 +49,9 @@ class ProcessData(BaseModel):
     inputs: List[ProcessInputItem]
     outputs: List[ProcessOutputItem]
     output_warehouse_uuid: Optional[str] = None
+    # what the stamped cost_per_unit/total_cost figures are denominated in;
+    # absent on rows persisted before costing became currency-aware
+    cost_currency: Optional[Currency] = None
 
     # @model_validator(mode="after")
     # def check_duplicate_input_uuids(self) -> "ProcessData":

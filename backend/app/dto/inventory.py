@@ -66,6 +66,9 @@ class InventoryRead(InventoryBase):
     created_at: datetime
     is_deleted: bool
     total_original_cost: Optional[float] = None
+    # the currency cost_per_unit/total_original_cost are reported in — set by
+    # enrichment, not stored; distinct from the (unused) lot `currency` column
+    cost_currency: Optional[Currency] = None
     material_name: Optional[str] = Field(
         None,
         validation_alias=AliasChoices("material_name", AliasPath("material", "name")))
@@ -80,6 +83,9 @@ class InventoryListParams(BaseModel):
     currency: Optional[Currency] = None
     current_quantity: Optional[float] = None
     original_quantity: Optional[float] = None
+    # currency the computed costs are reported in (conversion at the rate
+    # nearest each event's day); not a filter
+    cost_currency: Optional[Currency] = None
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
 

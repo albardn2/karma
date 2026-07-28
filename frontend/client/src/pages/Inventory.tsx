@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { InventoryFilters } from "@/components/inventory/InventoryFilters";
 import { AddInventoryDialog } from "@/components/inventory/AddInventoryDialog";
+import { CostCurrencyToggle, type CostCurrency } from "@/components/inventory/CostCurrencyToggle";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Package, Building } from "lucide-react";
 
@@ -30,6 +31,7 @@ interface Inventory {
   created_at: string;
   is_deleted: boolean;
   total_original_cost: number | null;
+  cost_currency: string | null;
 }
 
 interface InventoryPage {
@@ -55,18 +57,20 @@ export default function Inventory() {
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [filters, setFilters] = useState<Omit<InventoryFilters, 'page' | 'per_page'>>({});
+  const [costCurrency, setCostCurrency] = useState<CostCurrency>("SYP");
 
   // Fetch inventory data
   const { data: inventoryData, isLoading, error } = useQuery<InventoryPage>({
-    queryKey: ["/inventory/", currentPage, perPage, filters],
+    queryKey: ["/inventory/", currentPage, perPage, filters, costCurrency],
     queryFn: async ({ queryKey }) => {
-      const [, page, per_page, currentFilters] = queryKey;
+      const [, page, per_page, currentFilters, cost_currency] = queryKey;
       const params = new URLSearchParams({
         page: String(page),
         per_page: String(per_page),
+        cost_currency: String(cost_currency),
         ...(currentFilters as Record<string, string>)
       });
-      
+
       // Remove empty values
       Object.keys(currentFilters as Record<string, string>).forEach(key => {
         if (!(currentFilters as Record<string, string>)[key]) {
@@ -76,6 +80,8 @@ export default function Inventory() {
 
       return await apiRequest(`/inventory/?${params.toString()}`);
     },
+    // a currency or page flip must not blank the list into skeletons
+    placeholderData: keepPreviousData,
   });
 
   const handleFilterChange = (newFilters: typeof filters) => {
@@ -128,6 +134,7 @@ export default function Inventory() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <CostCurrencyToggle value={costCurrency} onChange={setCostCurrency} />
             <InventoryFilters
               filters={filters}
               onFiltersChange={handleFilterChange}
@@ -184,7 +191,7 @@ export default function Inventory() {
                             </div>
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">{t('inventory.costPerUnit')}</p>
-                              <p className="text-sm">{inventory.cost_per_unit ? `${inventory.cost_per_unit} ${inventory.currency || ''}` : t('inventory.na')}</p>
+                              <p className="text-sm">{inventory.cost_per_unit != null ? `${inventory.cost_per_unit} ${inventory.cost_currency || ''}` : t('inventory.na')}</p>
                             </div>
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">{t('inventory.warehouse')}</p>

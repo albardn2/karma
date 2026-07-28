@@ -11,7 +11,21 @@ from app.dto.inventory import (
 )
 from models.common import Inventory as InventoryModel
 from app.domains.inventory.domain import InventoryDomain
+from app.dto.common_enums import Currency
 from app.entrypoint.routes.inventory import inventory_blueprint
+
+
+def _cost_currency_arg():
+    """The validated ?cost_currency= query arg, or None for the default."""
+    raw = request.args.get('cost_currency')
+    if not raw:
+        return None
+    try:
+        return Currency(raw)
+    except ValueError:
+        raise BadRequestError(
+            f"cost_currency must be one of {[c.value for c in Currency]}"
+        )
 
 from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required
@@ -48,13 +62,18 @@ def create_inventory():
                  PermissionScope.SALES.value,
                  PermissionScope.DRIVER.value)
 def get_inventory(uuid: str):
+    cost_currency = _cost_currency_arg()
     with SqlAlchemyUnitOfWork() as uow:
         inv = uow.inventory_repository.find_one(uuid=uuid, is_deleted=False)
         if not inv:
             raise NotFoundError('Inventory not found')
         result = InventoryRead.from_orm(inv)
-        InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=result)
+        cost_ctx = InventoryDomain.new_cost_context(currency=cost_currency or Currency.SYP)
+        InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=result, cost_ctx=cost_ctx)
         result = result.model_dump(mode='json')
+        # rates pulled on the spot for missing days should outlive this read
+        if cost_ctx["rates_ingested"]:
+            uow.commit()
     return jsonify(result), 200
 #
 @inventory_blueprint.route('/<string:uuid>', methods=['PUT'])
@@ -118,11 +137,16 @@ def list_inventories():
         )
         # enrich items with cost per unit
         items = []
+        cost_ctx = InventoryDomain.new_cost_context(
+            currency=params.cost_currency or Currency.SYP
+        )
         for i in page_obj.items:
             dto = InventoryRead.from_orm(i)
-            InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=i)
+            InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=dto, cost_ctx=cost_ctx)
             items.append(dto.model_dump(mode='json'))
-        # items = [InventoryRead.from_orm(i).model_dump(mode='json') for i in page_obj.items]
+        # rates pulled on the spot for missing days should outlive this read
+        if cost_ctx["rates_ingested"]:
+            uow.commit()
         result = InventoryPage(
             inventories=items,
             total_count=page_obj.total,

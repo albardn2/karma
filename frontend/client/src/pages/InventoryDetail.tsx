@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,6 +25,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { CostCurrencyToggle, type CostCurrency } from "@/components/inventory/CostCurrencyToggle";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ArrowLeft, Edit2, Trash2, Copy, Check, Save, X, Package } from "lucide-react";
@@ -47,6 +48,7 @@ interface Inventory {
   created_at: string;
   is_deleted: boolean;
   total_original_cost: number | null;
+  cost_currency: string | null;
 }
 
 const inventoryUpdateSchema = z.object({
@@ -63,6 +65,7 @@ export default function InventoryDetail() {
   const [, setLocation] = useLocation();
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [costCurrency, setCostCurrency] = useState<CostCurrency>("SYP");
   const { toast } = useToast();
   const { t, te } = useLanguage();
   const queryClient = useQueryClient();
@@ -73,11 +76,13 @@ export default function InventoryDetail() {
 
   // Fetch inventory data
   const { data: inventory, isLoading } = useQuery<Inventory>({
-    queryKey: ["/inventory/", params?.uuid],
+    queryKey: ["/inventory/", params?.uuid, costCurrency],
     queryFn: async () => {
-      return await apiRequest(`/inventory/${params?.uuid}`);
+      return await apiRequest(`/inventory/${params?.uuid}?cost_currency=${costCurrency}`);
     },
     enabled: !!params?.uuid,
+    // switching the cost currency must not blank the page into a spinner
+    placeholderData: keepPreviousData,
   });
 
   // Set form values when data loads
@@ -290,11 +295,14 @@ export default function InventoryDetail() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-[#5469D4] via-[#6B73E0] to-[#8B5CF6]">
-                <Package className="h-5 w-5 text-white" />
-              </div>
-              {t('inventory.information')}
+            <CardTitle className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-[#5469D4] via-[#6B73E0] to-[#8B5CF6]">
+                  <Package className="h-5 w-5 text-white" />
+                </div>
+                {t('inventory.information')}
+              </span>
+              <CostCurrencyToggle value={costCurrency} onChange={setCostCurrency} />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -337,12 +345,12 @@ export default function InventoryDetail() {
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-muted-foreground">{t('inventory.costPerUnit')}</label>
-                    <p className="text-sm">{inventory.cost_per_unit ? `${inventory.cost_per_unit} ${inventory.currency || ''}` : t('inventory.na')}</p>
+                    <p className="text-sm">{inventory.cost_per_unit != null ? `${inventory.cost_per_unit} ${inventory.cost_currency || ''}` : t('inventory.na')}</p>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-muted-foreground">{t('inventory.totalOriginalCost')}</label>
-                    <p className="text-sm">{inventory.total_original_cost ? `${inventory.total_original_cost} ${inventory.currency || ''}` : t('inventory.na')}</p>
+                    <p className="text-sm">{inventory.total_original_cost != null ? `${inventory.total_original_cost} ${inventory.cost_currency || ''}` : t('inventory.na')}</p>
                   </div>
 
                   <div className="space-y-2">
@@ -417,8 +425,8 @@ export default function InventoryDetail() {
                   { label: t('inventory.warehouseUuid'), value: inventory.warehouse_uuid || t('inventory.na'), key: "warehouse_uuid" },
                   { label: t('inventory.currentQuantity'), value: `${inventory.current_quantity || t('inventory.na')} ${te(inventory.unit)}`, key: "current_quantity" },
                   { label: t('inventory.originalQuantity'), value: `${inventory.original_quantity || t('inventory.na')} ${te(inventory.unit)}`, key: "original_quantity" },
-                  { label: t('inventory.costPerUnit'), value: inventory.cost_per_unit ? `${inventory.cost_per_unit} ${inventory.currency || ''}` : t('inventory.na'), key: "cost_per_unit" },
-                  { label: t('inventory.totalOriginalCost'), value: inventory.total_original_cost ? `${inventory.total_original_cost} ${inventory.currency || ''}` : t('inventory.na'), key: "total_original_cost" },
+                  { label: t('inventory.costPerUnit'), value: inventory.cost_per_unit != null ? `${inventory.cost_per_unit} ${inventory.cost_currency || ''}` : t('inventory.na'), key: "cost_per_unit" },
+                  { label: t('inventory.totalOriginalCost'), value: inventory.total_original_cost != null ? `${inventory.total_original_cost} ${inventory.cost_currency || ''}` : t('inventory.na'), key: "total_original_cost" },
                   { label: t('inventory.lotId'), value: inventory.lot_id || t('inventory.na'), key: "lot_id" },
                   { label: t('inventory.expirationDate'), value: inventory.expiration_date ? new Date(inventory.expiration_date).toLocaleDateString() : t('inventory.na'), key: "expiration_date" },
                   { label: t('inventory.createdByUuid'), value: inventory.created_by_uuid || t('inventory.na'), key: "created_by_uuid" },

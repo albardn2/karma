@@ -1224,7 +1224,7 @@ class PurchaseOrderItem(Base):
     @adjusted_price_per_unit.expression
     def adjusted_price_per_unit(cls):
         return case(
-            [(cls.adjusted_quantity == 0, literal(0))],
+            (cls.adjusted_quantity == 0, literal(0)),
             else_=cls.adjusted_total_price / cls.adjusted_quantity
         )
     def __repr__(self):
@@ -1505,10 +1505,6 @@ class Inventory(Base):
     material = relationship("Material", back_populates="inventory")
     warehouse = relationship("Warehouse", back_populates="inventories")
     inventory_events = relationship("InventoryEvent", back_populates="inventory")
-
-    @hybrid_property
-    def total_original_cost(self):
-        return self.original_quantity * self.cost_per_unit
 
     @hybrid_property
     def original_quantity(self):

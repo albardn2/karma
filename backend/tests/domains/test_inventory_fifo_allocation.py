@@ -123,8 +123,13 @@ def test_single_lot_oversell_matches_the_observed_behaviour():
 
 class _CostEvent:
     def __init__(self, quantity, cost_per_unit):
+        from datetime import datetime
         self.quantity = quantity
         self.cost_per_unit = cost_per_unit
+        # costing is currency-aware now; SYP matches the default target so
+        # these tests stay about the arithmetic, not conversion
+        self.currency = "SYP"
+        self.created_at = datetime(2026, 7, 1)
         self.is_deleted = False
         self.affect_original = True
         self.purchase_order_item_uuid = None
@@ -165,8 +170,10 @@ def test_unit_cost_of_a_fully_credited_lot_is_zero_not_a_crash():
     assert _cost_for([_CostEvent(100, 10), _CostEvent(-100, 10)]) == 0
 
 
-def test_unit_cost_of_a_lot_with_no_events_is_zero():
-    assert _cost_for([]) == 0
+def test_unit_cost_of_a_lot_with_no_events_is_unknown():
+    # no receipts means no cost basis — null, which the UI shows as N/A,
+    # not 0, which would read as free goods
+    assert _cost_for([]) is None
 
 
 def test_unit_cost_is_still_the_weighted_average_when_it_can_be_computed():
