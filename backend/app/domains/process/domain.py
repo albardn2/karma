@@ -1,3 +1,4 @@
+import copy
 import time
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
@@ -12,7 +13,6 @@ from app.dto.inventory import InventoryCreate
 from app.dto.inventory_event import InventoryEventCreate, InventoryEventType
 from app.dto.process import ProcessOutputItem, ProcessInputItem
 from app.entrypoint.routes.common.errors import BadRequestError
-from app.dto.inventory import InventoryRead
 from app.domains.inventory.domain import InventoryDomain
 from app.dto.process import InputsUsedItem
 from sqlalchemy.orm.attributes import flag_modified
@@ -152,43 +152,87 @@ class ProcessDomain:
         uow: SqlAlchemyUnitOfWork,
         process: ProcessModel,
         output_inventory_uuid: str,
+        cost_ctx: dict = None,
     ) -> float:
-        """Calculate cost per unit for output."""
-        process = ProcessDomain._calculate_cost_per_unit(uow, process)
-        for output in process.data["outputs"]:
+        """Cost per unit of one output lot, or None if the lot is not among
+        this process's outputs.
+
+        Works on a copy of process.data: this runs on read paths (every lot
+        cost lookup), and process.data is a MutableDict — stamping costs into
+        the live dict would flush recalculated costs to the database whenever
+        the surrounding session commits.
+        """
+        data = ProcessDomain._compute_cost_data(uow, copy.deepcopy(process.data), cost_ctx)
+        for output in data["outputs"]:
             if output["inventory_uuid"] == output_inventory_uuid:
                 return output["cost_per_unit"]
+        return None
 
 
     @staticmethod
     def _calculate_cost_per_unit(uow, process: ProcessModel) -> ProcessModel:
-        """Convert process data from model to dict."""
-        # prevent circular import
-        cost_per_unit_mapper = {}
-        for input in process.data["inputs"]:
-            input_inventory = uow.inventory_repository.find_one(uuid=input["inventory_uuid"],is_deleted=False) #uow.inventory_repository.find_one(uuid=input.inventory_uuid, is_deleted=False)
-            if not input_inventory:
-                raise NotFoundError(f"Inventory with uuid {input['inventory_uuid']} not found") #raise NotFoundError(f"Inventory with uuid {input.inventory_uuid} not found")
-
-            input_inventory_dto = InventoryRead.from_orm(input_inventory)
-            InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=input_inventory_dto)
-
-            cost_per_unit_mapper[input["inventory_uuid"]] = input_inventory_dto.cost_per_unit
-            input["cost_per_unit"] = cost_per_unit_mapper[input["inventory_uuid"]]
-
-
+        """Stamp current input/output costs into process.data (write paths)."""
         for output in process.data["outputs"]:
-            output_material = uow.material_repository.find_one(uuid=output["material_uuid"],is_deleted=False) #uow.material_repository.find_one(uuid=output.material_uuid, is_deleted=False)
+            output_material = uow.material_repository.find_one(uuid=output["material_uuid"],is_deleted=False)
             if not output_material:
-                raise NotFoundError(f"Material with uuid {output['material_uuid']} not found") #raise NotFoundError(f"Material with uuid {output.material_uuid} not found")
+                raise NotFoundError(f"Material with uuid {output['material_uuid']} not found")
 
-            total_cost = 0
-            for input_used in output["inputs_used"]:
-                total_cost += cost_per_unit_mapper[input_used["inventory_uuid"]] * input_used["quantity"]
-            output["total_cost"] = total_cost
-            output["cost_per_unit"] = total_cost / output["quantity"] if output["quantity"] else 0
-
+        # reassignment (not in-place mutation) so the attribute is marked dirty
+        # even where callers forget flag_modified on the nested JSON
+        process.data = ProcessDomain._compute_cost_data(uow, copy.deepcopy(process.data), None)
         return process
+
+    @staticmethod
+    def _compute_cost_data(uow, data: dict, cost_ctx: dict = None) -> dict:
+        """Stamp input costs and rolled-up output costs into `data` and return it.
+
+        Mutates the dict it is given — callers pass either a deepcopy (read
+        paths) or a dict they intend to persist (write paths). An input lot
+        that is missing, or whose cost is unknowable (cycle back into a lot
+        currently being costed), contributes None as its cost and nothing to
+        the outputs' totals.
+        """
+        ctx = cost_ctx if cost_ctx is not None else InventoryDomain.new_cost_context()
+        # the currency every cost figure below is denominated in; persisted by
+        # the write paths so the stored snapshot is labelled, discarded with
+        # the deepcopy on read paths
+        data["cost_currency"] = ctx["currency"].value
+
+        cost_per_unit_mapper = {}
+        for input in data["inputs"]:
+            input_inventory = uow.inventory_repository.find_one(uuid=input["inventory_uuid"],is_deleted=False)
+            if not input_inventory:
+                cost_per_unit_mapper[input["inventory_uuid"]] = None
+                input["cost_per_unit"] = None
+                continue
+
+            cost, _ = InventoryDomain._lot_cost_and_quantity(
+                uow=uow, inventory_uuid=input["inventory_uuid"], ctx=ctx
+            )
+            cost_per_unit_mapper[input["inventory_uuid"]] = cost
+            input["cost_per_unit"] = cost
+
+        for output in data["outputs"]:
+            total_cost = 0
+            any_unknown = False
+            for input_used in output["inputs_used"]:
+                unit_cost = cost_per_unit_mapper.get(input_used["inventory_uuid"])
+                if unit_cost is None:
+                    any_unknown = True
+                    continue
+                total_cost += unit_cost * input_used["quantity"]
+            if any_unknown:
+                # an unknowable ingredient makes the whole output's cost
+                # unknowable — a number computed from the rest would be a
+                # confident understatement, exactly what event-level costing
+                # refuses to do
+                output["total_cost"] = None
+                output["cost_per_unit"] = None
+            else:
+                output["total_cost"] = total_cost
+                output["cost_per_unit"] = total_cost / output["quantity"] if output["quantity"] else 0
+
+        return data
 
     @staticmethod
     def create_inventory_entry(uow: SqlAlchemyUnitOfWork, process: ProcessModel) -> None:

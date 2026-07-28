@@ -139,6 +139,16 @@ def material_inventory_summary(uuid: str):
     from models.common import InventoryEvent as InventoryEventModel
     from app.domains.inventory.domain import InventoryDomain
     from app.dto.inventory import InventoryRead
+    from app.dto.common_enums import Currency
+    from app.entrypoint.routes.common.errors import BadRequestError
+
+    raw_currency = request.args.get('cost_currency')
+    try:
+        cost_currency = Currency(raw_currency) if raw_currency else Currency.SYP
+    except ValueError:
+        raise BadRequestError(
+            f"cost_currency must be one of {[c.value for c in Currency]}"
+        )
 
     with SqlAlchemyUnitOfWork() as uow:
         m = uow.material_repository.find_one(uuid=uuid, is_deleted=False)
@@ -161,6 +171,7 @@ def material_inventory_summary(uuid: str):
         ]
 
         lots = []
+        cost_ctx = InventoryDomain.new_cost_context(currency=cost_currency)
         for inv in uow.inventory_repository.find_all(material_uuid=uuid, is_deleted=False):
             qty = inv.current_quantity
             # Hide lots that are exactly empty — they are noise. NEGATIVE lots
@@ -169,11 +180,7 @@ def material_inventory_summary(uuid: str):
             if not qty or abs(qty) < 1e-9:
                 continue
             dto = InventoryRead.from_orm(inv)
-            InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=dto)
-            currency = inv.currency or next(
-                (e.currency for e in inv.inventory_events if not e.is_deleted and e.currency),
-                None,
-            )
+            InventoryDomain.enrich_cost_per_unit(uow=uow, inventory_dto=dto, cost_ctx=cost_ctx)
             lots.append({
                 "uuid": inv.uuid,
                 "lot_id": inv.lot_id,
@@ -181,11 +188,16 @@ def material_inventory_summary(uuid: str):
                 "current_quantity": qty,
                 "unit": inv.unit,
                 "cost_per_unit": dto.cost_per_unit,
-                "currency": currency,
+                # every cost above is converted into the requested currency —
+                # no more guessing a label from the first costed event
+                "currency": cost_currency.value,
                 "created_at": inv.created_at.isoformat() if inv.created_at else None,
                 "expiration_date": inv.expiration_date.isoformat() if inv.expiration_date else None,
             })
         lots.sort(key=lambda l: l["created_at"] or "")
+        # rates pulled on the spot for missing days should outlive this read
+        if cost_ctx["rates_ingested"]:
+            uow.commit()
     return jsonify({"events": events, "lots": lots}), 200
 
 

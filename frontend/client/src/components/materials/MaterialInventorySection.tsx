@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   ResponsiveContainer,
   LineChart,
@@ -25,6 +25,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "@/hooks/use-toast";
+import { CostCurrencyToggle, type CostCurrency } from "@/components/inventory/CostCurrencyToggle";
 
 interface SeriesEvent {
   t: string | null;
@@ -57,10 +58,15 @@ const DAY = 24 * 60 * 60 * 1000;
 
 export function MaterialInventorySection({ materialUuid }: { materialUuid: string }) {
   const { t } = useLanguage();
+  const [costCurrency, setCostCurrency] = useState<CostCurrency>("SYP");
   const { data: summary } = useQuery<{ events: SeriesEvent[]; lots: InventoryLot[] }>({
-    queryKey: ["/material/", materialUuid, "inventory-summary"],
-    queryFn: () => apiRequest(`/material/${materialUuid}/inventory-summary`),
+    queryKey: ["/material/", materialUuid, "inventory-summary", costCurrency],
+    queryFn: () =>
+      apiRequest(`/material/${materialUuid}/inventory-summary?cost_currency=${costCurrency}`),
     enabled: !!materialUuid,
+    // a currency flip refetches the whole summary; without this the chart and
+    // lots table would flash their (false) empty states while it loads
+    placeholderData: keepPreviousData,
   });
 
   // cumulative total-stock series
@@ -174,7 +180,10 @@ export function MaterialInventorySection({ materialUuid }: { materialUuid: strin
       {/* cost per lot */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('materials.inventoryLotsCost')}</CardTitle>
+          <CardTitle className="flex items-center justify-between gap-2">
+            {t('materials.inventoryLotsCost')}
+            <CostCurrencyToggle value={costCurrency} onChange={setCostCurrency} />
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {lots.length === 0 ? (

@@ -46,6 +46,15 @@ class ExchangeRateDomain:
             is_deleted=False,
         )
         if existing:
+            # a hand-entered rate outranks the scraper: pulls can now be
+            # triggered by mere reads (the costing gap-fill), and silently
+            # reverting a correction to the site's number would lose it with
+            # no record
+            if (
+                existing.source == ExchangeRateSource.MANUAL.value
+                and payload.source == ExchangeRateSource.SP_TODAY
+            ):
+                return existing, False
             existing.rate = payload.rate
             existing.buy_rate = payload.buy_rate
             existing.sell_rate = payload.sell_rate
@@ -83,6 +92,47 @@ class ExchangeRateDomain:
         if on_or_before:
             query = query.filter(ExchangeRateModel.rate_date <= on_or_before)
         return query.order_by(ExchangeRateModel.rate_date.desc()).first()
+
+    @staticmethod
+    def closest(
+        uow: SqlAlchemyUnitOfWork,
+        from_currency: Currency,
+        to_currency: Currency,
+        on: date,
+    ) -> Optional[ExchangeRateModel]:
+        """The rate whose market day is nearest to `on`, in either direction.
+
+        Costing wants the rate in effect around the day stock moved, and the
+        source skips days the market did not move — so an exact-day lookup
+        would miss constantly. A tie prefers the earlier day (the rate that
+        was actually in effect when the day started).
+
+        A raw query, so it filters account_uuid itself — the repository scoping
+        that `find_one` gets for free does not apply here.
+        """
+        base = uow.session.query(ExchangeRateModel).filter(
+            ExchangeRateModel.account_uuid == uow.account_uuid,
+            ExchangeRateModel.is_deleted == False,  # noqa: E712
+            ExchangeRateModel.from_currency == from_currency.value,
+            ExchangeRateModel.to_currency == to_currency.value,
+        )
+        before = (
+            base.filter(ExchangeRateModel.rate_date <= on)
+            .order_by(ExchangeRateModel.rate_date.desc())
+            .first()
+        )
+        after = (
+            base.filter(ExchangeRateModel.rate_date > on)
+            .order_by(ExchangeRateModel.rate_date.asc())
+            .first()
+        )
+        if before is None:
+            return after
+        if after is None:
+            return before
+        if (on - before.rate_date) <= (after.rate_date - on):
+            return before
+        return after
 
     @staticmethod
     def _ingest(
