@@ -89,12 +89,14 @@ function ChipRow({
   onChange,
   testIDPrefix,
   label,
+  title,
 }: {
   options: { value: string; labelKey: string }[];
   value: string;
   onChange: (v: string) => void;
   testIDPrefix: string;
   label: (key: string) => string;
+  title: string;
 }) {
   const scrollRef = useRef<ScrollView>(null);
   const geometry = useRef({ content: 0, viewport: 0, offset: 0 });
@@ -107,6 +109,10 @@ function ChipRow({
 
   return (
     <View style={styles.filterRow}>
+      {/* names the dimension, so each row's "All" says what it is all of */}
+      <ThemedText style={styles.filterLabel} numberOfLines={1}>
+        {title}
+      </ThemedText>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -224,16 +230,32 @@ export default function TripsScreen() {
     return () => sub.remove();
   }, [selectionMode, exitSelection]);
 
+  // Bumped by every replacing fetch (filter change, refresh). A page that was
+  // already in flight when the list was replaced must not append itself to the
+  // new list afterwards.
+  const fetchGeneration = useRef(0);
+
   const fetchPage = useCallback(
     async (pageNum: number, replace: boolean) => {
+      const generation = replace ? ++fetchGeneration.current : fetchGeneration.current;
       const status = statusFilter === 'all' ? '' : `&status=${statusFilter}`;
       const audited = auditFilter === 'all' ? '' : `&is_audited=${auditFilter}`;
       const res = await apiCall<{ items: Trip[]; pages: number }>(
         `/trip/?page=${pageNum}&per_page=${PER_PAGE}${status}${audited}`
       );
+      if (fetchGeneration.current !== generation) return; // superseded
       if (res.data) {
         setPages(res.data.pages || 1);
-        setTrips((prev) => (replace ? res.data!.items : [...prev, ...res.data!.items]));
+        setTrips((prev) => {
+          const incoming = res.data!.items;
+          if (replace) return incoming;
+          // Never append a trip that is already listed. Two ways it happens:
+          // onEndReached can fire twice for the same page, and the list is
+          // ordered newest-first, so a trip created while paging shifts every
+          // later page down by one and re-serves a row already shown.
+          const seen = new Set(prev.map((trip) => trip.uuid));
+          return [...prev, ...incoming.filter((trip) => !seen.has(trip.uuid))];
+        });
       }
     },
     [statusFilter, auditFilter]
@@ -246,13 +268,23 @@ export default function TripsScreen() {
     fetchPage(1, true).finally(() => setLoading(false));
   }, [fetchPage, isAdmin]);
 
+  // A ref, not the loadingMore state: onEndReached fires again before a state
+  // update commits, so a state guard lets two calls through and page N gets
+  // appended twice.
+  const loadingMoreRef = useRef(false);
+
   const loadMore = async () => {
-    if (loadingMore || loading || page >= pages) return;
+    if (loadingMoreRef.current || loading || page >= pages) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
-    const next = page + 1;
-    await fetchPage(next, false);
-    setPage(next);
-    setLoadingMore(false);
+    try {
+      const next = page + 1;
+      await fetchPage(next, false);
+      setPage(next);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
   };
 
   const onRefresh = async () => {
@@ -354,6 +386,7 @@ export default function TripsScreen() {
         onChange={(v) => { exitSelection(); setStatusFilter(v); }}
         testIDPrefix="trips-filter"
         label={t}
+        title={t('trips.filterStatusLabel')}
       />
 
       <ChipRow
@@ -362,6 +395,7 @@ export default function TripsScreen() {
         onChange={(v) => { exitSelection(); setAuditFilter(v); }}
         testIDPrefix="trips-audit-filter"
         label={t}
+        title={t('trips.filterAuditLabel')}
       />
 
       {/* a long press is invisible, so say it once — and only while it is the
@@ -441,9 +475,15 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyText: { fontSize: 14, color: '#6B7280' },
-  filterRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  filterRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingStart: 16 },
+  // fixed width so both rows' chips start at the same place; the padding lives
+  // on the row, not in here, or it eats the width and truncates the label
+  filterLabel: {
+    fontSize: 11, fontWeight: '700', color: '#9CA3AF',
+    width: 62, textTransform: 'uppercase',
+  },
   // the padding lives on the content so the first and last chip clear the edge
-  filterScroll: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 },
+  filterScroll: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingEnd: 16 },
   moreButton: { paddingHorizontal: 12, paddingVertical: 4 },
   moreArrow: { fontSize: 22, fontWeight: '700', color: '#5469D4', lineHeight: 24 },
   filterChip: {
