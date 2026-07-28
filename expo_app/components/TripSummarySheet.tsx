@@ -20,7 +20,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 interface CashRow {
   currency: string;
   collected: number;
+  // booked, then split by whether the cash actually left: net is
+  // collected - expenses_paid, so an unsettled cost does not move it
   expenses: number;
+  expenses_paid: number;
+  expenses_unpaid: number;
   net: number;
 }
 
@@ -171,11 +175,17 @@ export function TripSummarySheet({
                       label={t('trips.cashCollected')}
                       value={fmtMoney(row.collected)}
                     />
-                    {row.expenses !== 0 && (
+                    {row.expenses_paid !== 0 && (
                       <SheetRow
                         label={t('trips.tripSpend')}
-                        value={`- ${fmtMoney(row.expenses)}`}
+                        value={`- ${fmtMoney(row.expenses_paid)}`}
                         tone="#B45309"
+                      />
+                    )}
+                    {row.expenses_unpaid > 0 && (
+                      <SheetRow
+                        label={t('trips.unpaidSpend')}
+                        value={fmtMoney(row.expenses_unpaid)}
                       />
                     )}
                     <SheetRow

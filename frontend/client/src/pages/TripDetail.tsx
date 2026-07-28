@@ -144,6 +144,12 @@ export default function TripDetail() {
       ...Object.keys(trip?.trip_expenses || {}),
     ])
   ).sort();
+  // a cost booked to the trip but never paid has taken no cash off the van, so
+  // it does not come off what the driver owes back. The column only appears
+  // when there is something outstanding — normally everything is paid at once.
+  const hasUnpaidSpend = Object.values(trip?.trip_expenses_unpaid || {}).some(
+    (amount) => Number(amount) > 0
+  );
 
   // recorded GPS series for this trip (admin-only endpoint; hide the section on error)
   const { data: locationData } = useQuery<{ points: PlaybackPoint[]; total_count: number }>({
@@ -545,8 +551,10 @@ export default function TripDetail() {
           </Card>
         </div>
 
-        {/* Cash reconciliation: collected at the stops, less what was spent on
-            the road, giving what should actually come back */}
+        {/* Cash reconciliation: collected at the stops, less what was actually
+            paid out on the road, giving what should come back. Costs booked but
+            still unpaid are shown apart — they are owed to whoever fronted
+            them, not missing from the van */}
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -563,23 +571,35 @@ export default function TripDetail() {
                       <th className="py-2 pe-4 font-medium">{t('common.currency')}</th>
                       <th className="py-2 pe-4 font-medium text-end">{t('trips.cashCollected')}</th>
                       <th className="py-2 pe-4 font-medium text-end">{t('trips.tripSpend')}</th>
+                      {hasUnpaidSpend && (
+                        <th className="py-2 pe-4 font-medium text-end">{t('trips.unpaidSpend')}</th>
+                      )}
                       <th className="py-2 font-medium text-end">{t('trips.shouldReturn')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {cashCurrencies.map((cur) => {
                       const collected = Number((trip.expected_cash || {})[cur] || 0);
-                      const spent = Number((trip.trip_expenses || {})[cur] || 0);
+                      const paid = Number((trip.trip_expenses_paid || {})[cur] || 0);
+                      const unpaid = Number((trip.trip_expenses_unpaid || {})[cur] || 0);
                       const net = Number(
-                        (trip.net_expected_cash || {})[cur] ?? collected - spent
+                        (trip.net_expected_cash || {})[cur] ?? collected - paid
                       );
                       return (
                         <tr key={cur} className="border-b last:border-0" data-testid={`trip-cash-${cur}`}>
                           <td className="py-2 pe-4">{te(cur)}</td>
                           <td className="py-2 pe-4 text-end tabular-nums">{collected.toFixed(2)}</td>
                           <td className="py-2 pe-4 text-end tabular-nums text-amber-700">
-                            {spent ? `- ${spent.toFixed(2)}` : "—"}
+                            {paid ? `- ${paid.toFixed(2)}` : "—"}
                           </td>
+                          {hasUnpaidSpend && (
+                            <td
+                              className="py-2 pe-4 text-end tabular-nums text-gray-500"
+                              data-testid={`trip-cash-unpaid-${cur}`}
+                            >
+                              {unpaid ? unpaid.toFixed(2) : "—"}
+                            </td>
+                          )}
                           <td
                             className={`py-2 text-end font-semibold tabular-nums ${
                               net < 0 ? "text-red-600" : ""

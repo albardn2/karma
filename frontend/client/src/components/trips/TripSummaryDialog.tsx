@@ -21,8 +21,8 @@ interface Props {
 /** Cash and stock rolled up over the trips selected in the list.
  *
  * The cash columns deliberately match the single-trip page's Expected Cash card
- * (collected / spend / should return) so a total can be checked against the
- * trips it came from without translating between two vocabularies.
+ * (collected / spend / unpaid / should return) so a total can be checked against
+ * the trips it came from without translating between two vocabularies.
  */
 export function TripSummaryDialog({ open, onOpenChange, tripUuids }: Props) {
   const { t, te } = useLanguage();
@@ -42,6 +42,9 @@ export function TripSummaryDialog({ open, onOpenChange, tripUuids }: Props) {
     const v = Number(n);
     return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(3)));
   };
+  // only what was actually paid out comes off the net; costs still owed get
+  // their own column, and only when one of the trips has any
+  const hasUnpaidSpend = (data?.cash || []).some((row) => Number(row.expenses_unpaid) > 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -110,6 +113,9 @@ export function TripSummaryDialog({ open, onOpenChange, tripUuids }: Props) {
                         <th className="py-2 pe-4 font-medium text-start">{t('common.currency')}</th>
                         <th className="py-2 pe-4 font-medium text-end">{t('trips.cashCollected')}</th>
                         <th className="py-2 pe-4 font-medium text-end">{t('trips.tripSpend')}</th>
+                        {hasUnpaidSpend && (
+                          <th className="py-2 pe-4 font-medium text-end">{t('trips.unpaidSpend')}</th>
+                        )}
                         <th className="py-2 font-medium text-end">{t('trips.shouldReturn')}</th>
                       </tr>
                     </thead>
@@ -123,8 +129,16 @@ export function TripSummaryDialog({ open, onOpenChange, tripUuids }: Props) {
                           <td className="py-2 pe-4">{te(row.currency)}</td>
                           <td className="py-2 pe-4 text-end tabular-nums">{money(row.collected)}</td>
                           <td className="py-2 pe-4 text-end tabular-nums text-amber-700 dark:text-amber-500">
-                            {row.expenses ? `- ${money(row.expenses)}` : "—"}
+                            {row.expenses_paid ? `- ${money(row.expenses_paid)}` : "—"}
                           </td>
+                          {hasUnpaidSpend && (
+                            <td
+                              className="py-2 pe-4 text-end tabular-nums text-gray-500"
+                              data-testid={`summary-cash-unpaid-${row.currency}`}
+                            >
+                              {row.expenses_unpaid ? money(row.expenses_unpaid) : "—"}
+                            </td>
+                          )}
                           <td
                             className={`py-2 text-end font-semibold tabular-nums ${
                               row.net < 0 ? "text-red-600" : ""

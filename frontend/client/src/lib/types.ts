@@ -527,7 +527,11 @@ export interface Trip {
     { start: number; sold: number; expected_end: number; actual_end: number | null; variance: number | null }
   > | null;
   expected_cash?: Record<string, number> | null;
+  // costs booked to the trip, then split by whether the cash actually left:
+  // only the paid part comes off net_expected_cash
   trip_expenses?: Record<string, number> | null;
+  trip_expenses_paid?: Record<string, number> | null;
+  trip_expenses_unpaid?: Record<string, number> | null;
   net_expected_cash?: Record<string, number> | null;
   // audit sign-off. is_audited is derived server-side from audited_at, so the
   // two never disagree. audited_at is a NAIVE UTC datetime (no offset suffix).
@@ -597,6 +601,9 @@ export interface TripSummaryCash {
   currency: string;
   collected: number;
   expenses: number;
+  expenses_paid: number;
+  expenses_unpaid: number;
+  // collected - expenses_paid
   net: number;
 }
 

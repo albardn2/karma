@@ -39,7 +39,11 @@ interface Trip {
   audited_at?: string | null;
   audited_by_username?: string | null;
   expected_cash?: Record<string, number> | null;
+  // booked costs, then split by whether the cash actually left: only the paid
+  // part comes off net_expected_cash
   trip_expenses?: Record<string, number> | null;
+  trip_expenses_paid?: Record<string, number> | null;
+  trip_expenses_unpaid?: Record<string, number> | null;
   net_expected_cash?: Record<string, number> | null;
   inventory_reconciliation?: Record<
     string,
@@ -343,20 +347,26 @@ export default function TripDetailScreen() {
         {/* analytics */}
         <TripAnalyticsCard activity={activity} />
 
-        {/* cash reconciliation: collected at the stops, less what was spent on
-            the road, giving what should actually come back */}
+        {/* cash reconciliation: collected at the stops, less what was actually
+            paid out on the road, giving what should come back. A cost booked but
+            still unpaid took nothing off the van, so it is listed apart rather
+            than deducted */}
         {cashCurrencies.length > 0 && (
           <View style={styles.card}>
             <ThemedText style={styles.cardTitle}>{t('trips.expectedCash')}</ThemedText>
             {cashCurrencies.map((cur) => {
               const collected = Number((trip?.expected_cash || {})[cur] || 0);
-              const spent = Number((trip?.trip_expenses || {})[cur] || 0);
-              const net = Number((trip?.net_expected_cash || {})[cur] ?? collected - spent);
+              const paid = Number((trip?.trip_expenses_paid || {})[cur] || 0);
+              const unpaid = Number((trip?.trip_expenses_unpaid || {})[cur] || 0);
+              const net = Number((trip?.net_expected_cash || {})[cur] ?? collected - paid);
               return (
                 <View key={cur} style={styles.cashBlock} testID={`trip-cash-${cur}`}>
                   <ThemedText style={styles.cashCurrency}>{te(cur)}</ThemedText>
                   <Row label={t('trips.cashCollected')} value={fmtNum(collected)} />
-                  {spent > 0 && <Row label={t('trips.tripSpend')} value={`- ${fmtNum(spent)}`} />}
+                  {paid > 0 && <Row label={t('trips.tripSpend')} value={`- ${fmtNum(paid)}`} />}
+                  {unpaid > 0 && (
+                    <Row label={t('trips.unpaidSpend')} value={fmtNum(unpaid)} />
+                  )}
                   <Row label={t('trips.shouldReturn')} value={fmtNum(net)} />
                 </View>
               );
@@ -368,11 +378,15 @@ export default function TripDetailScreen() {
         {tripExpenses.length > 0 && (
           <View style={styles.card}>
             <ThemedText style={styles.cardTitle}>{t('trips.tripExpenses')}</ThemedText>
+            {/* the one that is not paid is the one worth spotting: it is the
+                cost the cash block reports but does not deduct */}
             {tripExpenses.map((e) => (
               <Row
                 key={e.uuid}
                 label={`${te(e.category)}${e.description ? ` · ${e.description}` : ''}`}
-                value={`${fmtNum(e.amount)} ${te(e.currency)}`}
+                value={`${fmtNum(e.amount)} ${te(e.currency)}${
+                  e.is_paid ? '' : ` · ${t('trips.expenseUnpaid')}`
+                }`}
               />
             ))}
           </View>

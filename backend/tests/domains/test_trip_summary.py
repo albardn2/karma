@@ -3,6 +3,8 @@
 The summary exists to be reconciled against, so the ways it could quietly lie
 are what these tests pin:
   - money from different currencies must never land in one total;
+  - a cost booked to a trip but never paid must not be deducted from what the
+    driver owes back — that would credit them for cash still in their hands;
   - a trip selected twice must not be counted twice;
   - a uuid that resolves to nothing (deleted, or another tenant's) must be
     reported, not treated as a zero-value trip that happens to add nothing;
@@ -23,10 +25,19 @@ GHOST = "cccccccc-3333-4333-8333-cccccccccccc"
 
 class _Trip:
     def __init__(self, uuid, expected_cash=None, trip_expenses=None,
-                 start=None, end=None, sold=None):
+                 trip_expenses_paid=None, start=None, end=None, sold=None):
         self.uuid = uuid
         self.expected_cash = expected_cash or {}
         self.trip_expenses = trip_expenses or {}
+        # the ordinary case is a cost paid the moment it is booked, so paid
+        # defaults to the whole of it; tests that care pass their own split
+        self.trip_expenses_paid = (
+            dict(self.trip_expenses) if trip_expenses_paid is None else trip_expenses_paid
+        )
+        self.trip_expenses_unpaid = {
+            currency: round(amount - self.trip_expenses_paid.get(currency, 0), 2)
+            for currency, amount in self.trip_expenses.items()
+        }
         self.start_inventory = start or {}
         self.end_inventory = end
         self._sold = sold or {}
@@ -120,6 +131,47 @@ def test_cash_is_summed_per_currency_never_across():
     assert by_currency["USD"].collected == 40.0
     assert by_currency["USD"].expenses == 5.0
     assert by_currency["USD"].net == 35.0
+
+
+def test_only_what_was_paid_comes_off_the_net():
+    """A cost booked to the trip but never paid is still sitting in the driver's
+    cash, so it must be reported and left out of the net, not deducted."""
+    trips = [
+        _Trip("t1", expected_cash={"SYP": 1000.0},
+              trip_expenses={"SYP": 300.0}, trip_expenses_paid={"SYP": 100.0}),
+    ]
+    row = _summary(trips).cash[0]
+    assert row.expenses == 300.0        # booked
+    assert row.expenses_paid == 100.0   # actually out of pocket
+    assert row.expenses_unpaid == 200.0
+    assert row.net == 900.0             # 1000 - 100, NOT 1000 - 300
+
+
+def test_an_entirely_unpaid_expense_leaves_the_net_alone():
+    """The whole of PR #62's hole: an expense with no live payout must not
+    credit the driver for money that never left."""
+    trips = [
+        _Trip("t1", expected_cash={"SYP": 500.0},
+              trip_expenses={"SYP": 80.0}, trip_expenses_paid={}),
+    ]
+    row = _summary(trips).cash[0]
+    assert row.expenses_paid == 0
+    assert row.expenses_unpaid == 80.0
+    assert row.net == 500.0
+
+
+def test_paid_and_unpaid_are_summed_per_currency_across_trips():
+    trips = [
+        _Trip("t1", expected_cash={"SYP": 600.0},
+              trip_expenses={"SYP": 100.0}, trip_expenses_paid={"SYP": 100.0}),
+        _Trip("t2", expected_cash={"SYP": 400.0},
+              trip_expenses={"SYP": 50.0}, trip_expenses_paid={"SYP": 20.0}),
+    ]
+    row = _summary(trips).cash[0]
+    assert row.expenses == 150.0
+    assert row.expenses_paid == 120.0
+    assert row.expenses_unpaid == 30.0
+    assert row.net == 880.0
 
 
 def test_a_currency_only_spent_in_still_gets_a_row():

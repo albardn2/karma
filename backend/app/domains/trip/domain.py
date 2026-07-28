@@ -72,11 +72,12 @@ class TripDomain:
         """Roll several trips up into one cash-and-stock picture.
 
         Deliberately built on the Trip model's own properties (`expected_cash`,
-        `trip_expenses`, `inventory_reconciliation`) rather than fresh SQL. Those
-        encode which money and which stock movements count — deleted payments,
-        voided invoices, orders soft-deleted before the cascade existed, sale
-        events left behind by legacy voids. A second implementation in SQL would
-        drift from the per-trip page it is meant to agree with.
+        the `trip_expenses*` family, `inventory_reconciliation`) rather than
+        fresh SQL. Those encode which money and which stock movements count —
+        deleted payments, voided invoices, orders soft-deleted before the
+        cascade existed, sale events left behind by legacy voids, expenses
+        booked but never paid. A second implementation in SQL would drift from
+        the per-trip page it is meant to agree with.
 
         Two things are reported rather than swallowed, because both make the
         totals mean less than they appear to:
@@ -101,7 +102,10 @@ class TripDomain:
         cash: dict[str, dict[str, float]] = {}
 
         def _cash_row(currency: str) -> dict[str, float]:
-            return cash.setdefault(currency, {"collected": 0.0, "expenses": 0.0})
+            return cash.setdefault(
+                currency,
+                {"collected": 0.0, "expenses": 0.0, "paid": 0.0, "unpaid": 0.0},
+            )
 
         materials: dict[str, dict] = {}
 
@@ -118,6 +122,12 @@ class TripDomain:
             for currency, amount in (trip.trip_expenses or {}).items():
                 # a currency that was only spent in still needs a row
                 _cash_row(currency)["expenses"] += amount or 0
+            # booked and paid are tracked apart: only the paid part has left the
+            # drivers' cash, so only it can move the net
+            for currency, amount in (trip.trip_expenses_paid or {}).items():
+                _cash_row(currency)["paid"] += amount or 0
+            for currency, amount in (trip.trip_expenses_unpaid or {}).items():
+                _cash_row(currency)["unpaid"] += amount or 0
 
             if not trip.end_inventory:
                 no_end_snapshot.append(trip.uuid)
@@ -144,8 +154,10 @@ class TripDomain:
                     currency=currency,
                     collected=round(row["collected"], 2),
                     expenses=round(row["expenses"], 2),
+                    expenses_paid=round(row["paid"], 2),
+                    expenses_unpaid=round(row["unpaid"], 2),
                     # from the unrounded pair, so the column always adds up
-                    net=round(row["collected"] - row["expenses"], 2),
+                    net=round(row["collected"] - row["paid"], 2),
                 )
                 for currency, row in sorted(cash.items())
             ],

@@ -191,8 +191,10 @@ class TripRead(BaseModel):
     assigned_username: Optional[str] = None
     inventory_reconciliation: Optional[dict] = None
     expected_cash: Optional[dict] = None  # {currency: amount} collected at this trip's stops
-    trip_expenses: Optional[dict] = None  # {currency: amount} costs booked to this trip
-    net_expected_cash: Optional[dict] = None  # collected minus those costs
+    trip_expenses: Optional[dict] = None  # {currency: amount} costs booked to this trip, paid or not
+    trip_expenses_paid: Optional[dict] = None  # of those, the cash actually paid out
+    trip_expenses_unpaid: Optional[dict] = None  # booked but not settled: a payable, not missing cash
+    net_expected_cash: Optional[dict] = None  # collected minus what was PAID
     # audit sign-off: is_audited derives from audited_at on the model, so the
     # flag and the timestamp cannot disagree. audited_by_username is resolved by
     # the routes, like assigned_username.
@@ -286,8 +288,14 @@ class TripSummaryCash(BaseModel):
 
     currency: str
     collected: float = Field(..., description="Cash taken at the stops")
-    expenses: float = Field(..., description="Costs booked to the trips")
-    net: float = Field(..., description="collected - expenses: what should come back")
+    expenses: float = Field(..., description="Costs booked to the trips, paid or not")
+    expenses_paid: float = Field(..., description="Of those costs, the cash actually paid out")
+    expenses_unpaid: float = Field(
+        ...,
+        description="Booked but not settled — owed to whoever fronted it, not cash "
+                    "missing from the drivers, so it does not move the net",
+    )
+    net: float = Field(..., description="collected - expenses_paid: what should come back")
 
 
 class TripSummaryMaterial(BaseModel):
