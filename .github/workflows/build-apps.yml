@@ -50,7 +50,10 @@ jobs:
             [[ "$TARGETS" == "all" || "$TARGETS" == "stores-only" ]] && STORES=true || STORES=false
           else
             PREVIEW=false; STORES=false; PLATFORMS=all
-            if [[ "$COMMIT_MSG" == \[build_apps\]* ]]; then
+            # Match BOTH [build_apps] and [build_apps:<platform>]. Testing only for
+            # the former meant the documented per-platform markers silently built
+            # nothing: "[build_apps:ios]..." does not start with "[build_apps]".
+            if [[ "$COMMIT_MSG" == \[build_apps\]* || "$COMMIT_MSG" == \[build_apps:* ]]; then
               PREVIEW=true; STORES=true
               [[ "$COMMIT_MSG" == \[build_apps:ios\]* ]] && PLATFORMS=ios
               [[ "$COMMIT_MSG" == \[build_apps:android\]* ]] && PLATFORMS=android
