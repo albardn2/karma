@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   BackHandler,
   FlatList,
+  I18nManager,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -72,6 +74,90 @@ const fmt = (s?: string | null) => {
 const PER_PAGE = 20;
 // matches MAX_SUMMARY_TRIPS on the endpoint — saying so here beats a 422
 const MAX_SELECTION = 100;
+
+/** One row of filter chips that scrolls sideways instead of wrapping.
+ *
+ * Five status chips do not fit a phone's width, and wrapping left one chip
+ * orphaned on a line of its own. A single row keeps the group readable at any
+ * label length — which matters because the Arabic labels are a different width
+ * again. The arrow appears only while there is something further along, and
+ * taps to scroll, so the overflow is not left to be discovered by swiping.
+ */
+function ChipRow({
+  options,
+  value,
+  onChange,
+  testIDPrefix,
+  label,
+}: {
+  options: { value: string; labelKey: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  testIDPrefix: string;
+  label: (key: string) => string;
+}) {
+  const scrollRef = useRef<ScrollView>(null);
+  const geometry = useRef({ content: 0, viewport: 0, offset: 0 });
+  const [hasMore, setHasMore] = useState(false);
+
+  const recompute = () => {
+    const { content, viewport, offset } = geometry.current;
+    setHasMore(content - viewport - offset > 8);
+  };
+
+  return (
+    <View style={styles.filterRow}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterScroll}
+        onContentSizeChange={(w) => {
+          geometry.current.content = w;
+          recompute();
+        }}
+        onLayout={(e) => {
+          geometry.current.viewport = e.nativeEvent.layout.width;
+          recompute();
+        }}
+        onScroll={(e) => {
+          geometry.current.offset = e.nativeEvent.contentOffset.x;
+          recompute();
+        }}
+        scrollEventThrottle={32}
+      >
+        {options.map((option) => {
+          const active = value === option.value;
+          return (
+            <TouchableOpacity
+              key={option.value}
+              style={[styles.filterChip, active && styles.filterChipActive]}
+              onPress={() => onChange(option.value)}
+              testID={`${testIDPrefix}-${option.value}`}
+            >
+              <ThemedText style={[styles.filterText, active && styles.filterTextActive]}>
+                {label(option.labelKey)}
+              </ThemedText>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+      {hasMore && (
+        <TouchableOpacity
+          style={styles.moreButton}
+          onPress={() => {
+            const { viewport, offset } = geometry.current;
+            scrollRef.current?.scrollTo({ x: offset + viewport * 0.7, animated: true });
+          }}
+          testID={`${testIDPrefix}-more`}
+        >
+          {/* points the way reading goes, so it flips with the layout */}
+          <ThemedText style={styles.moreArrow}>{I18nManager.isRTL ? '‹' : '›'}</ThemedText>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
 
 export default function TripsScreen() {
   const router = useRouter();
@@ -262,39 +348,21 @@ export default function TripsScreen() {
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/?tab=menu'))}
       />
 
-      <View style={styles.filterRow}>
-        {STATUS_FILTERS.map((f) => (
-          <TouchableOpacity
-            key={f.value}
-            style={[styles.filterChip, statusFilter === f.value && styles.filterChipActive]}
-            onPress={() => { exitSelection(); setStatusFilter(f.value); }}
-            testID={`trips-filter-${f.value}`}
-          >
-            <ThemedText
-              style={[styles.filterText, statusFilter === f.value && styles.filterTextActive]}
-            >
-              {t(f.labelKey)}
-            </ThemedText>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <ChipRow
+        options={STATUS_FILTERS}
+        value={statusFilter}
+        onChange={(v) => { exitSelection(); setStatusFilter(v); }}
+        testIDPrefix="trips-filter"
+        label={t}
+      />
 
-      <View style={styles.filterRow}>
-        {AUDIT_FILTERS.map((f) => (
-          <TouchableOpacity
-            key={f.value}
-            style={[styles.filterChip, auditFilter === f.value && styles.filterChipActive]}
-            onPress={() => { exitSelection(); setAuditFilter(f.value); }}
-            testID={`trips-audit-filter-${f.value}`}
-          >
-            <ThemedText
-              style={[styles.filterText, auditFilter === f.value && styles.filterTextActive]}
-            >
-              {t(f.labelKey)}
-            </ThemedText>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <ChipRow
+        options={AUDIT_FILTERS}
+        value={auditFilter}
+        onChange={(v) => { exitSelection(); setAuditFilter(v); }}
+        testIDPrefix="trips-audit-filter"
+        label={t}
+      />
 
       {/* a long press is invisible, so say it once — and only while it is the
           thing to do */}
@@ -373,10 +441,11 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyText: { fontSize: 14, color: '#6B7280' },
-  filterRow: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
-    paddingHorizontal: 16, paddingVertical: 10,
-  },
+  filterRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  // the padding lives on the content so the first and last chip clear the edge
+  filterScroll: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 },
+  moreButton: { paddingHorizontal: 12, paddingVertical: 4 },
+  moreArrow: { fontSize: 22, fontWeight: '700', color: '#5469D4', lineHeight: 24 },
   filterChip: {
     borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6,
     backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB',
