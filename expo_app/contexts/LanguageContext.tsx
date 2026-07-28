@@ -22,22 +22,52 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+/**
+ * Keep the native layout direction in step with the language — Arabic is
+ * right-to-left. I18nManager's flag is persisted natively, so it survives
+ * reinstalls and login changes and can easily disagree with the language we
+ * resolved (an admin edits the profile on the web, a previous session left the
+ * flag set, …). Call this from EVERY path that adopts a language, not just the
+ * in-app switcher, or the app renders English text in a mirrored layout.
+ *
+ * React Native only applies a direction change on the next app start, so we
+ * reload — but only when the direction actually changed, otherwise the app
+ * would reload-loop on every launch.
+ */
+function syncLayoutDirection(l: Lang) {
+  const wantRTL = l === 'ar';
+  if (I18nManager.isRTL === wantRTL) return;
+  I18nManager.allowRTL(wantRTL);
+  I18nManager.forceRTL(wantRTL);
+  try {
+    DevSettings.reload();
+  } catch {
+    // release build without dev menu — direction applies on next launch
+  }
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [lang, setLangState] = useState<Lang>('en');
 
   // the signed-in user's PROFILE language is the source of truth: adopt it
   // whenever it changes (e.g. login, or an admin changed it on the web).
-  // AsyncStorage is only a pre-auth cache for the very first paint.
+  // AsyncStorage is only a pre-auth cache for the very first paint. Whichever
+  // language wins, reconcile the native layout direction with it — the flag
+  // persists across launches and reinstalls, so it may well contradict us.
   useEffect(() => {
     (async () => {
+      let resolved: Lang = 'en';
       if (user?.language === 'ar' || user?.language === 'en') {
-        setLangState(user.language);
-        await AsyncStorage.setItem(STORAGE_KEY, user.language);
+        resolved = user.language;
+        await AsyncStorage.setItem(STORAGE_KEY, resolved);
       } else {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (stored === 'en' || stored === 'ar') setLangState(stored);
+        if (stored === 'en' || stored === 'ar') resolved = stored;
       }
+      setLangState(resolved);
+      // after the cache write above, so a reload can't drop the language
+      syncLayoutDirection(resolved);
     })();
   }, [user?.language]);
 
@@ -69,20 +99,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     // persist the preference on the user profile; best-effort
     apiCall('/auth/me', { method: 'PUT', body: JSON.stringify({ language: l }) }).catch(() => {});
 
-    // Arabic is a right-to-left language: flip the layout direction. React
-    // Native only applies the flip on the next app start, so reload when the
-    // direction actually changes (DevSettings.reload works in dev clients and
-    // release builds pick it up on next launch).
-    const wantRTL = l === 'ar';
-    if (I18nManager.isRTL !== wantRTL) {
-      I18nManager.allowRTL(wantRTL);
-      I18nManager.forceRTL(wantRTL);
-      try {
-        DevSettings.reload();
-      } catch {
-        // release build without dev menu — direction applies on next launch
-      }
-    }
+    syncLayoutDirection(l);
   }, []);
 
   return (
