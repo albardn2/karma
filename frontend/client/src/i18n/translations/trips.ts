@@ -181,6 +181,30 @@ export const en: Record<string, string> = {
   'trips.shouldReturn': 'Should return',
   'trips.tripExpenses': 'Trip Expenses',
   'trips.noTripExpenses': 'No expenses booked to this trip',
+  // multi-select + aggregate summary over the selected trips
+  'trips.selectTrip': 'Select trip',
+  'trips.selectAllOnPage': 'Select every trip on this page',
+  'trips.selectedCount': '{count} selected',
+  'trips.clearSelection': 'Clear',
+  'trips.summary': 'Summary',
+  'trips.summaryTitle': 'Selected Trips Summary',
+  'trips.summarySubtitle': 'Totals across {count} trip(s)',
+  'trips.summaryFailed': 'Could not load the summary: {message}',
+  'trips.summaryTooMany': 'At most {max} trips can be summarised at once',
+  'trips.summaryNoCash': 'No cash was collected or spent on the selected trips.',
+  'trips.summaryNoMaterials': 'No stock moved on the selected trips.',
+  'trips.summaryNetInventory': 'Net Inventory Change',
+  'trips.summaryLoaded': 'Loaded',
+  'trips.summaryReturned': 'Returned',
+  'trips.summaryNetChange': 'Net Change',
+  'trips.summaryNetChangeHint':
+    'Net change is what came back minus what was loaded, so it carries losses as well as sales. Compare it against Sold.',
+  'trips.summaryPartialHint': 'Counts only the selected trips whose stock was counted back in.',
+  // '(s)' rather than a plural rule: the t() helper does no pluralisation, and
+  // '1 of the selected trips have' reads as a bug
+  'trips.summaryMissing': '{count} selected trip(s) no longer exist and are not included.',
+  'trips.summaryNoEndSnapshot':
+    '{count} selected trip(s) have no returned-stock count yet, so they add to Sold but not to Net Change.',
 };
 
 export const ar: Record<string, string> = {
@@ -362,4 +386,26 @@ export const ar: Record<string, string> = {
   'trips.shouldReturn': 'الواجب إرجاعه',
   'trips.tripExpenses': 'مصاريف الرحلة',
   'trips.noTripExpenses': 'لا مصاريف مسجلة على هذه الرحلة',
+  // التحديد المتعدد وملخص الرحلات المحددة
+  'trips.selectTrip': 'تحديد الرحلة',
+  'trips.selectAllOnPage': 'تحديد كل الرحلات في هذه الصفحة',
+  'trips.selectedCount': 'المحدد: {count}',
+  'trips.clearSelection': 'إلغاء التحديد',
+  'trips.summary': 'الملخص',
+  'trips.summaryTitle': 'ملخص الرحلات المحددة',
+  'trips.summarySubtitle': 'الإجماليات عبر {count} رحلة',
+  'trips.summaryFailed': 'تعذّر تحميل الملخص: {message}',
+  'trips.summaryTooMany': 'يمكن تلخيص {max} رحلة كحد أقصى في المرة الواحدة',
+  'trips.summaryNoCash': 'لم يُحصَّل أو يُصرف أي نقد في الرحلات المحددة.',
+  'trips.summaryNoMaterials': 'لا حركة مخزون في الرحلات المحددة.',
+  'trips.summaryNetInventory': 'صافي حركة المخزون',
+  'trips.summaryLoaded': 'المحمَّل',
+  'trips.summaryReturned': 'المُرجَع',
+  'trips.summaryNetChange': 'الصافي',
+  'trips.summaryNetChangeHint':
+    'الصافي = المُرجَع ناقص المحمَّل، فهو يشمل الفاقد كما يشمل المبيع. قارنه مع المُباع.',
+  'trips.summaryPartialHint': 'يحتسب فقط الرحلات المحددة التي تم جرد مخزونها عند العودة.',
+  'trips.summaryMissing': '{count} من الرحلات المحددة لم تعد موجودة ولم تُحتسب.',
+  'trips.summaryNoEndSnapshot':
+    '{count} من الرحلات المحددة لم يتم جرد مخزونها عند العودة بعد، فهي تُضاف إلى المُباع دون الصافي.',
 };

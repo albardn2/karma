@@ -250,3 +250,85 @@ class TripPage(BaseModel):
     page: int = Field(..., description="Current page number")
     per_page: int = Field(..., description="Number of items per page")
     pages: int = Field(..., description="Total number of pages")
+
+
+# One page of trips is the realistic selection, and the aggregate walks each
+# trip's stops in Python, so the cost is bounded by keeping this near the max
+# page size rather than letting a caller ask for the whole history at once.
+MAX_SUMMARY_TRIPS = 100
+
+
+class TripSummaryParams(BaseModel):
+    """Which trips to roll up. Comma-separated so this stays a GET: the summary
+    only sums figures the caller can already read one trip at a time."""
+    model_config = ConfigDict(extra="forbid")
+
+    trip_uuids: List[str] = Field(..., min_length=1, max_length=MAX_SUMMARY_TRIPS)
+
+    @field_validator("trip_uuids", mode="before")
+    def _split_and_dedupe(cls, v):
+        if isinstance(v, str):
+            v = v.split(",")
+        seen, out = set(), []
+        for raw in v or []:
+            u = raw.strip() if isinstance(raw, str) else raw
+            # a uuid sent twice must not be counted twice — the totals would lie
+            if u and u not in seen:
+                seen.add(u)
+                out.append(u)
+        return out
+
+
+class TripSummaryCash(BaseModel):
+    """Cash for one currency. Never summed across currencies — a trip can
+    collect USD and spend SYP, and adding those together is meaningless."""
+    model_config = ConfigDict(extra="forbid")
+
+    currency: str
+    collected: float = Field(..., description="Cash taken at the stops")
+    expenses: float = Field(..., description="Costs booked to the trips")
+    net: float = Field(..., description="collected - expenses: what should come back")
+
+
+class TripSummaryMaterial(BaseModel):
+    """Stock movement for one material across the selected trips.
+
+    `net_change` is what actually left the vans (returned - loaded), so it
+    carries shrinkage as well as sales; `sold` is the clean sales figure. Both
+    are reported because an audit needs to see them disagree.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    material_uuid: str
+    material_name: Optional[str] = None
+    measure_unit: Optional[str] = None
+    loaded: float = Field(..., description="Sum of the start snapshots")
+    sold: float = Field(..., description="Sold off the vans (vehicle sale events)")
+    returned: float = Field(..., description="Sum of the end snapshots, where taken")
+    net_change: float = Field(..., description="returned - loaded; negative means stock left")
+    variance: float = Field(..., description="Sum of (actual end - expected end)")
+    net_change_partial: bool = Field(
+        False,
+        description="True when a selected trip moved this material but has no end "
+                    "snapshot, so net_change/returned/variance cover fewer trips than sold",
+    )
+
+
+class TripSummary(BaseModel):
+    """Aggregate of several trips: cash per currency, stock per material."""
+    model_config = ConfigDict(extra="forbid")
+
+    trip_count: int = Field(..., description="Trips actually included")
+    trip_uuids: List[str] = Field(..., description="The included trips")
+    cash: List[TripSummaryCash] = Field(default_factory=list)
+    materials: List[TripSummaryMaterial] = Field(default_factory=list)
+    missing_uuids: List[str] = Field(
+        default_factory=list,
+        description="Requested but not found in this account (deleted or foreign) — "
+                    "reported rather than silently counted as zero",
+    )
+    trips_without_end_inventory: List[str] = Field(
+        default_factory=list,
+        description="Included trips with no end snapshot: their stock has not been "
+                    "counted back in, so they contribute to sold but not to net_change",
+    )

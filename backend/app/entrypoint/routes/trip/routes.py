@@ -9,6 +9,7 @@ from app.dto.trip import (
     TripUpdate,
     TripListParams,
     TripPage,
+    TripSummaryParams,
 )
 from models.common import Trip as TripModel
 from app.domains.trip.domain import TripDomain
@@ -162,6 +163,31 @@ def unaudit_trip(uuid: str):
         result = dto.model_dump(mode="json")
         uow.commit()
     return jsonify(result), 200
+
+
+@trip_blueprint.route("/summary", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATOR.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.DRIVER.value,
+    PermissionScope.SALES.value,
+)
+def summarize_trips():
+    """Cash and stock rolled up over several selected trips.
+
+    A GET, and open to everyone who can read a trip, because that is what it is:
+    every figure here is already visible on each trip's own page — this only adds
+    them up. Registered before the `/<uuid>` rule is irrelevant to Werkzeug
+    (static rules outrank converters either way), but `summary` is not a uuid, so
+    the two cannot collide.
+    """
+    params = TripSummaryParams(**request.args)
+    with SqlAlchemyUnitOfWork() as uow:
+        dto = TripDomain.summarize(uow=uow, trip_uuids=params.trip_uuids)
+    return jsonify(dto.model_dump(mode="json")), 200
 
 
 def _assigned_username_for_wfe(uow, wfe_uuid):
