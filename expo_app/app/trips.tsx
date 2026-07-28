@@ -1,16 +1,21 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  BackHandler,
   FlatList,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { NativeHeader } from '@/components/layout/NativeHeader';
+import { TripSummarySheet } from '@/components/TripSummarySheet';
 import { apiCall } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -65,11 +70,14 @@ const fmt = (s?: string | null) => {
 };
 
 const PER_PAGE = 20;
+// matches MAX_SUMMARY_TRIPS on the endpoint — saying so here beats a 422
+const MAX_SELECTION = 100;
 
 export default function TripsScreen() {
   const router = useRouter();
   const { t } = useLanguage();
   const { isAdmin } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -79,6 +87,56 @@ export default function TripsScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Long-press a trip to start selecting; after that a tap toggles instead of
+  // opening. Kept across pages so a month can be rolled up, but dropped when a
+  // filter changes — the trips on screen would no longer explain the total.
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [showSummary, setShowSummary] = useState(false);
+
+  const exitSelection = useCallback(() => {
+    setSelectionMode(false);
+    setSelected([]);
+  }, []);
+
+  const beginSelection = (uuid: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setSelectionMode(true);
+    setSelected([uuid]);
+  };
+
+  const toggleSelected = (uuid: string) => {
+    // the cap message is decided out here: a state updater has to stay pure, or
+    // React is free to run it twice and alert twice
+    if (!selected.includes(uuid) && selected.length >= MAX_SELECTION) {
+      Alert.alert(t('trips.summaryTooMany', { max: MAX_SELECTION }));
+      return;
+    }
+    setSelected((prev) =>
+      prev.includes(uuid)
+        ? prev.filter((u) => u !== uuid)
+        : prev.length >= MAX_SELECTION
+          ? prev
+          : [...prev, uuid]
+    );
+  };
+
+  // unchecking the last one leaves selection mode, as a list should. Derived
+  // from the selection rather than done inside the updater, for the same reason.
+  useEffect(() => {
+    if (selectionMode && selected.length === 0) setSelectionMode(false);
+  }, [selectionMode, selected]);
+
+  // on Android, back should leave selection rather than the screen
+  useEffect(() => {
+    if (!selectionMode) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      exitSelection();
+      return true;
+    });
+    return () => sub.remove();
+  }, [selectionMode, exitSelection]);
 
   const fetchPage = useCallback(
     async (pageNum: number, replace: boolean) => {
@@ -133,13 +191,30 @@ export default function TripsScreen() {
 
   const renderTrip = ({ item }: { item: Trip }) => {
     const badge = STATUS_BADGE[item.status] || { bg: '#E5E7EB', fg: '#4B5563', labelKey: '' };
+    const isSelected = selected.includes(item.uuid);
     return (
       <TouchableOpacity
-        style={styles.card}
-        onPress={() => router.push({ pathname: '/trips/[uuid]', params: { uuid: item.uuid } })}
+        style={[styles.card, selectionMode && styles.cardSelectable, isSelected && styles.cardSelected]}
+        onPress={() =>
+          selectionMode
+            ? toggleSelected(item.uuid)
+            : router.push({ pathname: '/trips/[uuid]', params: { uuid: item.uuid } })
+        }
+        onLongPress={() => (selectionMode ? toggleSelected(item.uuid) : beginSelection(item.uuid))}
+        delayLongPress={300}
         activeOpacity={0.75}
         testID={`trip-row-${item.uuid}`}
       >
+        {/* the box only takes space once selecting has started, so the normal
+            list is unchanged; flexDirection flips itself under RTL */}
+        {selectionMode && (
+          <View style={styles.checkboxCol}>
+            <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
+              {isSelected && <ThemedText style={styles.checkboxTick}>✓</ThemedText>}
+            </View>
+          </View>
+        )}
+        <View style={styles.cardBody}>
         <View style={styles.cardTop}>
           <ThemedText style={styles.plate} numberOfLines={1}>
             {item.vehicle_plate || item.uuid.slice(0, 8)}
@@ -174,6 +249,7 @@ export default function TripsScreen() {
           <ThemedText style={styles.metaLabel}>{t('trips.created')}</ThemedText>
           <ThemedText style={styles.metaValue}>{fmt(item.created_at)}</ThemedText>
         </View>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -191,7 +267,7 @@ export default function TripsScreen() {
           <TouchableOpacity
             key={f.value}
             style={[styles.filterChip, statusFilter === f.value && styles.filterChipActive]}
-            onPress={() => setStatusFilter(f.value)}
+            onPress={() => { exitSelection(); setStatusFilter(f.value); }}
             testID={`trips-filter-${f.value}`}
           >
             <ThemedText
@@ -208,7 +284,7 @@ export default function TripsScreen() {
           <TouchableOpacity
             key={f.value}
             style={[styles.filterChip, auditFilter === f.value && styles.filterChipActive]}
-            onPress={() => setAuditFilter(f.value)}
+            onPress={() => { exitSelection(); setAuditFilter(f.value); }}
             testID={`trips-audit-filter-${f.value}`}
           >
             <ThemedText
@@ -219,6 +295,12 @@ export default function TripsScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* a long press is invisible, so say it once — and only while it is the
+          thing to do */}
+      {!selectionMode && !loading && trips.length > 0 && (
+        <ThemedText style={styles.selectHint}>{t('trips.selectHint')}</ThemedText>
+      )}
 
       {loading ? (
         <View style={styles.centered}>
@@ -241,8 +323,48 @@ export default function TripsScreen() {
               <ThemedText style={styles.emptyText}>{t('trips.empty')}</ThemedText>
             </View>
           }
+          // rows are re-rendered when the selection changes, not just the data
+          extraData={`${selectionMode}:${selected.join(',')}`}
         />
       )}
+
+      {/* Action bar, only while selecting — pinned under the list so the Summary
+          button is in thumb reach, clear of the filter chips up top. It takes
+          flow space rather than floating, so the list shrinks to fit and the
+          last card stays scrollable without extra padding. */}
+      {selectionMode && (
+        <View
+          style={[styles.actionBar, { paddingBottom: Math.max(insets.bottom, 12) }]}
+          testID="trips-selection-bar"
+        >
+          <ThemedText style={styles.actionCount} testID="trips-selected-count">
+            {t('trips.selectedCount', { count: selected.length })}
+          </ThemedText>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={exitSelection}
+              testID="trips-selection-cancel"
+            >
+              <ThemedText style={styles.cancelText}>{t('common.cancel')}</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.summaryBtn, selected.length === 0 && styles.summaryBtnDisabled]}
+              disabled={selected.length === 0}
+              onPress={() => setShowSummary(true)}
+              testID="trips-summary-button"
+            >
+              <ThemedText style={styles.summaryText}>{t('trips.summaryButton')}</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      <TripSummarySheet
+        visible={showSummary}
+        tripUuids={selected}
+        onClose={() => setShowSummary(false)}
+      />
     </ThemedView>
   );
 }
@@ -262,12 +384,40 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
   filterText: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
   filterTextActive: { color: '#fff' },
+  selectHint: { fontSize: 11, color: '#9CA3AF', paddingHorizontal: 16, paddingBottom: 6 },
   list: { paddingHorizontal: 16, paddingBottom: 32 },
   card: {
     backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
     elevation: 2, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(0,0,0,0.06)',
   },
+  // while selecting, the card becomes a row: box first, then the usual content
+  cardSelectable: { flexDirection: 'row', alignItems: 'flex-start' },
+  cardSelected: { borderColor: '#5469D4', borderWidth: 1.5, backgroundColor: '#F5F6FE' },
+  cardBody: { flex: 1 },
+  checkboxCol: { paddingTop: 2, paddingEnd: 12 },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#9CA3AF',
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff',
+  },
+  checkboxOn: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
+  checkboxTick: { color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 16 },
+  actionBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingTop: 12,
+    backgroundColor: '#fff', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB',
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: -2 },
+    elevation: 8,
+  },
+  actionCount: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  actionButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cancelBtn: { paddingHorizontal: 14, paddingVertical: 9 },
+  cancelText: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
+  summaryBtn: {
+    backgroundColor: '#5469D4', borderRadius: 10, paddingHorizontal: 18, paddingVertical: 9,
+  },
+  summaryBtnDisabled: { backgroundColor: '#C7CDF2' },
+  summaryText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   plate: { fontSize: 16, fontWeight: '700', color: '#111827', flexShrink: 1 },
   badgeGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
