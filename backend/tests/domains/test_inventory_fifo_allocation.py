@@ -111,3 +111,64 @@ def test_single_lot_oversell_matches_the_observed_behaviour():
     """986 in stock, 1486 sold, lot ends at -500 (checked against the real stack)."""
     out = allocate([_Lot("only", 986)], 1486, allow_negative=True)
     assert [(o.inventory_uuid, o.quantity) for o in out] == [("only", 1486)]
+
+
+# --- unit cost when the receipts net to zero --------------------------------
+# A lot whose receipts were fully credited back leaves signed costs of
+# [+1000, -1000] over signed quantities of [+100, -100]. Dividing by that zero
+# raised ZeroDivisionError, which is not an ApiError, so it became a 500 that
+# took down the whole paginated inventory list — and on the material page, whose
+# query has no error branch, the lot list fell back to empty and the negative lot
+# and its "Zero out" button silently disappeared.
+
+class _CostEvent:
+    def __init__(self, quantity, cost_per_unit):
+        self.quantity = quantity
+        self.cost_per_unit = cost_per_unit
+        self.is_deleted = False
+        self.affect_original = True
+        self.purchase_order_item_uuid = None
+        self.process_uuid = None
+
+
+class _CostLot:
+    def __init__(self, events):
+        self.uuid = "lot-1"
+        self.inventory_events = events
+
+
+class _CostRepo:
+    def __init__(self, lot):
+        self._lot = lot
+
+    def find_one(self, **_kwargs):
+        return self._lot
+
+
+class _CostUow:
+    def __init__(self, events):
+        self.inventory_repository = _CostRepo(_CostLot(events))
+
+
+class _Dto:
+    uuid = "lot-1"          # enrich_cost_per_unit re-fetches the lot by uuid
+    cost_per_unit = None
+
+
+def _cost_for(events):
+    dto = _Dto()
+    InventoryDomain.enrich_cost_per_unit(uow=_CostUow(events), inventory_dto=dto)
+    return dto.cost_per_unit
+
+
+def test_unit_cost_of_a_fully_credited_lot_is_zero_not_a_crash():
+    assert _cost_for([_CostEvent(100, 10), _CostEvent(-100, 10)]) == 0
+
+
+def test_unit_cost_of_a_lot_with_no_events_is_zero():
+    assert _cost_for([]) == 0
+
+
+def test_unit_cost_is_still_the_weighted_average_when_it_can_be_computed():
+    # 100 @ 10 plus 100 @ 20 -> 3000 / 200
+    assert _cost_for([_CostEvent(100, 10), _CostEvent(100, 20)]) == pytest.approx(15)

@@ -79,11 +79,18 @@ class InventoryDomain:
                 ) or 0
                 agg_total_costs.append(cost_per_unit * event.quantity)
 
-        if not agg_total_costs:
+        # The divisor is a SIGNED sum, so it can legitimately reach zero — a lot
+        # whose receipts were fully credited back leaves costs of [+1000, -1000]
+        # over quantities of [+100, -100]. Dividing then raised ZeroDivisionError,
+        # which is not an ApiError, so it surfaced as a 500 that took down the
+        # whole paginated inventory list; on the material page, whose query has no
+        # error branch, the lot list fell back to empty and the negative lot and
+        # its "Zero out" button silently disappeared.
+        denominator = sum(event.quantity for event in events)
+        if not agg_total_costs or abs(denominator) < 1e-9:
             inventory_dto.cost_per_unit = 0
-
         else:
-            inventory_dto.cost_per_unit = sum(agg_total_costs) / sum([event.quantity for event in events])
+            inventory_dto.cost_per_unit = sum(agg_total_costs) / denominator
 
 
     @staticmethod
