@@ -83,6 +83,29 @@ export const translations: Record<Lang, Record<string, string>> = {
     'trips.reconSold': 'Sold',
     'trips.reconEnd': 'End',
     'trips.reconVariance': 'Variance',
+    // multi-select + aggregate summary. Wording copied from the web summary so
+    // the two products say the same thing; 'trips.summary' is already the trip
+    // detail card title, hence summaryButton.
+    'trips.selectHint': 'Hold a trip to select several.',
+    'trips.selectedCount': '{count} selected',
+    'trips.summaryButton': 'Summary',
+    'trips.summaryTitle': 'Selected Trips Summary',
+    'trips.summarySubtitle': 'Totals across {count} trip(s)',
+    'trips.summaryRetry': 'Try again',
+    'trips.summaryFailedShort': 'Could not load the summary',
+    'trips.summaryTooMany': 'At most {max} trips can be summarised at once',
+    'trips.summaryNoCash': 'No cash was collected or spent on the selected trips.',
+    'trips.summaryNoMaterials': 'No stock moved on the selected trips.',
+    'trips.summaryNetInventory': 'Net Inventory Change',
+    'trips.summaryLoaded': 'Loaded',
+    'trips.summaryReturned': 'Returned',
+    'trips.summaryNetChange': 'Net',
+    'trips.summaryNetChangeHint':
+      'Net change is what came back minus what was loaded, so it carries losses as well as sales. Compare it against Sold.',
+    'trips.summaryPartialHint': 'Counts only the selected trips whose stock was counted back in.',
+    'trips.summaryMissing': '{count} selected trip(s) no longer exist and are not included.',
+    'trips.summaryNoEndSnapshot':
+      '{count} selected trip(s) have no returned-stock count yet, so they add to Sold but not to Net.',
     // tracking (admin live/playback on the trip map)
     'tracking.button': 'Tracking',
     'tracking.live': 'Live',
@@ -513,6 +536,27 @@ export const translations: Record<Lang, Record<string, string>> = {
     'trips.reconSold': 'المُباع',
     'trips.reconEnd': 'النهاية',
     'trips.reconVariance': 'الفرق',
+    // التحديد المتعدد وملخص الرحلات المحددة — نفس صياغة الويب
+    'trips.selectHint': 'اضغط مطولاً على رحلة لتحديد عدة رحلات.',
+    'trips.selectedCount': 'المحدد: {count}',
+    'trips.summaryButton': 'الملخص',
+    'trips.summaryTitle': 'ملخص الرحلات المحددة',
+    'trips.summarySubtitle': 'الإجماليات عبر {count} رحلة',
+    'trips.summaryRetry': 'إعادة المحاولة',
+    'trips.summaryFailedShort': 'تعذّر تحميل الملخص',
+    'trips.summaryTooMany': 'يمكن تلخيص {max} رحلة كحد أقصى في المرة الواحدة',
+    'trips.summaryNoCash': 'لم يُحصَّل أو يُصرف أي نقد في الرحلات المحددة.',
+    'trips.summaryNoMaterials': 'لا حركة مخزون في الرحلات المحددة.',
+    'trips.summaryNetInventory': 'صافي حركة المخزون',
+    'trips.summaryLoaded': 'المحمَّل',
+    'trips.summaryReturned': 'المُرجَع',
+    'trips.summaryNetChange': 'الصافي',
+    'trips.summaryNetChangeHint':
+      'الصافي = المُرجَع ناقص المحمَّل، فهو يشمل الفاقد كما يشمل المبيع. قارنه مع المُباع.',
+    'trips.summaryPartialHint': 'يحتسب فقط الرحلات المحددة التي تم جرد مخزونها عند العودة.',
+    'trips.summaryMissing': '{count} من الرحلات المحددة لم تعد موجودة ولم تُحتسب.',
+    'trips.summaryNoEndSnapshot':
+      '{count} من الرحلات المحددة لم يتم جرد مخزونها عند العودة بعد، فهي تُضاف إلى المُباع دون الصافي.',
     // tracking (admin live/playback on the trip map)
     'tracking.button': 'التتبع',
     'tracking.live': 'مباشر',

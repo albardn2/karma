@@ -14,12 +14,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
-import { Truck, Plus, Trash2, ClipboardCheck, Clock } from "lucide-react";
+import { Truck, Plus, Trash2, ClipboardCheck, Clock, Calculator, X } from "lucide-react";
 import { TripFilters } from "@/components/trips/TripFilters";
 import { AddTripDialog } from "@/components/trips/AddTripDialog";
+import { TripSummaryDialog } from "@/components/trips/TripSummaryDialog";
 import { format } from "date-fns";
 import type { TripPage, TripFilters as TripFiltersType } from "@/lib/types";
 
@@ -31,6 +33,11 @@ export default function Trips() {
   const [activeTab, setActiveTab] = useState('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [deleteTargetUuid, setDeleteTargetUuid] = useState<string | null>(null);
+  // trips picked for the aggregate summary. Kept across pages so a month's
+  // worth can be rolled up, but dropped when the filters change: the set on
+  // screen would no longer explain the number.
+  const [selected, setSelected] = useState<string[]>([]);
+  const [showSummary, setShowSummary] = useState(false);
   const { isAdmin } = useAuth();
   const { t, te } = useLanguage();
   const { toast } = useToast();
@@ -38,10 +45,12 @@ export default function Trips() {
 
   const deleteTripMutation = useMutation({
     mutationFn: (uuid: string) => apiRequest(`/trip/${uuid}`, { method: "DELETE" }),
-    onSuccess: () => {
+    onSuccess: (_data, uuid) => {
       queryClient.invalidateQueries({ queryKey: ["/trip/"] });
       // the paired workflow execution is soft-deleted too
       queryClient.invalidateQueries({ queryKey: ["/workflow-execution/"] });
+      // a deleted trip must leave the selection, or the summary reports it missing
+      setSelected((prev) => prev.filter((u) => u !== uuid));
       if (trips.length === 1 && currentPage > 1) setCurrentPage(currentPage - 1);
       toast({ title: t('trips.tripDeleted') });
     },
@@ -82,10 +91,12 @@ export default function Trips() {
   const handleFilterChange = (newFilters: Omit<TripFiltersType, 'page' | 'per_page'>) => {
     setFilters(newFilters);
     setCurrentPage(1);
+    setSelected([]);
   };
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
+    setSelected([]);
     let newFilters: TripFiltersType = {};
     
     switch (tab) {
@@ -122,6 +133,44 @@ export default function Trips() {
   const trips = tripData?.items || [];
   const totalCount = tripData?.total_count || 0;
   const totalPages = tripData?.pages || 0;
+
+  // matches MAX_SUMMARY_TRIPS on the endpoint — refusing here with a message
+  // beats letting the request come back 422
+  const MAX_SELECTION = 100;
+  const selectedSet = new Set(selected);
+  const pageUuids = trips.map((trip) => trip.uuid);
+  const allPageSelected = pageUuids.length > 0 && pageUuids.every((u) => selectedSet.has(u));
+  const somePageSelected = pageUuids.some((u) => selectedSet.has(u));
+
+  const toggleOne = (uuid: string) => {
+    setSelected((prev) => {
+      if (prev.includes(uuid)) return prev.filter((u) => u !== uuid);
+      if (prev.length >= MAX_SELECTION) {
+        toast({ title: t('trips.summaryTooMany', { max: MAX_SELECTION }), variant: "destructive" });
+        return prev;
+      }
+      return [...prev, uuid];
+    });
+  };
+
+  const togglePage = () => {
+    if (allPageSelected) {
+      setSelected((prev) => prev.filter((u) => !pageUuids.includes(u)));
+      return;
+    }
+    setSelected((prev) => {
+      const merged = [...prev];
+      for (const uuid of pageUuids) {
+        if (merged.includes(uuid)) continue;
+        if (merged.length >= MAX_SELECTION) {
+          toast({ title: t('trips.summaryTooMany', { max: MAX_SELECTION }), variant: "destructive" });
+          break;
+        }
+        merged.push(uuid);
+      }
+      return merged;
+    });
+  };
 
   const formatDateTime = (dateString?: string) => {
     if (!dateString) return t('trips.notSet');
@@ -235,12 +284,48 @@ export default function Trips() {
           </div>
         </div>
 
+        {/* Selection bar — only once something is picked, so it never competes
+            with the filters for attention */}
+        {selected.length > 0 && (
+          <div
+            className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-[#5469D4]/30 bg-[#5469D4]/5 px-4 py-3"
+            data-testid="trip-selection-bar"
+          >
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100" data-testid="text-selected-count">
+              {t('trips.selectedCount', { count: selected.length })}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setShowSummary(true)}
+                className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
+                data-testid="button-trip-summary"
+              >
+                <Calculator className="w-4 h-4 me-2" />
+                {t('trips.summary')}
+              </Button>
+              <Button variant="ghost" onClick={() => setSelected([])} data-testid="button-clear-selection">
+                <X className="w-4 h-4 me-2" />
+                {t('trips.clearSelection')}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
+                  <th className="ps-6 pe-2 py-3 w-10">
+                    <Checkbox
+                      checked={allPageSelected ? true : somePageSelected ? "indeterminate" : false}
+                      onCheckedChange={togglePage}
+                      disabled={pageUuids.length === 0}
+                      aria-label={t('trips.selectAllOnPage')}
+                      data-testid="checkbox-select-page"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     {t('trips.colTripId')}
                   </th>
@@ -275,7 +360,7 @@ export default function Trips() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={isAdmin ? 9 : 8} className="px-6 py-16 text-center">
+                    <td colSpan={isAdmin ? 10 : 9} className="px-6 py-16 text-center">
                       <div className="animate-pulse space-y-4">
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-32 mx-auto"></div>
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-48 mx-auto"></div>
@@ -286,7 +371,7 @@ export default function Trips() {
                   </tr>
                 ) : trips.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdmin ? 9 : 8} className="px-6 py-16 text-center">
+                    <td colSpan={isAdmin ? 10 : 9} className="px-6 py-16 text-center">
                       <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                         {error ? t('trips.errorLoading') : t('trips.noTrips')}
@@ -314,6 +399,19 @@ export default function Trips() {
                       onClick={() => setLocation(`/trip/${trip.uuid}`)}
                       data-testid={`row-trip-${trip.uuid}`}
                     >
+                      {/* the row navigates on click, so the checkbox cell has to
+                          swallow the event or picking a trip would leave the page */}
+                      <td
+                        className="ps-6 pe-2 py-4 w-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={selectedSet.has(trip.uuid)}
+                          onCheckedChange={() => toggleOne(trip.uuid)}
+                          aria-label={t('trips.selectTrip')}
+                          data-testid={`checkbox-trip-${trip.uuid}`}
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
                           {trip.uuid.substring(0, 8)}...
@@ -455,6 +553,12 @@ export default function Trips() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <TripSummaryDialog
+        open={showSummary}
+        onOpenChange={setShowSummary}
+        tripUuids={selected}
+      />
 
       <AddTripDialog
         open={showAddDialog}

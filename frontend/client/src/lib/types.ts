@@ -590,3 +590,38 @@ export interface TripPage {
   per_page: number;
   pages: number;
 }
+
+// Aggregate over several selected trips. Cash stays split by currency — the
+// backend never adds USD to SYP and neither should the UI.
+export interface TripSummaryCash {
+  currency: string;
+  collected: number;
+  expenses: number;
+  net: number;
+}
+
+export interface TripSummaryMaterial {
+  material_uuid: string;
+  material_name?: string | null;
+  measure_unit?: string | null;
+  loaded: number;
+  sold: number;
+  returned: number;
+  // returned - loaded: negative means stock left the vans. Carries shrinkage as
+  // well as sales, which is why `sold` is reported beside it.
+  net_change: number;
+  variance: number;
+  // a selected trip moved this material but was never counted back in, so
+  // net_change covers fewer trips than sold does
+  net_change_partial: boolean;
+}
+
+export interface TripSummary {
+  trip_count: number;
+  trip_uuids: string[];
+  cash: TripSummaryCash[];
+  materials: TripSummaryMaterial[];
+  // selected but not found (deleted, or another account's)
+  missing_uuids: string[];
+  trips_without_end_inventory: string[];
+}
