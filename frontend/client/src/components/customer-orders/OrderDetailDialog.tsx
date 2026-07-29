@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Input } from "@/components/ui/input";
+
+// money is DOUBLE PRECISION end to end; never render or send the raw float
+const round2 = (n: number) => Math.round(Number(n) * 100) / 100;
 
 export function OrderDetailDialog({
   orderUuid,
@@ -49,6 +53,26 @@ export function OrderDetailDialog({
   const canFulfill = unfulfilled.length > 0;
   const canPay = amountDue > 0;
 
+  // The amount to pay, as a string so the field can be cleared while typing.
+  // Seeded with the whole balance, which keeps the old behaviour — leave it
+  // alone and Submit settles the order; edit it down to take part of the money.
+  // Re-seeded whenever the balance changes, so after a partial payment the field
+  // offers the NEW remainder rather than the amount already collected.
+  const [payAmount, setPayAmount] = useState("");
+  useEffect(() => {
+    if (canPay) setPayAmount(String(round2(amountDue)));
+  }, [amountDue, canPay]);
+
+  const payNumber = Number(payAmount);
+  const payAmountValid =
+    payAmount.trim() !== "" &&
+    Number.isFinite(payNumber) &&
+    payNumber > 0 &&
+    // half a cent of slack, matching MONEY_TOLERANCE on the backend, so typing
+    // the balance back in cannot be refused by a rounding hair
+    payNumber <= amountDue + 0.005;
+  const remainingAfter = payAmountValid ? round2(amountDue - payNumber) : null;
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       if (doFulfill && canFulfill) {
@@ -60,13 +84,16 @@ export function OrderDetailDialog({
           },
         });
       }
-      if (doPay && canPay) {
+      if (doPay && canPay && payAmountValid) {
         await apiRequest("/payment/", {
           method: "POST",
           body: {
             invoice_uuid: invoice.uuid,
             financial_account_uuid: null, // default account (by currency) on the backend
-            amount: amountDue,
+            // whatever is in the field: the full balance by default, or less for
+            // a part payment. Rounded to the cent so a float tail cannot be read
+            // as an overpayment.
+            amount: round2(payNumber),
             currency,
             payment_method: "cash", // default method
             trip_stop_uuid: tripStopUuid || null, // attribute cash to the current trip stop
@@ -81,7 +108,8 @@ export function OrderDetailDialog({
     onError: (e: Error) => toast({ title: t('common.error'), description: e.message, variant: "destructive" }),
   });
 
-  const nothingSelected = !(doFulfill && canFulfill) && !(doPay && canPay);
+  const nothingSelected =
+    !(doFulfill && canFulfill) && !(doPay && canPay && payAmountValid);
 
   const fmtDate = (s?: string) => {
     if (!s) return "";
@@ -127,9 +155,11 @@ export function OrderDetailDialog({
 
             {/* totals */}
             <div className="text-sm space-y-1">
-              <div className="flex justify-between"><span className="text-gray-500">{t('common.total')}</span><span>{invoice?.total_amount ?? order.total_adjusted_amount ?? 0} {currency}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">{t('customerOrders.paid')}</span><span>{invoice?.net_amount_paid ?? order.net_amount_paid ?? 0} {currency}</span></div>
-              <div className="flex justify-between font-semibold"><span>{t('customerOrders.due')}</span><span>{amountDue} {currency}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">{t('common.total')}</span><span className="tabular-nums">{round2(invoice?.total_amount ?? order.total_adjusted_amount ?? 0)} {currency}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">{t('customerOrders.paid')}</span><span className="tabular-nums">{round2(invoice?.net_amount_paid ?? order.net_amount_paid ?? 0)} {currency}</span></div>
+              {/* the outstanding balance, which stays visible while it is only
+                  partly paid — rounded, since paying in parts leaves float dust */}
+              <div className="flex justify-between font-semibold"><span>{t('customerOrders.due')}</span><span className="tabular-nums" data-testid="text-amount-due">{round2(amountDue)} {currency}</span></div>
             </div>
 
             {/* actions: tick what to do, then submit */}
@@ -145,10 +175,60 @@ export function OrderDetailDialog({
                   {canPay && (
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input type="checkbox" checked={doPay} onChange={(e) => setDoPay(e.target.checked)} data-testid="check-pay" />
-                      {t('customerOrders.markPaidAmount', { amount: amountDue, currency })}
+                      {t('customerOrders.recordPayment')}
                     </label>
                   )}
                 </div>
+
+                {/* How much of the balance is being collected. Prefilled with the
+                    whole thing, so the common case is still one click. */}
+                {canPay && doPay && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step={0.01}
+                        max={round2(amountDue)}
+                        value={payAmount}
+                        onChange={(e) => setPayAmount(e.target.value)}
+                        className="h-9 w-40 tabular-nums"
+                        aria-label={t('customerOrders.amountToPay')}
+                        data-testid="input-pay-amount"
+                      />
+                      <span className="text-sm text-gray-500">{currency}</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPayAmount(String(round2(amountDue)))}
+                        data-testid="button-pay-full"
+                      >
+                        {t('customerOrders.payFullBalance')}
+                      </Button>
+                    </div>
+                    {!payAmountValid ? (
+                      <p className="text-xs text-red-600" data-testid="text-pay-amount-error">
+                        {t('customerOrders.payAmountInvalid', {
+                          amount: round2(amountDue),
+                          currency,
+                        })}
+                      </p>
+                    ) : (
+                      // what is still owed once this payment lands — the point of
+                      // a part payment is knowing what is left
+                      <p className="text-xs text-gray-500" data-testid="text-remaining-after">
+                        {remainingAfter === 0
+                          ? t('customerOrders.settlesOrder')
+                          : t('customerOrders.remainingAfter', {
+                              amount: remainingAfter as number,
+                              currency,
+                            })}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <Button
                   onClick={() => submitMutation.mutate()}

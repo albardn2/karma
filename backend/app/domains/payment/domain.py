@@ -4,7 +4,7 @@ from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWo
 from app.domains.financial_account.domain import FinancialAccountDomain
 
 from app.dto.payment import PaymentCreate, PaymentRead
-from models.common import Payment as PaymentModel
+from models.common import MONEY_TOLERANCE, Payment as PaymentModel
 
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.entrypoint.routes.common.errors import NotFoundError
@@ -52,9 +52,16 @@ class PaymentDomain:
                 )
 
 
-        if pay.invoice and pay.invoice.net_amount_due < 0:
+        # Tolerant by half a cent, deliberately. This runs AFTER the payment is
+        # flushed, so net_amount_due already includes it — and an invoice paid in
+        # instalments lands a hair below zero from float dust (12.30 settled as
+        # 4.10 x3 gives -1.8e-15). A bare `< 0` therefore rejected the very
+        # payment that settled the balance. A real overpayment is at least one
+        # cent and still refused.
+        if pay.invoice and pay.invoice.net_amount_due < -MONEY_TOLERANCE:
             raise BadRequestError(
-                f"payment amount {pay.amount} is larger than payment due"
+                f"payment amount {pay.amount} is larger than the {pay.invoice.currency} "
+                f"{round(pay.invoice.net_amount_due + pay.amount, 2)} still due"
             )
 
         if pay.debit_note_item and pay.debit_note_item.amount_due < 0:

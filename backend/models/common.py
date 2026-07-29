@@ -29,6 +29,17 @@ from sqlalchemy.orm import relationship
 from sqlalchemy import UniqueConstraint, Index, text
 from models.base import Base
 
+# Half a cent. Every money column here is DOUBLE PRECISION, so a balance settled
+# in instalments does not land bit-exactly on zero: 100 paid as 4.10 + 4.10 + 4.10
+# leaves 1.8e-15, and about half of such cases land NEGATIVE. An exact `== 0`
+# test therefore leaves fully-paid invoices reading unpaid, and a `< 0`
+# overpayment guard rejects the payment that settles them.
+#
+# This is the threshold for "the same amount of money": anything a real currency
+# can express (one cent) stays visible, while float dust is absorbed. Same idea
+# and same magnitude as TransactionDomain.MONEY_TOLERANCE.
+MONEY_TOLERANCE = 0.005
+
 
 class Account(Base):
     """A tenant: one company using the system. Every business row carries
@@ -568,11 +579,17 @@ class Invoice(Base):
 
     @hybrid_property
     def is_paid(self):
-        return self.net_amount_due == 0
+        # Within half a cent, not bit-exact — see MONEY_TOLERANCE. An invoice
+        # settled in instalments does not land on zero: 12.30 paid as
+        # 4.10 + 4.10 + 4.10 leaves 1.8e-15, so `== 0` would keep a fully-paid
+        # invoice "pending" forever while the UI rounds the balance to 0.00.
+        return abs(self.net_amount_due) <= MONEY_TOLERANCE
 
     @is_paid.expression
     def is_paid(cls):
-        return cls.net_amount_due == literal(0)
+        # kept in step with the Python branch above: the two are read
+        # interchangeably (ORM attribute vs SQL filter) and must not disagree
+        return func.abs(cls.net_amount_due) <= literal(MONEY_TOLERANCE)
 
     @hybrid_property
     def status(self):
