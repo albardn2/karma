@@ -31,10 +31,19 @@ from app.dto.task import TaskInputField
 
 
 class TripStopOutcome(str, Enum):
+    """What came of a stop, as "<key> - <arabic>".
+
+    The WHOLE string is what lands in `trip_stop.outcome`, so these values are
+    data, not labels: editing one orphans every row already written with it. The
+    key's prefix before ':' is the family, and the customer analytics filter
+    matches on it (`ilike 'prefix%'`), so a new family needs an option there too.
+    """
     # with arabic translation
     SALE = "sale - تم البيع"
     INTERESTED_HAVE_INVENTORY = "interested:have_inventory - مهتم: لديه مخزون"
     INTERESTED_NEEDS_BETTER_PRICE = "interested:needs_better_price - مهتم: يحتاج إلى سعر أفضل"
+    # wants the goods but cannot pay today — interested, not a refusal
+    INTERESTED_INSUFFICIENT_FUNDS = "interested:insufficient_funds - مهتم: السيولة غير كافية"
     NOT_INTERESTED_COMPETITOR = "not_interested:competitors_product - غير مهتم: منتج المنافس"
     NOT_INTERESTED_BAD_PRODUCT = "not_interested:bad_product - غير مهتم: منتج سيئ"
     NOT_INTERSTED_PRICE_TOO_HIGH = "not_interested:price_too_high - غير مهتم: السعر مرتفع جدًا"
@@ -44,6 +53,9 @@ class TripStopOutcome(str, Enum):
     SKIPPED_NO_PARKING = "skipped:no_parking - تم التخطي: لا يوجد موقف"
     SKIPPED_NO_TIME = "skipped:no_time - تم التخطي: لا يوجد وقت"
     SKIPPED_OTHER = "skipped:other - تم التخطي: أخرى"
+    # its own family: a verdict about the customer, not a reason they declined.
+    # Records the visit only — nothing stops this customer being sold to again.
+    BLACKLIST = "blacklist - القائمة السوداء"
 
 
 

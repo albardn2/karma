@@ -113,6 +113,12 @@ These are the rest, in rough order of how much they mislead someone:
 
 ---
 
+## From the trip-stop outcome options (2026-07-28)
+
+- **Stop outcomes already contain values no enum member produces.** `trip_stop.outcome` stores the whole `"<key> - <arabic>"` composite, so the enum is a *generator* of values, not a constraint on the column — nothing validates a stop's outcome against `TripStopOutcome`. The local database shows the consequence: `no_sale - لا يوجد بيع` (1 row, a member that no longer exists), `skipped:no_time - تم التخطي` (1 row, an older shorter Arabic rendering of a member that is now `skipped:no_time - تم التخطي: لا يوجد وقت`), and 2 rows with an empty outcome. Each renders as its own slice in the outcome charts, so the same real-world reason can appear twice under different labels. Options are baked into each trip's task input field at creation time, which is why old spellings survive. Fix is a data question first (map the orphans onto current members, or accept them as historical), then optionally a check constraint or a normalising read. **Small lift to migrate the rows; the decision is whether history should be rewritten at all.** Prod has not been checked — the same query will tell you: `SELECT outcome, count(*) FROM trip_stop GROUP BY outcome;`
+
+---
+
 ## Testing
 
 - **The backend test suite is ~92% red and nothing runs it.** As of 2026-07-27: `pytest` gives **234 failed, 20 passed**. Two independent causes, both long-standing: (1) every route test calls `client.put(...)` with no `Authorization` header and gets 401 — those files were last touched 2025-04-23, `jwt_required` arrived on the routes 2025-06-21, and `conftest.py` has an unused `admin_token` fixture sitting right there; (2) `tests/domains/test_transaction_domain.py` constructs `TransactionCreate(amount=…, currency=…, exchange_rate=…)`, a DTO shape that no longer exists (it is `from_amount` / `from_currency` / `usd_to_syp_exchange_rate`, and the model is `extra="forbid"`), so every case dies in validation. No workflow runs pytest, so none of this is visible in CI. **Medium lift** to repair (mostly mechanical: inject the token fixture, update the DTO calls), and until then the suite provides zero protection on a codebase that moves money. Verified the rot predates the transaction-bug PR (#60): the parent commit's DTO already had the current field names.
