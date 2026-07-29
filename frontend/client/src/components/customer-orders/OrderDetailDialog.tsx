@@ -103,7 +103,10 @@ export function OrderDetailDialog({
     },
     onSuccess: () => {
       toast({ title: t('customerOrders.orderUpdated'), description: t('customerOrders.orderUpdatedDesc') });
+      // refresh the lists behind the dialog, then get out of the way: the work is
+      // done, and staying open on a stale balance invites a second payment
       refresh();
+      onOpenChange(false);
     },
     onError: (e: Error) => toast({ title: t('common.error'), description: e.message, variant: "destructive" }),
   });
