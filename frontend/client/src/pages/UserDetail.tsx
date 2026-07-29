@@ -651,24 +651,31 @@ export default function UserDetail() {
                         <FormField
                           control={form.control}
                           name="is_active"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 md:col-span-2">
-                              <div className="space-y-0.5">
-                                <FormLabel>{t("users.isActive")}</FormLabel>
-                                <FormDescription>
-                                  {t("users.isActiveDesc")}
-                                </FormDescription>
-                              </div>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value ?? true}
-                                  onCheckedChange={field.onChange}
-                                  disabled={authUser?.uuid === uuid}
-                                  data-testid="switch-user-is-active"
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
+                          render={({ field }) => {
+                            // Deactivation bites on the target's very next
+                            // request, so deactivating yourself would lock you
+                            // out with no way back — the server refuses it too.
+                            // Say why, rather than showing a dead switch.
+                            const isSelf = authUser?.uuid === uuid;
+                            return (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 md:col-span-2">
+                                <div className="space-y-0.5">
+                                  <FormLabel>{t("users.isActive")}</FormLabel>
+                                  <FormDescription>
+                                    {isSelf ? t("users.isActiveSelfHint") : t("users.isActiveDesc")}
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value ?? true}
+                                    onCheckedChange={field.onChange}
+                                    disabled={isSelf}
+                                    data-testid="switch-user-is-active"
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            );
+                          }}
                         />
 
                         <FormField
