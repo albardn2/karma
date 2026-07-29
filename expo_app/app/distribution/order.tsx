@@ -56,27 +56,35 @@ export default function OrderActionsScreen() {
   const amountDue = invoice?.net_amount_due ?? order?.net_amount_due ?? 0;
   const currency = order?.currency || '';
   const canFulfill = unfulfilled.length > 0;
-  const canPay = amountDue > 0;
+  // matches the backend's MONEY_TOLERANCE: a balance it already treats as
+  // settled must not offer a payment the guard would refuse
+  const canPay = amountDue > 0.005;
 
   // How much of the balance is being collected. Kept as a string so the field
   // can be cleared while typing, and seeded with the whole balance so the common
   // case is unchanged: leave it alone and Submit settles the order. Re-seeded
   // whenever the balance changes, so after one instalment the field offers the
   // NEW remainder rather than the amount already taken.
+  // The balance to the cent. Everything downstream uses this one value, because
+  // mixing the rounded and unrounded bases made the field reject its own prefill:
+  // a 1.045 balance seeds 1.05, while 1.045 + 0.005 is 1.0499999999999998 in
+  // float, so 1.05 <= that is false.
+  const dueRounded = round2(amountDue);
+
   const [payAmount, setPayAmount] = useState('');
   useEffect(() => {
-    if (canPay) setPayAmount(String(round2(amountDue)));
-  }, [amountDue, canPay]);
+    if (canPay) setPayAmount(String(dueRounded));
+  }, [dueRounded, canPay]);
 
   const payNumber = Number(payAmount);
   const payAmountValid =
     payAmount.trim() !== '' &&
     Number.isFinite(payNumber) &&
     payNumber > 0 &&
-    // half a cent of slack, matching MONEY_TOLERANCE on the backend, so typing
-    // the balance back in cannot be refused over a rounding hair
-    payNumber <= amountDue + 0.005;
-  const remainingAfter = payAmountValid ? round2(amountDue - payNumber) : null;
+    // no slack needed now that the ceiling and the prefill are the same rounded
+    // number; anything above it is an overpayment the backend would refuse
+    payNumber <= dueRounded;
+  const remainingAfter = payAmountValid ? round2(dueRounded - payNumber) : null;
 
   const submit = async () => {
     if (!(doFulfill && canFulfill) && !(doPay && canPay && payAmountValid)) return;
@@ -130,6 +138,10 @@ export default function OrderActionsScreen() {
 
   const nothingSelected =
     !(doFulfill && canFulfill) && !(doPay && canPay && payAmountValid);
+  // Asking to record a payment with an unusable amount must not quietly do the
+  // OTHER half of the job — fulfilling the items, recording no cash, and still
+  // showing a success banner.
+  const payBlocked = doPay && canPay && !payAmountValid;
 
   const fmtDate = (s?: string) => {
     if (!s) return '';
@@ -148,7 +160,7 @@ export default function OrderActionsScreen() {
       {loading || !order ? (
         <View style={styles.centered}><ActivityIndicator size="large" color="#5469D4" /></View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {/* header */}
           <View style={styles.headerRow}>
             <ThemedText style={styles.date}>{fmtDate(order.created_at)}</ThemedText>
@@ -220,7 +232,7 @@ export default function OrderActionsScreen() {
                     <ThemedText style={styles.payCurrency}>{te(currency)}</ThemedText>
                     <TouchableOpacity
                       style={styles.fullBtn}
-                      onPress={() => setPayAmount(String(round2(amountDue)))}
+                      onPress={() => setPayAmount(String(dueRounded))}
                       testID="button-pay-full"
                     >
                       <ThemedText style={styles.fullBtnText}>{t('order.payFullBalance')}</ThemedText>
@@ -228,7 +240,7 @@ export default function OrderActionsScreen() {
                   </View>
                   {!payAmountValid ? (
                     <ThemedText style={styles.payError} testID="text-pay-amount-error">
-                      {t('order.payAmountInvalid', { amount: round2(amountDue), currency: te(currency) })}
+                      {t('order.payAmountInvalid', { amount: dueRounded, currency: te(currency) })}
                     </ThemedText>
                   ) : (
                     <ThemedText style={styles.payHint} testID="text-remaining-after">
@@ -240,9 +252,9 @@ export default function OrderActionsScreen() {
                 </View>
               )}
               <TouchableOpacity
-                style={[styles.submit, (nothingSelected || submitting) && styles.submitDisabled]}
+                style={[styles.submit, (nothingSelected || payBlocked || submitting) && styles.submitDisabled]}
                 onPress={submit}
-                disabled={nothingSelected || submitting || !!savedBanner}
+                disabled={nothingSelected || payBlocked || submitting || !!savedBanner}
                 testID="button-submit-order-actions"
               >
                 {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.submitText}>{t('order.submit')}</ThemedText>}

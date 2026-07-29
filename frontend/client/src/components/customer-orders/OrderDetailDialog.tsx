@@ -51,27 +51,37 @@ export function OrderDetailDialog({
   };
 
   const canFulfill = unfulfilled.length > 0;
-  const canPay = amountDue > 0;
+  // matches the backend's MONEY_TOLERANCE: a balance it already treats as
+  // settled must not offer a payment the guard would refuse
+  const canPay = amountDue > 0.005;
 
   // The amount to pay, as a string so the field can be cleared while typing.
   // Seeded with the whole balance, which keeps the old behaviour — leave it
   // alone and Submit settles the order; edit it down to take part of the money.
   // Re-seeded whenever the balance changes, so after a partial payment the field
   // offers the NEW remainder rather than the amount already collected.
+  // The balance to the cent. EVERYTHING downstream is based on this one value —
+  // the prefill, the ceiling, the max, the error text and the Full balance button
+  // — because mixing the rounded and unrounded bases made the field reject its own
+  // prefill: a 1.045 balance seeds 1.05, while 1.045 + 0.005 is 1.0499999999999998
+  // in float, so 1.05 <= that is false.
+  const dueRounded = round2(amountDue);
+
   const [payAmount, setPayAmount] = useState("");
   useEffect(() => {
-    if (canPay) setPayAmount(String(round2(amountDue)));
-  }, [amountDue, canPay]);
+    if (canPay) setPayAmount(String(dueRounded));
+  }, [dueRounded, canPay]);
 
   const payNumber = Number(payAmount);
   const payAmountValid =
     payAmount.trim() !== "" &&
     Number.isFinite(payNumber) &&
     payNumber > 0 &&
-    // half a cent of slack, matching MONEY_TOLERANCE on the backend, so typing
-    // the balance back in cannot be refused by a rounding hair
-    payNumber <= amountDue + 0.005;
-  const remainingAfter = payAmountValid ? round2(amountDue - payNumber) : null;
+    // no slack needed now that the ceiling and the prefill are the same rounded
+    // number: the prefill is exactly dueRounded, and anything above it is an
+    // overpayment the backend would refuse anyway
+    payNumber <= dueRounded;
+  const remainingAfter = payAmountValid ? round2(dueRounded - payNumber) : null;
 
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -113,6 +123,11 @@ export function OrderDetailDialog({
 
   const nothingSelected =
     !(doFulfill && canFulfill) && !(doPay && canPay && payAmountValid);
+  // Asking to record a payment with an unusable amount must not quietly do the
+  // OTHER half of the job. Without this, clearing the field and hitting Submit
+  // fulfilled the items, recorded no cash, and still reported success — the
+  // driver would believe the money was taken.
+  const payBlocked = doPay && canPay && !payAmountValid;
 
   const fmtDate = (s?: string) => {
     if (!s) return "";
@@ -193,7 +208,7 @@ export function OrderDetailDialog({
                         inputMode="decimal"
                         min={0}
                         step={0.01}
-                        max={round2(amountDue)}
+                        max={dueRounded}
                         value={payAmount}
                         onChange={(e) => setPayAmount(e.target.value)}
                         className="h-9 w-40 tabular-nums"
@@ -205,7 +220,7 @@ export function OrderDetailDialog({
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => setPayAmount(String(round2(amountDue)))}
+                        onClick={() => setPayAmount(String(dueRounded))}
                         data-testid="button-pay-full"
                       >
                         {t('customerOrders.payFullBalance')}
@@ -214,7 +229,7 @@ export function OrderDetailDialog({
                     {!payAmountValid ? (
                       <p className="text-xs text-red-600" data-testid="text-pay-amount-error">
                         {t('customerOrders.payAmountInvalid', {
-                          amount: round2(amountDue),
+                          amount: dueRounded,
                           currency,
                         })}
                       </p>
@@ -235,7 +250,7 @@ export function OrderDetailDialog({
 
                 <Button
                   onClick={() => submitMutation.mutate()}
-                  disabled={nothingSelected || submitMutation.isPending}
+                  disabled={nothingSelected || payBlocked || submitMutation.isPending}
                   className="w-full bg-[#5469D4] hover:bg-[#5469D4]/90"
                   data-testid="button-submit-order-actions"
                 >
