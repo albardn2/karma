@@ -41,7 +41,6 @@ const makeUserSchema = (t: (key: string) => string) =>
     phone_number: z.string().optional(),
     language: z.string().optional(),
     permission_scope: z.string().optional(),
-    rfid_token: z.string().optional(),
   });
 
 type UserFormValues = z.infer<ReturnType<typeof makeUserSchema>>;
@@ -88,7 +87,6 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
       phone_number: "",
       language: "",
       permission_scope: PermissionScope.OPERATOR,
-      rfid_token: "",
     },
   });
 
@@ -310,20 +308,6 @@ export function AddUserDialog({ permissionScopes }: AddUserDialogProps) {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="rfid_token"
-                render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-                    <FormLabel>{t("users.rfidToken")}</FormLabel>
-                    <FormControl>
-                      <Input placeholder={t("users.enterRfidTokenOptional")} {...field} />
-                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

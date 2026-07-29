@@ -55,7 +55,6 @@ export const en: Record<string, string> = {
   'users.lastName': 'Last Name',
   'users.phoneNumber': 'Phone Number',
   'users.newPasswordOptional': 'New Password (optional)',
-  'users.rfidToken': 'RFID Token',
   'users.trackLocation': 'Track Location',
   'users.trackLocationDesc': "Publish this user's live location from the mobile app",
   'users.pingCadence': 'Live Ping Cadence',
@@ -80,8 +79,6 @@ export const en: Record<string, string> = {
   'users.enterEmail': 'Enter email',
   'users.enterPhoneNumber': 'Enter phone number',
   'users.enterLanguage': 'Enter language preference',
-  'users.enterRfidToken': 'Enter RFID token',
-  'users.enterRfidTokenOptional': 'Enter RFID token (optional)',
 
   // add dialog (AddUserDialog.tsx)
   'users.addUser': 'Add User',
@@ -243,7 +240,6 @@ export const ar: Record<string, string> = {
   'users.lastName': 'اسم العائلة',
   'users.phoneNumber': 'رقم الهاتف',
   'users.newPasswordOptional': 'كلمة مرور جديدة (اختياري)',
-  'users.rfidToken': 'رمز RFID',
   'users.trackLocation': 'تتبع الموقع',
   'users.trackLocationDesc': 'نشر الموقع المباشر لهذا المستخدم من تطبيق الهاتف',
   'users.pingCadence': 'وتيرة إرسال الموقع المباشر',
@@ -268,8 +264,6 @@ export const ar: Record<string, string> = {
   'users.enterEmail': 'أدخل البريد الإلكتروني',
   'users.enterPhoneNumber': 'أدخل رقم الهاتف',
   'users.enterLanguage': 'أدخل اللغة المفضلة',
-  'users.enterRfidToken': 'أدخل رمز RFID',
-  'users.enterRfidTokenOptional': 'أدخل رمز RFID (اختياري)',
 
   // add dialog (AddUserDialog.tsx)
   'users.addUser': 'إضافة مستخدم',
