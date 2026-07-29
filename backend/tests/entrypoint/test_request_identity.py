@@ -64,6 +64,7 @@ class _Uow:
 
 class _User:
     is_deleted = False
+    is_active = True
     is_superuser = False
     is_admin = True                      # admin => g.user_acl is None
     account_uuid = "acct-1"
@@ -108,6 +109,54 @@ def test_a_soft_deleted_user_is_rejected_too(monkeypatch):
 
     assert result is not None
     assert result[1] == 401
+
+
+def test_a_deactivated_user_loses_their_live_session(monkeypatch):
+    """Deactivation has to bite mid-session, not whenever the 24h token
+    happens to lapse — this hook is what makes that immediate, because it
+    re-reads the row on every single request."""
+    suspended = _User()
+    suspended.is_active = False
+    result = _run_hook(monkeypatch, user=suspended)
+
+    assert result is not None, "a deactivated user's request was allowed to continue"
+    response, status = result
+    assert status == 401
+    assert "deactivated" in response.get_json()["msg"].lower()
+
+
+def test_deactivation_binds_the_platform_owner_too(monkeypatch):
+    """The account-blocked check exempts superusers; deactivation must not —
+    it is a per-user switch, and the exemption is also what keeps the
+    impersonation route covered without a check of its own."""
+    suspended = _User()
+    suspended.is_active = False
+    suspended.is_superuser = True
+    result = _run_hook(monkeypatch, user=suspended)
+
+    assert result is not None
+    assert result[1] == 401
+
+
+def test_a_deactivated_user_never_gets_a_tenant_scope(monkeypatch):
+    """Same requirement as the deleted-user case: rejection must land before
+    anything publishes g, or the request would run unscoped."""
+    suspended = _User()
+    suspended.is_active = False
+
+    monkeypatch.setattr(app_module, "SqlAlchemyUnitOfWork", lambda **kw: _Uow(suspended),
+                        raising=False)
+    import app.adapters.unit_of_work.sqlalchemy_unit_of_work as uow_mod
+    monkeypatch.setattr(uow_mod, "SqlAlchemyUnitOfWork", lambda **kw: _Uow(suspended))
+    import flask_jwt_extended
+    monkeypatch.setattr(flask_jwt_extended, "verify_jwt_in_request", lambda **kw: None)
+    monkeypatch.setattr(flask_jwt_extended, "get_jwt", lambda: {"sub": "user-1"})
+
+    flask_app = Flask(__name__)
+    with flask_app.test_request_context("/customer/"):
+        assert _load_request_identity()[1] == 401
+        assert getattr(g, "account_uuid", None) is None
+        assert getattr(g, "user_scopes", None) is None
 
 
 def test_rejection_happens_before_any_tenant_scope_is_established(monkeypatch):

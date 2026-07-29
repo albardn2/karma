@@ -34,6 +34,7 @@ def make_user_model(**overrides):
         permission_scope=PermissionScope.ADMIN.value,
         created_at=now,
         is_deleted=False,
+        is_active=True,
         password="$2b$12$dummyhashedpw"  # bcrypt stub
     )
     base.update(overrides)

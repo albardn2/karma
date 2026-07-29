@@ -62,6 +62,8 @@ export interface User {
   created_at: string;
   permission_scope?: string;
   is_deleted: boolean;
+  /** false = deactivated: cannot sign in, and live sessions are cut */
+  is_active?: boolean;
   track_location?: boolean;
   location_ping_seconds?: number;
   permissions?: UserPermissions | null;
@@ -88,6 +90,7 @@ export interface UserUpdateData {
   language?: string;
   password?: string;
   permission_scope?: string;
+  is_active?: boolean;
   track_location?: boolean;
   location_ping_seconds?: number;
   /** null explicitly clears fine-grained permissions back to role behavior */

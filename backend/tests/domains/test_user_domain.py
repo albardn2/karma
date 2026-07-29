@@ -34,8 +34,14 @@ def make_user(**kwargs) -> UserModel:
         phone_number=kwargs.get("phone_number", None),
         language=kwargs.get("language", None),
     )
-    # default non‐deleted
+    # Column(default=...) only fires on flush against a real DB and these
+    # tests never flush, so stand in for the NOT NULL defaults here. Without
+    # this a real UserRead.from_orm rejects the row (None for a bool/int
+    # field), which is why several tests below stub from_orm out entirely.
     object.__setattr__(u, "is_deleted", False)
+    object.__setattr__(u, "is_active", True)
+    object.__setattr__(u, "track_location", False)
+    object.__setattr__(u, "location_ping_seconds", 15)
     # attach is_admin based on scope
     return u
 
@@ -235,6 +241,106 @@ def test_update_user_success_with_scope_and_fields(monkeypatch, dummy_uow_class,
     # DTO reflects the change
     assert dto.first_name == "NewName"
     assert dto.permission_scope == PermissionScope.ADMIN
+
+
+# --- DEACTIVATION -----------------------------------------------------------
+# A reversible "may not sign in", carried on UserUpdate. Only the write side is
+# here; that it actually ends a live session is the request chokepoint's job
+# (tests/entrypoint/test_request_identity.py).
+
+def _deactivation_uow(dummy_uow_class, return_dicts, target, caller):
+    return_single, return_all = return_dicts
+    return_single["user"] = target
+    uow = dummy_uow_class(return_single, return_all)
+    rows = [target] if caller is target else [target, caller]
+    uow.session_rows[UserModel] = rows
+    return uow
+
+
+def test_a_non_admin_cannot_deactivate_anyone(dummy_uow_class, return_dicts):
+    target = make_user(permission_scope=PermissionScope.OPERATOR.value)
+    caller = make_user(uuid=str(uuid.uuid4()),
+                       permission_scope=PermissionScope.SALES.value)
+    uow = _deactivation_uow(dummy_uow_class, return_dicts, target, caller)
+
+    with pytest.raises(BadRequestError):
+        UserDomain.update_user(
+            uow=uow, user_uuid=target.uuid,
+            payload=UserUpdate(is_active=False), current_user_uuid=caller.uuid,
+        )
+
+
+def test_a_user_cannot_deactivate_themselves_to_dodge_anything(dummy_uow_class, return_dicts):
+    """A non-admin editing their OWN row passes the ownership check, so the
+    is_active guard is what has to stop them."""
+    user = make_user(permission_scope=PermissionScope.DRIVER.value)
+    uow = _deactivation_uow(dummy_uow_class, return_dicts, user, user)
+
+    with pytest.raises(BadRequestError):
+        UserDomain.update_user(
+            uow=uow, user_uuid=user.uuid,
+            payload=UserUpdate(is_active=False), current_user_uuid=user.uuid,
+        )
+
+
+def test_an_admin_cannot_deactivate_their_own_account(dummy_uow_class, return_dicts):
+    """They would be locked out on their next request with no way to undo it."""
+    admin = make_user(permission_scope=PermissionScope.ADMIN.value)
+    uow = _deactivation_uow(dummy_uow_class, return_dicts, admin, admin)
+
+    with pytest.raises(BadRequestError, match="your own account"):
+        UserDomain.update_user(
+            uow=uow, user_uuid=admin.uuid,
+            payload=UserUpdate(is_active=False), current_user_uuid=admin.uuid,
+        )
+
+
+def test_an_admin_deactivates_and_reactivates_somebody_else(monkeypatch, dummy_uow_class, return_dicts):
+    target = make_user(permission_scope=PermissionScope.DRIVER.value)
+    admin = make_user(uuid=str(uuid.uuid4()),
+                      permission_scope=PermissionScope.ADMIN.value)
+    monkeypatch.setattr(UserDomain, "validate_existing", lambda **kw: None)
+
+    uow = _deactivation_uow(dummy_uow_class, return_dicts, target, admin)
+    UserDomain.update_user(
+        uow=uow, user_uuid=target.uuid,
+        payload=UserUpdate(is_active=False), current_user_uuid=admin.uuid,
+    )
+    assert uow.user_repository.saved_model.is_active is False
+
+    # and back again — deactivation is a suspension, not a one-way door
+    uow = _deactivation_uow(dummy_uow_class, return_dicts, target, admin)
+    UserDomain.update_user(
+        uow=uow, user_uuid=target.uuid,
+        payload=UserUpdate(is_active=True), current_user_uuid=admin.uuid,
+    )
+    assert uow.user_repository.saved_model.is_active is True
+
+
+def test_an_unrelated_edit_leaves_the_flag_alone(monkeypatch, dummy_uow_class, return_dicts):
+    """is_active is NOT NULL, so an absent field must not write NULL — the web
+    form sends the whole payload on every save."""
+    target = make_user(permission_scope=PermissionScope.DRIVER.value)
+    admin = make_user(uuid=str(uuid.uuid4()),
+                      permission_scope=PermissionScope.ADMIN.value)
+    monkeypatch.setattr(UserDomain, "validate_existing", lambda **kw: None)
+    uow = _deactivation_uow(dummy_uow_class, return_dicts, target, admin)
+
+    UserDomain.update_user(
+        uow=uow, user_uuid=target.uuid,
+        payload=UserUpdate(first_name="Renamed"), current_user_uuid=admin.uuid,
+    )
+    assert uow.user_repository.saved_model.is_active is True
+
+
+def test_self_service_me_cannot_touch_the_flag():
+    """MeUpdate is the only endpoint a non-admin can write themselves through;
+    a deactivated user must not be able to switch themselves back on."""
+    from app.dto.auth import MeUpdate
+    from app.entrypoint.routes.common.errors import BadRequestError as BRE
+
+    with pytest.raises((CoreValidationError, BRE, ValueError)):
+        MeUpdate(is_active=True)
 
 
 # --- DELETE_USER ------------------------------------------------------------

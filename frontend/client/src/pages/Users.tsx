@@ -270,8 +270,18 @@ export default function Users() {
                       <Calendar className="h-3 w-3" />
                       <span>{t("users.createdDate", { date: formatDate(user.created_at) })}</span>
                     </div>
-                    <Badge variant={user.is_deleted ? "destructive" : "default"} className="text-xs">
-                      {user.is_deleted ? t("users.deleted") : t("users.active")}
+                    {/* deleted wins over deactivated — a deleted user is
+                        also inactive, and the stronger fact is the useful one */}
+                    <Badge
+                      variant={user.is_deleted ? "destructive" : user.is_active === false ? "secondary" : "default"}
+                      className="text-xs"
+                      data-testid={`badge-user-status-${user.uuid}`}
+                    >
+                      {user.is_deleted
+                        ? t("users.deleted")
+                        : user.is_active === false
+                          ? t("users.inactive")
+                          : t("users.active")}
                     </Badge>
                   </div>
                 </CardContent>

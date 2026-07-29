@@ -49,6 +49,9 @@ class DummyRepo:
             model.created_at = datetime.utcnow()
         if hasattr(model, "is_deleted") and model.is_deleted is None:
             model.is_deleted = False
+        # NOT NULL with a flush-time default, same as is_deleted above
+        if hasattr(model, "is_active") and model.is_active is None:
+            model.is_active = True
 
         self.saved_model = model
 

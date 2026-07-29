@@ -113,6 +113,13 @@ def _load_request_identity():
             # 401 rather than 403 so both clients' auto-logout machinery runs,
             # matching the blocked-account branch below.
             return jsonify({"msg": "User no longer exists"}), 401
+        # Deactivation revokes LIVE sessions, not just future logins: this
+        # runs before every request and reads the row fresh, so flipping
+        # is_active off takes effect on the deactivated user's very next
+        # request rather than whenever their 24h token happens to expire.
+        # 401 so both clients' auto-logout machinery signs them out.
+        if not user.is_active:
+            return jsonify({"msg": "This user has been deactivated"}), 401
         # blocked account / tenant feature cap: resolved fresh per
         # request (the platform owner is exempt from both)
         g.account_perms = None

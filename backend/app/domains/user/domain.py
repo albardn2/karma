@@ -104,6 +104,15 @@ class UserDomain:
 
         if payload.permission_scope and not current_user.is_admin:
             raise BadRequestError("You are not authorized to change permission scope")
+
+        if payload.is_active is not None:
+            if not current_user.is_admin:
+                raise BadRequestError("You are not authorized to activate or deactivate a user")
+            # Deactivation takes effect on the target's next request, so an
+            # admin deactivating themselves would be locked out immediately
+            # and could not undo it — refuse rather than hand them the shovel.
+            if payload.is_active is False and current_user_uuid == user_uuid:
+                raise BadRequestError("You cannot deactivate your own account")
         # privilege-escalation guard: only the platform owner can grant the
         # superuser scope (a tenant admin must not promote anyone — including
         # themselves — to platform owner)
@@ -126,7 +135,7 @@ class UserDomain:
         updates = payload.model_dump(exclude_unset=True)
         # these columns are NOT NULL; an explicit null in the payload means
         # "leave unchanged" (email/phone may still be cleared via null)
-        for key in ("track_location", "location_ping_seconds"):
+        for key in ("track_location", "location_ping_seconds", "is_active"):
             if updates.get(key) is None:
                 updates.pop(key, None)
         for field, val in updates.items():
