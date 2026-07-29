@@ -123,6 +123,14 @@ export const en: Record<string, string> = {
   'customerOrders.markFulfilledOne': 'Mark fulfilled ({count} item)',
   'customerOrders.markFulfilledMany': 'Mark fulfilled ({count} items)',
   'customerOrders.markPaidAmount': 'Mark paid ({amount} {currency})',
+  // partial payments: the amount defaults to the whole balance, so "record a
+  // payment" covers both settling the order and taking part of the money
+  'customerOrders.recordPayment': 'Record a payment',
+  'customerOrders.amountToPay': 'Amount to pay',
+  'customerOrders.payFullBalance': 'Full balance',
+  'customerOrders.payAmountInvalid': 'Enter an amount between 0 and {amount} {currency}',
+  'customerOrders.remainingAfter': 'Leaves {amount} {currency} still due',
+  'customerOrders.settlesOrder': 'Settles this order in full',
   'customerOrders.orderUpdated': 'Order updated',
   'customerOrders.orderUpdatedDesc': 'Selected actions were applied.',
 
@@ -304,6 +312,13 @@ export const ar: Record<string, string> = {
   'customerOrders.markFulfilledOne': 'تحديد كمُسلَّم ({count} صنف)',
   'customerOrders.markFulfilledMany': 'تحديد كمُسلَّم ({count} أصناف)',
   'customerOrders.markPaidAmount': 'تحديد كمدفوع ({amount} {currency})',
+  // الدفعات الجزئية
+  'customerOrders.recordPayment': 'تسجيل دفعة',
+  'customerOrders.amountToPay': 'المبلغ المدفوع',
+  'customerOrders.payFullBalance': 'كامل الرصيد',
+  'customerOrders.payAmountInvalid': 'أدخل مبلغاً بين 0 و {amount} {currency}',
+  'customerOrders.remainingAfter': 'يتبقى {amount} {currency} مستحقة',
+  'customerOrders.settlesOrder': 'يسدد هذا الطلب بالكامل',
   'customerOrders.orderUpdated': 'تم تحديث الطلب',
   'customerOrders.orderUpdatedDesc': 'تم تطبيق الإجراءات المحددة.',
 

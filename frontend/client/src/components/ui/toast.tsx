@@ -14,7 +14,11 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      // Above every other layer, deliberately: dialog.tsx sits at z-[9999] and
+// alert-dialog.tsx at z-[10000], so at the stock z-[100] a toast was painted
+// underneath any open dialog — including its black/80 scrim. A toast is a
+// notification; if it is worth showing it is worth showing on top.
+      "fixed top-0 z-[10001] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
       className
     )}
     {...props}
