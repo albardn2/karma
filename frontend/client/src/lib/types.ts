@@ -76,7 +76,6 @@ export interface UserFormData {
   phone_number?: string;
   language?: string;
   permission_scope?: string;
-  rfid_token?: string;
   permissions?: UserPermissions;
 }
 
@@ -89,7 +88,6 @@ export interface UserUpdateData {
   language?: string;
   password?: string;
   permission_scope?: string;
-  rfid_token?: string;
   track_location?: boolean;
   location_ping_seconds?: number;
   /** null explicitly clears fine-grained permissions back to role behavior */

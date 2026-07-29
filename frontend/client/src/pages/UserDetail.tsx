@@ -61,7 +61,6 @@ const makeUserUpdateSchema = (t: (key: string) => string) =>
     language: z.string().optional(),
     password: z.string().min(6, t("users.passwordMin")).optional().or(z.literal("")),
     permission_scope: z.string().optional(),
-    rfid_token: z.string().optional(),
     track_location: z.boolean().optional(),
     location_ping_seconds: z.preprocess(
       (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
@@ -151,7 +150,6 @@ export default function UserDetail() {
       language: "",
       password: "",
       permission_scope: "",
-      rfid_token: "",
       track_location: undefined,
       location_ping_seconds: undefined,
     },
@@ -171,7 +169,6 @@ export default function UserDetail() {
         language: user.language || "",
         password: "",
         permission_scope: user.permission_scope || "",
-        rfid_token: "",
         track_location: user.track_location,
         location_ping_seconds: user.location_ping_seconds,
       });
@@ -647,19 +644,6 @@ export default function UserDetail() {
                           )}
                         />
 
-                        <FormField
-                          control={form.control}
-                          name="rfid_token"
-                          render={({ field }) => (
-                            <FormItem className="md:col-span-2">
-                              <FormLabel>{t("users.rfidToken")}</FormLabel>
-                              <FormControl>
-                                <Input placeholder={t("users.enterRfidToken")} {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
 
                         <FormField
                           control={form.control}

@@ -33,7 +33,7 @@ interface SignupResult {
 
 interface AuthContextType {
   user: User | null;
-  login: (emailOrRfid: string, password?: string) => Promise<boolean>;
+  login: (usernameOrEmail: string, password: string) => Promise<boolean>;
   signup: (data: SignupData) => Promise<SignupResult>;
   logout: () => void;
   /** update the signed-in user's language in memory (keeps the profile the
@@ -86,14 +86,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (emailOrRfid: string, password?: string): Promise<boolean> => {
+  const login = async (usernameOrEmail: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
-      
-      // Determine if this is RFID login (no password) or username/password login
-      const loginData = password 
-        ? { username_or_email: emailOrRfid, password }
-        : { rfid_token: emailOrRfid };
+
+      const loginData = { username_or_email: usernameOrEmail, password };
 
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
