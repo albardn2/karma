@@ -86,6 +86,42 @@ class DummyRepo:
         # but still return a real Pagination
         return self.find_all_paginated(page, per_page)
 
+class DummySession:
+    """Just enough of a SQLAlchemy session for domains that deliberately go
+    around the repositories to do an UNSCOPED lookup — e.g.
+    UserDomain.update_user resolving the caller, which has to work even while
+    a superuser is impersonating a tenant they do not belong to.
+
+    Rows are registered per model class on the UoW (`uow.session_rows[Model]`).
+    Only the handful of methods those lookups actually use is implemented:
+    anything else raises AttributeError loudly rather than silently matching
+    nothing, which is how the previous absence of `session` went unnoticed
+    (every test touching it errored out and was written off as a known
+    failure, leaving the privilege-escalation guards untested).
+    """
+
+    def __init__(self, rows: dict):
+        self._rows = rows
+        self._pending = []
+
+    def query(self, model):
+        self._pending = list(self._rows.get(model, []))
+        return self
+
+    def filter_by(self, **kwargs):
+        self._pending = [
+            row for row in self._pending
+            if all(getattr(row, k, None) == v for k, v in kwargs.items())
+        ]
+        return self
+
+    def one_or_none(self):
+        return self._pending[0] if self._pending else None
+
+    def first(self):
+        return self._pending[0] if self._pending else None
+
+
 class DummyUoW:
     """
     Context manager that hands out DummyRepo for each repo attribute.
@@ -94,6 +130,9 @@ class DummyUoW:
 
     def __init__(self, return_single, return_all):
         DummyUoW.last_instance = self
+        # rows visible through uow.session — see DummySession
+        self.session_rows: dict = {}
+        self.session = DummySession(self.session_rows)
         # names must match what's used in your routes:
         self.customer_repository = DummyRepo("customer", return_single, return_all)
         self.material_repository = DummyRepo("material",  return_single, return_all)

@@ -53,7 +53,7 @@ def test_create_user_success(monkeypatch, dummy_uow_class, return_dicts):
         first_name="New",
         last_name="User",
         password="secret",
-        permission_scope=PermissionScope.MANAGER,
+        permission_scope=PermissionScope.OPERATION_MANAGER,
         email="new@example.com",
         phone_number="555-1234",
         language="en",
@@ -90,7 +90,7 @@ def test_create_user_success(monkeypatch, dummy_uow_class, return_dicts):
     assert isinstance(saved.created_at, datetime)
     # DTO matches
     assert dto.username == "newuser"
-    assert dto.permission_scope == PermissionScope.MANAGER
+    assert dto.permission_scope == PermissionScope.OPERATION_MANAGER
 
 
 @pytest.mark.parametrize(
@@ -104,13 +104,13 @@ def test_create_user_duplicate(monkeypatch, dummy_uow_class, return_dicts, dup_f
     return_single, return_all = return_dicts
     uow = dummy_uow_class(return_single, return_all)
 
-    # monkey‐patch find_one to raise on the right field
-    def fake_find_one(**kw):
-        if dup_field in kw:
-            return UserModel()  # conflict
-        return None
-
-    uow.user_repository.find_one = fake_find_one
+    # usernames and emails are unique GLOBALLY (they identify the user at
+    # login, before any account is known), so validate_existing queries
+    # uow.session directly and deliberately bypasses the tenant-scoped
+    # repositories — the clashing row has to be visible there.
+    clash = make_user(username="someone_else", email="someone_else@x.com")
+    setattr(clash, dup_field, dup_value)
+    uow.session_rows[UserModel] = [clash]
 
     payload = RegisterRequest(
         username="maybe",
@@ -142,14 +142,13 @@ def test_update_user_not_found(dummy_uow_class, return_dicts):
 
 
 def test_update_user_current_not_found(dummy_uow_class, return_dicts):
+    """The caller is resolved through uow.session (an unscoped lookup, so
+    impersonation still works); a caller whose row is gone must not proceed."""
     return_single, return_all = return_dicts
     user = make_user()
     return_single["user"] = user
     uow = dummy_uow_class(return_single, return_all)
-
-    # first call returns `user`, second returns None
-    seq = [user, None]
-    uow.user_repository.find_one = lambda **kw: seq.pop(0)
+    uow.session_rows[UserModel] = [user]  # "other" is deliberately absent
 
     with pytest.raises(NotFoundError):
         UserDomain.update_user(
@@ -158,15 +157,15 @@ def test_update_user_current_not_found(dummy_uow_class, return_dicts):
 
 
 def test_update_user_unauthorized_non_admin(dummy_uow_class, return_dicts):
+    """A non-admin may not touch somebody else's row at all."""
     return_single, return_all = return_dicts
     user = make_user(permission_scope=PermissionScope.OPERATOR.value)
     away = make_user(
         uuid=str(uuid.uuid4()), permission_scope=PermissionScope.OPERATOR.value
     )
-    # both found but neither is admin
-    seq = [user, away]
+    return_single["user"] = user          # the target
     uow = dummy_uow_class(return_single, return_all)
-    uow.user_repository.find_one = lambda **kw: seq.pop(0)
+    uow.session_rows[UserModel] = [user, away]  # the caller is `away`
 
     with pytest.raises(BadRequestError):
         UserDomain.update_user(
@@ -175,11 +174,13 @@ def test_update_user_unauthorized_non_admin(dummy_uow_class, return_dicts):
 
 
 def test_update_user_forbidden_scope_change(dummy_uow_class, return_dicts):
+    """Editing your OWN row is allowed, but promoting yourself is not."""
     return_single, return_all = return_dicts
     user = make_user(permission_scope=PermissionScope.OPERATOR.value)
     # same user, not admin
     return_single["user"] = user
     uow = dummy_uow_class(return_single, return_all)
+    uow.session_rows[UserModel] = [user]
 
     with pytest.raises(BadRequestError):
         UserDomain.update_user(
@@ -196,6 +197,7 @@ def test_update_user_success_with_scope_and_fields(monkeypatch, dummy_uow_class,
     user = make_user(permission_scope=PermissionScope.SUPER_ADMIN.value)
     return_single["user"] = user
     uow = dummy_uow_class(return_single, return_all)
+    uow.session_rows[UserModel] = [user]
 
     # no conflicts
     monkeypatch.setattr(UserDomain, "validate_existing", lambda **kw: None)

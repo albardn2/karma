@@ -62,7 +62,7 @@ def test_register_success(client, monkeypatch, dummy_uow_class):
         email="new@example.com",
         phone_number="1234",
         language="en",
-        permission_scope=PermissionScope.MANAGER,
+        permission_scope=PermissionScope.OPERATION_MANAGER,
         created_at=now,
         is_deleted=False,
     )
