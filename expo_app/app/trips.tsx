@@ -36,6 +36,8 @@ interface Trip {
   created_at: string;
   notes?: string | null;
   is_audited?: boolean;
+  /** optional label for the run; older trips have none */
+  name?: string | null;
 }
 
 // One row of chips covering both dimensions. The audit pair are toggles rather
@@ -306,7 +308,7 @@ export default function TripsScreen() {
         <View style={styles.cardBody}>
         <View style={styles.cardTop}>
           <ThemedText style={styles.plate} numberOfLines={1}>
-            {item.vehicle_plate || item.uuid.slice(0, 8)}
+            {item.name || item.vehicle_plate || item.uuid.slice(0, 8)}
           </ThemedText>
           <View style={styles.badgeGroup}>
             {item.is_audited && (

@@ -2030,6 +2030,9 @@ class Trip(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     is_deleted = Column(Boolean, nullable=False, default=False, server_default=false())
     vehicle_uuid = Column(String(36), ForeignKey("vehicle.uuid"), nullable=False)
+    # optional short label for the run, set on the start-trip form and
+    # defaulted to the start date; null on every trip that predates it
+    name = Column(String(120), nullable=True)
     distribution_area = Column(Geometry("POLYGON", srid=4326), nullable=True)  # Area covered by the trip
     notes = Column(Text, nullable=True)
     status = Column(String(120), nullable=False)  # e.g., planned, in_progress, completed, cancelled

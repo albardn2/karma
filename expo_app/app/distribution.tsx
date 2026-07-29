@@ -29,6 +29,8 @@ interface TaskExecutionSummary {
 }
 
 interface WorkflowExecution {
+  /** the run's own name; falls back to 'Trip · date' when unset */
+  trip_name?: string | null;
   uuid: string;
   workflow_uuid: string;
   name?: string | null;
@@ -282,7 +284,9 @@ export default function DistributionScreen() {
                 >
                   <View style={styles.cardHeader}>
                     <ThemedText style={styles.cardTitle}>
-                      {t('dist.tripCardTitle', { date: formatDateTime(execution.start_time || execution.created_at) })}
+                      {execution.trip_name
+                        ? execution.trip_name
+                        : t('dist.tripCardTitle', { date: formatDateTime(execution.start_time || execution.created_at) })}
                     </ThemedText>
                     {statusBadge(execution.status)}
                   </View>

@@ -1,6 +1,6 @@
 
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional
 
@@ -237,6 +237,7 @@ class CreateTripOperator(OperatorInterface):
         # create trip
         TripDomain.create_trip(uow=uow,
                                payload=TripCreate(
+                                   name=self.get_trip_name(),
                                    created_by_uuid=payload.completed_by_uuid,
                                    vehicle_uuid=vehicle.uuid,
                                    status=TripStatus.IN_PROGRESS.value,
@@ -316,6 +317,24 @@ class CreateTripOperator(OperatorInterface):
         for task_exe in self.all_tasks_executions:
             if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("service_areas")
+    def get_trip_name(self) -> str:
+        """The name typed on the start-trip form, or the start date if it was left
+        blank — which is the normal case.
+
+        Defaulted here rather than on either client so both agree, and so a trip
+        created by an API caller that never saw the form still gets a label. The
+        date is Damascus local (UTC+3): the servers run UTC and the business does
+        not, so `utcnow()` would name a trip started after 21:00 with yesterday's
+        date. ISO order, which sorts correctly and reads the same in both UIs.
+        """
+        for task_exe in self.all_tasks_executions:
+            if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+                typed = (task_exe.result or {}).get("trip_name")
+                if typed and str(typed).strip():
+                    return str(typed).strip()[:120]
+                break
+        return (datetime.utcnow() + timedelta(hours=3)).strftime("%Y-%m-%d")
+
     def get_vehicle_plate(self) -> str:
         """
         This method is a placeholder for retrieving the service area UUID.

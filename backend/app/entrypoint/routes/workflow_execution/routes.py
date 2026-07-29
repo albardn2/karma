@@ -133,6 +133,27 @@ def create_workflow_execution():
         uow.commit()
     return jsonify(dto.model_dump(mode="json")), 201
 
+def _trip_name_for(workflow_exe):
+    """The run's name for the execution lists.
+
+    Prefers the trip's own name. Falls back to what was typed on the start-trip
+    form, which covers the window between the execution being created and
+    CreateTripOperator running — otherwise a just-started run would show no name
+    for the few seconds before its trip exists. Returns None when neither is set,
+    and each client keeps the label it shows today.
+    """
+    for trip in (workflow_exe.trips or []):
+        if not trip.is_deleted and trip.name:
+            return trip.name
+    for task_exe in (workflow_exe.task_executions or []):
+        if task_exe.operator == "start_trip_operator":
+            typed = (task_exe.result or {}).get("trip_name")
+            if typed and str(typed).strip():
+                return str(typed).strip()
+            break
+    return None
+
+
 @workflow_execution_blueprint.route("/<string:uuid>", methods=["GET"])
 @jwt_required()
 @scopes_required(
@@ -149,7 +170,9 @@ def get_workflow_execution(uuid: str):
         if not workflow_exe:
             raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
 
-        dto = WorkflowExecutionRead.from_orm(workflow_exe).model_dump(mode="json")
+        read = WorkflowExecutionRead.from_orm(workflow_exe)
+        read.trip_name = _trip_name_for(workflow_exe)
+        dto = read.model_dump(mode="json")
     return jsonify(dto), 200
 
 
@@ -484,10 +507,11 @@ def list_workflow_executions():
             page=params.page,
             per_page=params.per_page
         )
-        items = [
-            WorkflowExecutionRead.from_orm(workflow_exe).model_dump(mode="json")
-            for workflow_exe in page.items
-        ]
+        items = []
+        for workflow_exe in page.items:
+            read = WorkflowExecutionRead.from_orm(workflow_exe)
+            read.trip_name = _trip_name_for(workflow_exe)
+            items.append(read.model_dump(mode="json"))
         result = WorkflowExecutionPage(
             workflow_executions=items,
             total_count=page.total,
