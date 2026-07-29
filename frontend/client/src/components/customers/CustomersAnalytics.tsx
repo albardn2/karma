@@ -565,6 +565,7 @@ export function CustomersAnalytics() {
                   {t("customers.outcomeNotInterested")}
                 </SelectItem>
                 <SelectItem value="skipped">{t("customers.outcomeSkipped")}</SelectItem>
+                <SelectItem value="blacklist">{t("customers.outcomeBlacklist")}</SelectItem>
               </SelectContent>
             </Select>
             <Input
