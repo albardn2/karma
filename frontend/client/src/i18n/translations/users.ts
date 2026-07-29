@@ -18,6 +18,7 @@ export const en: Record<string, string> = {
   'users.createdDate': 'Created: {date}',
   'users.deleted': 'Deleted',
   'users.active': 'Active',
+  'users.inactive': 'Inactive',
 
   // validation (AddUserDialog + UserDetail schemas)
   'users.usernameMin': 'Username must be at least 3 characters',
@@ -57,6 +58,9 @@ export const en: Record<string, string> = {
   'users.newPasswordOptional': 'New Password (optional)',
   'users.trackLocation': 'Track Location',
   'users.trackLocationDesc': "Publish this user's live location from the mobile app",
+  'users.isActive': 'Account Active',
+  'users.isActiveDesc': "Turn this off to block sign-in and end this user's current sessions immediately",
+  'users.isActiveSelfHint': 'You cannot deactivate your own account — ask another admin',
   'users.pingCadence': 'Live Ping Cadence',
   'users.pingCadenceLabel': 'Live ping cadence (seconds)',
   'users.enterPingCadence': 'Enter ping cadence in seconds',
@@ -203,6 +207,7 @@ export const ar: Record<string, string> = {
   'users.createdDate': 'تاريخ الإنشاء: {date}',
   'users.deleted': 'محذوف',
   'users.active': 'فعّال',
+  'users.inactive': 'غير فعّال',
 
   // validation (AddUserDialog + UserDetail schemas)
   'users.usernameMin': 'يجب أن يتألف اسم المستخدم من 3 أحرف على الأقل',
@@ -242,6 +247,9 @@ export const ar: Record<string, string> = {
   'users.newPasswordOptional': 'كلمة مرور جديدة (اختياري)',
   'users.trackLocation': 'تتبع الموقع',
   'users.trackLocationDesc': 'نشر الموقع المباشر لهذا المستخدم من تطبيق الهاتف',
+  'users.isActive': 'الحساب فعّال',
+  'users.isActiveDesc': 'أوقف هذا الخيار لمنع تسجيل الدخول وإنهاء جلسات هذا المستخدم الحالية فوراً',
+  'users.isActiveSelfHint': 'لا يمكنك إيقاف حسابك الخاص — اطلب ذلك من مسؤول آخر',
   'users.pingCadence': 'وتيرة إرسال الموقع المباشر',
   'users.pingCadenceLabel': 'وتيرة إرسال الموقع المباشر (ثوانٍ)',
   'users.enterPingCadence': 'أدخل وتيرة الإرسال بالثواني',

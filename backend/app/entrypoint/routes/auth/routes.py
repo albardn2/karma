@@ -107,6 +107,14 @@ def login():
         else:
             raise BadRequestError("username_or_email or rfid_token must be provided")
 
+        # Deactivated users cannot sign in by ANY credential. Placed after all
+        # three lookup branches (username, email, rfid_token) on purpose — put
+        # inside one of them and the others would still hand out tokens. A
+        # wrong password still reads as "Bad credentials"; only someone who
+        # has the right password learns the account is deactivated.
+        if not user.is_active:
+            raise Unauthorized("This user has been deactivated")
+
         # blocked accounts cannot sign in (platform owner exempt)
         if not user.is_superuser:
             account = uow.account_repository.find_one(uuid=user.account_uuid)
@@ -141,6 +149,9 @@ def refresh():
         user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
         if not user:
             raise Unauthorized("User not found")
+        # a session cannot be renewed once the user is deactivated
+        if not user.is_active:
+            raise Unauthorized("This user has been deactivated")
         if not user.is_superuser:
             account = uow.account_repository.find_one(uuid=user.account_uuid)
             if account and account.is_blocked:
@@ -221,6 +232,8 @@ def list_users():
         filters.append(UserModel.email == params.email)
     if params.permission_scope:
         filters.append(UserModel.permission_scope == params.permission_scope.value)
+    if params.is_active is not None:
+        filters.append(UserModel.is_active == params.is_active)
 
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.user_repository.find_all_by_filters_paginated(

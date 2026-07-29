@@ -61,6 +61,7 @@ const makeUserUpdateSchema = (t: (key: string) => string) =>
     language: z.string().optional(),
     password: z.string().min(6, t("users.passwordMin")).optional().or(z.literal("")),
     permission_scope: z.string().optional(),
+    is_active: z.boolean().optional(),
     track_location: z.boolean().optional(),
     location_ping_seconds: z.preprocess(
       (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
@@ -150,6 +151,7 @@ export default function UserDetail() {
       language: "",
       password: "",
       permission_scope: "",
+      is_active: undefined,
       track_location: undefined,
       location_ping_seconds: undefined,
     },
@@ -169,6 +171,7 @@ export default function UserDetail() {
         language: user.language || "",
         password: "",
         permission_scope: user.permission_scope || "",
+        is_active: user.is_active,
         track_location: user.track_location,
         location_ping_seconds: user.location_ping_seconds,
       });
@@ -647,6 +650,36 @@ export default function UserDetail() {
 
                         <FormField
                           control={form.control}
+                          name="is_active"
+                          render={({ field }) => {
+                            // Deactivation bites on the target's very next
+                            // request, so deactivating yourself would lock you
+                            // out with no way back — the server refuses it too.
+                            // Say why, rather than showing a dead switch.
+                            const isSelf = authUser?.uuid === uuid;
+                            return (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 md:col-span-2">
+                                <div className="space-y-0.5">
+                                  <FormLabel>{t("users.isActive")}</FormLabel>
+                                  <FormDescription>
+                                    {isSelf ? t("users.isActiveSelfHint") : t("users.isActiveDesc")}
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value ?? true}
+                                    onCheckedChange={field.onChange}
+                                    disabled={isSelf}
+                                    data-testid="switch-user-is-active"
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            );
+                          }}
+                        />
+
+                        <FormField
+                          control={form.control}
                           name="track_location"
                           render={({ field }) => (
                             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 md:col-span-2">
@@ -936,8 +969,15 @@ export default function UserDetail() {
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <span>{t("common.status")}</span>
                   </div>
-                  <Badge variant={user.is_deleted ? "destructive" : "default"}>
-                    {user.is_deleted ? t("users.deleted") : t("users.active")}
+                  <Badge
+                    variant={user.is_deleted ? "destructive" : user.is_active === false ? "secondary" : "default"}
+                    data-testid="badge-user-status"
+                  >
+                    {user.is_deleted
+                      ? t("users.deleted")
+                      : user.is_active === false
+                        ? t("users.inactive")
+                        : t("users.active")}
                   </Badge>
                 </div>
               </CardContent>

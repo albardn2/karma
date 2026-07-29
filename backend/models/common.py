@@ -113,6 +113,13 @@ class User(Base):
     # {resource: [crud actions]}}. NULL = legacy role-scope behavior.
     permissions = Column(MutableDict.as_mutable(JSONB), nullable=True)
     is_deleted = Column(Boolean, default=False)
+    # Deactivation: a reversible "may not sign in" switch, deliberately
+    # separate from is_deleted so somebody can be suspended (leave of
+    # absence, lost device, offboarding under review) without erasing them
+    # or freeing up their username. Enforced at login, at refresh, and —
+    # because the request chokepoint re-reads this row on every request —
+    # on already-issued tokens, so live sessions die immediately.
+    is_active = Column(Boolean, nullable=False, default=True, server_default=true())
     # location tracking: master switch + live publish cadence (seconds)
     track_location = Column(Boolean, nullable=False, default=False, server_default=false())
     location_ping_seconds = Column(Integer, nullable=False, default=15, server_default='15')

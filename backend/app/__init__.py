@@ -51,6 +51,127 @@ from app.entrypoint.routes.vehicle_inventory_event import vehicle_inventory_even
 
 jwt = JWTManager()
 load_dotenv()
+
+
+def _load_request_identity():
+    # Request chokepoint: resolve the caller's user row once and put the
+    # tenant scope + fine-grained ACL on flask.g.
+    #  - g.account_uuid: the UnitOfWork picks it up and every repository
+    #    read/write is filtered/stamped with it.
+    #  - g.user_acl / g.is_admin: the caller's EFFECTIVE fine-grained
+    #    permissions — their explicit checklist, or their role's preset
+    #    (roles are shortcuts for a pre-defined permission set). This is
+    #    the source of truth: a non-admin must be granted the matching
+    #    CRUD action on the resource blueprint or the request is rejected
+    #    right here. Admins bypass (g.user_acl None).
+    # Absent or unreadable tokens leave g unset and continue: protected routes
+    # still reject them via their own decorators, and unauthenticated routes
+    # (login/signup) must run unscoped since no tenant is known yet. A token
+    # that IS readable but whose user cannot be resolved is a different
+    # story — see the 401 below.
+    #
+    # Module-level rather than nested in create_app so the security decisions
+    # here can be unit-tested directly (tests/entrypoint/test_request_identity).
+    from flask import g, jsonify, request
+    from flask_jwt_extended import verify_jwt_in_request, get_jwt
+    from app.entrypoint.routes.common.permissions import (
+        RESOURCE_SET,
+        endpoint_allowed,
+        effective_permissions,
+    )
+    try:
+        verify_jwt_in_request(optional=True)
+        claims = get_jwt()
+    except Exception:
+        return None
+    if not claims:
+        return None
+
+    from app.adapters.unit_of_work.sqlalchemy_unit_of_work import (
+        SqlAlchemyUnitOfWork,
+    )
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        user = uow.user_repository.find_one(
+            uuid=claims.get("sub"), is_deleted=False
+        )
+        if not user:
+            # The token is validly signed but names a user who no longer
+            # exists (offboarded via DELETE /auth/user/<uuid>, which only
+            # soft-deletes and cannot revoke a live token).
+            #
+            # This MUST fail closed. Continuing left g unset, and everything
+            # downstream reads that as "unscoped": the UnitOfWork built every
+            # repository with account_uuid=None so no tenant filter was
+            # applied to any query, scopes_required fell back to the token's
+            # stale `scopes` claim instead of the DB-fresh set, and the
+            # per-endpoint ACL gate below was skipped entirely. A deleted
+            # driver replaying their token read every tenant's data for the
+            # remaining life of it (24h) — verified against a local stack:
+            # GET /customer/ went from 267 rows (their own account) to 269
+            # (all accounts) the moment their user row was soft-deleted.
+            #
+            # 401 rather than 403 so both clients' auto-logout machinery runs,
+            # matching the blocked-account branch below.
+            return jsonify({"msg": "User no longer exists"}), 401
+        # Deactivation revokes LIVE sessions, not just future logins: this
+        # runs before every request and reads the row fresh, so flipping
+        # is_active off takes effect on the deactivated user's very next
+        # request rather than whenever their 24h token happens to expire.
+        # 401 so both clients' auto-logout machinery signs them out.
+        if not user.is_active:
+            return jsonify({"msg": "This user has been deactivated"}), 401
+        # blocked account / tenant feature cap: resolved fresh per
+        # request (the platform owner is exempt from both)
+        g.account_perms = None
+        if not user.is_superuser:
+            from models.common import Account as AccountModel
+            acct = (
+                uow.session.query(
+                    AccountModel.is_blocked, AccountModel.permissions
+                )
+                .filter(AccountModel.uuid == user.account_uuid)
+                .first()
+            )
+            if acct and acct[0]:
+                # 401 (not 403) so both clients' auto-logout machinery
+                # kicks in: web clears the token and reloads to the login
+                # page; the app fails its refresh and signs out — active
+                # sessions are revoked on their next request
+                return jsonify({"msg": "This account is blocked"}), 401
+            g.account_perms = acct[1] if acct else None
+        # impersonation: a superuser token may carry a target account —
+        # the platform owner operates inside that tenant's scope
+        imp_account = claims.get("imp_account_uuid")
+        if imp_account and user.is_superuser:
+            g.account_uuid = imp_account
+        else:
+            g.account_uuid = user.account_uuid
+        g.is_admin = user.is_admin
+        # DB-fresh scopes: role changes apply to live sessions immediately
+        # (the JWT scopes claim is only a fallback, it goes stale)
+        g.user_scopes = set((user.permission_scope or "").split(","))
+        # effective perms: explicit checklist or role preset (None = admin)
+        g.user_acl = effective_permissions(user)
+
+    if request.blueprint in RESOURCE_SET:
+        # tenant feature cap binds EVERYONE in the account, admins
+        # included (the platform owner is exempt — g.account_perms None)
+        if g.account_perms is not None and not endpoint_allowed(
+            g.account_perms, request.blueprint, request.method
+        ):
+            return jsonify(
+                {"msg": "Forbidden — feature not enabled for this account"}
+            ), 403
+        # per-user fine-grained grant (admins bypass)
+        if (
+            not g.is_admin
+            and g.user_acl is not None
+            and not endpoint_allowed(g.user_acl, request.blueprint, request.method)
+        ):
+            return jsonify({"msg": "Forbidden — missing endpoint permission"}), 403
+    return None
+
+
 def create_app(config_object=Config):
     app = Flask(__name__)
 
@@ -79,96 +200,7 @@ def create_app(config_object=Config):
     app.config["JWT_COOKIE_CSRF_PROTECT"] = False # TESTING
     jwt.init_app(app)
 
-    @app.before_request
-    def _load_request_identity():
-        # Request chokepoint: resolve the caller's user row once and put the
-        # tenant scope + fine-grained ACL on flask.g.
-        #  - g.account_uuid: the UnitOfWork picks it up and every repository
-        #    read/write is filtered/stamped with it.
-        #  - g.user_acl / g.is_admin: the caller's EFFECTIVE fine-grained
-        #    permissions — their explicit checklist, or their role's preset
-        #    (roles are shortcuts for a pre-defined permission set). This is
-        #    the source of truth: a non-admin must be granted the matching
-        #    CRUD action on the resource blueprint or the request is rejected
-        #    right here. Admins bypass (g.user_acl None).
-        # Invalid or absent tokens leave g unset — protected routes still
-        # reject them via their own decorators; unauthenticated routes
-        # (login/signup) run unscoped, which is correct since no tenant is
-        # known yet.
-        from flask import g, jsonify, request
-        from flask_jwt_extended import verify_jwt_in_request, get_jwt
-        from app.entrypoint.routes.common.permissions import (
-            RESOURCE_SET,
-            endpoint_allowed,
-            effective_permissions,
-        )
-        try:
-            verify_jwt_in_request(optional=True)
-            claims = get_jwt()
-        except Exception:
-            return None
-        if not claims:
-            return None
-
-        from app.adapters.unit_of_work.sqlalchemy_unit_of_work import (
-            SqlAlchemyUnitOfWork,
-        )
-        with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
-            user = uow.user_repository.find_one(
-                uuid=claims.get("sub"), is_deleted=False
-            )
-            if not user:
-                return None
-            # blocked account / tenant feature cap: resolved fresh per
-            # request (the platform owner is exempt from both)
-            g.account_perms = None
-            if not user.is_superuser:
-                from models.common import Account as AccountModel
-                acct = (
-                    uow.session.query(
-                        AccountModel.is_blocked, AccountModel.permissions
-                    )
-                    .filter(AccountModel.uuid == user.account_uuid)
-                    .first()
-                )
-                if acct and acct[0]:
-                    # 401 (not 403) so both clients' auto-logout machinery
-                    # kicks in: web clears the token and reloads to the login
-                    # page; the app fails its refresh and signs out — active
-                    # sessions are revoked on their next request
-                    return jsonify({"msg": "This account is blocked"}), 401
-                g.account_perms = acct[1] if acct else None
-            # impersonation: a superuser token may carry a target account —
-            # the platform owner operates inside that tenant's scope
-            imp_account = claims.get("imp_account_uuid")
-            if imp_account and user.is_superuser:
-                g.account_uuid = imp_account
-            else:
-                g.account_uuid = user.account_uuid
-            g.is_admin = user.is_admin
-            # DB-fresh scopes: role changes apply to live sessions immediately
-            # (the JWT scopes claim is only a fallback, it goes stale)
-            g.user_scopes = set((user.permission_scope or "").split(","))
-            # effective perms: explicit checklist or role preset (None = admin)
-            g.user_acl = effective_permissions(user)
-
-        if request.blueprint in RESOURCE_SET:
-            # tenant feature cap binds EVERYONE in the account, admins
-            # included (the platform owner is exempt — g.account_perms None)
-            if g.account_perms is not None and not endpoint_allowed(
-                g.account_perms, request.blueprint, request.method
-            ):
-                return jsonify(
-                    {"msg": "Forbidden — feature not enabled for this account"}
-                ), 403
-            # per-user fine-grained grant (admins bypass)
-            if (
-                not g.is_admin
-                and g.user_acl is not None
-                and not endpoint_allowed(g.user_acl, request.blueprint, request.method)
-            ):
-                return jsonify({"msg": "Forbidden — missing endpoint permission"}), 403
-        return None
+    app.before_request(_load_request_identity)
 
     # Register blueprints
     app.register_blueprint(customer_blueprint, url_prefix='/customer')

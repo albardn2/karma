@@ -106,6 +106,9 @@ class UserUpdate(BaseModel):
     # location tracking (admin-managed)
     track_location: Optional[bool] = None
     location_ping_seconds: Optional[int] = pydantic.Field(None, gt=0, le=3600)
+    # deactivation (admin-managed; absent from MeUpdate on purpose, so a
+    # deactivated user cannot reactivate themselves)
+    is_active: Optional[bool] = None
     # only admins may change this:
     permission_scope: Optional[str] = None
     # fine-grained ACL (admin-managed); explicit null clears it back to
@@ -159,6 +162,8 @@ class UserRead(BaseModel):
     created_at: datetime
     permission_scope: Optional[str]
     is_deleted: bool
+    # False = deactivated: cannot sign in and live sessions are cut
+    is_active: bool = True
     account_uuid: Optional[str] = None
     # explicit per-user override (None = follow the role preset)
     permissions: Optional[dict] = None
@@ -188,6 +193,7 @@ class UserListParams(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     uuid: Optional[str] = None
+    is_active: Optional[bool] = None
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
 
