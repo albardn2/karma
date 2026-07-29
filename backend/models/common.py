@@ -1713,10 +1713,13 @@ class DebitNoteItem(Base):
 
     @hybrid_property
     def is_paid(self):
-        return self.amount_due == 0
+        # paired with the tolerant guard in PaymentDomain.create_payment: if the
+        # payment that settles this is accepted, the item has to read as settled
+        return abs(self.amount_due) <= MONEY_TOLERANCE
+
     @is_paid.expression
     def is_paid(cls):
-        return cls.amount_due == literal(0)
+        return func.abs(cls.amount_due) <= literal(MONEY_TOLERANCE)
 
     def __repr__(self):
         return f"<DebitNoteItem(uuid={self.uuid}, amount={self.amount}, status={self.status})>"

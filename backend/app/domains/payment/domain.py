@@ -64,9 +64,15 @@ class PaymentDomain:
                 f"{round(pay.invoice.net_amount_due + pay.amount, 2)} still due"
             )
 
-        if pay.debit_note_item and pay.debit_note_item.amount_due < 0:
+        # Same tolerance as the invoice branch above. Leaving this at a bare `< 0`
+        # would keep exactly the bug that branch was changed to fix, two lines
+        # apart in the same function: the instalment that settles a debit note
+        # gets refused over float dust.
+        if pay.debit_note_item and pay.debit_note_item.amount_due < -MONEY_TOLERANCE:
             raise BadRequestError(
-                f"Payment amount {pay.amount} is greater than debit note item amount {pay.debit_note_item.amount}"
+                f"payment amount {pay.amount} is larger than the "
+                f"{round(pay.debit_note_item.amount_due + pay.amount, 2)} still due "
+                f"on debit note item {pay.debit_note_item.uuid}"
             )
 
         # financial_account.balance += pay.amount
