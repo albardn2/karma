@@ -133,6 +133,23 @@ These are the rest, in rough order of how much they mislead someone:
 
 ---
 
+## The customer spatial index does not know about tenants (found 2026-07-30)
+
+- **`idx_customer_coordinates` is GiST on `coordinates` alone, so `account_uuid` is applied as a post-filter.** Correctness is unaffected — verified against real cross-tenant data, the map returns 236 of the 238 coord-bearing customers because 2 belong to another account — but the work done is proportional to *every* tenant's density in the viewport, not the caller's. `EXPLAIN ANALYZE` on the map-cluster query:
+
+  ```
+  Index Scan using idx_customer_coordinates on customer  (rows=233)
+    Index Cond: (coordinates @ <viewport envelope>)
+    Filter: (NOT is_deleted AND account_uuid = '<uuid>' AND ST_Within(...))
+    Rows Removed by Filter: 4
+  ```
+
+  Today's dilution is 4 rows, so this is a scaling note rather than a problem. It matters because of what this business actually is: the tenants are Syrian distributors and their customers are largely the same few square kilometres of Damascus, so tenants' geography *overlaps heavily*. Ten tenants in one city means each one's viewport scan walks roughly ten times the points it needs. It cannot be measured locally — one account holds 236 of 238 customers.
+
+  The fix is a composite `GiST (account_uuid, coordinates)`, which needs the `btree_gist` extension: available here (1.5) but **not installed**, so it is a migration that adds an extension plus an index, and installing an extension on the managed prod database is worth checking before promising it. Do not swap the existing index out — keep both until the plan is confirmed to use the composite. **Small lift, but gate it on a real measurement** (the honest trigger is a second tenant with real Damascus customer volume, at which point `Rows Removed by Filter` on that plan tells you directly).
+
+---
+
 ## CI runs no tests at all (found 2026-07-30)
 
 - **No workflow in `.github/workflows/` invokes pytest.** `grep -rn pytest .github/workflows/` returns nothing: the pipelines build and push images and deploy, and that is all. So the backend suite is advisory — nothing stops a red suite from reaching production.
