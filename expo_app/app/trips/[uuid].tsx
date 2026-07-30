@@ -28,6 +28,8 @@ import { STATUS_BADGE } from '../trips';
 interface Trip {
   uuid: string;
   status: string;
+  /** optional label for the run; older trips have none */
+  name?: string | null;
   vehicle_plate?: string | null;
   assigned_username?: string | null;
   workflow_execution_uuid?: string | null;
@@ -267,7 +269,7 @@ export default function TripDetailScreen() {
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <NativeHeader
-        title={trip.vehicle_plate || t('trips.title')}
+        title={trip.name || trip.vehicle_plate || t('trips.title')}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/trips'))}
         rightButton={
           trip.workflow_execution_uuid
@@ -289,6 +291,9 @@ export default function TripDetailScreen() {
               </ThemedText>
             </View>
           </View>
+          {/* both, since the header now shows whichever of the two exists */}
+          {!!trip.name && <Row label={t('trips.colName')} value={trip.name} />}
+          <Row label={t('trips.vehicle')} value={trip.vehicle_plate || '—'} />
           <Row label={t('trips.assigned')} value={trip.assigned_username || '—'} />
           <Row label={t('trips.start')} value={fmt(trip.start_time)} />
           <Row label={t('trips.end')} value={fmt(trip.end_time)} />

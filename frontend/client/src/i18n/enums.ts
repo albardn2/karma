@@ -28,6 +28,7 @@ const ENUM_AR: Record<string, string> = {
   meters: 'متر',
   pcs: 'قطعة',
   // task-form field identifiers (task_inputs field names/labels)
+  trip_name: 'اسم الرحلة',
   manual_stops: 'محطات يدوية',
   service_areas: 'مناطق الخدمة',
   start_warehouse_name: 'مستودع الانطلاق',

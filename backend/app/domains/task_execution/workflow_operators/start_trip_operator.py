@@ -17,6 +17,10 @@ from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWo
 class StartTripOperatorSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # optional label for the run, typed on the start-trip form. Blank is normal:
+    # CreateTripOperator fills it with the start date.
+    trip_name: Optional[str] = None
+
     # manual mode: the driver adds stops ad hoc during the trip; only the
     # vehicle and assigned user are needed (routing inputs are skipped)
     manual_stops: Optional[bool] = False

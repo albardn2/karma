@@ -503,6 +503,8 @@ export interface TripData {
 }
 
 export interface Trip {
+  /** optional label for the run; null on trips created before names existed */
+  name?: string | null;
   uuid: string;
   created_by_uuid?: string;
   created_at: string;

@@ -327,7 +327,7 @@ export default function Trips() {
                     />
                   </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    {t('trips.colTripId')}
+                    {t('trips.colName')}
                   </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     {t('trips.colVehicle')}
@@ -412,9 +412,20 @@ export default function Trips() {
                           data-testid={`checkbox-trip-${trip.uuid}`}
                         />
                       </td>
+                      {/* the run's name; older trips have none and show a dash
+                          rather than a manufactured label */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                          {trip.uuid.substring(0, 8)}...
+                        <span
+                          className="text-sm font-medium text-gray-900 dark:text-gray-100"
+                          data-testid={`text-trip-name-${trip.uuid}`}
+                        >
+                          {trip.name || (
+                            /* nothing identifies the row now that the uuid column
+                               is gone, so an unnamed trip shows its short uuid */
+                            <span className="font-mono text-gray-500">
+                              {trip.uuid.substring(0, 8)}…
+                            </span>
+                          )}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

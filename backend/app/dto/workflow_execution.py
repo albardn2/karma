@@ -58,6 +58,12 @@ class WorkflowExecutionRead(WorkflowExecutionBase):
     created_at: datetime  # Time when the workflow execution was created
     tags : Optional[List[WorkflowTags]] = []  # Tags associated with the workflow execution
     name : Optional[str] = None  # Name of the workflow execution, if applicable
+    # The trip's own name, so the execution lists can label a run the way the user
+    # named it. NOT the same thing as `name` above, which is a hybrid property
+    # returning the WORKFLOW TEMPLATE's name and reads "simple_trip_workflow" on
+    # every row. Resolved by the routes from the execution's trip, falling back to
+    # what was typed on the start-trip form for the window before the trip exists.
+    trip_name: Optional[str] = None
     task_executions: Optional[List[TaskExecutionRead]] = []  # List of task executions associated with this workflow execution
 
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -6,6 +6,7 @@ import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -71,6 +72,7 @@ export default function TripDetail() {
   const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotes, setEditedNotes] = useState("");
+  const [editedName, setEditedName] = useState("");
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { user, isAdmin } = useAuth();
@@ -172,8 +174,29 @@ export default function TripDetail() {
   const pageRows = activityRows.slice(activityPage * PAGE_SIZE, (activityPage + 1) * PAGE_SIZE);
   const pageCount = Math.max(1, Math.ceil(activityRows.length / PAGE_SIZE));
 
+  // keep the name box in step with the loaded trip (and with a save that just
+  // landed), without disturbing whatever the user is mid-way through typing
+  useEffect(() => {
+    setEditedName(trip?.name || "");
+  }, [trip?.uuid, trip?.name]);
+
+  const saveNameMutation = useMutation({
+    mutationFn: async (name: string | null) =>
+      await apiRequest(`/trip/${params?.uuid}`, { method: "PUT", body: { name } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/trip/"] });
+      toast({ title: t("common.success"), description: t("trips.updatedSuccess") });
+    },
+    onError: (error: any) =>
+      toast({
+        title: t("common.error"),
+        description: error?.message || t("trips.failedUpdate"),
+        variant: "destructive",
+      }),
+  });
+
   const updateTripMutation = useMutation({
-    mutationFn: async (data: { notes?: string }) => {
+    mutationFn: async (data: { notes?: string; name?: string | null }) => {
       return await apiRequest(`/trip/${params?.uuid}`, {
         method: "PUT",
         body: data,
@@ -238,6 +261,7 @@ export default function TripDetail() {
 
   const handleEditClick = () => {
     setEditedNotes(trip?.notes || "");
+    setEditedName(trip?.name || "");
     setIsEditing(true);
   };
 
@@ -450,6 +474,38 @@ export default function TripDetail() {
               <CardTitle>{t('trips.generalInfo')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* the run's name: what a person identifies a trip by, so it comes
+                  before the uuid. Editable in place — PUT /trip/<uuid> already
+                  accepts it. Blank clears it back to unnamed. */}
+              <div>
+                <label className="text-sm font-medium text-gray-500">{t('trips.colName')}</label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    maxLength={120}
+                    placeholder={t('trips.namePlaceholder')}
+                    className="h-9"
+                    data-testid="input-trip-name"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={saveNameMutation.isPending || editedName === (trip.name || "")}
+                    onClick={() => {
+                      // its own request, not updateTripMutation: that one's
+                      // onSuccess calls setIsEditing(false), which would slam the
+                      // notes editor shut (and lose an unsaved note) just because
+                      // the name was saved
+                      saveNameMutation.mutate(editedName.trim() || null);
+                    }}
+                    data-testid="button-save-trip-name"
+                  >
+                    {saveNameMutation.isPending ? t('common.saving') : t('common.save')}
+                  </Button>
+                </div>
+              </div>
+
               <div>
                 <label className="text-sm font-medium text-gray-500">{t('trips.tripUuid')}</label>
                 <div className="flex items-center gap-2">

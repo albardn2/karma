@@ -41,6 +41,8 @@ class TripData(BaseModel):
 class TripCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    name: Optional[str] = Field(None, max_length=120)
+
     created_by_uuid: Optional[str] = None
     vehicle_uuid: str
     # default to list
@@ -104,6 +106,8 @@ class TripCreate(BaseModel):
 class TripUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    name: Optional[str] = Field(None, max_length=120)
+
     vehicle_uuid: Optional[str] = None
     service_area_uuid: Optional[str] = None
     distribution_area: Optional[str] = None
@@ -166,6 +170,9 @@ class TripRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     uuid: str
+    # optional label for the run; null for trips created before this existed, so
+    # every client keeps its old fallback (plate, or a truncated uuid)
+    name: Optional[str] = None
     created_by_uuid: Optional[str] = None
     created_at: datetime
     vehicle_uuid: str

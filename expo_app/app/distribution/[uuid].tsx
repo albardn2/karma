@@ -33,6 +33,8 @@ interface TaskExecution {
 }
 
 interface WorkflowExecution {
+  /** the run's own name; falls back to 'Trip · date' when unset */
+  trip_name?: string | null;
   uuid: string;
   status: string;
   created_at: string;
@@ -512,7 +514,9 @@ export default function ExecutionDetailScreen() {
       >
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
-            <ThemedText style={styles.summaryTitle}>{t('trip.summaryTitle', { date: fmt(execution.start_time || execution.created_at) })}</ThemedText>
+            <ThemedText style={styles.summaryTitle}>{execution.trip_name
+              ? execution.trip_name
+              : t('trip.summaryTitle', { date: fmt(execution.start_time || execution.created_at) })}</ThemedText>
             {statusBadge(execution.status)}
           </View>
           <ThemedText style={styles.summaryMeta}>{t('trip.tasksDone', { done: progress.done, total: progress.total })}</ThemedText>

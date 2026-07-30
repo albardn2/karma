@@ -15,6 +15,8 @@ export const en: Record<string, string> = {
   'trips.notSet': 'Not set',
 
   // list table headers
+  'trips.colName': 'Name',
+  'trips.namePlaceholder': 'Unnamed — e.g. 2026-07-30-zaid-malki',
   'trips.colTripId': 'Trip ID',
   'trips.colVehicle': 'Vehicle',
   'trips.assignedTo': 'Assigned To',
@@ -221,6 +223,8 @@ export const ar: Record<string, string> = {
   'trips.notSet': 'غير محدد',
 
   // list table headers
+  'trips.colName': 'الاسم',
+  'trips.namePlaceholder': 'بدون اسم — مثال 2026-07-30-zaid-malki',
   'trips.colTripId': 'معرّف الرحلة',
   'trips.colVehicle': 'المركبة',
   'trips.assignedTo': 'مسندة إلى',

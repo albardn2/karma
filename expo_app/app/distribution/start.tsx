@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -42,6 +42,26 @@ interface Field {
   placeholder?: string | null;
 }
 
+// The trip name the setup form suggests: the date, then the assignee, then the
+// regions — "2026-07-30", "2026-07-30-zaid", "2026-07-30-zaid-malki-Mezzeh".
+//
+// Anchored to Damascus (UTC+3) rather than the device clock, so this screen, the
+// web form and the server's own fallback all name the same trip the same way; a
+// phone left on another timezone would otherwise be a day out.
+const TRIP_NAME_MAX = 120;
+
+function deriveTripName(assignee?: string | null, regions?: string[] | null): string {
+  const damascusDate = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const parts = [damascusDate];
+  if (assignee && String(assignee).trim()) parts.push(String(assignee).trim());
+  for (const region of regions || []) {
+    if (region && String(region).trim()) parts.push(String(region).trim());
+  }
+  // the column is String(120); cut here so what is shown is what is stored
+  return parts.join('-').slice(0, TRIP_NAME_MAX);
+}
+
+
 export default function StartTripScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -53,6 +73,30 @@ export default function StartTripScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // the last name this screen suggested, so a name the user typed is left alone
+  const lastSuggestedName = useRef<string | null>(null);
+
+  // Keep the suggested trip name in step with the assignee and the regions.
+  // Only ever replaces a value this effect put there (or an empty field): once
+  // somebody types their own name it stops interfering.
+  useEffect(() => {
+    if (!fields.some((f) => f.name === 'trip_name')) return;
+    const regions = Array.isArray(values.service_areas) ? values.service_areas : [];
+    const suggestion = deriveTripName(values.assigned_user_uuid, regions);
+    const current = values.trip_name;
+    const untouched = !current || current === lastSuggestedName.current;
+    if (untouched && current !== suggestion) {
+      lastSuggestedName.current = suggestion;
+      setValues((prev) => ({ ...prev, trip_name: suggestion }));
+    } else if (untouched) {
+      lastSuggestedName.current = suggestion;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Deliberately NOT watching values.trip_name. Doing so re-filled the field
+    // the instant it went empty, so clearing the suggestion to type your own name
+    // meant fighting it from the first keystroke. Changing a selection still
+    // brings a suggestion back.
+  }, [fields, values.assigned_user_uuid, JSON.stringify(values.service_areas)]);
 
   // load the workflow + its setup form fields
   useEffect(() => {
