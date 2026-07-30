@@ -62,6 +62,13 @@ import type {
   WorkflowExecutionCreate,
 } from "@/types/workflowExecution";
 
+// The backend stores naive UTC and serialises it without an offset, so
+// `new Date("2026-07-30T09:48:02")` is read as LOCAL time — hours out for anyone
+// not on UTC. Same helper as TripDetail uses for the audit timestamp.
+const parseNaiveUtc = (ts: string): Date =>
+  new Date(ts.includes("T") && !/(?:Z|[+-]\d{2}:?\d{2})$/.test(ts) ? `${ts}Z` : ts);
+
+
 export default function WorkflowExecutionDetail() {
   const [, params] = useRoute("/workflow-execution/:uuid");
   const workflowUuid = params?.uuid || "";
@@ -209,7 +216,7 @@ export default function WorkflowExecutionDetail() {
 
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return t('workflows.na');
-    return new Date(dateString).toLocaleString("en-US", {
+    return parseNaiveUtc(dateString).toLocaleString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -220,17 +227,25 @@ export default function WorkflowExecutionDetail() {
 
   const formatDuration = (start: string | null | undefined, end: string | null | undefined) => {
     if (!start) return t('workflows.na');
-    const startTime = new Date(start).getTime();
-    const endTime = end ? new Date(end).getTime() : Date.now();
+    const startTime = parseNaiveUtc(start).getTime();
+    const endTime = end ? parseNaiveUtc(end).getTime() : Date.now();
     const duration = Math.floor((endTime - startTime) / 1000);
-    
-    const hours = Math.floor(duration / 3600);
-    const minutes = Math.floor((duration % 3600) / 60);
-    const seconds = duration % 60;
-    
-    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-    if (minutes > 0) return `${minutes}m ${seconds}s`;
-    return `${seconds}s`;
+
+    // Format the MAGNITUDE and carry the sign separately. The old version tested
+    // `hours > 0` / `minutes > 0`, which are both false for a negative duration,
+    // so it fell through and printed the seconds remainder alone — a start time
+    // read 4h52m in the future displayed as "-44s", which looks like a rounding
+    // quirk instead of the bug it is. A negative here now means real clock skew
+    // and says so plainly.
+    const sign = duration < 0 ? '-' : '';
+    const total = Math.abs(duration);
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+
+    if (hours > 0) return `${sign}${hours}h ${minutes}m ${seconds}s`;
+    if (minutes > 0) return `${sign}${minutes}m ${seconds}s`;
+    return `${sign}${seconds}s`;
   };
 
   const getStatusIcon = (status: WorkflowExecutionStatus) => {
@@ -371,8 +386,15 @@ export default function WorkflowExecutionDetail() {
                       >
                         <TableCell>
                           <Link href={`/workflow-execution/${workflowUuid}/${execution.uuid}`}>
-                            <span className="text-blue-600 hover:underline font-medium">
-                              {execution.name || execution.uuid}
+                            {/* the run's own name first: `execution.name` is a
+                                hybrid returning the WORKFLOW TEMPLATE's name, so
+                                it reads "simple_trip_workflow" on every row and
+                                identifies nothing */}
+                            <span
+                              className="text-blue-600 hover:underline font-medium"
+                              data-testid={`text-execution-name-${execution.uuid}`}
+                            >
+                              {execution.trip_name || execution.name || execution.uuid}
                             </span>
                           </Link>
                         </TableCell>

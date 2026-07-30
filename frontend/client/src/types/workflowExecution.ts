@@ -19,6 +19,9 @@ export const WorkflowExecutionStatusLabels: Record<WorkflowExecutionStatus, stri
 import type { TaskExecution } from "./taskExecution";
 
 export interface WorkflowExecution {
+  /** the trip's own name, resolved by the backend from the execution's trip.
+   *  Distinct from `name`, which is the workflow TEMPLATE's name. */
+  trip_name?: string | null;
   uuid: string;
   workflow_uuid: string;
   status: WorkflowExecutionStatus;
