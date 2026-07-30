@@ -1,9 +1,10 @@
+import math
 from datetime import datetime, timedelta
 from flask import  request, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from geoalchemy2 import WKTElement
 from pydantic import  ValidationError
-from sqlalchemy import func
+from sqlalchemy import func, select
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.customer import customer_blueprint
@@ -13,6 +14,12 @@ from app.utils.geom_utils import lat_lon_to_wkt
 from models.common import Customer as CustomerModel
 
 from app.dto.customer import CustomerUpdate, CustomerReadList,CustomerListParams, CustomerPage
+from app.dto.customer import (
+    MAX_MAP_POINTS,
+    CustomerMapCluster,
+    CustomerMapClusterPage,
+    CustomerMapClusterParams,
+)
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.entrypoint.routes.common.errors import NotFoundError
 
@@ -542,4 +549,166 @@ def analytics_sold_customers():
             "per_page": per_page,
             "pages": ceil(total / per_page) if total else 0,
         }
+    return jsonify(result), 200
+
+
+# Target whole cells across the viewport's longer axis. 9 leaves room for the two
+# partial cells at the edges and still fits inside MAX_MAP_POINTS (10 x 10).
+MAP_CELLS_PER_AXIS = 9
+
+
+def grid_cell_degrees(span_degrees: float, cells_per_axis: int = MAP_CELLS_PER_AXIS) -> float:
+    """Side length, in degrees, of the grid cell used to group map pins.
+
+    Two properties matter, and both come from the arithmetic rather than from a
+    LIMIT that would silently drop customers off the map.
+
+    BOUNDED OUTPUT. `k = floor(log2(360 / target))` gives `2**k <= 360 / target`,
+    hence `cell = 360 / 2**k >= target = span / cells_per_axis`. So a viewport
+    spans at most `cells_per_axis` whole cells per axis, plus at most one more
+    where the edges fall mid-cell: at most 10 x 10 = 100 non-empty cells for the
+    default 9. That is the "max 100 points" guarantee, and it holds for every
+    viewport rather than on average.
+
+    STABLE UNDER PANNING. The size is quantised to a power-of-two fraction of 360
+    and the grid is anchored at (-180, -90) — a global origin, not the corner of
+    whatever the user happens to be looking at. Panning therefore slides the
+    viewport across a fixed grid and pins stay put; only zooming changes the
+    grouping, which is what makes zooming in feel like clusters splitting rather
+    than everything rearranging itself.
+    """
+    if span_degrees <= 0:
+        # a degenerate viewport (zero span) still has to answer something
+        span_degrees = 1e-6
+    target = span_degrees / max(1, cells_per_axis)
+    k = math.floor(math.log2(360.0 / target))
+    # floor at 3 (45-degree cells) because a coarser grid than that cannot bound
+    # a whole-world view any better, and cap at 30 (~4 cm) because past that the
+    # grid is finer than any coordinate is accurate and doubles for nothing
+    k = max(3, min(30, k))
+    return 360.0 / (2 ** k)
+
+
+@customer_blueprint.route('/map-clusters', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.ACCOUNTANT.value)
+def customer_map_clusters():
+    """Summarise the customers in a viewport as at most 100 map pins.
+
+    The map used to render this from `GET /customer/?within_polygon=...`, which
+    forces per_page to 10000 and serialises a full CustomerRead per row — the
+    reason the app died on any account with real customer volume. Here the
+    response size is fixed by the grid, so it does not grow with the number of
+    customers: a viewport holding 50 customers and one holding 50,000 both come
+    back as at most 100 rows.
+
+    A pin with count == 1 carries its customer's uuid so the app can open the
+    existing detail popup; the expensive full DTO is fetched for that one
+    customer on tap, which is the only place it is actually needed.
+    """
+    params = CustomerMapClusterParams(**request.args)
+
+    try:
+        poly = WKTElement(params.within_polygon, srid=CustomerModel.coordinates.type.srid)
+    except (ValidationError, ValueError) as e:
+        raise BadRequestError(f"Invalid polygon: {e}")
+
+    with SqlAlchemyUnitOfWork() as uow:
+        # Ask PostGIS for the viewport's extent rather than parsing WKT here, so
+        # the polygon is validated by the same code that will filter on it. An
+        # unparseable polygon raises here instead of silently matching nothing.
+        try:
+            xmin, ymin, xmax, ymax = uow.session.execute(
+                select(
+                    func.ST_XMin(poly), func.ST_YMin(poly),
+                    func.ST_XMax(poly), func.ST_YMax(poly),
+                )
+            ).one()
+        except Exception as e:
+            raise BadRequestError(f"Invalid polygon: {e}")
+
+        cell = grid_cell_degrees(max(float(xmax) - float(xmin), float(ymax) - float(ymin)))
+
+        filters = [
+            CustomerModel.is_deleted == False,
+            CustomerModel.coordinates.is_not(None),
+            CustomerModel.coordinates.ST_Within(poly),  # type: ignore[attr-defined]
+        ]
+        # This is a raw session query, so it is OUTSIDE the repository layer that
+        # normally injects the tenant filter (AbstractRepository._scope_filters).
+        # Without this line the map would show every account's customers. None
+        # means the platform owner, who is deliberately unscoped — same condition
+        # the repositories use.
+        if uow.account_uuid is not None:
+            filters.append(CustomerModel.account_uuid == uow.account_uuid)
+
+        if params.category:
+            filters.append(CustomerModel.category == params.category.value)
+        if params.company_name:
+            filters.append(CustomerModel.company_name.ilike(f"%{params.company_name}%"))
+        if params.full_name:
+            filters.append(CustomerModel.full_name.ilike(f"%{params.full_name}%"))
+
+        # Integer cell indices via floor, NOT ST_SnapToGrid. SnapToGrid rounds to
+        # the nearest node, which puts cell boundaries at odd half-multiples of
+        # the size — so consecutive levels of the ladder are not nested and
+        # zooming in makes clusters merge and re-split incoherently instead of
+        # each one dividing. floor nests exactly, because
+        # floor(u) == floor(floor(2u) / 2) for every u.
+        grid_x = func.floor((func.ST_X(CustomerModel.coordinates) + 180.0) / cell)
+        grid_y = func.floor((func.ST_Y(CustomerModel.coordinates) + 90.0) / cell)
+        # The pin sits on the centroid of its members, not on the cell's centre,
+        # so a cluster appears over the customers it stands for instead of on an
+        # arbitrary grid intersection.
+        centroid = func.ST_Centroid(func.ST_Collect(CustomerModel.coordinates))
+
+        rows = (
+            uow.session.query(
+                func.count().label("n"),
+                func.ST_Y(centroid).label("lat"),
+                func.ST_X(centroid).label("lng"),
+                # only meaningful for a single-member cell, which is the only
+                # case that reads them; min() over one row is that row
+                func.min(CustomerModel.uuid).label("uuid"),
+                func.min(CustomerModel.company_name).label("company_name"),
+                func.min(func.ST_Y(CustomerModel.coordinates)).label("min_lat"),
+                func.max(func.ST_Y(CustomerModel.coordinates)).label("max_lat"),
+                func.min(func.ST_X(CustomerModel.coordinates)).label("min_lng"),
+                func.max(func.ST_X(CustomerModel.coordinates)).label("max_lng"),
+            )
+            .filter(*filters)
+            .group_by(grid_x, grid_y)
+            .order_by(func.count().desc())
+            .limit(MAX_MAP_POINTS)
+            .all()
+        )
+
+        clusters = [
+            CustomerMapCluster(
+                latitude=float(r.lat),
+                longitude=float(r.lng),
+                count=int(r.n),
+                customer_uuid=r.uuid if int(r.n) == 1 else None,
+                company_name=r.company_name if int(r.n) == 1 else None,
+                min_latitude=float(r.min_lat),
+                max_latitude=float(r.max_lat),
+                min_longitude=float(r.min_lng),
+                max_longitude=float(r.max_lng),
+            )
+            for r in rows
+            # a NULL centroid would mean an empty collection, which grouping
+            # cannot produce — but a bad row must not become a pin at (0, 0)
+            if r.lat is not None and r.lng is not None
+        ]
+
+        result = CustomerMapClusterPage(
+            clusters=clusters,
+            total_count=sum(c.count for c in clusters),
+            cell_size_degrees=cell,
+        ).model_dump(mode='json')
+
     return jsonify(result), 200
