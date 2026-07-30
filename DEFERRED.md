@@ -150,6 +150,18 @@ These are the rest, in rough order of how much they mislead someone:
 
 ---
 
+## The location-ingest service honours no account-level gate (found 2026-07-30)
+
+- **`backend/location_ingest/` bypasses the HTTP chokepoint entirely, so neither `is_blocked` nor `is_verified` applies to it.** It consumes location pings off MQTT and writes them straight to Postgres; `__main__.py` checks only `is_deleted` and `track_location` on the user before committing a `LocationPing`. There is no reference to `is_blocked` or `is_verified` anywhere in that service.
+
+  This is **pre-existing for `is_blocked`** — a blocked account's phones have always been able to keep filling the location table — so account verification does not make it worse, and it is recorded rather than fixed for that reason. It is worth knowing about because it is the one place where "the account is switched off" is not true.
+
+  The app half is handled: `expo_app/contexts/LocationTrackingContext.tsx` now gates on `isVerified` as well as `isAuthenticated`, so a client that knows it is unverified stops publishing. But that is the client cooperating, not the server enforcing — a build that never learns the flag (offline, or an old install that has not re-fetched `/auth/me`) keeps streaming, and the ingest service will keep accepting it. Background tracking makes this concrete: it survives the app being killed and reads its config from an AsyncStorage snapshot, and it publishes to MQTT without touching Flask, so no 403 can reach it.
+
+  Fix is to resolve the account in the ingest loop and drop pings for accounts that are blocked or unverified — one extra join on a path that already loads the user. **Small lift.** The trigger for doing it is the first unverified or blocked account whose devices are still reporting.
+
+---
+
 ## CI runs no tests at all (found 2026-07-30)
 
 - **No workflow in `.github/workflows/` invokes pytest.** `grep -rn pytest .github/workflows/` returns nothing: the pipelines build and push images and deploy, and that is all. So the backend suite is advisory — nothing stops a red suite from reaching production.

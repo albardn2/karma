@@ -123,11 +123,19 @@ def _load_request_identity():
         # blocked account / tenant feature cap: resolved fresh per
         # request (the platform owner is exempt from both)
         g.account_perms = None
+        # True is the PLATFORM OWNER's value: superusers skip the block below and
+        # are exempt from verification exactly as they are from is_blocked and the
+        # feature cap. A tenant user always has this overwritten from their row.
+        g.account_verified = True
         if not user.is_superuser:
             from models.common import Account as AccountModel
             acct = (
                 uow.session.query(
-                    AccountModel.is_blocked, AccountModel.permissions
+                    AccountModel.is_blocked,
+                    AccountModel.permissions,
+                    # LAST on purpose — acct[2] below indexes into this tuple,
+                    # and tests mock this query's return value positionally.
+                    AccountModel.is_verified,
                 )
                 .filter(AccountModel.uuid == user.account_uuid)
                 .first()
@@ -139,6 +147,10 @@ def _load_request_identity():
                 # sessions are revoked on their next request
                 return jsonify({"msg": "This account is blocked"}), 401
             g.account_perms = acct[1] if acct else None
+            # No row means the account cannot be resolved, which must deny
+            # rather than admit — the same fail-closed reasoning as the deleted-user
+            # branch above.
+            g.account_verified = bool(acct[2]) if acct else False
         # impersonation: a superuser token may carry a target account —
         # the platform owner operates inside that tenant's scope
         imp_account = claims.get("imp_account_uuid")
@@ -154,6 +166,31 @@ def _load_request_identity():
         g.user_acl = effective_permissions(user)
 
     if request.blueprint in RESOURCE_SET:
+        # An unverified company gets no resource access at all. FIRST in this
+        # block on purpose: it is the coarsest gate, it binds admins as well as
+        # staff, and answering "not verified" before "missing permission" is both
+        # cheaper and the truer explanation of why the request failed.
+        #
+        # `auth` is not in RESOURCE_SET, so /auth/login, /auth/refresh and
+        # /auth/me keep working — which is exactly what lets a signed-in user be
+        # told they are unverified rather than simply failing.
+        # Plain attribute access, not a defaulted getattr: this block is only
+        # reached for an authenticated request (the `if not claims: return None`
+        # above), and every such path sets g.account_verified. A missing attribute
+        # would mean that invariant broke, and on a security gate that must fail
+        # loudly rather than quietly open.
+        if not g.account_verified:
+            # 403, deliberately NOT the 401 that a blocked account returns. The
+            # requirement is that an unverified company CAN sign in and be told
+            # why nothing works; a 401 trips both clients' auto-logout and bounces
+            # them to the login screen, which is the one behaviour this must avoid.
+            # The `code` is what the clients branch on — message text is not a
+            # contract, and both of them need to distinguish this from an ordinary
+            # permission denial.
+            return jsonify(
+                {"msg": "This account is pending verification",
+                 "code": "account_unverified"}
+            ), 403
         # tenant feature cap binds EVERYONE in the account, admins
         # included (the platform owner is exempt — g.account_perms None)
         if g.account_perms is not None and not endpoint_allowed(

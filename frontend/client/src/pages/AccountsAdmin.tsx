@@ -42,6 +42,7 @@ interface SuperAccount {
   phone_number: string | null;
   created_at: string;
   is_blocked: boolean;
+  is_verified: boolean;
   subscription_rate: number | null;
   subscription_currency: string | null;
   user_count: number;
@@ -409,6 +410,11 @@ export function AccountsPanel() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
+                            {!account.is_verified && (
+                              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700" data-testid={`badge-unverified-${account.uuid}`}>
+                                {t("misc.accounts.pendingVerification")}
+                              </Badge>
+                            )}
                             {account.is_blocked && (
                               <Badge variant="destructive">{t("misc.accounts.blocked")}</Badge>
                             )}
@@ -497,6 +503,21 @@ export function AccountsPanel() {
 
               <div className="space-y-6">
                 {/* Block / unblock */}
+                <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {t("misc.accounts.verifyAccount")}
+                    </p>
+                    <p className="text-sm text-gray-500">{t("misc.accounts.verifyHint")}</p>
+                  </div>
+                  <Switch
+                    data-testid="account-verify-switch"
+                    checked={selected.is_verified}
+                    disabled={updateMutation.isPending}
+                    onCheckedChange={(checked) => updateMutation.mutate({ is_verified: checked })}
+                  />
+                </div>
+
                 <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
                   <div>
                     <p className="text-sm font-medium text-gray-900">

@@ -54,6 +54,11 @@ class Account(Base):
     is_deleted = Column(Boolean, default=False)
     # platform-owner (superuser) managed:
     is_blocked = Column(Boolean, nullable=False, default=False)
+    # New companies arrive unverified: they can sign in, but every resource
+    # endpoint refuses them and both clients show a notice instead of the app,
+    # until a platform owner flips this. Existing accounts were grandfathered to
+    # true by the migration that added it — see d5a17c93e8b4.
+    is_verified = Column(Boolean, nullable=False, default=False, server_default=false())
     subscription_rate = Column(Float, nullable=True)   # per month
     subscription_currency = Column(String(10), nullable=True)
     # 'flat' = rate per month; 'per_user' = rate x active users per month

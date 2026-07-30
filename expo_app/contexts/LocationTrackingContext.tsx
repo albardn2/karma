@@ -26,7 +26,7 @@ const RECONNECT_MAX_MS = 120000;
  * when backgrounded, if the Always permission is granted.
  */
 export function LocationTrackingProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isVerified } = useAuth();
   // everything lives in refs: this component renders nothing and must never
   // re-render the tree on tracking state changes
   const configRef = useRef<ClientConfig | null>(null);
@@ -157,7 +157,15 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     };
     const sub = AppState.addEventListener('change', onAppState);
 
-    if (isAuthenticated) {
+    // Gated on verification as well as sign-in, and `isVerified` is in the deps
+    // for a reason the HTTP layer cannot cover: this tracker publishes straight to
+    // MQTT and never calls Flask, so the 403 an unverified account gets on every
+    // resource endpoint does nothing to stop it. Background tracking also survives
+    // the app being killed and reads its config from an AsyncStorage snapshot, so
+    // an account that starts tracking and is then UN-verified would otherwise keep
+    // streaming location indefinitely. Adding isVerified to the deps is what makes
+    // the cleanup below re-run and actually stop it.
+    if (isAuthenticated && isVerified) {
       startTracking().catch(() => {});
     }
 
@@ -165,7 +173,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
       sub.remove();
       stopTracking();
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isVerified]);
 
   return <>{children}</>;
 }

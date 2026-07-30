@@ -9,6 +9,10 @@ interface AuthContextType {
   loading: boolean;
   user: any;
   isAdmin: boolean;
+  /** False only while the signed-in user's company is awaiting verification. */
+  isVerified: boolean;
+  /** Re-reads /auth/me — how the verification notice notices it was verified. */
+  refreshUser: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -170,9 +174,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     .map((s) => s.trim())
     .filter(Boolean);
   const isAdmin = scopes.includes('admin') || scopes.includes('superuser');
+  // Compared against `false` explicitly rather than tested for truthiness: the
+  // field is absent from an older backend's response and from a `user_data`
+  // payload cached before this feature shipped, and neither of those may lock a
+  // working account out of the app. Superusers are sent `true` by the server, so
+  // nothing here needs to re-derive platform-owner status.
+  const isVerified = user?.account_verified !== false;
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout, loading, user, isAdmin }}>
+    <AuthContext.Provider
+      value={{ isAuthenticated, login, logout, loading, user, isAdmin, isVerified,
+               refreshUser: fetchUserInfo }}
+    >
       {children}
     </AuthContext.Provider>
   );

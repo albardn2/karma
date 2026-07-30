@@ -14,6 +14,9 @@ class AccountUpdate(BaseModel):
     email: Optional[str] = None
     phone_number: Optional[str] = None
     is_blocked: Optional[bool] = None
+    # The verification gate. Flipping this to true is what lets a new company
+    # actually use the product; false puts it back behind the notice.
+    is_verified: Optional[bool] = None
     subscription_rate: Optional[float] = Field(None, ge=0)
     subscription_currency: Optional[str] = Field(None, max_length=10)
     subscription_type: Optional[str] = None
@@ -73,6 +76,7 @@ class AccountRead(BaseModel):
     created_at: datetime
     is_deleted: bool
     is_blocked: bool
+    is_verified: bool
     subscription_rate: Optional[float]
     subscription_currency: Optional[str]
     subscription_type: Optional[str] = 'flat'
