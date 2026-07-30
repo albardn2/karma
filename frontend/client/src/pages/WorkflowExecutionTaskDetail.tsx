@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link, useLocation} from "wouter";
 import { useForm } from "react-hook-form";
@@ -56,6 +56,26 @@ import type { WorkflowExecution } from "@/types/workflowExecution";
 import type { TaskExecution, TaskExecutionPage, TaskExecutionComplete } from "@/types/taskExecution";
 import type { Task } from "@shared/schema";
 import type { TaskInputField, FieldType } from "@/types/taskInputs";
+
+// The trip name the start-trip form suggests: the date, then the assignee, then
+// the regions — "2026-07-30", "2026-07-30-zaid", "2026-07-30-zaid-malki-Mezzeh".
+//
+// Anchored to Damascus (UTC+3) rather than the device clock so the web, the app
+// and the server's own fallback all produce the same date for the same trip; a
+// laptop left on another timezone would otherwise name a trip a day out.
+export const TRIP_NAME_MAX = 120;
+
+export function deriveTripName(assignee?: string | null, regions?: string[] | null): string {
+  const damascusDate = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const parts = [damascusDate];
+  if (assignee && String(assignee).trim()) parts.push(String(assignee).trim());
+  for (const region of regions || []) {
+    if (region && String(region).trim()) parts.push(String(region).trim());
+  }
+  // the column is String(120); cut here so what is shown is what is stored
+  return parts.join('-').slice(0, TRIP_NAME_MAX);
+}
+
 
 export default function WorkflowExecutionTaskDetail() {
   const [, params] = useRoute("/workflow-execution/:workflow_uuid/:execution_uuid");
@@ -248,6 +268,32 @@ export default function WorkflowExecutionTaskDetail() {
       form.reset(getDefaultValues());
     }
   }, [selectedTaskExecution?.uuid, taskInputFields.length]);
+
+  // Keep the suggested trip name in step with the assignee and the regions.
+  // Only ever overwrites a value this effect itself put there (or an empty
+  // field): the moment somebody types their own name it stops interfering,
+  // which is the difference between a helpful default and a fight.
+  const hasTripNameField = taskInputFields.some((f: any) => f?.name === 'trip_name');
+  const lastSuggestedName = useRef<string | null>(null);
+  const watchedAssignee = form.watch('assigned_user_uuid' as any);
+  const watchedRegions = form.watch('service_areas' as any);
+  const watchedTripName = form.watch('trip_name' as any);
+  useEffect(() => {
+    if (!hasTripNameField) return;
+    const suggestion = deriveTripName(
+      watchedAssignee as any,
+      Array.isArray(watchedRegions) ? (watchedRegions as string[]) : []
+    );
+    const current = form.getValues('trip_name' as any);
+    const untouched = !current || current === lastSuggestedName.current;
+    if (untouched && current !== suggestion) {
+      form.setValue('trip_name' as any, suggestion as any, { shouldDirty: false });
+    }
+    if (untouched) lastSuggestedName.current = suggestion;
+    // watching the name itself is what lets clearing the field bring the
+    // suggestion back. It cannot loop: once the field already equals the
+    // suggestion the write is skipped, so it settles after one pass.
+  }, [hasTripNameField, watchedAssignee, JSON.stringify(watchedRegions), watchedTripName]);
 
   // Task execution completion mutation
   const completeTaskMutation = useMutation({
