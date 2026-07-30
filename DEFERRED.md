@@ -133,6 +133,35 @@ These are the rest, in rough order of how much they mislead someone:
 
 ---
 
+## The customer spatial index does not know about tenants (found 2026-07-30)
+
+- **`idx_customer_coordinates` is GiST on `coordinates` alone, so `account_uuid` is applied as a post-filter.** Correctness is unaffected — verified against real cross-tenant data, the map returns 236 of the 238 coord-bearing customers because 2 belong to another account — but the work done is proportional to *every* tenant's density in the viewport, not the caller's. `EXPLAIN ANALYZE` on the map-cluster query:
+
+  ```
+  Index Scan using idx_customer_coordinates on customer  (rows=233)
+    Index Cond: (coordinates @ <viewport envelope>)
+    Filter: (NOT is_deleted AND account_uuid = '<uuid>' AND ST_Within(...))
+    Rows Removed by Filter: 4
+  ```
+
+  Today's dilution is 4 rows, so this is a scaling note rather than a problem. It matters because of what this business actually is: the tenants are Syrian distributors and their customers are largely the same few square kilometres of Damascus, so tenants' geography *overlaps heavily*. Ten tenants in one city means each one's viewport scan walks roughly ten times the points it needs. It cannot be measured locally — one account holds 236 of 238 customers.
+
+  The fix is a composite `GiST (account_uuid, coordinates)`, which needs the `btree_gist` extension: available here (1.5) but **not installed**, so it is a migration that adds an extension plus an index, and installing an extension on the managed prod database is worth checking before promising it. Do not swap the existing index out — keep both until the plan is confirmed to use the composite. **Small lift, but gate it on a real measurement** (the honest trigger is a second tenant with real Damascus customer volume, at which point `Rows Removed by Filter` on that plan tells you directly).
+
+---
+
+## CI runs no tests at all (found 2026-07-30)
+
+- **No workflow in `.github/workflows/` invokes pytest.** `grep -rn pytest .github/workflows/` returns nothing: the pipelines build and push images and deploy, and that is all. So the backend suite is advisory — nothing stops a red suite from reaching production.
+
+  The consequence is already visible. The full suite on clean `origin/main` is **227 failed, 197 passed**, essentially all of it `tests/entrypoint/` (22 of the failures are customer routes). `tests/domains/` is comparatively healthy at 5 failures, all in `test_transaction_domain`, which is why work that only ran the domains subset never noticed. A suite that large and that broken cannot be used to answer "did I break something" — the only usable technique right now is to diff the failure SET against a clean `origin/main` worktree, which is what this branch did.
+
+  Two separable pieces of work, and the order matters. Adding a CI step first would simply paint the pipeline red forever, so: (1) triage `tests/entrypoint/` — decide per file whether it is repairable or should be deleted, since a test nobody can run is worse than no test; then (2) add a pytest step to the dev-build workflow and make it blocking. **Medium lift for the triage, small for the CI step.** Worth doing before the suite grows any further — every new test file added now inherits a harness nobody is checking.
+
+  Note the domains subset IS worth gating on immediately even before the triage: it is 5 known failures away from green and covers the money and trip logic.
+
+---
+
 ## Three roles cannot touch customer orders at all (found 2026-07-30)
 
 - **`driver`, `operator` and `operation_manager` have no `customer_order` grant whatsoever**, so both reading and creating orders 403 for them at the `before_request` chokepoint ([backend/app/__init__.py:156-171](backend/app/__init__.py#L156)) before the route body runs. Verified by evaluating the gate directly rather than by reading the presets:
