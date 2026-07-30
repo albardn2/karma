@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +17,7 @@ import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime } from '@/utils/date';
+import { findSaleOption, hasRevenueOrderAtStop } from '@/utils/tripStopOutcome';
 
 interface Field {
   name: string;
@@ -54,6 +55,7 @@ export default function StopDetailScreen() {
   const [exeStatus, setExeStatus] = useState<string | null>(null);
   const [balance, setBalance] = useState<Record<string, number> | null>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [stopHasSale, setStopHasSale] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -93,6 +95,11 @@ export default function StopDetailScreen() {
       setBalance(custRes.data?.balance_per_currency || {});
 
       const all: any[] = ordersRes.data?.orders || ordersRes.data?.customer_orders || [];
+      // Computed from the FULL list, never from the sliced recentOrders below:
+      // that slice is sorted unpaid/unfulfilled first and cut to five, and an
+      // order just created here is paid AND fulfilled, so it sorts last and gets
+      // cut away — for exactly the customers who order most often.
+      setStopHasSale(hasRevenueOrderAtStop(all, tripStopUuid));
       const attention = (o: any) => o.is_paid === false || o.is_fulfilled === false;
       setRecentOrders(
         [...all].sort((a, b) => {
@@ -109,6 +116,50 @@ export default function StopDetailScreen() {
   }, [taskUuid, customerUuid, refreshKey]);
 
   const setValue = (name: string, v: any) => setValues((p) => ({ ...p, [name]: v }));
+
+  // A stop where a revenue-bearing order was written up is a sale, so say so.
+  //
+  // This has to be its OWN effect. Putting it in the fetch effect's setValues
+  // initializer above would be dead code on the main flow: that initializer is
+  // skipped whenever `prev` is already populated, which it always is by the time
+  // the driver comes back from creating an order — so the outcome would stay on
+  // "Select…" after a sale, yet fill in correctly if they instead backed out to
+  // the trip list and re-entered. Broken one way and working the other reads as
+  // random flakiness, which is worse than not having the feature.
+  const completed = exeStatus === 'completed';
+  const outcomeField = fields.find((f) => f.type === 'select' && f.label === 'outcome');
+  const saleOption = findSaleOption(outcomeField?.options);
+  const lastAutoOutcome = useRef<string | null>(null);
+  useEffect(() => {
+    if (!outcomeField || !saleOption || !stopHasSale) return;
+    // A completed stop is a record; its fields are read-only and showing a value
+    // that differs from what was submitted would contradict the record.
+    if (completed) return;
+    // Key by the field's `name`, which for this field is NOT its label: the
+    // descriptor is name "outcome -  النتيجة" (two spaces after the dash — and
+    // stops created before that vintage carry a bare "outcome"), label "outcome".
+    // The dropdown reads values[f.name], so the label would write a phantom key
+    // and leave Complete blocked on a required field that looks filled in.
+    const key = outcomeField.name;
+    // Functional update because the fetch effect may have just replaced `values`
+    // in the same commit; the updater stays pure, so the ref write sits outside.
+    // Recording the suggestion unconditionally is safe: it is only ever compared
+    // against what is in the field, so a value the driver chose still fails the
+    // untouched test and survives.
+    setValues((prev) => {
+      const current = prev[key];
+      const untouched = !current || current === lastAutoOutcome.current;
+      if (!untouched || current === saleOption) return prev;
+      return { ...prev, [key]: saleOption };
+    });
+    lastAutoOutcome.current = saleOption;
+    // Deliberately NOT watching the outcome value itself. A driver who overrides
+    // the suggestion keeps their choice — a stop can carry an order and still
+    // honestly end in `interested:insufficient_funds` — and this screen re-runs
+    // its fetch on every focus and every pull-to-refresh, so re-suggesting on
+    // each pass would overwrite them repeatedly with no visible cause. Nothing
+    // here ever CLEARS the field either.
+  }, [outcomeField?.name, saleOption, stopHasSale, completed]);
   const toggleChecklist = (name: string, opt: string) =>
     setValues((p) => {
       const cur: string[] = p[name] || [];
@@ -143,8 +194,6 @@ export default function StopDetailScreen() {
       setSubmitting(false);
     }
   };
-
-  const completed = exeStatus === 'completed';
 
   const renderField = (f: Field) => {
     if (f.type === 'select') {

@@ -51,6 +51,7 @@ import { AddStopDialog } from "@/components/trips/AddStopDialog";
 import { CreateTripExpenseDialog } from "@/components/expenses/CreateTripExpenseDialog";
 import { CustomerRecentOrders } from "@/components/customer-orders/CustomerRecentOrders";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { findSaleOption, hasRevenueOrderAtStop } from "@/lib/tripStopOutcome";
 import { useToast } from "@/hooks/use-toast";
 import type { WorkflowExecution } from "@/types/workflowExecution";
 import type { TaskExecution, TaskExecutionPage, TaskExecutionComplete } from "@/types/taskExecution";
@@ -191,6 +192,18 @@ export default function WorkflowExecutionTaskDetail() {
         }
         case 'email':
           fieldSchema = z.string().email();
+          break;
+        case 'select':
+          // A required select has to actually hold something. Marking one
+          // `required` used to be decorative: the default value is '' and bare
+          // z.string() accepts it, so the form submitted and the backend took it
+          // (`outcome: str` accepts ""). The result is a stop whose outcome is
+          // the empty string — falsy in both clients, so it renders as "no
+          // outcome yet", never matches `ilike 'sale%'`, and drops silently out
+          // of every sale count. Two rows in the local database are already in
+          // that state. The outcome select is the only required select in the
+          // system, so this bites exactly there.
+          fieldSchema = field.required ? z.string().min(1) : z.string();
           break;
         case 'checklist':
           fieldSchema = z.array(z.string());
@@ -795,6 +808,56 @@ export default function WorkflowExecutionTaskDetail() {
     }
   };
   const orderContext = getTripStopOrderContext();
+
+  // A stop where a revenue-bearing order was written up is a sale, so say so.
+  //
+  // Shares its query key with the CustomerRecentOrders panel rendered below, so
+  // this is the same cache entry and the same single request — and it refetches
+  // on the ["/customer-order/"] invalidation CreateOrderDialog fires on success,
+  // which is how the suggestion appears the moment an order is created without
+  // anything having to poll.
+  const { data: stopOrdersPage } = useQuery<any>({
+    queryKey: ["/customer-order/", "recent", orderContext?.customerUuid],
+    queryFn: async () => apiRequest(`/customer-order/?customer_uuid=${orderContext?.customerUuid}&per_page=50`),
+    enabled: !!orderContext?.customerUuid,
+  });
+  const outcomeField = taskInputFields.find((f: any) => f?.type === 'select' && f?.label === 'outcome');
+  const saleOption = findSaleOption(outcomeField?.options);
+  const stopHasSale = hasRevenueOrderAtStop(
+    stopOrdersPage?.orders || stopOrdersPage?.customer_orders,
+    orderContext?.tripStopUuid,
+  );
+  // Remembers the suggestion this effect made, keyed by task execution, so
+  // switching between stops cannot make one stop's suggestion look like the
+  // other's deliberate choice.
+  const lastAutoOutcome = useRef<{ exeUuid?: string; value: string } | null>(null);
+  useEffect(() => {
+    if (!outcomeField || !saleOption || !stopHasSale) return;
+    // A completed stop is a record, not a draft. The web still allows editing one
+    // (the submit button reads "update"), so without this an admin opening a past
+    // visit just to read it would have its outcome silently rewritten to sale.
+    if (selectedTaskExecution?.status === 'completed') return;
+    // The react-hook-form key is the field's `name`, which for this field is NOT
+    // its label: the descriptor is name "outcome -  النتيجة" (two spaces after the
+    // dash — and stops created before that vintage carry a bare "outcome"), label
+    // "outcome". Read it off the field rather than writing either one down.
+    const key = outcomeField.name;
+    const current = form.getValues(key as any);
+    const ours = lastAutoOutcome.current;
+    const untouched =
+      !current ||
+      (!!ours && ours.exeUuid === selectedTaskExecution?.uuid && current === ours.value);
+    if (!untouched) return;
+    if (current !== saleOption) {
+      form.setValue(key as any, saleOption as any, { shouldDirty: false });
+    }
+    lastAutoOutcome.current = { exeUuid: selectedTaskExecution?.uuid, value: saleOption };
+    // Deliberately NOT watching the outcome value itself — same reason as the trip
+    // name above. A driver who overrides the suggestion keeps their choice: a stop
+    // can carry an order and still honestly end in `interested:insufficient_funds`.
+    // And nothing here ever CLEARS the field — a later zero-revenue order must not
+    // wipe an outcome somebody already recorded.
+  }, [outcomeField?.name, saleOption, stopHasSale, selectedTaskExecution?.uuid, selectedTaskExecution?.status]);
 
   // manual-stops mode: when checked on the start_trip form, hide the routing
   // inputs. service_areas intentionally stays visible: manual trips also carry
