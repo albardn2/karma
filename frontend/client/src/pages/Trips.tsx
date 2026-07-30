@@ -330,9 +330,6 @@ export default function Trips() {
                     {t('trips.colName')}
                   </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    {t('trips.colTripId')}
-                  </th>
-                  <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     {t('trips.colVehicle')}
                   </th>
                   <th className="px-6 py-3 text-start text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -363,7 +360,7 @@ export default function Trips() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={isAdmin ? 11 : 10} className="px-6 py-16 text-center">
+                    <td colSpan={isAdmin ? 10 : 9} className="px-6 py-16 text-center">
                       <div className="animate-pulse space-y-4">
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-32 mx-auto"></div>
                         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-48 mx-auto"></div>
@@ -374,7 +371,7 @@ export default function Trips() {
                   </tr>
                 ) : trips.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdmin ? 11 : 10} className="px-6 py-16 text-center">
+                    <td colSpan={isAdmin ? 10 : 9} className="px-6 py-16 text-center">
                       <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                         {error ? t('trips.errorLoading') : t('trips.noTrips')}
@@ -422,12 +419,13 @@ export default function Trips() {
                           className="text-sm font-medium text-gray-900 dark:text-gray-100"
                           data-testid={`text-trip-name-${trip.uuid}`}
                         >
-                          {trip.name || '—'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                          {trip.uuid.substring(0, 8)}...
+                          {trip.name || (
+                            /* nothing identifies the row now that the uuid column
+                               is gone, so an unnamed trip shows its short uuid */
+                            <span className="font-mono text-gray-500">
+                              {trip.uuid.substring(0, 8)}…
+                            </span>
+                          )}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
