@@ -10,9 +10,10 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { LocationTrackingProvider } from '@/contexts/LocationTrackingContext';
+import { AccountUnverifiedNotice } from '@/components/AccountUnverifiedNotice';
 
 function NavigationContent() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, isVerified } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -34,6 +35,21 @@ function NavigationContent() {
         <ActivityIndicator size="large" />
       </View>
     );
+  }
+
+  // An unverified company gets the notice INSTEAD of the navigator.
+  //
+  // This has to sit at the root. There are only two layouts in the app, and the
+  // (tabs) group declares just `index` and `explore` — every module screen
+  // (customers, trips, distribution, …) is a sibling of (tabs) on this Stack, so
+  // a deep link like myapp://customers never passes through the tab layout. A
+  // gate anywhere below here would be bypassable by exactly the deep links this
+  // app is driven by.
+  //
+  // Rendering instead of redirecting also means no module screen ever mounts, so
+  // none of their fetch-on-mount effects fire against an API that would 403.
+  if (isAuthenticated && !isVerified) {
+    return <AccountUnverifiedNotice />;
   }
 
   return (

@@ -8,6 +8,15 @@ export const en: Record<string, string> = {
   'misc.customer': 'Customer',
   'misc.searchAdjust': 'Try adjusting your search terms',
 
+  // account pending verification: the only thing an unverified company sees
+  'misc.unverified.title': 'Account pending verification',
+  'misc.unverified.body': 'Your company account has not been verified yet, so the system is not available.',
+  'misc.unverified.contact': 'Please contact an administrator to have your account verified.',
+  'misc.unverified.company': 'Company',
+  'misc.unverified.signedInAs': 'Signed in as',
+  'misc.unverified.recheck': 'Check again',
+  'misc.unverified.signOut': 'Sign out',
+
   // login page
   'misc.login.failedTitle': 'Login Failed',
   'misc.login.networkErrorTitle': 'Network Error',
@@ -110,6 +119,9 @@ export const en: Record<string, string> = {
   'misc.accounts.manage': 'Manage',
   'misc.accounts.noneFound': 'No accounts found',
   'misc.accounts.loadError': 'Failed to load accounts',
+  'misc.accounts.verifyAccount': 'Verified',
+  'misc.accounts.verifyHint': 'Until this is on, the company can sign in but sees only a verification notice.',
+  'misc.accounts.pendingVerification': 'Pending verification',
   'misc.accounts.blockAccount': 'Block account',
   'misc.accounts.blockHint': 'Users of a blocked account cannot sign in.',
   'misc.accounts.blockConfirmTitle': 'Block this account?',
@@ -195,6 +207,15 @@ export const ar: Record<string, string> = {
   // shared across the legacy list pages
   'misc.customer': 'العميل',
   'misc.searchAdjust': 'حاول تعديل مصطلحات البحث',
+
+  // account pending verification: the only thing an unverified company sees
+  'misc.unverified.title': 'الحساب بانتظار التحقق',
+  'misc.unverified.body': 'لم يتم التحقق من حساب شركتك بعد، لذلك النظام غير متاح.',
+  'misc.unverified.contact': 'يرجى التواصل مع المسؤول للتحقق من حسابك.',
+  'misc.unverified.company': 'الشركة',
+  'misc.unverified.signedInAs': 'مسجّل الدخول كـ',
+  'misc.unverified.recheck': 'التحقق مرة أخرى',
+  'misc.unverified.signOut': 'تسجيل الخروج',
 
   // login page
   'misc.login.failedTitle': 'فشل تسجيل الدخول',
@@ -298,6 +319,9 @@ export const ar: Record<string, string> = {
   'misc.accounts.manage': 'إدارة',
   'misc.accounts.noneFound': 'لا توجد حسابات',
   'misc.accounts.loadError': 'تعذر تحميل الحسابات',
+  'misc.accounts.verifyAccount': 'موثّق',
+  'misc.accounts.verifyHint': 'حتى يتم تشغيل هذا، يمكن للشركة تسجيل الدخول لكنها ترى إشعار التحقق فقط.',
+  'misc.accounts.pendingVerification': 'بانتظار التحقق',
   'misc.accounts.blockAccount': 'حظر الحساب',
   'misc.accounts.blockHint': 'لا يمكن لمستخدمي الحساب المحظور تسجيل الدخول.',
   'misc.accounts.blockConfirmTitle': 'حظر هذا الحساب؟',

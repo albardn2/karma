@@ -35,6 +35,18 @@ from app.dto.auth import PermissionScope
 @auth_blueprint.route("/register", methods=["POST"])
 @scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def register():
+    # An unverified company must not be able to provision users. The `auth`
+    # blueprint is deliberately outside RESOURCE_SET so that login and /auth/me
+    # keep working while unverified, which means the chokepoint's verification
+    # gate does not cover this route — it has to say so itself. Without this, an
+    # unapproved signup could create unlimited users, which also feeds the
+    # per-user billing rate.
+    from flask import g
+    if not getattr(g, "account_verified", True):
+        return jsonify(
+            {"msg": "This account is pending verification",
+             "code": "account_unverified"}
+        ), 403
     payload = RegisterRequest(**request.json)
     # privilege-escalation guard: only the platform owner can create
     # superuser accounts
@@ -303,8 +315,18 @@ def me():
         if not user.is_superuser:
             account = uow.account_repository.find_one(uuid=user.account_uuid)
             dto["account_permissions"] = account.permissions if account else None
+            # Both clients render a verification notice instead of the app when
+            # this is false. It has to ride on /auth/me because that is the only
+            # thing an unverified user can still call — every resource blueprint
+            # 403s them, by design.
+            dto["account_verified"] = bool(account.is_verified) if account else False
+            # so the verification notice can name the company it is about
+            dto["account_company_name"] = account.company_name if account else None
         else:
             dto["account_permissions"] = None
+            # the platform owner has no tenant to verify
+            dto["account_verified"] = True
+            dto["account_company_name"] = None
         # impersonation (platform owner operating inside a tenant): tell the
         # frontend which company so it can show a banner + exit control
         imp_account = get_jwt().get("imp_account_uuid")

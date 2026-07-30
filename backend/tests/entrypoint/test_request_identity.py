@@ -59,7 +59,7 @@ class _Uow:
         return self
 
     def first(self):
-        return (False, None)   # not blocked, no feature cap
+        return (False, None, True)   # not blocked, no feature cap, verified
 
 
 class _User:

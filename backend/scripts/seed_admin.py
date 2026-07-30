@@ -28,7 +28,13 @@ def main() -> None:
 
         account = uow.account_repository.find_first(company_name=COMPANY, is_deleted=False)
         if not account:
-            account = Account(company_name=COMPANY, email=EMAIL)
+            # Explicitly verified: the column defaults to false so that real
+            # SIGNUPS are gated, but a seeded development tenant must work out of
+            # the box. Leaving it default would fail in a way that hides itself —
+            # the seeded user is superuser+admin and therefore exempt, so whoever
+            # ran the seed sees a working app, while every non-superuser they
+            # create afterwards gets 403 on every resource endpoint.
+            account = Account(company_name=COMPANY, email=EMAIL, is_verified=True)
             uow.account_repository.save(model=account, commit=False)
             print(f"[seed] created account {COMPANY!r}")
 
