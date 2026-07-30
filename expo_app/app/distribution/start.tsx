@@ -92,10 +92,11 @@ export default function StartTripScreen() {
       lastSuggestedName.current = suggestion;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    // values.trip_name is in the deps so clearing the field brings the
-    // suggestion back; it cannot loop, since a field already equal to the
-    // suggestion is left alone.
-  }, [fields, values.assigned_user_uuid, JSON.stringify(values.service_areas), values.trip_name]);
+    // Deliberately NOT watching values.trip_name. Doing so re-filled the field
+    // the instant it went empty, so clearing the suggestion to type your own name
+    // meant fighting it from the first keystroke. Changing a selection still
+    // brings a suggestion back.
+  }, [fields, values.assigned_user_uuid, JSON.stringify(values.service_areas)]);
 
   // load the workflow + its setup form fields
   useEffect(() => {

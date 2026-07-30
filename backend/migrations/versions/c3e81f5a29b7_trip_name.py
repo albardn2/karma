@@ -43,7 +43,10 @@ depends_on = None
 # of the task result; `label` is what the clients render (both prettify it).
 TRIP_NAME_FIELD = {
     "name": "trip_name",
-    "label": "trip name",
+    # label == name, as every other descriptor in this JSON does: the clients
+    # prettify it for English and look it up in ENUM_AR for Arabic, so the label
+    # has to be the key those dictionaries hold
+    "label": "trip_name",
     "type": "text",
     "required": False,
     "placeholder": "Optional — defaults to today's date",
@@ -80,8 +83,21 @@ def upgrade():
             continue
         inputs = dict(task_inputs or {})
         fields = list(inputs.get("fields") or [])
-        # idempotent: never add the field twice if this is re-run
-        if any((f or {}).get("name") == TRIP_NAME_FIELD["name"] for f in fields):
+        # Idempotent, and self-healing. The guard keys off `name`, so a database
+        # that took an earlier version of this migration with a different `label`
+        # would be skipped and left with the wrong descriptor — and `label` is the
+        # key the WEB posts results under (WorkflowExecutionTaskDetail.tsx does
+        # result[field.label]), so a wrong one makes StartTripOperatorSchema, which
+        # forbids extras, reject every start-trip submission. Repair it instead.
+        existing = next((f for f in fields if (f or {}).get("name") == TRIP_NAME_FIELD["name"]), None)
+        if existing is not None:
+            if existing.get("label") != TRIP_NAME_FIELD["label"]:
+                fields = [dict(TRIP_NAME_FIELD) if f is existing else f for f in fields]
+                inputs["fields"] = fields
+                conn.execute(
+                    sa.text("UPDATE task SET task_inputs = CAST(:inputs AS jsonb) WHERE uuid = :uuid"),
+                    {"inputs": json.dumps(inputs), "uuid": task_uuid},
+                )
             continue
         # first, so it reads as the heading of the form rather than an afterthought
         inputs["fields"] = [TRIP_NAME_FIELD] + fields

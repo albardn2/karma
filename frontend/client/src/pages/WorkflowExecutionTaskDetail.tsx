@@ -277,7 +277,6 @@ export default function WorkflowExecutionTaskDetail() {
   const lastSuggestedName = useRef<string | null>(null);
   const watchedAssignee = form.watch('assigned_user_uuid' as any);
   const watchedRegions = form.watch('service_areas' as any);
-  const watchedTripName = form.watch('trip_name' as any);
   useEffect(() => {
     if (!hasTripNameField) return;
     const suggestion = deriveTripName(
@@ -290,10 +289,12 @@ export default function WorkflowExecutionTaskDetail() {
       form.setValue('trip_name' as any, suggestion as any, { shouldDirty: false });
     }
     if (untouched) lastSuggestedName.current = suggestion;
-    // watching the name itself is what lets clearing the field bring the
-    // suggestion back. It cannot loop: once the field already equals the
-    // suggestion the write is skipped, so it settles after one pass.
-  }, [hasTripNameField, watchedAssignee, JSON.stringify(watchedRegions), watchedTripName]);
+    // Deliberately NOT watching the name itself. Doing so re-filled the box the
+    // instant it went empty, so anyone who cleared the suggestion to type their
+    // own was fighting it from the first keystroke. Clearing now leaves it empty;
+    // changing a selection brings a suggestion back, which is the same escape
+    // hatch without the fight.
+  }, [hasTripNameField, watchedAssignee, JSON.stringify(watchedRegions)]);
 
   // Task execution completion mutation
   const completeTaskMutation = useMutation({

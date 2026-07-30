@@ -133,6 +133,18 @@ These are the rest, in rough order of how much they mislead someone:
 
 ---
 
+## From the trip-name change (2026-07-30)
+
+- **The web posts task results keyed by `field.label`, the app by `field.name`.** [WorkflowExecutionTaskDetail.tsx:307](frontend/client/src/pages/WorkflowExecutionTaskDetail.tsx#L307) does `result[field.label] = data[field.name]` and reads existing values back the same way at :233, while [expo start.tsx](expo_app/app/distribution/start.tsx) keys strictly by `f.name`. Since every operator schema is `extra="forbid"`, a form descriptor whose label differs from its name breaks **the web only**, tenant-wide, while the app keeps working — which is what a label of `"trip name"` did to this change before review caught it. `app/dto/task.py:99-117` also enriches options by `f.label`. Two clients disagreeing about the wire key is the actual defect; the label==name convention is a workaround that everyone has to remember. Fix is to make the web post by `name` like the app, which needs a migration of every stored `result` whose keys are labels. **Medium lift, and worth doing before the next form field is added.**
+
+- **The execution list's Name column and its Name filter no longer mean the same thing.** The column now shows the trip's name ([WorkflowExecutionDetail.tsx](frontend/client/src/pages/WorkflowExecutionDetail.tsx)), but the filter still searches `WorkflowExecution.name`, the workflow *template* name, via `ilike` in [workflow_execution/routes.py](backend/app/entrypoint/routes/workflow_execution/routes.py). So filtering by what you can see does not work. Fix needs the filter to search the joined trip name. **Small lift.**
+
+- **`_trip_name_for` touches the lazy `trips` relationship once per row** of the paginated execution list, so it is an N+1 on a page of 20. It rides alongside existing per-row work and the page is small, so it is a latency item to watch rather than a bug. Fix is a `selectinload` on the list query. **Small lift.**
+
+- **The app's execution card lost the start time** when the name replaced `Trip · {date}` ([expo distribution.tsx](expo_app/app/distribution.tsx)). Two runs on the same day now read identically unless their names differ — and the default name is only the date, so same-day runs collide by default. Worth adding the time as a subtitle. **Small lift.**
+
+---
+
 ## Testing
 
 - **The backend test suite is ~92% red and nothing runs it.** As of 2026-07-27: `pytest` gives **234 failed, 20 passed**. Two independent causes, both long-standing: (1) every route test calls `client.put(...)` with no `Authorization` header and gets 401 — those files were last touched 2025-04-23, `jwt_required` arrived on the routes 2025-06-21, and `conftest.py` has an unused `admin_token` fixture sitting right there; (2) `tests/domains/test_transaction_domain.py` constructs `TransactionCreate(amount=…, currency=…, exchange_rate=…)`, a DTO shape that no longer exists (it is `from_amount` / `from_currency` / `usd_to_syp_exchange_rate`, and the model is `extra="forbid"`), so every case dies in validation. No workflow runs pytest, so none of this is visible in CI. **Medium lift** to repair (mostly mechanical: inject the token fixture, update the DTO calls), and until then the suite provides zero protection on a codebase that moves money. Verified the rot predates the transaction-bug PR (#60): the parent commit's DTO already had the current field names.

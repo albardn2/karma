@@ -328,6 +328,14 @@ export default function TripsScreen() {
             </View>
           </View>
         </View>
+        {/* the name takes the headline, so the van still needs a line of its own
+            or the card no longer says which vehicle ran the trip */}
+        {!!item.name && (
+          <View style={styles.cardRow}>
+            <ThemedText style={styles.metaLabel}>{t('trips.vehicle')}</ThemedText>
+            <ThemedText style={styles.metaValue}>{item.vehicle_plate || '—'}</ThemedText>
+          </View>
+        )}
         <View style={styles.cardRow}>
           <ThemedText style={styles.metaLabel}>{t('trips.assigned')}</ThemedText>
           <ThemedText style={styles.metaValue}>{item.assigned_username || '—'}</ThemedText>

@@ -73,7 +73,6 @@ export default function TripDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotes, setEditedNotes] = useState("");
   const [editedName, setEditedName] = useState("");
-  const [savingName, setSavingName] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { user, isAdmin } = useAuth();
@@ -180,6 +179,21 @@ export default function TripDetail() {
   useEffect(() => {
     setEditedName(trip?.name || "");
   }, [trip?.uuid, trip?.name]);
+
+  const saveNameMutation = useMutation({
+    mutationFn: async (name: string | null) =>
+      await apiRequest(`/trip/${params?.uuid}`, { method: "PUT", body: { name } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/trip/"] });
+      toast({ title: t("common.success"), description: t("trips.updatedSuccess") });
+    },
+    onError: (error: any) =>
+      toast({
+        title: t("common.error"),
+        description: error?.message || t("trips.failedUpdate"),
+        variant: "destructive",
+      }),
+  });
 
   const updateTripMutation = useMutation({
     mutationFn: async (data: { notes?: string; name?: string | null }) => {
@@ -477,17 +491,17 @@ export default function TripDetail() {
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={savingName || editedName === (trip.name || "")}
+                    disabled={saveNameMutation.isPending || editedName === (trip.name || "")}
                     onClick={() => {
-                      setSavingName(true);
-                      updateTripMutation.mutate(
-                        { name: editedName.trim() || null },
-                        { onSettled: () => setSavingName(false) }
-                      );
+                      // its own request, not updateTripMutation: that one's
+                      // onSuccess calls setIsEditing(false), which would slam the
+                      // notes editor shut (and lose an unsaved note) just because
+                      // the name was saved
+                      saveNameMutation.mutate(editedName.trim() || null);
                     }}
                     data-testid="button-save-trip-name"
                   >
-                    {savingName ? t('common.saving') : t('common.save')}
+                    {saveNameMutation.isPending ? t('common.saving') : t('common.save')}
                   </Button>
                 </div>
               </div>
