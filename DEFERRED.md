@@ -133,6 +133,24 @@ These are the rest, in rough order of how much they mislead someone:
 
 ---
 
+## Three roles cannot touch customer orders at all (found 2026-07-30)
+
+- **`driver`, `operator` and `operation_manager` have no `customer_order` grant whatsoever**, so both reading and creating orders 403 for them at the `before_request` chokepoint ([backend/app/__init__.py:156-171](backend/app/__init__.py#L156)) before the route body runs. Verified by evaluating the gate directly rather than by reading the presets:
+
+  ```
+  driver             GET=False POST=False grant=None
+  operator           GET=False POST=False grant=None
+  operation_manager  GET=False POST=False grant=None
+  sales              GET=True  POST=True  grant=['create','read','update']
+  accountant         GET=True  POST=False grant=['read']
+  ```
+
+  This looks like an oversight rather than a policy: `driver` already holds `invoice: [create,read,update]`, `customer_order_item: [create,read]` and `payment: [create,read,update]` — every *part* of an order except the order itself, and the parts cannot be created without the parent. The practical effect is that **a driver cannot complete a sale in the app**: `POST /customer-order/with-items-and-invoice/checkout` lives on the `customer_order` blueprint, so it maps to action `create` and is denied. The recent-orders panel on the stop screen is likewise always empty for them, and the new sale auto-populate is a permanent silent no-op — it degrades quietly (no crash, no toast, `hasRevenueOrderAtStop([])` is just false), which is why it is recorded here rather than treated as a bug in that feature.
+
+  Needs a product/security call, not a mechanical fix: grant `customer_order: [create, read]` to `driver` (and decide about the other two), or establish that trip users are always given `sales`. Until then the whole selling flow at a stop only works for admins and `sales`. **Small lift once decided** — one entry in `role_presets.json` plus a parity check that the preset still matches what the routes need.
+
+---
+
 ## From the trip-name change (2026-07-30)
 
 - **The web posts task results keyed by `field.label`, the app by `field.name`.** [WorkflowExecutionTaskDetail.tsx:307](frontend/client/src/pages/WorkflowExecutionTaskDetail.tsx#L307) does `result[field.label] = data[field.name]` and reads existing values back the same way at :233, while [expo start.tsx](expo_app/app/distribution/start.tsx) keys strictly by `f.name`. Since every operator schema is `extra="forbid"`, a form descriptor whose label differs from its name breaks **the web only**, tenant-wide, while the app keeps working — which is what a label of `"trip name"` did to this change before review caught it. `app/dto/task.py:99-117` also enriches options by `f.label`. Two clients disagreeing about the wire key is the actual defect; the label==name convention is a workaround that everyone has to remember. Fix is to make the web post by `name` like the app, which needs a migration of every stored `result` whose keys are labels. **Medium lift, and worth doing before the next form field is added.**
