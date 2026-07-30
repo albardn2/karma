@@ -72,6 +72,12 @@ def upgrade():
     conn = op.get_bind()
     for row in _start_trip_tasks(conn):
         task_uuid, task_inputs = row[0], row[1]
+        # 6 task rows in the local database hold a JSON scalar rather than an
+        # object; none are start-trip today, but a scalar here would raise inside
+        # dict() and take the whole migration — and the deploy brings the stack
+        # down to migrate. Skip anything that is not an object instead.
+        if task_inputs is not None and not isinstance(task_inputs, dict):
+            continue
         inputs = dict(task_inputs or {})
         fields = list(inputs.get("fields") or [])
         # idempotent: never add the field twice if this is re-run
@@ -89,6 +95,8 @@ def downgrade():
     conn = op.get_bind()
     for row in _start_trip_tasks(conn):
         task_uuid, task_inputs = row[0], row[1]
+        if task_inputs is not None and not isinstance(task_inputs, dict):
+            continue
         inputs = dict(task_inputs or {})
         fields = [f for f in (inputs.get("fields") or [])
                   if (f or {}).get("name") != TRIP_NAME_FIELD["name"]]
