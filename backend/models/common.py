@@ -25,7 +25,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 from sqlalchemy import UniqueConstraint, Index, text
 from models.base import Base
 
@@ -109,9 +109,25 @@ class AccountLedgerEntry(Base):
     period_start = Column(Date, nullable=True)
     period_end = Column(Date, nullable=True)
     notes = Column(Text, nullable=True)
+    # Which charge this PAYMENT settles. Null on a charge or an adjustment (a CHECK
+    # enforces that), and null on a payment received on account but not yet applied
+    # to a period. Several partial payments may point at one charge; a single payment
+    # settles a single charge, exactly as payment.invoice_uuid works on the customer
+    # side — a company paying three months records three payments.
+    settles_charge_uuid = Column(
+        String(36), ForeignKey('account_ledger_entry.uuid'), nullable=True, index=True
+    )
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     is_deleted = Column(Boolean, default=False)
+
+    # payments pointing at this charge; `remote_side` because the FK is on this
+    # same table and SQLAlchemy cannot otherwise tell which end is which
+    settling_payments = relationship(
+        "AccountLedgerEntry",
+        backref=backref("settled_charge", remote_side=[uuid]),
+        foreign_keys=[settles_charge_uuid],
+    )
 
 
 class User(Base):

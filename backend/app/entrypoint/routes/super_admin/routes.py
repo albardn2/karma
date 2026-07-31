@@ -20,6 +20,7 @@ from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.errors import BadRequestError, NotFoundError
 from app.entrypoint.routes.super_admin import super_admin_blueprint
 from models.common import (
+    MONEY_TOLERANCE,
     Account as AccountModel,
     AccountLedgerEntry as LedgerModel,
     User as UserModel,
@@ -125,17 +126,77 @@ def list_ledger(account_uuid: str):
             page=page,
             per_page=per_page,
         )
+        # Settlement state for the charges on this page, in one grouped query rather
+        # than one per row.
+        paid = billing.paid_amounts(
+            uow, [e.uuid for e in pagination.items if e.entry_type == "charge"]
+        )
+        # Which period each payment settled, so a payment row can say "August"
+        # instead of leaving the reader to follow a uuid.
+        settled_uuids = [
+            e.settles_charge_uuid for e in pagination.items if e.settles_charge_uuid
+        ]
+        settled_periods = dict(
+            uow.session.query(LedgerModel.uuid, LedgerModel.period)
+            .filter(LedgerModel.uuid.in_(settled_uuids))
+            .all()
+        ) if settled_uuids else {}
+
+        entries = []
+        for e in pagination.items:
+            dto = LedgerEntryRead.from_orm(e).model_dump(mode="json")
+            if e.entry_type == "charge":
+                got = paid.get(e.uuid, 0.0)
+                dto["paid_amount"] = round(got, 2)
+                dto["outstanding"] = round(billing.outstanding(e, got), 2)
+                dto["is_paid"] = billing.is_paid(e, got)
+            elif e.settles_charge_uuid:
+                dto["settles_period"] = settled_periods.get(e.settles_charge_uuid)
+            entries.append(dto)
+
         result = {
-            "entries": [
-                LedgerEntryRead.from_orm(e).model_dump(mode="json")
-                for e in pagination.items
-            ],
+            "entries": entries,
             "balances": _balances(uow, account_uuid),
             "total_count": pagination.total,
             "page": pagination.page,
             "per_page": pagination.per_page,
             "total_pages": pagination.pages,
         }
+    return jsonify(result), 200
+
+
+@super_admin_blueprint.route("/accounts/<string:account_uuid>/unpaid-charges",
+                             methods=["GET"])
+@scopes_required(SUPER)
+def list_unpaid_charges(account_uuid: str):
+    """The charges a payment can be applied to, oldest first.
+
+    Not paginated, deliberately: the list is bounded by how many months an account
+    has gone unpaid, and a picker that hides the oldest debt behind a second page is
+    a picker that gets the wrong charge chosen.
+    """
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        _account_or_404(uow, account_uuid)
+        rows = billing.unpaid_charges(uow, account_uuid)
+        result = {
+            "charges": [
+                {
+                    "uuid": charge.uuid,
+                    "period": charge.period,
+                    "period_start": charge.period_start.isoformat() if charge.period_start else None,
+                    "period_end": charge.period_end.isoformat() if charge.period_end else None,
+                    "amount": round(abs(charge.amount), 2),
+                    "outstanding": round(left, 2),
+                    "currency": charge.currency,
+                }
+                for charge, left in rows
+            ],
+            "total_outstanding": {},
+        }
+        for charge, left in rows:
+            result["total_outstanding"][charge.currency] = round(
+                result["total_outstanding"].get(charge.currency, 0.0) + left, 2
+            )
     return jsonify(result), 200
 
 
@@ -180,6 +241,35 @@ def create_ledger_entry(account_uuid: str):
                 period_start, period_end = nxt, billing.add_months(nxt, 1)
         elif payload.entry_type == "payment":
             amount = abs(payload.amount)
+            if payload.settles_charge_uuid:
+                charge = uow.session.query(LedgerModel).filter(
+                    LedgerModel.uuid == payload.settles_charge_uuid,
+                    LedgerModel.account_uuid == account.uuid,
+                    LedgerModel.entry_type == "charge",
+                    LedgerModel.is_deleted.is_(False),
+                ).one_or_none()
+                # Scoped to THIS account on purpose: without the account_uuid filter
+                # a payment could be pointed at another tenant's charge and settle
+                # someone else's debt.
+                if charge is None:
+                    raise BadRequestError(
+                        "settles_charge_uuid is not an open charge on this account"
+                    )
+                if charge.currency != currency:
+                    raise BadRequestError(
+                        f"payment is {currency} but that charge is {charge.currency}"
+                    )
+                already = billing.paid_amounts(uow, [charge.uuid]).get(charge.uuid, 0.0)
+                left = billing.outstanding(charge, already)
+                # Rejected rather than silently absorbed: an overpayment aimed at one
+                # month is almost always a typo, and if it is not, the money belongs
+                # on the account as an unallocated payment where it can be applied
+                # deliberately.
+                if amount - left > MONEY_TOLERANCE:
+                    raise BadRequestError(
+                        f"that charge only has {left:.2f} {currency} outstanding; "
+                        f"record the rest as a payment with no charge selected"
+                    )
         else:  # adjustment — signed as given
             amount = payload.amount
 
@@ -193,6 +283,9 @@ def create_ledger_entry(account_uuid: str):
             period_start=period_start,
             period_end=period_end,
             notes=payload.notes or auto_note,
+            settles_charge_uuid=(
+                payload.settles_charge_uuid if payload.entry_type == "payment" else None
+            ),
             created_by_uuid=get_jwt_identity(),
         )
         uow.account_ledger_repository.save(model=entry, commit=False)

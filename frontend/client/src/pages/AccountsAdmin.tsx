@@ -70,6 +70,27 @@ interface LedgerEntry {
   period: string | null;
   notes: string | null;
   created_at: string;
+  settles_charge_uuid?: string | null;
+  // derived by the ledger route for charges, and for payments that settled one
+  paid_amount?: number | null;
+  outstanding?: number | null;
+  is_paid?: boolean | null;
+  settles_period?: string | null;
+}
+
+interface UnpaidCharge {
+  uuid: string;
+  period: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  amount: number;
+  outstanding: number;
+  currency: string;
+}
+
+interface UnpaidChargesPage {
+  charges: UnpaidCharge[];
+  total_outstanding: Record<string, number>;
 }
 
 interface LedgerPage {
@@ -80,6 +101,10 @@ interface LedgerPage {
   per_page: number;
   total_pages: number;
 }
+
+// shadcn's Select rejects "" as an item value, so an explicit sentinel stands for
+// "received on account, not applied to any month".
+const ON_ACCOUNT = "__on_account__";
 
 const entryBadgeVariant = (type: LedgerEntryType): "default" | "secondary" | "outline" =>
   type === "payment" ? "default" : type === "charge" ? "secondary" : "outline";
@@ -134,6 +159,8 @@ export function AccountsPanel() {
   const [entryPeriod, setEntryPeriod] = useState("");
   const [entryNotes, setEntryNotes] = useState("");
   const [ledgerPage, setLedgerPage] = useState(1);
+  // which unpaid charge a payment settles; "" means received on account
+  const [entrySettlesCharge, setEntrySettlesCharge] = useState<string>("");
 
   // /auth/me returns snake_case; the typed camelCase field is never populated
   const permissionScope: string =
@@ -152,6 +179,16 @@ export function AccountsPanel() {
   const { data: accountDetail } = useQuery<SuperAccount>({
     queryKey: [`/super-admin/accounts/${selectedUuid}`],
     enabled: isSuperuser && !!selectedUuid,
+  });
+
+  const { data: unpaidData } = useQuery<UnpaidChargesPage>({
+    // Key deliberately prefixed "/super-admin/accounts" so invalidateAccounts'
+    // predicate catches it — otherwise the picker would keep offering a charge that
+    // was just paid.
+    queryKey: ["/super-admin/accounts", selectedUuid, "unpaid-charges"],
+    queryFn: async () =>
+      await apiRequest(`/super-admin/accounts/${selectedUuid}/unpaid-charges`),
+    enabled: !!selectedUuid,
   });
 
   const { data: ledgerData } = useQuery<LedgerPage>({
@@ -236,6 +273,7 @@ export function AccountsPanel() {
     onSuccess: () => {
       invalidateAccounts();
       setEntryAmount("");
+      setEntrySettlesCharge("");
       setEntryPeriod("");
       setEntryNotes("");
       setLedgerPage(1);
@@ -288,6 +326,7 @@ export function AccountsPanel() {
     setEntryCurrency(account.subscription_currency ?? "");
     setEntryPeriod("");
     setEntryNotes("");
+    setEntrySettlesCharge("");
     setLedgerPage(1);
     setBlockConfirmOpen(false);
   };
@@ -297,6 +336,9 @@ export function AccountsPanel() {
     if (entryAmount.trim() !== "") body.amount = Number(entryAmount);
     if (entryCurrency) body.currency = entryCurrency;
     if (entryType === "charge" && entryPeriod) body.period = entryPeriod;
+    if (entryType === "payment" && entrySettlesCharge && entrySettlesCharge !== ON_ACCOUNT) {
+      body.settles_charge_uuid = entrySettlesCharge;
+    }
     if (entryNotes.trim()) body.notes = entryNotes.trim();
     addEntryMutation.mutate(body);
   };
@@ -708,7 +750,38 @@ export function AccountsPanel() {
                                     {formatCurrency(entry.amount, entry.currency)}
                                   </TableCell>
                                   <TableCell className="text-gray-600">
-                                    {entry.period ?? "—"}
+                                    {entry.entry_type === "charge" ? (
+                                      <div className="flex items-center gap-2">
+                                        <span>{entry.period ?? "—"}</span>
+                                        {entry.is_paid ? (
+                                          <Badge
+                                            variant="outline"
+                                            className="border-green-300 bg-green-50 text-green-700"
+                                            data-testid={`charge-paid-${entry.uuid}`}
+                                          >
+                                            {t("misc.accounts.paid")}
+                                          </Badge>
+                                        ) : (
+                                          <Badge
+                                            variant="outline"
+                                            className="border-amber-300 bg-amber-50 text-amber-700"
+                                            data-testid={`charge-outstanding-${entry.uuid}`}
+                                          >
+                                            {formatCurrency(
+                                              entry.outstanding ?? 0,
+                                              entry.currency,
+                                            )}{" "}
+                                            {t("misc.accounts.outstanding")}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    ) : entry.settles_period ? (
+                                      <span className="text-xs">
+                                        {t("misc.accounts.settled")} {entry.settles_period}
+                                      </span>
+                                    ) : (
+                                      (entry.period ?? "—")
+                                    )}
                                   </TableCell>
                                   <TableCell className="text-gray-600 max-w-[12rem] truncate">
                                     {entry.notes ?? "—"}
@@ -815,6 +888,46 @@ export function AccountsPanel() {
                               value={entryPeriod}
                               onChange={(e) => setEntryPeriod(e.target.value)}
                             />
+                          </div>
+                        )}
+                        {entryType === "payment" && (
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label>{t("misc.accounts.settlesCharge")}</Label>
+                            <Select
+                              value={entrySettlesCharge}
+                              onValueChange={(value) => {
+                                setEntrySettlesCharge(value);
+                                // Prefill with what is actually left on that month, so
+                                // the common case is one click and the amount cannot
+                                // silently overpay.
+                                const picked = unpaidData?.charges.find((c) => c.uuid === value);
+                                if (picked) {
+                                  setEntryAmount(String(picked.outstanding));
+                                  setEntryCurrency(picked.currency);
+                                }
+                              }}
+                            >
+                              <SelectTrigger data-testid="ledger-settles-charge">
+                                <SelectValue placeholder={t("misc.accounts.onAccount")} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={ON_ACCOUNT}>
+                                  {t("misc.accounts.onAccount")}
+                                </SelectItem>
+                                {(unpaidData?.charges ?? []).map((charge) => (
+                                  <SelectItem key={charge.uuid} value={charge.uuid}>
+                                    {charge.period ?? "—"} ·{" "}
+                                    {formatCurrency(charge.outstanding, charge.currency)}{" "}
+                                    {t("misc.accounts.outstanding")}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {!unpaidData?.charges.length && (
+                              <p className="text-xs text-gray-500">
+                                {t("misc.accounts.noUnpaidCharges")}
+                              </p>
+                            )}
                           </div>
                         )}
                         <div className="space-y-2 sm:col-span-2">

@@ -26,6 +26,7 @@ from typing import NamedTuple, Optional
 from sqlalchemy import func
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+from models.common import MONEY_TOLERANCE
 from models.common import Account as AccountModel
 from models.common import AccountLedgerEntry as LedgerModel
 from models.common import User as UserModel
@@ -219,3 +220,84 @@ def billable_accounts(uow: SqlAlchemyUnitOfWork) -> list[AccountModel]:
         .order_by(AccountModel.created_at.asc())
         .all()
     )
+
+
+# --------------------------------------------------------------------------
+# settlement: which charges are paid
+# --------------------------------------------------------------------------
+#
+# A charge is paid when the payments pointing at it cover it. Derived rather than
+# stored, for the same reason `Invoice.is_paid` is derived on the customer side: a
+# stored flag and the rows it summarises drift apart the first time a payment is
+# soft-deleted, and then the ledger disagrees with itself.
+
+
+def paid_amounts(uow: SqlAlchemyUnitOfWork, charge_uuids: list[str]) -> dict[str, float]:
+    """How much has been paid against each of these charges.
+
+    One grouped query for the whole page rather than one per row — the ledger view
+    asks this for every charge it renders.
+    """
+    if not charge_uuids:
+        return {}
+    rows = (
+        uow.session.query(
+            LedgerModel.settles_charge_uuid,
+            func.coalesce(func.sum(LedgerModel.amount), 0),
+        )
+        .filter(
+            LedgerModel.settles_charge_uuid.in_(charge_uuids),
+            LedgerModel.entry_type == "payment",
+            LedgerModel.is_deleted.is_(False),
+        )
+        .group_by(LedgerModel.settles_charge_uuid)
+        .all()
+    )
+    return {uuid_: float(total or 0) for uuid_, total in rows}
+
+
+def outstanding(charge: LedgerModel, paid: float) -> float:
+    """What is still owed on a charge.
+
+    Never negative: an overpayment is a credit on the ACCOUNT, not a negative debt
+    on one month, and letting it go below zero would make a single generous payment
+    appear to reduce what other months owe.
+    """
+    return max(0.0, abs(charge.amount) - paid)
+
+
+def is_paid(charge: LedgerModel, paid: float) -> bool:
+    """Settled to within half a cent.
+
+    The same bar the invoice and payment code uses, for the same reason: every money
+    column here is DOUBLE PRECISION, so a charge settled in instalments does not land
+    bit-exactly on zero, and an exact comparison would leave it forever "not quite
+    paid" over dust the UI rounds away.
+    """
+    return outstanding(charge, paid) <= MONEY_TOLERANCE
+
+
+def unpaid_charges(uow: SqlAlchemyUnitOfWork,
+                   account_uuid: str) -> list[tuple[LedgerModel, float]]:
+    """Charges with something still owed, oldest first — the list a payment picks
+    from. Oldest first because that is the order anyone settling a debt works in.
+
+    Returns (charge, outstanding) pairs so no caller has to recompute the arithmetic
+    and get it slightly different.
+    """
+    charges = (
+        uow.session.query(LedgerModel)
+        .filter(
+            LedgerModel.account_uuid == account_uuid,
+            LedgerModel.entry_type == "charge",
+            LedgerModel.is_deleted.is_(False),
+        )
+        .order_by(LedgerModel.period_start.asc())
+        .all()
+    )
+    paid = paid_amounts(uow, [c.uuid for c in charges])
+    return [
+        (c, outstanding(c, paid.get(c.uuid, 0.0)))
+        for c in charges
+        if not is_paid(c, paid.get(c.uuid, 0.0))
+    ]
