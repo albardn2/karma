@@ -31,7 +31,8 @@ import {
   Play,
   Car,
   Truck,
-  Landmark
+  Landmark,
+  Settings,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -72,6 +73,17 @@ const navigation = [
   { key: "nav.workflowExecution", href: "/workflow-execution", icon: Play },
   // adminOnly entries are filtered out for non-admin users below
   { key: "nav.liveMap", href: "/live-map", icon: MapPin, adminOnly: true },
+  // alwaysVisible: NOT subject to the tenant feature cap. A company must always be
+  // able to see what it is being charged — capping that would hide a customer's own
+  // invoices from them. adminOnly because a subscription cost is not operational
+  // data a driver needs.
+  {
+    key: "nav.accountSettings",
+    href: "/account-settings",
+    icon: Settings,
+    adminOnly: true,
+    alwaysVisible: true,
+  },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
@@ -100,6 +112,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const visibleNavigation = navigation.filter((item: any) => {
     if (item.superOnly && !isSuperuser) return false;
     if (item.adminOnly && !isAdmin) return false;
+    // Checked BEFORE the module gate: the cap binds admins too, so an entry whose
+    // module id is absent from a capped account's list would otherwise vanish for
+    // everyone in that account.
+    if (item.alwaysVisible) return true;
     if (grantedModules) {
       const moduleId = item.href === '/' ? 'dashboard' : item.href.slice(1);
       return grantedModules.includes(moduleId);

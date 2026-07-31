@@ -80,6 +80,7 @@ import WorkflowCreate from "@/pages/WorkflowCreate";
 import WorkflowExecution from "@/pages/WorkflowExecution";
 import WorkflowExecutionDetail from "@/pages/WorkflowExecutionDetail";
 import WorkflowExecutionTaskDetail from "@/pages/WorkflowExecutionTaskDetail";
+import AccountSettings from "@/pages/AccountSettings";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import SuperAdmin from "@/pages/SuperAdmin";
@@ -101,6 +102,7 @@ function HomeRoute() {
 function Router() {
   return (
     <Switch>
+      <Route path="/account-settings" component={() => <ProtectedRoute><AccountSettings /></ProtectedRoute>} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
       <Route path="/" component={HomeRoute} />
