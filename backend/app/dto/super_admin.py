@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, List
 
 import pydantic
@@ -42,6 +42,9 @@ class LedgerEntryCreate(BaseModel):
     currency: Optional[str] = Field(None, max_length=10)
     period: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}$")
     notes: Optional[str] = None
+    # For a payment: the charge it settles, chosen from the account's unpaid list.
+    # Left out for a payment received on account and not yet applied to a period.
+    settles_charge_uuid: Optional[str] = None
 
     @pydantic.model_validator(mode="after")
     def validate_entry(cls, values):
@@ -51,6 +54,10 @@ class LedgerEntryCreate(BaseModel):
             raise ValueError("amount is required for payments and adjustments")
         if values.entry_type == "payment" and values.amount is not None and values.amount <= 0:
             raise ValueError("payment amount must be positive")
+        # Only a payment settles a charge. The database enforces this too, but a 422
+        # naming the field is a better answer than a 500 from a CHECK violation.
+        if values.entry_type != "payment" and values.settles_charge_uuid:
+            raise ValueError("only a payment can settle a charge")
         return values
 
 
@@ -62,6 +69,18 @@ class LedgerEntryRead(BaseModel):
     amount: float
     currency: str
     period: Optional[str]
+    # the window a charge covers; null on payments and adjustments
+    period_start: Optional[date] = None
+    period_end: Optional[date] = None
+    # the charge a payment settles; null on charges, adjustments and
+    # payments received on account but not yet applied
+    settles_charge_uuid: Optional[str] = None
+    # derived by the ledger route, not columns: a charge's settlement state, and the
+    # period a payment settled so the row can name it instead of showing a uuid
+    paid_amount: Optional[float] = None
+    outstanding: Optional[float] = None
+    is_paid: Optional[bool] = None
+    settles_period: Optional[str] = None
     notes: Optional[str]
     created_by_uuid: Optional[str]
     created_at: datetime
@@ -77,6 +96,8 @@ class AccountRead(BaseModel):
     is_deleted: bool
     is_blocked: bool
     is_verified: bool
+    # when the account was admitted; also its billing anchor
+    verified_at: Optional[datetime] = None
     subscription_rate: Optional[float]
     subscription_currency: Optional[str]
     subscription_type: Optional[str] = 'flat'

@@ -150,6 +150,28 @@ These are the rest, in rough order of how much they mislead someone:
 
 ---
 
+## The daily job has no heartbeat (found 2026-07-31)
+
+- **If `daily-tasks` stops running, nothing says so.** It logs to stdout where `docker compose logs daily-tasks` finds it, and that is the whole of the observability. There is no alerting anywhere in this stack, so a container that crash-loops or a `restart: always` that quietly gave up would be discovered whenever somebody next looked at the ledger — potentially weeks of unbilled subscriptions.
+
+  Two things partly cover it today, both accidental rather than designed. A missing exchange rate is visible: `SELECT count(*) FROM exchange_rate WHERE rate_date = CURRENT_DATE` is 0 if the job did not run, and the transaction form would start showing a stale rate. And an unbilled account eventually shows up as `MAX(period_end)` falling behind, which is queryable:
+
+  ```sql
+  SELECT a.company_name, MAX(l.period_end) AS covered_until
+    FROM account a LEFT JOIN account_ledger_entry l
+      ON l.account_uuid = a.uuid AND l.entry_type = 'charge' AND NOT l.is_deleted
+   WHERE a.is_deleted IS NOT TRUE AND a.is_verified
+     AND a.subscription_rate IS NOT NULL
+   GROUP BY a.company_name
+  HAVING MAX(l.period_end) IS NULL OR MAX(l.period_end) <= CURRENT_DATE;
+  ```
+
+  Neither is a heartbeat — both require someone to ask. The cheap fix is a `platform_setting` row (the table already exists) stamped with the last successful run per task, surfaced in the super-admin console next to the accounts list, so a stale timestamp is visible without anyone running SQL. **Small lift.** The trigger is the first month where billing matters financially.
+
+- **Only 1 of 6 accounts currently has a subscription rate set**, so the job charges almost nothing until rates are configured per account in the super-admin console. That is correct behaviour — an account with no rate cannot be billed and is skipped with a WARNING rather than guessed at — but it means "the cron is working" and "invoices are being raised" are different statements right now.
+
+---
+
 ## The location-ingest service honours no account-level gate (found 2026-07-30)
 
 - **`backend/location_ingest/` bypasses the HTTP chokepoint entirely, so neither `is_blocked` nor `is_verified` applies to it.** It consumes location pings off MQTT and writes them straight to Postgres; `__main__.py` checks only `is_deleted` and `track_location` on the user before committing a `LocationPing`. There is no reference to `is_blocked` or `is_verified` anywhere in that service.

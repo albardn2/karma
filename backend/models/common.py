@@ -25,7 +25,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 from sqlalchemy import UniqueConstraint, Index, text
 from models.base import Base
 
@@ -59,6 +59,12 @@ class Account(Base):
     # until a platform owner flips this. Existing accounts were grandfathered to
     # true by the migration that added it — see d5a17c93e8b4.
     is_verified = Column(Boolean, nullable=False, default=False, server_default=false())
+    # WHEN the account was admitted, and therefore the day of the month it is
+    # billed on — see app/domains/billing. Stamped the first time is_verified
+    # becomes true and never overwritten, because the whole monthly grid hangs off
+    # it: moving it would re-open periods already charged or skip ones that were
+    # not. Null while unverified, which is also never billed.
+    verified_at = Column(DateTime, nullable=True)
     subscription_rate = Column(Float, nullable=True)   # per month
     subscription_currency = Column(String(10), nullable=True)
     # 'flat' = rate per month; 'per_user' = rate x active users per month
@@ -93,10 +99,35 @@ class AccountLedgerEntry(Base):
     amount = Column(Float, nullable=False)           # signed
     currency = Column(String(10), nullable=False)
     period = Column(String(7), nullable=True)        # 'YYYY-MM' for charges
+    # The half-open window a CHARGE covers, [period_start, period_end). Monthly,
+    # anchored on the account's creation date — an account created on the 18th is
+    # billed 18th-to-18th — so these deliberately do not line up with calendar
+    # months. Null on payments and adjustments, which cover nothing. The daily job
+    # decides what to bill by comparing these against the account's own monthly
+    # grid, so a charge without them is invisible to it; see migration
+    # e7b41d20fa96, which backfilled the existing rows for exactly that reason.
+    period_start = Column(Date, nullable=True)
+    period_end = Column(Date, nullable=True)
     notes = Column(Text, nullable=True)
+    # Which charge this PAYMENT settles. Null on a charge or an adjustment (a CHECK
+    # enforces that), and null on a payment received on account but not yet applied
+    # to a period. Several partial payments may point at one charge; a single payment
+    # settles a single charge, exactly as payment.invoice_uuid works on the customer
+    # side — a company paying three months records three payments.
+    settles_charge_uuid = Column(
+        String(36), ForeignKey('account_ledger_entry.uuid'), nullable=True, index=True
+    )
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     is_deleted = Column(Boolean, default=False)
+
+    # payments pointing at this charge; `remote_side` because the FK is on this
+    # same table and SQLAlchemy cannot otherwise tell which end is which
+    settling_payments = relationship(
+        "AccountLedgerEntry",
+        backref=backref("settled_charge", remote_side=[uuid]),
+        foreign_keys=[settles_charge_uuid],
+    )
 
 
 class User(Base):

@@ -174,6 +174,26 @@ class ExchangeRateDomain:
         )
 
     @staticmethod
+    def store_quotes(
+        uow: SqlAlchemyUnitOfWork,
+        quotes,
+        created_by_uuid: Optional[str] = None,
+    ) -> ExchangeRatePullResult:
+        """Store quotes that the caller already fetched.
+
+        Exists for the daily job, which has to fetch from sp-today ONCE and then
+        write the result for every tenant — `exchange_rate.account_uuid` is NOT
+        NULL, so one market quote becomes one row per account. Calling
+        `pull_today` per account would fetch the identical data from a third party
+        once per tenant.
+
+        A public seam rather than the job reaching into `_ingest`, so the mapping
+        from quote to row (mid-rate, both market sides, the source label) stays in
+        one place.
+        """
+        return ExchangeRateDomain._ingest(uow, quotes, created_by_uuid)
+
+    @staticmethod
     def pull_today(
         uow: SqlAlchemyUnitOfWork,
         created_by_uuid: Optional[str] = None,
