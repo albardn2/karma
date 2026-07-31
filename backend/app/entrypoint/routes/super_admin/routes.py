@@ -157,16 +157,21 @@ def create_ledger_entry(account_uuid: str):
                 amount, auto_note = billing.charge_amount(uow, account, base=payload.amount)
             except ValueError as exc:
                 raise BadRequestError(f"amount is required ({exc})")
-            # A hand-raised charge still gets a coverage window, or it would be
-            # invisible to the daily job's MAX(period_end) and the account would be
-            # charged a second time. Bills forward from wherever cover ran out,
-            # exactly as the job does.
-            period_start, period_end = billing.next_period(
-                uow, account.uuid, billing.damascus_today()
-            ) or (
-                billing.damascus_today(),
-                billing.damascus_today() + timedelta(days=billing.PERIOD_DAYS),
-            )
+            # A hand-raised charge still gets a coverage window, or the daily job
+            # would not see it as covering anything and would bill the same month
+            # again. Takes the account's earliest UNBILLED monthly period, which is
+            # exactly what the job would have raised next; if nothing is outstanding
+            # it opens the next period on the grid, so an owner charging early stays
+            # on the same anniversary.
+            anchor = billing.billing_anchor(account)
+            today = billing.damascus_today()
+            outstanding = billing.missing_periods(uow, account.uuid, anchor, today)
+            if outstanding:
+                period_start, period_end = outstanding[0]
+            else:
+                covered = billing.existing_charge_windows(uow, account.uuid)
+                nxt = max((e for _, e in covered), default=today)
+                period_start, period_end = nxt, billing.add_months(nxt, 1)
         elif payload.entry_type == "payment":
             amount = abs(payload.amount)
         else:  # adjustment — signed as given

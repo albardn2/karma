@@ -76,44 +76,55 @@ def charge_due_subscriptions(today: Optional[date] = None) -> TaskResult:
                     {"k": f"subscription_charge:{account_uuid}"},
                 )
 
-                window = billing.next_period(uow, account_uuid, today)
-                if window is None:
-                    skipped_covered += 1
-                    continue
-
                 account = uow.session.query(AccountModel).filter(
                     AccountModel.uuid == account_uuid
                 ).one()
+
+                periods = billing.missing_periods(
+                    uow, account_uuid, billing.billing_anchor(account), today
+                )
+                if not periods:
+                    skipped_covered += 1
+                    continue
 
                 # Not an error, but it must be visible: an account with no rate can
                 # never be billed, and a silent skip would hide that forever.
                 if account.subscription_rate is None or not account.subscription_currency:
                     skipped_unconfigured += 1
                     log.warning(
-                        "billing: %s (%s) is due but has no subscription rate/currency"
-                        " — skipping", company_name, account_uuid,
+                        "billing: %s (%s) has %d unbilled period(s) but no "
+                        "subscription rate/currency — skipping",
+                        company_name, account_uuid, len(periods),
                     )
                     continue
 
-                period_start, period_end = window
-                entry = billing.create_charge(
-                    uow, account, period_start, period_end, created_by_uuid=None
-                )
+                # Every missing period in one transaction for this account: a
+                # backfill that half-applied would leave the ledger describing
+                # months that were never really billed.
+                written = []
+                for period_start, period_end in periods:
+                    entry = billing.create_charge(
+                        uow, account, period_start, period_end, created_by_uuid=None
+                    )
+                    written.append((period_start, period_end, entry.amount, entry.currency))
                 uow.commit()
-                # Read the values out BEFORE the session closes. The UnitOfWork's
-                # __exit__ closes the session, which detaches the instance, and
-                # touching a detached attribute raises — so logging these after the
-                # block reported every SUCCESSFUL charge as a failure. The money was
-                # right and the summary was wrong, which also meant the loop never
-                # marked the day done and re-swept every tick.
-                amount, currency = entry.amount, entry.currency
+                # Read the values out BEFORE the session closes: the UnitOfWork's
+                # __exit__ detaches the instances, and touching a detached attribute
+                # raises — which reported every successful charge as a failure.
+                rows = list(written)
 
-            charged += 1
-            log.info(
-                "billing: charged %s (%s) %.2f %s for %s..%s",
-                company_name, account_uuid, amount, currency,
-                period_start, period_end,
-            )
+            charged += len(rows)
+            if len(rows) > 1:
+                log.info(
+                    "billing: backfilled %d period(s) for %s (%s), %s..%s",
+                    len(rows), company_name, account_uuid, rows[0][0], rows[-1][1],
+                )
+            for period_start, period_end, amount, currency in rows:
+                log.info(
+                    "billing: charged %s (%s) %.2f %s for %s..%s",
+                    company_name, account_uuid, amount, currency,
+                    period_start, period_end,
+                )
         except Exception as exc:  # noqa: BLE001 — one account must not sink the sweep
             failed.append(f"{company_name}: {exc}")
             log.exception("billing: account %s failed", account_uuid)

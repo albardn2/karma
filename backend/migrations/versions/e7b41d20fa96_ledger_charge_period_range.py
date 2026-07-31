@@ -1,14 +1,15 @@
 """Give a subscription charge an explicit coverage window.
 
 `period` is a String(7) holding 'YYYY-MM'. That was enough while charges were
-raised by hand from the super-admin console, but a daily job that decides whether
-an account is already paid up has to ask "is there a charge covering the days
-ahead", and a month label cannot answer that for a ROLLING 30-day subscription —
-a company that signs up on the 28th should get 30 days, not three.
+raised by hand from the super-admin console, but a daily job has to ask which
+periods an account has and has not been billed for, and a month label cannot answer
+that: periods are anchored on the account's CREATION DATE, so an account created on
+the 18th is billed 18th-to-18th and its windows do not line up with calendar months
+at all.
 
 So charges gain a real half-open range, [period_start, period_end). `period` stays
-and keeps holding the start month, because the console displays it and nothing
-about this change should alter what an owner already reads.
+and keeps holding the month each period opens in, because the console displays it
+and nothing about this change should alter what an owner already reads.
 
 THE BACKFILL IS NOT COSMETIC. The daily job decides whether to bill from
 MAX(period_end) over an account's live charges, and SQL MAX ignores NULLs — so a
@@ -38,7 +39,12 @@ def upgrade():
     op.add_column('account_ledger_entry', sa.Column('period_start', sa.Date(), nullable=True))
     op.add_column('account_ledger_entry', sa.Column('period_end', sa.Date(), nullable=True))
 
-    # Existing charges get the window their 'YYYY-MM' label always meant. Guarded
+    # Existing charges get the window their 'YYYY-MM' label always meant: the
+    # calendar month, because that is what an operator typing into a month picker
+    # meant. Those windows will not sit on any account's anniversary grid, which is
+    # exactly why the job treats a period as covered when a charge OVERLAPS it
+    # rather than when one starts on the same day — otherwise these rows would be
+    # invisible and their months billed a second time. Guarded
     # on the label actually parsing: `period` is free-form text, so anything that
     # is not exactly YYYY-MM is left alone rather than crashing the deploy — the
     # stack is down while this runs.
