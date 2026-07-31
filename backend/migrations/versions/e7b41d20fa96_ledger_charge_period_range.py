@@ -63,15 +63,24 @@ def upgrade():
     # NULLs, so such a row would make its account read as never-billed exactly once
     # — one wrong money row, appearing silently, then self-healing. Better to stop
     # here and have someone fix the label by hand.
+    # Named, not just counted: this failure aborts the migrate job, and the deploy
+    # job `needs` it, so the stack stays DOWN until someone fixes the data. Printing
+    # the uuids and their bad labels turns that from a hunt into one UPDATE.
     leftover = op.get_bind().execute(sa.text(
-        "SELECT count(*) FROM account_ledger_entry "
-        "WHERE entry_type = 'charge' AND period_end IS NULL"
-    )).scalar()
+        "SELECT uuid, account_uuid, period FROM account_ledger_entry "
+        "WHERE entry_type = 'charge' AND period_end IS NULL "
+        "ORDER BY created_at LIMIT 50"
+    )).fetchall()
     if leftover:
+        rows = "\n".join(
+            f"    uuid={r[0]} account={r[1]} period={r[2]!r}" for r in leftover
+        )
         raise RuntimeError(
-            f"{leftover} charge row(s) still have no period_end: their `period` is "
-            f"not a YYYY-MM label. Fix them by hand — left as NULL, the daily job "
-            f"bills those accounts a second time."
+            f"{len(leftover)} charge row(s) have no period_end because their `period` "
+            f"is not a YYYY-MM label:\n{rows}\n"
+            f"Left NULL these are invisible to the daily job, which would bill those "
+            f"accounts a second time. Fix the labels (or set period_start/period_end "
+            f"directly) and re-run the deploy."
         )
 
     # The lookup the daily job makes for every account, every day.
