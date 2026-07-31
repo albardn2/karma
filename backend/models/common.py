@@ -59,6 +59,12 @@ class Account(Base):
     # until a platform owner flips this. Existing accounts were grandfathered to
     # true by the migration that added it — see d5a17c93e8b4.
     is_verified = Column(Boolean, nullable=False, default=False, server_default=false())
+    # WHEN the account was admitted, and therefore the day of the month it is
+    # billed on — see app/domains/billing. Stamped the first time is_verified
+    # becomes true and never overwritten, because the whole monthly grid hangs off
+    # it: moving it would re-open periods already charged or skip ones that were
+    # not. Null while unverified, which is also never billed.
+    verified_at = Column(DateTime, nullable=True)
     subscription_rate = Column(Float, nullable=True)   # per month
     subscription_currency = Column(String(10), nullable=True)
     # 'flat' = rate per month; 'per_user' = rate x active users per month

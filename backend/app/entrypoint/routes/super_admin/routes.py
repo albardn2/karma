@@ -98,6 +98,12 @@ def update_account(account_uuid: str):
         account = _account_or_404(uow, account_uuid)
         for field, value in payload.model_dump(exclude_unset=True).items():
             setattr(account, field, value)
+        # Stamp the moment of admission, once. This is the billing anchor, so it is
+        # deliberately NOT refreshed on a later re-verification: the account's whole
+        # monthly grid hangs off it, and moving it would re-open periods that were
+        # already charged or skip ones that were not.
+        if account.is_verified and account.verified_at is None:
+            account.verified_at = datetime.utcnow()
         uow.account_repository.save(model=account, commit=False)
         result = _account_read(uow, account)
         uow.commit()

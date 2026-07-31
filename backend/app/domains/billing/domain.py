@@ -64,8 +64,19 @@ def add_months(anchor: date, months: int) -> date:
 
 
 def billing_anchor(account: AccountModel) -> date:
-    """The day of the month this account is billed on: the day it was created."""
-    return account.created_at.date()
+    """The day of the month this account is billed on: the day it was VERIFIED.
+
+    Not the day it was created. A company that signs up and then waits for approval
+    is refused every endpoint in the meantime, so billing it from creation would
+    charge it for months it was actively denied the product.
+
+    Falls back to `created_at` for accounts with no `verified_at` — everything that
+    predates the verification feature, which was grandfathered to verified precisely
+    because it was never gated, and whose honest admission date is its creation.
+    The fallback is also what keeps an account billable if the column is ever null
+    for a reason nobody anticipated, rather than silently exempting it.
+    """
+    return (account.verified_at or account.created_at).date()
 
 
 class ChargeAmount(NamedTuple):

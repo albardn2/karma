@@ -80,6 +80,8 @@ class AccountRead(BaseModel):
     is_deleted: bool
     is_blocked: bool
     is_verified: bool
+    # when the account was admitted; also its billing anchor
+    verified_at: Optional[datetime] = None
     subscription_rate: Optional[float]
     subscription_currency: Optional[str]
     subscription_type: Optional[str] = 'flat'

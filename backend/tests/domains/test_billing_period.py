@@ -222,6 +222,7 @@ class _Account:
     subscription_currency = "USD"
     subscription_type = "flat"
     created_at = datetime(2026, 1, 18, 9, 0, 0)
+    verified_at = datetime(2026, 3, 5, 14, 0, 0)
 
 
 class _CountingSession:
@@ -243,8 +244,39 @@ class _CountingUow:
         self.session = _CountingSession(user_count)
 
 
-def test_the_anchor_is_the_accounts_creation_day():
-    assert billing.billing_anchor(_Account()) == date(2026, 1, 18)
+def test_the_anchor_is_the_day_the_account_was_verified():
+    """Not the day it was created. A company waiting for approval is refused every
+    endpoint, so billing it from creation charges it for months it was denied the
+    product."""
+    assert billing.billing_anchor(_Account()) == date(2026, 3, 5)
+
+
+def test_the_anchor_falls_back_to_creation_when_never_stamped():
+    """Everything predating the verification feature: grandfathered to verified
+    precisely because it was never gated, so its admission date IS its creation.
+    The fallback also keeps an account billable if the column is somehow null,
+    rather than silently exempting it from billing forever."""
+    account = _Account()
+    account.verified_at = None
+    assert billing.billing_anchor(account) == date(2026, 1, 18)
+
+
+def test_a_company_is_not_billed_for_the_months_it_waited_for_approval():
+    """The whole reason the anchor moved. Signed up in January, approved in June:
+    it owes from June, not from January."""
+    account = _Account()
+    account.created_at = datetime(2026, 1, 10, 9, 0)
+    account.verified_at = datetime(2026, 6, 20, 14, 0)
+    anchor = billing.billing_anchor(account)
+
+    billed = missing(anchor, date(2026, 7, 31))
+    assert billed[0][0] == date(2026, 6, 20), "must start at verification"
+    assert len(billed) == 2
+
+    from_creation = missing(account.created_at.date(), date(2026, 7, 31))
+    assert len(from_creation) == 7, (
+        "the premise: anchoring on creation would have billed five extra months"
+    )
 
 
 def test_a_flat_charge_is_the_rate_negated():
