@@ -93,6 +93,14 @@ class AccountLedgerEntry(Base):
     amount = Column(Float, nullable=False)           # signed
     currency = Column(String(10), nullable=False)
     period = Column(String(7), nullable=True)        # 'YYYY-MM' for charges
+    # The half-open window a CHARGE covers, [period_start, period_end). Rolling
+    # 30 days rather than a calendar month, so a company signing up on the 28th
+    # gets thirty days of service. Null on payments and adjustments, which cover
+    # nothing. The daily job decides whether to bill from MAX(period_end), so a
+    # charge without these is invisible to it — see migration e7b41d20fa96, which
+    # backfilled the existing rows for exactly that reason.
+    period_start = Column(Date, nullable=True)
+    period_end = Column(Date, nullable=True)
     notes = Column(Text, nullable=True)
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

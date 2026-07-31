@@ -15,6 +15,7 @@ from app.dto.super_admin import (
     LedgerEntryCreate,
     LedgerEntryRead,
 )
+from app.domains.billing import domain as billing
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.errors import BadRequestError, NotFoundError
 from app.entrypoint.routes.super_admin import super_admin_blueprint
@@ -146,28 +147,28 @@ def create_ledger_entry(account_uuid: str):
             )
 
         auto_note = None
-        if payload.entry_type == "payment":
+        period_start = period_end = None
+        if payload.entry_type == "charge":
+            # The amount arithmetic lives in the billing domain so that this route
+            # and the daily job cannot drift apart — a charge computed two slightly
+            # different ways is the kind of bug nobody notices until a customer
+            # disputes it. See app/domains/billing/domain.py.
+            try:
+                amount, auto_note = billing.charge_amount(uow, account, base=payload.amount)
+            except ValueError as exc:
+                raise BadRequestError(f"amount is required ({exc})")
+            # A hand-raised charge still gets a coverage window, or it would be
+            # invisible to the daily job's MAX(period_end) and the account would be
+            # charged a second time. Bills forward from wherever cover ran out,
+            # exactly as the job does.
+            period_start, period_end = billing.next_period(
+                uow, account.uuid, billing.damascus_today()
+            ) or (
+                billing.damascus_today(),
+                billing.damascus_today() + timedelta(days=billing.PERIOD_DAYS),
+            )
+        elif payload.entry_type == "payment":
             amount = abs(payload.amount)
-        elif payload.entry_type == "charge":
-            base = payload.amount
-            if base is None:
-                if account.subscription_rate is None:
-                    raise BadRequestError(
-                        "amount is required (the account has no subscription rate set)"
-                    )
-                base = account.subscription_rate
-                if (account.subscription_type or "flat") == "per_user":
-                    user_count = (
-                        uow.session.query(func.count(UserModel.uuid))
-                        .filter(
-                            UserModel.account_uuid == account.uuid,
-                            UserModel.is_deleted.is_(False),
-                        )
-                        .scalar()
-                    )
-                    base = account.subscription_rate * user_count
-                    auto_note = f"{user_count} users x {account.subscription_rate}"
-            amount = -abs(base)
         else:  # adjustment — signed as given
             amount = payload.amount
 
@@ -177,7 +178,9 @@ def create_ledger_entry(account_uuid: str):
             amount=amount,
             currency=currency,
             period=payload.period
-            or (datetime.utcnow().strftime("%Y-%m") if payload.entry_type == "charge" else None),
+            or (period_start.strftime("%Y-%m") if period_start else None),
+            period_start=period_start,
+            period_end=period_end,
             notes=payload.notes or auto_note,
             created_by_uuid=get_jwt_identity(),
         )

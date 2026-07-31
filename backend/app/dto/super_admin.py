@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, List
 
 import pydantic
@@ -62,6 +62,9 @@ class LedgerEntryRead(BaseModel):
     amount: float
     currency: str
     period: Optional[str]
+    # the window a charge covers; null on payments and adjustments
+    period_start: Optional[date] = None
+    period_end: Optional[date] = None
     notes: Optional[str]
     created_by_uuid: Optional[str]
     created_at: datetime

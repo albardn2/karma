@@ -71,6 +71,22 @@ services:
     networks:
       - proxy
 
+  # Runs the daily platform jobs: subscription charges and the USD->SYP rate.
+  # Same image as the API with a different entrypoint, exactly like location-ingest.
+  # One long-lived process that sleeps until 02:00 Damascus; both tasks are
+  # idempotent, so `restart: always` re-running a day is harmless.
+  daily-tasks:
+    image: ghcr.io/albardn2/karma-backend:latest-prod
+    restart: always
+    depends_on:
+      - db
+    entrypoint: ["python", "-m", "daily_tasks"]
+    environment:
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+      KARMA_ENV: prod
+    networks:
+      - proxy
+
   nginx-proxy:
     image: jwilder/nginx-proxy
     restart: always
