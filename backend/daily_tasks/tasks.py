@@ -100,11 +100,18 @@ def charge_due_subscriptions(today: Optional[date] = None) -> TaskResult:
                     uow, account, period_start, period_end, created_by_uuid=None
                 )
                 uow.commit()
+                # Read the values out BEFORE the session closes. The UnitOfWork's
+                # __exit__ closes the session, which detaches the instance, and
+                # touching a detached attribute raises — so logging these after the
+                # block reported every SUCCESSFUL charge as a failure. The money was
+                # right and the summary was wrong, which also meant the loop never
+                # marked the day done and re-swept every tick.
+                amount, currency = entry.amount, entry.currency
 
             charged += 1
             log.info(
                 "billing: charged %s (%s) %.2f %s for %s..%s",
-                company_name, account_uuid, entry.amount, entry.currency,
+                company_name, account_uuid, amount, currency,
                 period_start, period_end,
             )
         except Exception as exc:  # noqa: BLE001 — one account must not sink the sweep
