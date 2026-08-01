@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, apiCall, setOnAuthFailure } from '@/utils/api';
+import { API_BASE_URL, apiCall, setOnAuthFailure, setOnPermsChanged } from '@/utils/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -28,8 +29,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(false);
       setUser(null);
     });
+    // An admin changed this user's role, permissions or the company's feature cap.
+    // Re-read the profile so the menu stops offering what they can no longer use —
+    // previously this only happened on a cold start, which on a phone that is never
+    // force-quit could be weeks.
+    setOnPermsChanged(() => {
+      refreshProfile();
+    });
     checkAuthStatus();
-    return () => setOnAuthFailure(null);
+
+    // The header only arrives on a response, so it needs traffic — and a user
+    // sitting on the menu generates none. Resuming the app is the moment that
+    // matters in practice: the change was made while the phone was in a pocket,
+    // and this is when they look at it again.
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshProfile();
+    });
+
+    return () => {
+      setOnAuthFailure(null);
+      setOnPermsChanged(null);
+      appStateSub.remove();
+    };
   }, []);
 
   const clearAuthData = async () => {
@@ -73,6 +94,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(false);
       setUser(null);
       return false;
+    }
+  };
+
+  /**
+   * Re-read the profile WITHOUT risking the session.
+   *
+   * fetchUserInfo signs the user out on any non-200, which is right at startup —
+   * a bad token must not leave a half-signed-in app — and wrong for an
+   * opportunistic refresh: resuming in a tunnel with no signal would log the user
+   * out over a network blip. This applies a newer profile when one arrives and
+   * otherwise changes nothing.
+   *
+   * A genuinely dead session still ends: apiCall's 401 path refreshes the token
+   * and, if that is rejected, fires onAuthFailure — the existing machinery.
+   */
+  const refreshProfile = async () => {
+    try {
+      const response = await apiCall('/auth/me');
+      if (response.status === 200 && response.data) {
+        await AsyncStorage.setItem('user_data', JSON.stringify(response.data));
+        setUser(response.data);
+      }
+    } catch (error) {
+      console.error('Profile refresh failed, session kept:', error);
     }
   };
 

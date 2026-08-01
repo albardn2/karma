@@ -301,6 +301,8 @@ def list_permissions():
 @auth_blueprint.route("/me", methods=["GET"])
 @jwt_required()
 def me():
+    from flask import g
+
     current_uuid = get_jwt_identity()
     with SqlAlchemyUnitOfWork() as uow:
         # self-lookup by verified JWT identity — unscoped so impersonation
@@ -334,6 +336,11 @@ def me():
             account = uow.account_repository.find_one(uuid=imp_account)
             dto["impersonating_account_uuid"] = imp_account
             dto["impersonating_company"] = account.company_name if account else None
+        # The baseline a client compares later responses against. Read from `g`
+        # rather than recomputed here so the body and the X-Perms-Version header
+        # can never disagree — computing it twice from two code paths is how a
+        # client ends up refreshing in a loop against a version it can never match.
+        dto["perms_version"] = getattr(g, "perms_version", None)
         return jsonify(dto), 200
 
 

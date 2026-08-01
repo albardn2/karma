@@ -19,8 +19,48 @@ export const setOnAuthFailure = (handler: (() => void) | null) => {
   onAuthFailure = handler;
 };
 
+export const PERMS_VERSION_HEADER = 'X-Perms-Version';
+
+// Registered by AuthContext so a permission change re-reads /auth/me.
+let onPermsChanged: (() => void) | null = null;
+export const setOnPermsChanged = (handler: (() => void) | null) => {
+  onPermsChanged = handler;
+};
+
+// The fingerprint the cached `user` object is consistent with. Deliberately not
+// persisted: on a cold start AuthContext re-reads /auth/me anyway, so the first
+// response of the session seeds this and there is nothing to go stale.
+let knownPermsVersion: string | null = null;
+
+/**
+ * Notice, from any response, that this user's permissions are no longer what the
+ * cached profile says.
+ *
+ * The server revokes on the next request; the app was the stale half, holding a
+ * menu built at mount until it was force-quit. Every response carries the current
+ * fingerprint, so ordinary traffic is the discovery channel — no poll, no push.
+ *
+ * The new version is adopted BEFORE the handler runs, which is what stops a loop:
+ * the /auth/me call the handler makes returns this same version, so it reads as a
+ * match instead of triggering another refresh, forever.
+ */
+const notePermsVersion = (response: Response) => {
+  const version = response.headers.get(PERMS_VERSION_HEADER);
+  if (!version) return;
+  if (knownPermsVersion === null) {
+    knownPermsVersion = version;
+    return;
+  }
+  if (version === knownPermsVersion) return;
+  knownPermsVersion = version;
+  onPermsChanged?.();
+};
+
 const clearStoredAuth = async () => {
   await AsyncStorage.multiRemove(['access_token', 'refresh_token', 'user_email', 'user_data']);
+  // so the next user to sign in on this device is not compared against the
+  // previous one's fingerprint
+  knownPermsVersion = null;
 };
 
 // 'ok' = new access token stored; 'rejected' = refresh token invalid/expired
@@ -76,7 +116,12 @@ const doFetch = async (endpoint: string, options: RequestInit): Promise<Response
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  return fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+  // checked here rather than in apiCall so it covers the retried request too,
+  // and every caller regardless of status: a 403 is the response most likely to
+  // be the first sign that permissions moved.
+  notePermsVersion(response);
+  return response;
 };
 
 export const apiCall = async <T = any>(

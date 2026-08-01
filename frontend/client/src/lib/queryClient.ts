@@ -1,6 +1,48 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { API_BASE_URL } from "./config";
 
+export const PERMS_VERSION_HEADER = "X-Perms-Version";
+
+// Registered by AuthContext so a permission change re-reads /auth/me.
+let onPermsChanged: (() => void) | null = null;
+export const setOnPermsChanged = (handler: (() => void) | null) => {
+  onPermsChanged = handler;
+};
+
+// The fingerprint the in-memory `user` object is consistent with.
+let knownPermsVersion: string | null = null;
+
+export const resetPermsVersion = () => {
+  knownPermsVersion = null;
+};
+
+/**
+ * Notice, from any response, that this user's permissions have changed.
+ *
+ * The sidebar is built from the profile fetched once at mount, so before this a
+ * revoked module stayed clickable for the whole life of the tab — and the save
+ * that revoked it happens in a DIFFERENT browser session, which no amount of
+ * react-query invalidation can reach.
+ *
+ * Requires the backend to name this header in `expose_headers`; a browser hides
+ * every non-safelisted response header from JS, so without that this reads null
+ * and silently does nothing.
+ *
+ * The new version is adopted BEFORE the handler runs, so the /auth/me request the
+ * handler makes is not itself a second trigger.
+ */
+export function notePermsVersion(res: Response) {
+  const version = res.headers.get(PERMS_VERSION_HEADER);
+  if (!version) return;
+  if (knownPermsVersion === null) {
+    knownPermsVersion = version;
+    return;
+  }
+  if (version === knownPermsVersion) return;
+  knownPermsVersion = version;
+  onPermsChanged?.();
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     if (res.status === 401) {
@@ -35,7 +77,9 @@ export async function apiRequest(
   });
   
   console.log(`API Response: ${res.status} ${res.statusText}`);
-  
+
+  notePermsVersion(res);
+
   if (res.status === 401) {
     localStorage.removeItem('auth_token');
     window.location.reload();
@@ -68,6 +112,8 @@ export const getQueryFn: <T>(options: {
       headers,
       mode: 'cors',
     });
+
+    notePermsVersion(res);
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;

@@ -112,3 +112,42 @@ def endpoint_allowed(permissions: dict, blueprint: str, method: str) -> bool:
         return False
     allowed = (permissions.get("endpoints") or {}).get(blueprint) or []
     return action in allowed
+
+
+def perms_version(scopes, user_acl, account_perms, account_verified) -> str:
+    """A short fingerprint of everything that governs what a client may see.
+
+    The server revokes access on the caller's very next request, because the
+    chokepoint re-reads their row every time. The CLIENTS were the stale half:
+    both fetch /auth/me exactly once per provider mount, so a menu built from a
+    revoked grant survived until the app was force-quit — on a phone that is
+    never force-quit, until the 14-day refresh token died.
+
+    This is the signal that closes that gap. It rides on every response as a
+    header; a client holding a different value knows to re-read /auth/me. Cheaper
+    than polling and it needs no push channel.
+
+    DERIVED, not stored, so there is no column to forget to bump and no migration:
+    it is a hash of the actual governing values, so it moves when — and only when —
+    one of them does. That covers a role change, a per-user checklist edit, a
+    tenant feature-cap change, a verification flip, AND a role_presets.json edit
+    shipped by a deploy, none of which have to know this function exists.
+
+    hashlib rather than hash(): the builtin is salted per process, so under
+    gunicorn's several workers every worker would report a different version for
+    the same user and clients would refresh on every other request forever.
+    """
+    import hashlib
+
+    payload = json.dumps(
+        {
+            "scopes": sorted(s for s in (scopes or []) if s),
+            "acl": user_acl,
+            "account": account_perms,
+            "verified": bool(account_verified),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
