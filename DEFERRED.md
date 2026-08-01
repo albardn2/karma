@@ -150,6 +150,20 @@ These are the rest, in rough order of how much they mislead someone:
 
 ---
 
+## 15 blueprints have routes any authenticated user can reach (found 2026-08-01)
+
+- **A route with no `scopes_required` is readable and writable by every role**, and the preset generator says so explicitly: `if required is None: allowed = True`. Enumerated from the live app, the blueprints with at least one such route are:
+
+  `customer`, `employee`, `expense`, `inventory_event`, `invoice`, `location`, `material`, `payment`, `process`, `purchase_order`, `quality_control`, `task_execution`, `vendor`, `workflow`, `workflow_execution`
+
+  `payment`, `invoice`, `expense` and `customer` are the ones that matter: a decorator omitted years ago is the reason every role — driver included — can read customer data and create payments. That is not a deliberate policy anyone wrote down; it is the default that applies when the decorator is absent.
+
+  It surfaced while adding `warehouse_keeper`, which is meant to touch stock and nothing else. Deriving its preset from decorators could not produce a narrow role, because the ungated routes grant everything regardless of which decorators name it. The workaround is `ROLE_OVERRIDES` in `scripts/gen_role_presets.py`: the preset is the runtime gate, so stating one outright genuinely restricts the role. That fixes the one role rather than the underlying default.
+
+  **The real fix is to make the absence of a decorator mean DENY rather than ALLOW** — invert that branch in the generator, then add explicit `scopes_required` to every route that legitimately needs broad access. **Medium lift**, and it must be done with the preset diff in hand: flipping the default silently narrows all five existing roles, so the change is only safe alongside a before/after comparison of every preset and a pass over the routes that lose access. Worth doing — the current state means "which roles can create a payment" has no answer anyone chose.
+
+---
+
 ## The daily job has no heartbeat (found 2026-07-31)
 
 - **If `daily-tasks` stops running, nothing says so.** It logs to stdout where `docker compose logs daily-tasks` finds it, and that is the whole of the observability. There is no alerting anywhere in this stack, so a container that crash-loops or a `restart: always` that quietly gave up would be discovered whenever somebody next looked at the ledger — potentially weeks of unbilled subscriptions.
