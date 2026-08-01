@@ -81,6 +81,8 @@ class LedgerEntryRead(BaseModel):
     outstanding: Optional[float] = None
     is_paid: Optional[bool] = None
     settles_period: Optional[str] = None
+    settles_period_start: Optional[date] = None
+    settles_period_end: Optional[date] = None
     notes: Optional[str]
     created_by_uuid: Optional[str]
     created_at: datetime

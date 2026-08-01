@@ -22,11 +22,26 @@ interface BillingEntry {
   period: string | null;
   notes: string | null;
   created_at: string;
+  period_start: string | null;
+  period_end: string | null;
   paid_amount?: number;
   outstanding?: number;
   is_paid?: boolean;
   settles_period?: string | null;
+  settles_period_start?: string | null;
+  settles_period_end?: string | null;
 }
+
+/**
+ * A charge's coverage window as "yyyy-mm-dd – yyyy-mm-dd".
+ *
+ * Printed straight from the ISO strings the API sends, never through `new Date()`:
+ * these are calendar facts with no time and no zone, and parsing them shifted the
+ * displayed day by one in any negative UTC offset. An en dash rather than an arrow
+ * so the range still reads correctly in a right-to-left layout.
+ */
+const periodRange = (start?: string | null, end?: string | null, fallback = "—") =>
+  start && end ? `${start} – ${end}` : fallback;
 
 interface BillingData {
   company_name: string;
@@ -243,8 +258,11 @@ export default function AccountSettings() {
                                 </TableCell>
                                 <TableCell className="text-gray-600">
                                   {entry.entry_type === "charge" ? (
-                                    <div className="flex items-center gap-2">
-                                      <span>{entry.period ?? "—"}</span>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="whitespace-nowrap">
+                                        {periodRange(entry.period_start, entry.period_end,
+                                                     entry.period ?? "—")}
+                                      </span>
                                       {entry.is_paid ? (
                                         <Badge
                                           variant="outline"
@@ -262,9 +280,12 @@ export default function AccountSettings() {
                                         </Badge>
                                       )}
                                     </div>
-                                  ) : entry.settles_period ? (
-                                    <span className="text-xs">
-                                      {t("accountSettings.settled")} {entry.settles_period}
+                                  ) : entry.settles_period || entry.settles_period_start ? (
+                                    <span className="text-xs whitespace-nowrap">
+                                      {t("accountSettings.settled")}{" "}
+                                      {periodRange(entry.settles_period_start,
+                                                   entry.settles_period_end,
+                                                   entry.settles_period ?? "—")}
                                     </span>
                                   ) : (
                                     (entry.period ?? "—")

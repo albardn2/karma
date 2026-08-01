@@ -63,13 +63,18 @@ def my_billing():
 
         charge_uuids = [e.uuid for e in entries if e.entry_type == "charge"]
         paid = billing.paid_amounts(uow, charge_uuids)
-        settled_periods = dict(
-            uow.session.query(LedgerModel.uuid, LedgerModel.period)
-            .filter(LedgerModel.uuid.in_(
+        # The settled charge's window, not just its month label: the period column
+        # shows real from/to dates, and a payment should name the same window as the
+        # charge it paid rather than a coarser version of it.
+        settled = {
+            row[0]: (row[1], row[2], row[3])
+            for row in uow.session.query(
+                LedgerModel.uuid, LedgerModel.period,
+                LedgerModel.period_start, LedgerModel.period_end,
+            ).filter(LedgerModel.uuid.in_(
                 [e.settles_charge_uuid for e in entries if e.settles_charge_uuid]
-            ))
-            .all()
-        ) if any(e.settles_charge_uuid for e in entries) else {}
+            )).all()
+        } if any(e.settles_charge_uuid for e in entries) else {}
 
         rows = []
         for e in entries:
@@ -90,7 +95,10 @@ def my_billing():
                 row["outstanding"] = round(billing.outstanding(e, got), 2)
                 row["is_paid"] = billing.is_paid(e, got)
             elif e.settles_charge_uuid:
-                row["settles_period"] = settled_periods.get(e.settles_charge_uuid)
+                label, start, end = settled.get(e.settles_charge_uuid, (None, None, None))
+                row["settles_period"] = label
+                row["settles_period_start"] = start.isoformat() if start else None
+                row["settles_period_end"] = end.isoformat() if end else None
             rows.append(row)
 
         balances = {

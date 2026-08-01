@@ -76,6 +76,10 @@ interface LedgerEntry {
   outstanding?: number | null;
   is_paid?: boolean | null;
   settles_period?: string | null;
+  settles_period_start?: string | null;
+  settles_period_end?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
 }
 
 interface UnpaidCharge {
@@ -105,6 +109,15 @@ interface LedgerPage {
 // shadcn's Select rejects "" as an item value, so an explicit sentinel stands for
 // "received on account, not applied to any month".
 const ON_ACCOUNT = "__on_account__";
+
+/**
+ * A charge's coverage window as "yyyy-mm-dd – yyyy-mm-dd", printed straight from the
+ * ISO strings rather than through `new Date()` — these are calendar facts with no
+ * zone, and parsing them shifts the day in a negative UTC offset. En dash rather
+ * than an arrow so the range reads correctly right-to-left too.
+ */
+const periodRange = (start?: string | null, end?: string | null, fallback = "—") =>
+  start && end ? `${start} – ${end}` : fallback;
 
 const entryBadgeVariant = (type: LedgerEntryType): "default" | "secondary" | "outline" =>
   type === "payment" ? "default" : type === "charge" ? "secondary" : "outline";
@@ -751,8 +764,11 @@ export function AccountsPanel() {
                                   </TableCell>
                                   <TableCell className="text-gray-600">
                                     {entry.entry_type === "charge" ? (
-                                      <div className="flex items-center gap-2">
-                                        <span>{entry.period ?? "—"}</span>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="whitespace-nowrap">
+                                          {periodRange(entry.period_start, entry.period_end,
+                                                       entry.period ?? "—")}
+                                        </span>
                                         {entry.is_paid ? (
                                           <Badge
                                             variant="outline"
@@ -775,9 +791,12 @@ export function AccountsPanel() {
                                           </Badge>
                                         )}
                                       </div>
-                                    ) : entry.settles_period ? (
-                                      <span className="text-xs">
-                                        {t("misc.accounts.settled")} {entry.settles_period}
+                                    ) : entry.settles_period || entry.settles_period_start ? (
+                                      <span className="text-xs whitespace-nowrap">
+                                        {t("misc.accounts.settled")}{" "}
+                                        {periodRange(entry.settles_period_start,
+                                                     entry.settles_period_end,
+                                                     entry.settles_period ?? "—")}
                                       </span>
                                     ) : (
                                       (entry.period ?? "—")
