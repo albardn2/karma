@@ -31,7 +31,9 @@ const ALL_MENU_ITEMS: MenuItem[] = [
 
 const LANGS: Lang[] = ['en', 'ar'];
 
-// Field crews only work the trip flow, so their menu shows Distribution alone.
+// Field crews only work the trip flow, so their menu is capped at Distribution — capped,
+// not fixed: it is still subject to the module filter below, so revoking Distribution
+// from a driver empties their menu rather than being quietly ignored.
 //
 // sales_associate is here because a sales associate IS field crew — the rep visiting
 // shops — and leaving it out would have handed them the full menu instead of the
@@ -63,14 +65,12 @@ export default function HomeScreen() {
       .filter(Boolean);
     const fieldOnly = scopes.length > 0 && scopes.every((s) => FIELD_ROLES.has(s));
     const isAdmin = scopes.includes('admin') || scopes.includes('superuser');
-    if (fieldOnly) return ALL_MENU_ITEMS.filter((i) => i.section === 'distribution');
 
-    // Beyond the field-crew shortcut, show only what this user's permissions will
-    // actually answer. The menu was role-name-driven alone, so a role whose preset
-    // denies a resource was still offered its tile: a warehouse keeper was shown
-    // Customers, and tapping it lands on a screen whose every request 403s. Operator
-    // and operation_manager were being offered Customer Orders on the same footing,
-    // which their presets also deny.
+    // Show only what this user's permissions will actually answer. The menu was
+    // role-name-driven alone, so a role whose preset denies a resource was still
+    // offered its tile: a warehouse keeper was shown Customers, and tapping it lands
+    // on a screen whose every request 403s. Operator and operation_manager were being
+    // offered Customer Orders on the same footing, which their presets also deny.
     //
     // Same rule as the web sidebar: the user's own grants intersected with the
     // account's feature cap, with null meaning unrestricted (admins, platform owner).
@@ -87,6 +87,12 @@ export default function HomeScreen() {
         : userModules ?? accountModules;
 
     return ALL_MENU_ITEMS.filter((i) => {
+      // Field crew work the trip flow alone. This narrows the menu, it does not widen
+      // it: an admin who revokes Distribution from a driver must actually lose the
+      // tile. Returning early here instead — as this did — made the field menu an
+      // override rather than an intersection, so a driver's menu was the one thing in
+      // the app the console could never change.
+      if (fieldOnly && i.section !== 'distribution') return false;
       if (i.adminOnly && !isAdmin) return false;
       return granted ? granted.includes(i.module) : true;
     });
