@@ -18,20 +18,34 @@ interface MenuItem {
   section: string;
   color: string;
   adminOnly?: boolean;
+  /** Menu-module id this tile needs, matching the ids in the backend's MODULES. */
+  module: string;
 }
 
 const ALL_MENU_ITEMS: MenuItem[] = [
-  { id: 1, titleKey: 'menu.customers', icon: '👥', section: 'customers', color: '#5469D4' },
-  { id: 2, titleKey: 'menu.customerOrders', icon: '📋', section: 'customer_orders', color: '#e74c3c' },
-  { id: 3, titleKey: 'menu.distribution', icon: '🚚', section: 'distribution', color: '#16a34a' },
-  { id: 4, titleKey: 'menu.trips', icon: '🗺️', section: 'trips', color: '#d97706', adminOnly: true },
+  { id: 1, titleKey: 'menu.customers', icon: '👥', section: 'customers', color: '#5469D4', module: 'customers' },
+  { id: 2, titleKey: 'menu.customerOrders', icon: '📋', section: 'customer_orders', color: '#e74c3c', module: 'customer-orders' },
+  { id: 3, titleKey: 'menu.distribution', icon: '🚚', section: 'distribution', color: '#16a34a', module: 'workflow-execution' },
+  { id: 4, titleKey: 'menu.trips', icon: '🗺️', section: 'trips', color: '#d97706', adminOnly: true, module: 'trips' },
 ];
 
 const LANGS: Lang[] = ['en', 'ar'];
 
-// field crews (sales/drivers with no other role) only work the trip flow —
-// their menu shows Distribution alone
-const FIELD_ROLES = new Set(['sales', 'driver']);
+// Field crews only work the trip flow, so their menu shows Distribution alone.
+//
+// sales_associate is here because a sales associate IS field crew — the rep visiting
+// shops — and leaving it out would have handed them the full menu instead of the
+// focused one `sales` gets.
+//
+// sales_manager is deliberately NOT here. A manager wants the wider menu, and that is
+// the one place the two new sales roles genuinely differ: their API permissions are
+// identical, their app menu is not.
+//
+// warehouse_keeper is not field crew either, and does not need to be listed: its
+// preset grants none of the modules below, so the module filter leaves it with an
+// empty menu — which is the honest answer, since the app is a distribution tool and
+// its permissions deny customers, orders and trips outright.
+const FIELD_ROLES = new Set(['sales', 'sales_associate', 'driver']);
 
 export default function HomeScreen() {
   const { user, logout } = useAuth();
@@ -50,8 +64,33 @@ export default function HomeScreen() {
     const fieldOnly = scopes.length > 0 && scopes.every((s) => FIELD_ROLES.has(s));
     const isAdmin = scopes.includes('admin') || scopes.includes('superuser');
     if (fieldOnly) return ALL_MENU_ITEMS.filter((i) => i.section === 'distribution');
-    return ALL_MENU_ITEMS.filter((i) => !i.adminOnly || isAdmin);
-  }, [user?.permission_scope]);
+
+    // Beyond the field-crew shortcut, show only what this user's permissions will
+    // actually answer. The menu was role-name-driven alone, so a role whose preset
+    // denies a resource was still offered its tile: a warehouse keeper was shown
+    // Customers, and tapping it lands on a screen whose every request 403s. Operator
+    // and operation_manager were being offered Customer Orders on the same footing,
+    // which their presets also deny.
+    //
+    // Same rule as the web sidebar: the user's own grants intersected with the
+    // account's feature cap, with null meaning unrestricted (admins, platform owner).
+    const userModules: string[] | null =
+      !isAdmin && Array.isArray(user?.effective_permissions?.modules)
+        ? user.effective_permissions.modules
+        : null;
+    const accountModules: string[] | null = Array.isArray(user?.account_permissions?.modules)
+      ? user.account_permissions.modules
+      : null;
+    const granted: string[] | null =
+      userModules && accountModules
+        ? userModules.filter((m: string) => accountModules.includes(m))
+        : userModules ?? accountModules;
+
+    return ALL_MENU_ITEMS.filter((i) => {
+      if (i.adminOnly && !isAdmin) return false;
+      return granted ? granted.includes(i.module) : true;
+    });
+  }, [user?.permission_scope, user?.effective_permissions, user?.account_permissions]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -104,6 +143,14 @@ export default function HomeScreen() {
               </View>
 
               <View style={styles.menuGrid}>
+                {/* A role whose permissions cover none of the tiles above — a
+                    warehouse keeper, say — would otherwise land on a blank screen
+                    with no way to tell a missing grant from a broken app. */}
+                {menuItems.length === 0 && (
+                  <ThemedText style={styles.emptyMenu} testID="menu-empty">
+                    {t('menu.nothingAvailable')}
+                  </ThemedText>
+                )}
                 {menuItems.map((item) => (
                   <TouchableOpacity
                     key={item.id}
@@ -199,6 +246,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+  },
+  emptyMenu: {
+    fontSize: 15,
+    opacity: 0.6,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    lineHeight: 22,
   },
   menuItem: {
     width: '47%',
