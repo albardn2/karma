@@ -167,6 +167,9 @@ export const en: Record<string, string> = {
   'enum.accountant': 'Accountant',
   'enum.operator': 'Operator',
   'enum.driver': 'Driver',
+  'enum.sales_associate': 'Sales Associate',
+  'enum.sales_manager': 'Sales Manager',  'enum.warehouse_keeper': 'Warehouse Keeper',
+
   'enum.sales': 'Sales',
   'users.adminFullAccess': 'Administrators have full access to everything — no checklist needed.',
   'users.savePermissions': 'Save Permissions',
@@ -356,6 +359,9 @@ export const ar: Record<string, string> = {
   'enum.accountant': 'محاسب',
   'enum.operator': 'مشغّل',
   'enum.driver': 'سائق',
+  'enum.sales_associate': 'مندوب مبيعات',
+  'enum.sales_manager': 'مدير مبيعات',  'enum.warehouse_keeper': 'أمين مستودع',
+
   'enum.sales': 'مبيعات',
   'users.adminFullAccess': 'لمديري النظام صلاحية كاملة على كل شيء — لا حاجة لقائمة صلاحيات.',
   'users.savePermissions': 'حفظ الصلاحيات',

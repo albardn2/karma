@@ -15,6 +15,14 @@ class PermissionScope(str, Enum):
     OPERATOR = "operator"
     DRIVER = "driver"
     SALES = "sales"
+    # Split out of the single SALES role. Both currently carry exactly SALES's
+    # grants — see ROLE_ALIASES in scripts/gen_role_presets.py — so the difference
+    # between them is a policy decision still to be made, not something the code
+    # already encodes.
+    SALES_ASSOCIATE = "sales_associate"
+    SALES_MANAGER = "sales_manager"
+    # أمين مستودع — stock only; see ROLE_OVERRIDES in scripts/gen_role_presets.py
+    WAREHOUSE_KEEPER = "warehouse_keeper"
 
 class UserPermissions(BaseModel):
     """Fine-grained ACL for a non-admin user: frontend menu modules plus

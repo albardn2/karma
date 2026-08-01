@@ -4,6 +4,19 @@ import { Lang } from './translations';
 // The RAW value keeps flowing to (and being compared against) the API —
 // only what the user sees changes.
 const ENUM_AR: Record<string, string> = {
+  // User roles. The app had none of these, so a role name rendered as its raw key
+  // in Arabic — the whole set is here rather than only the two being added, since
+  // the gap is the same for all of them.
+  superuser: 'مدير أعلى',
+  admin: 'مدير النظام',
+  operation_manager: 'مدير العمليات',
+  accountant: 'محاسب',
+  operator: 'مشغّل',
+  driver: 'سائق',
+  sales: 'مبيعات',
+  sales_associate: 'مندوب مبيعات',
+  sales_manager: 'مدير مبيعات',
+  warehouse_keeper: 'أمين مستودع',
   // customer categories (CustomerCategory)
   roastery: 'محمصة',
   restaurant: 'مطعم',
