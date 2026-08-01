@@ -136,11 +136,13 @@ def list_ledger(account_uuid: str):
         settled_uuids = [
             e.settles_charge_uuid for e in pagination.items if e.settles_charge_uuid
         ]
-        settled_periods = dict(
-            uow.session.query(LedgerModel.uuid, LedgerModel.period)
-            .filter(LedgerModel.uuid.in_(settled_uuids))
-            .all()
-        ) if settled_uuids else {}
+        settled_windows = {
+            row[0]: (row[1], row[2], row[3])
+            for row in uow.session.query(
+                LedgerModel.uuid, LedgerModel.period,
+                LedgerModel.period_start, LedgerModel.period_end,
+            ).filter(LedgerModel.uuid.in_(settled_uuids)).all()
+        } if settled_uuids else {}
 
         entries = []
         for e in pagination.items:
@@ -151,7 +153,12 @@ def list_ledger(account_uuid: str):
                 dto["outstanding"] = round(billing.outstanding(e, got), 2)
                 dto["is_paid"] = billing.is_paid(e, got)
             elif e.settles_charge_uuid:
-                dto["settles_period"] = settled_periods.get(e.settles_charge_uuid)
+                label, start, end = settled_windows.get(
+                    e.settles_charge_uuid, (None, None, None)
+                )
+                dto["settles_period"] = label
+                dto["settles_period_start"] = start.isoformat() if start else None
+                dto["settles_period_end"] = end.isoformat() if end else None
             entries.append(dto)
 
         result = {

@@ -33,6 +33,7 @@ from app.entrypoint.routes.credit_note import credit_note_item_blueprint
 from app.entrypoint.routes.process import process_blueprint
 from app.entrypoint.routes.process_template import process_template_blueprint
 from app.entrypoint.routes.dashboard import dashboard_blueprint
+from app.entrypoint.routes.account import account_blueprint
 from app.entrypoint.routes.super_admin import super_admin_blueprint
 from app.entrypoint.routes.auth import auth_blueprint
 from app.entrypoint.routes.workflow import workflow_blueprint
@@ -267,6 +268,9 @@ def create_app(config_object=Config):
     app.register_blueprint(process_template_blueprint, url_prefix='/process-template')
     app.register_blueprint(dashboard_blueprint, url_prefix='/dashboard')
     app.register_blueprint(super_admin_blueprint, url_prefix='/super-admin')
+    # a tenant looking at its own account; see the module docstring for why this
+    # is separate from the super-admin console
+    app.register_blueprint(account_blueprint, url_prefix='/account')
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
     app.register_blueprint(workflow_blueprint, url_prefix='/workflow')
     app.register_blueprint(task_blueprint, url_prefix='/task')

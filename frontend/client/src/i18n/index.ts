@@ -4,6 +4,7 @@
 // consistent with the mobile app (expo_app/i18n/translations.ts).
 // Placeholders use {name} syntax and are substituted by t(key, vars).
 
+import * as accountSettings from './translations/accountSettings';
 import * as common from './translations/common';
 import * as nav from './translations/nav';
 import * as dashboard from './translations/dashboard';
@@ -41,6 +42,7 @@ export const LANGUAGE_LABELS: Record<Lang, string> = {
 };
 
 const modules = [
+  accountSettings,
   common,
   nav,
   dashboard,
