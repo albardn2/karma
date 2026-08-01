@@ -14,7 +14,7 @@ Reports, per role: LOST (old allow, new deny) — must be ZERO — and GAINED
 """
 from app import create_app
 from app.entrypoint.routes.common.permissions import (
-    METHOD_ACTIONS, RESOURCE_SET, ROLE_PRESETS, preset_for_scope, endpoint_allowed,
+    METHOD_ACTIONS, RESOURCE_SET, ROLE_PRESETS_BASELINE, preset_for_scope, endpoint_allowed,
 )
 
 ADMIN = {"admin", "superuser"}

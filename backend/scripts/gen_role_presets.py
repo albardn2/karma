@@ -12,7 +12,8 @@ matching method allows it. Modules preset = menu tabs whose resource the role
 can READ (users/live-map/location-tracking are admin-only, excluded).
 
 Run:  docker exec karma-backend-1 python scripts/gen_role_presets.py
-Prints a Python literal to paste into permissions.py as ROLE_PRESETS.
+Prints JSON to paste into role_presets.json, which is the BASELINE that a
+platform-owner role override falls back to.
 """
 import json
 

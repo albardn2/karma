@@ -345,6 +345,149 @@ def set_default_account_permissions():
     return jsonify(result), 200
 
 
+def _role_preset_payload(uow):
+    """Every role's defaults, plus what an editor needs to act safely.
+
+    `baseline` is the generated-from-decorators floor, so the UI can offer "reset
+    to default" and show what an override changed. `following` is the blast radius:
+    how many users actually inherit this role's defaults right now, which is the
+    number that matters before widening or narrowing a role.
+    """
+    from app.entrypoint.routes.common.permissions import (
+        ROLE_PRESETS_BASELINE,
+        resolved_role_presets,
+        role_overrides,
+    )
+    from models.common import User as UserModel
+
+    overrides = role_overrides()
+    resolved = resolved_role_presets()
+
+    # Users who FOLLOW the role: no explicit per-user override. Users with their
+    # own checklist are deliberately excluded — editing a role's defaults does
+    # not touch them, and counting them here would overstate the impact.
+    counts = dict(
+        uow.session.query(UserModel.permission_scope, func.count(UserModel.uuid))
+        .filter(
+            UserModel.is_deleted.is_(False),
+            UserModel.permissions.is_(None),
+        )
+        .group_by(UserModel.permission_scope)
+        .all()
+    )
+
+    return {
+        "roles": [
+            {
+                "role": role,
+                "permissions": resolved[role],
+                "baseline": ROLE_PRESETS_BASELINE[role],
+                "is_overridden": role in overrides and bool(overrides[role]),
+                "following": counts.get(role, 0),
+            }
+            for role in sorted(ROLE_PRESETS_BASELINE)
+        ]
+    }
+
+
+@super_admin_blueprint.route("/settings/role-presets", methods=["GET"])
+@scopes_required(SUPER)
+def get_role_presets():
+    """Per-role default permissions. A user with no explicit checklist is governed
+    by their role's entry here."""
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        result = _role_preset_payload(uow)
+    return jsonify(result), 200
+
+
+@super_admin_blueprint.route("/settings/role-presets/<string:role>", methods=["PUT"])
+@scopes_required(SUPER)
+def set_role_preset(role: str):
+    """Override one role's default permissions, platform-wide.
+
+    Takes effect without a deploy: every user following this role is re-governed
+    on their next request, and the perms-version header tells their already-open
+    clients to re-read their profile rather than keep a stale menu.
+    """
+    from pydantic import BaseModel, ConfigDict
+    from app.dto.auth import UserPermissions
+    from app.entrypoint.routes.common.permissions import (
+        ROLE_PRESETS_BASELINE,
+        ROLE_PRESETS_SETTING_KEY,
+        invalidate_role_overrides,
+    )
+    from models.common import PlatformSetting
+
+    # Only roles that HAVE defaults. admin/superuser are excluded because they
+    # bypass the ACL entirely (effective_permissions returns None for them), so a
+    # preset for them would be stored, displayed, and silently ignored.
+    if role not in ROLE_PRESETS_BASELINE:
+        raise BadRequestError(
+            f"unknown role {role!r} — must be one of "
+            f"{sorted(ROLE_PRESETS_BASELINE)}"
+        )
+
+    class _Body(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        # Required, not optional: an explicit null here would be ambiguous
+        # between "clear the override" and "grant nothing", and those differ by
+        # everything. Clearing is DELETE.
+        permissions: UserPermissions
+
+    payload = _Body(**request.json)
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        row = uow.session.query(PlatformSetting).filter_by(
+            key=ROLE_PRESETS_SETTING_KEY).one_or_none()
+        # Rebuilt rather than mutated in place: MutableDict tracks top-level key
+        # assignment, and updating a nested dict would not always be flagged dirty.
+        value = dict(row.value) if row and row.value else {}
+        value[role] = payload.permissions.model_dump()
+        if row:
+            row.value = value
+        else:
+            uow.session.add(
+                PlatformSetting(key=ROLE_PRESETS_SETTING_KEY, value=value)
+            )
+        # COMMIT BEFORE invalidating and re-reading, in that order. role_overrides()
+        # reads through its own short-lived session, so it cannot see this
+        # transaction's uncommitted writes: invalidating first made the very next
+        # read cache the stale pre-commit value with a FRESH timestamp, which then
+        # served the old defaults for the whole TTL. Caught by the endpoint
+        # reporting is_overridden=false on a row that had in fact been written.
+        uow.commit()
+        invalidate_role_overrides()
+        result = _role_preset_payload(uow)
+    return jsonify(result), 200
+
+
+@super_admin_blueprint.route("/settings/role-presets/<string:role>", methods=["DELETE"])
+@scopes_required(SUPER)
+def reset_role_preset(role: str):
+    """Drop the override and return this role to the generated baseline."""
+    from app.entrypoint.routes.common.permissions import (
+        ROLE_PRESETS_BASELINE,
+        ROLE_PRESETS_SETTING_KEY,
+        invalidate_role_overrides,
+    )
+    from models.common import PlatformSetting
+
+    if role not in ROLE_PRESETS_BASELINE:
+        raise BadRequestError(f"unknown role {role!r}")
+
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        row = uow.session.query(PlatformSetting).filter_by(
+            key=ROLE_PRESETS_SETTING_KEY).one_or_none()
+        if row and row.value and role in row.value:
+            value = dict(row.value)
+            value.pop(role, None)
+            row.value = value
+        # Same ordering rule as the PUT: commit, then invalidate, then read.
+        uow.commit()
+        invalidate_role_overrides()
+        result = _role_preset_payload(uow)
+    return jsonify(result), 200
+
+
 @super_admin_blueprint.route("/accounts/<string:account_uuid>/impersonate", methods=["POST"])
 @scopes_required(SUPER)
 def impersonate(account_uuid: str):

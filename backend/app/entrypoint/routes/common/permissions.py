@@ -29,7 +29,79 @@ ACTIONS = ["create", "read", "update", "delete"]
 
 _PRESETS_PATH = os.path.join(os.path.dirname(__file__), "role_presets.json")
 with open(_PRESETS_PATH, encoding="utf-8") as _f:
-    ROLE_PRESETS: dict = json.load(_f)
+    # The BASELINE, generated from the route decorators. Never mutated at runtime:
+    # it is the floor a role falls back to, so a missing, empty or unparseable
+    # override can never leave a role with no permissions at all.
+    ROLE_PRESETS_BASELINE: dict = json.load(_f)
+
+
+# Platform-owner overrides live in platform_setting under this key, as
+# {role: {"modules": [...], "endpoints": {...}}} for OVERRIDDEN roles only —
+# absent means "use the generated baseline for that role".
+ROLE_PRESETS_SETTING_KEY = "role_presets"
+
+# A role's defaults are resolved on every authenticated request (the chokepoint
+# calls effective_permissions per request), so they are cached rather than read
+# from the database each time. The TTL is what bounds cross-worker staleness:
+# gunicorn runs several workers, each with its own cache, and the worker that
+# serves the edit is not the worker that serves the next request. 30s is short
+# enough that an admin sees the change take effect while they are still looking
+# at the screen, and long enough that this is not a per-request query.
+_ROLE_OVERRIDE_TTL_SECONDS = 30
+_override_cache: dict = {"at": None, "value": {}}
+
+
+def invalidate_role_overrides() -> None:
+    """Drop the cached overrides so the next read hits the database.
+
+    Called by the write path so the admin who just saved sees their own change
+    immediately, rather than up to a TTL later in their own worker.
+    """
+    _override_cache["at"] = None
+
+
+def role_overrides() -> dict:
+    """Platform-owner overrides for role defaults, cached with a short TTL."""
+    import time
+
+    now = time.monotonic()
+    at = _override_cache["at"]
+    if at is not None and (now - at) < _ROLE_OVERRIDE_TTL_SECONDS:
+        return _override_cache["value"]
+
+    try:
+        from app.adapters.unit_of_work.sqlalchemy_unit_of_work import (
+            SqlAlchemyUnitOfWork,
+        )
+        from models.common import PlatformSetting
+
+        with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+            row = (
+                uow.session.query(PlatformSetting)
+                .filter_by(key=ROLE_PRESETS_SETTING_KEY)
+                .one_or_none()
+            )
+            value = dict(row.value) if row and row.value else {}
+    except Exception:
+        # This function sits on the authorization path. A settings table that is
+        # unreachable mid-migration, or a row someone hand-edited into invalid
+        # JSON, must NOT take the API down or silently widen access — serve the
+        # last known value (falling back to the generated baseline) and move on.
+        return _override_cache["value"]
+
+    _override_cache["at"] = now
+    _override_cache["value"] = value
+    return value
+
+
+def resolved_role_presets() -> dict:
+    """Every role's effective defaults: the override where one exists, else the
+    generated baseline. This is what actually governs users who follow a role."""
+    overrides = role_overrides()
+    return {
+        role: overrides.get(role) or baseline
+        for role, baseline in ROLE_PRESETS_BASELINE.items()
+    }
 
 # HTTP method -> CRUD action
 METHOD_ACTIONS = {
@@ -76,12 +148,19 @@ _ADMIN_SCOPES = {"admin", "superuser"}
 
 def preset_for_scope(permission_scope: str | None) -> dict:
     """The role preset for a permission_scope string (may be comma-joined).
-    Union of every matched role's preset. Unknown/empty scope -> empty."""
+    Union of every matched role's preset. Unknown/empty scope -> empty.
+
+    Reads the RESOLVED presets, so a platform-owner edit to a role's defaults
+    takes effect for every user following that role without a deploy. Users with
+    an explicit per-user override are unaffected — effective_permissions returns
+    their own column and never reaches here.
+    """
+    presets = resolved_role_presets()
     scopes = [s.strip() for s in (permission_scope or "").split(",") if s.strip()]
     modules: set = set()
     endpoints: dict = {}
     for scope in scopes:
-        preset = ROLE_PRESETS.get(scope)
+        preset = presets.get(scope)
         if not preset:
             continue
         modules.update(preset.get("modules", []))

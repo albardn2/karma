@@ -63,15 +63,24 @@ def register():
 @scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
 def permission_catalog():
     """The checklists an admin can grant: menu modules + per-resource CRUD,
-    plus each role's preset so the UI can apply a role as a shortcut."""
+    plus each role's preset so the UI can apply a role as a shortcut.
+
+    RESOLVED presets, not the generated baseline. This is load-bearing rather than
+    cosmetic: the user editor compares the checklist against the preset and stores
+    null when they match, which is what keeps a user FOLLOWING their role. Serving
+    the baseline once a role has been overridden would make that comparison miss,
+    so picking a role and saving would quietly write an explicit per-user override
+    equal to the old defaults — detaching that user from the role without anyone
+    choosing to.
+    """
     from app.entrypoint.routes.common.permissions import (
-        MODULES, RESOURCES, ACTIONS, ROLE_PRESETS,
+        MODULES, RESOURCES, ACTIONS, resolved_role_presets,
     )
     return jsonify({
         "modules": MODULES,
         "resources": RESOURCES,
         "actions": ACTIONS,
-        "role_presets": ROLE_PRESETS,
+        "role_presets": resolved_role_presets(),
     }), 200
 
 

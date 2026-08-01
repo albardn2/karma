@@ -1,5 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RolePresetsAdmin } from "@/components/superadmin/RolePresetsAdmin";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AccountsPanel } from "@/pages/AccountsAdmin";
@@ -43,6 +44,9 @@ export default function SuperAdmin() {
                 <TabsTrigger value="workflows" data-testid="superadmin-tab-workflows">
                   {t("nav.workflows")}
                 </TabsTrigger>
+                <TabsTrigger value="roles" data-testid="superadmin-tab-roles">
+                  {t("rolePresets.tab")}
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="accounts" className="mt-4">
                 <AccountsPanel />
@@ -52,6 +56,9 @@ export default function SuperAdmin() {
               </TabsContent>
               <TabsContent value="workflows" className="mt-4">
                 <WorkflowsPanel />
+              </TabsContent>
+              <TabsContent value="roles" className="mt-4">
+                <RolePresetsAdmin />
               </TabsContent>
             </Tabs>
           </div>
