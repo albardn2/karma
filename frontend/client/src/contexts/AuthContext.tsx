@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { API_BASE_URL } from '../lib/config';
+import { notePermsVersion, resetPermsVersion, setOnPermsChanged } from '../lib/queryClient';
 
 interface User {
   uuid: string;
@@ -53,7 +54,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Check for existing session on mount
     checkAuthStatus();
+    // An admin changed this user's role, permissions or the company's feature cap.
+    // Re-read the profile so the sidebar stops offering what they can no longer
+    // use. This has to come from a response header rather than a react-query
+    // invalidation: the save happens in the ADMIN's browser session, which cannot
+    // reach into this one.
+    setOnPermsChanged(() => {
+      refreshProfile();
+    });
+
+    // The header needs traffic, and a left-open tab generates none. Coming back to
+    // the tab is the equivalent of resuming the app on a phone.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshProfile();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      setOnPermsChanged(null);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
+
+  /**
+   * Re-read the profile WITHOUT risking the session.
+   *
+   * checkAuthStatus drops the stored token on any failure, including a transient
+   * one — right for a mount-time check, wrong here: a flaky moment on tab focus
+   * would silently sign the user out on their next request. This applies a newer
+   * profile when one arrives and otherwise changes nothing.
+   */
+  const refreshProfile = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        mode: 'cors',
+      });
+
+      notePermsVersion(response);
+      if (response.ok) setUser(await response.json());
+    } catch (error) {
+      console.error('Profile refresh failed, session kept:', error);
+    }
+  };
 
   const checkAuthStatus = async () => {
     try {
@@ -71,6 +121,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         mode: 'cors',
       });
+
+      // seeds the baseline other responses are compared against — this call
+      // bypasses apiRequest, so without it nothing would establish it
+      notePermsVersion(response);
 
       if (response.ok) {
         const userData = await response.json();
@@ -201,6 +255,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('auth_token');
     setUser(null);
+    // so the next user on this browser is not compared against this one's
+    // fingerprint and refreshed for no reason
+    resetPermsVersion();
   };
 
   const scopes = (user?.permission_scope ?? '')

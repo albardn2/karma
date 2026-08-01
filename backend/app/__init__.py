@@ -79,6 +79,7 @@ def _load_request_identity():
         RESOURCE_SET,
         endpoint_allowed,
         effective_permissions,
+        perms_version,
     )
     try:
         verify_jwt_in_request(optional=True)
@@ -165,6 +166,12 @@ def _load_request_identity():
         g.user_scopes = set((user.permission_scope or "").split(","))
         # effective perms: explicit checklist or role preset (None = admin)
         g.user_acl = effective_permissions(user)
+        # Fingerprint of what governs this caller, emitted on every response by
+        # _emit_perms_version below. Computed here because this is the one place
+        # that has all four inputs already resolved and DB-fresh.
+        g.perms_version = perms_version(
+            g.user_scopes, g.user_acl, g.account_perms, g.account_verified
+        )
 
     if request.blueprint in RESOURCE_SET:
         # An unverified company gets no resource access at all. FIRST in this
@@ -210,12 +217,42 @@ def _load_request_identity():
     return None
 
 
+PERMS_VERSION_HEADER = "X-Perms-Version"
+
+
+def _emit_perms_version(response):
+    """Stamp the caller's permission fingerprint onto every authenticated response.
+
+    On EVERY response, not just /auth/me: the point is that a client discovers its
+    permissions moved while going about its ordinary business, without a poll and
+    without waiting to be restarted.
+
+    Silent for unauthenticated requests — _load_request_identity returns before
+    setting this when there are no claims, so `getattr` rather than attribute
+    access. An absent header simply means "nothing to compare", which is what an
+    older client already assumes.
+    """
+    from flask import g
+
+    version = getattr(g, "perms_version", None)
+    if version:
+        response.headers[PERMS_VERSION_HEADER] = version
+    return response
+
+
 def create_app(config_object=Config):
     app = Flask(__name__)
 
     # CORS(app, supports_credentials=True)
     # CORS FOR ANY ORIGIN
-    CORS(app)
+    #
+    # expose_headers is required, not cosmetic: a browser hides every response
+    # header from JS except a short safelist, so without naming it here the web
+    # client reads null from X-Perms-Version and never notices a change. The
+    # native app is unaffected either way — CORS is a browser rule — which is
+    # exactly the sort of asymmetry that would have looked like "works on mobile,
+    # broken on web" instead of a missing config line.
+    CORS(app, expose_headers=[PERMS_VERSION_HEADER])
 
     # load configs from .env
     app.config.from_object(Config)
@@ -239,6 +276,7 @@ def create_app(config_object=Config):
     jwt.init_app(app)
 
     app.before_request(_load_request_identity)
+    app.after_request(_emit_perms_version)
 
     # Register blueprints
     app.register_blueprint(customer_blueprint, url_prefix='/customer')
