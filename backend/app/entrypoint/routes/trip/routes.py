@@ -1,8 +1,9 @@
 # app/entrypoint/routes/trip/routes.py
 from flask import Blueprint, g, request, jsonify
 from sqlalchemy import func
+from shapely import wkt as shapely_wkt
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
-from app.entrypoint.routes.common.errors import ApiError, NotFoundError
+from app.entrypoint.routes.common.errors import ApiError, BadRequestError, NotFoundError
 from app.dto.trip import (
     TripCreate,
     TripRead,
@@ -386,7 +387,21 @@ def list_trips():
     if params.vehicle_uuid:
         filters.append(TripModel.vehicle_uuid == params.vehicle_uuid)
     if params.service_area_uuid:
-        filters.append(TripModel.service_area_uuid == params.service_area_uuid)
+        # A trip does not store service-area uuids. It stores service_area_names, a
+        # varchar[] snapshot of the areas it covered, so `TripModel.service_area_uuid`
+        # was an AttributeError for every request that passed this param — valid uuid
+        # or not. Resolve the uuid to its name and match against that array instead,
+        # which is what the filter was always meant to express.
+        with SqlAlchemyUnitOfWork() as uow:
+            area = uow.service_area_repository.find_one(
+                uuid=params.service_area_uuid, is_deleted=False
+            )
+            if not area:
+                raise NotFoundError("ServiceArea not found")
+            # read the name while the session is still open — the instance detaches
+            # when this block exits and touching it afterwards is a DetachedInstanceError
+            area_name = area.name
+        filters.append(TripModel.service_area_names.any(area_name))
     if params.workflow_execution_uuid:
         filters.append(TripModel.workflow_execution_uuid == params.workflow_execution_uuid)
     if params.status:
@@ -396,8 +411,17 @@ def list_trips():
         filters.append(TripModel.audited_at.isnot(None) if params.is_audited
                        else TripModel.audited_at.is_(None))
     if params.intersects_area:
+        # Trip has no `geometry` column; the polygon it covered is `distribution_area`.
+        # As with service_area_uuid, this raised AttributeError on every use.
+        # Parse the WKT first: an invalid one otherwise fails inside the query as a
+        # psycopg2 geometry parse error and is served as a 500 rather than a 400.
+        try:
+            shapely_wkt.loads(params.intersects_area)
+        except Exception as e:
+            raise BadRequestError(f"Invalid intersects_area polygon: {e}")
         geom_expr = func.ST_GeomFromText(params.intersects_area, 4326)
-        filters.append(func.ST_Intersects(TripModel.geometry, geom_expr))
+        filters.append(TripModel.distribution_area.isnot(None))
+        filters.append(func.ST_Intersects(TripModel.distribution_area, geom_expr))
 
     filters.append(TripModel.is_deleted.is_(False))
 
