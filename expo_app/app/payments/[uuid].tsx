@@ -13,7 +13,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 
 interface Payment {
@@ -67,17 +67,17 @@ export default function PaymentDetailScreen() {
 
         if (res.data.invoice_uuid) {
           const inv = await apiCall<any>(`/invoice/${res.data.invoice_uuid}`);
-          const customerUuid = inv.status === 200 ? inv.data?.customer_uuid : null;
+          const customerUuid = isOk(inv.status) ? inv.data?.customer_uuid : null;
           if (customerUuid) {
             const cust = await apiCall<any>(`/customer/${customerUuid}`);
-            if (cust.status === 200) {
+            if (isOk(cust.status)) {
               setPayer(cust.data?.company_name || cust.data?.full_name || null);
             }
           }
         }
         if (res.data.financial_account_uuid) {
           const fa = await apiCall<any>(`/financial-account/${res.data.financial_account_uuid}`);
-          setAccount(fa.status === 200 ? (fa.data?.account_name ?? null) : null);
+          setAccount(isOk(fa.status) ? (fa.data?.account_name ?? null) : null);
         }
       } catch {
         setFailed(true);

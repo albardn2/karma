@@ -163,6 +163,11 @@ export const translations: Record<Lang, Record<string, string>> = {
   'customerOrders.due': 'Outstanding',
   'customerOrders.items': 'Items ({count})',
   'customerOrders.noItems': 'No line items on this order.',
+  'customerOrders.itemsTitle': 'Line items',
+  'customerOrders.invoices': 'Invoices',
+  'customerOrders.noInvoices': 'No invoice raised for this order.',
+  'customerOrders.fulfilAndPay': 'Fulfil & take payment',
+
   'menu.inventory': 'Inventory',
   'inventory.active': 'Active',
   'inventory.inactive': 'Inactive',
@@ -797,6 +802,11 @@ export const translations: Record<Lang, Record<string, string>> = {
   'customerOrders.due': 'المتبقي',
   'customerOrders.items': 'البنود ({count})',
   'customerOrders.noItems': 'لا توجد بنود في هذا الطلب.',
+  'customerOrders.itemsTitle': 'البنود',
+  'customerOrders.invoices': 'الفواتير',
+  'customerOrders.noInvoices': 'لا توجد فاتورة لهذا الطلب.',
+  'customerOrders.fulfilAndPay': 'التسليم وتحصيل الدفعة',
+
   'menu.inventory': 'المخزون',
   'inventory.active': 'نشط',
   'inventory.inactive': 'غير نشط',

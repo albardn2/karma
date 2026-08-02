@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 
 interface Vendor {
   uuid: string;
@@ -40,7 +40,7 @@ export default function VendorsDetailScreen() {
 
   const remove = async () => {
     const res = await apiCall(`/vendor/${uuid}`, { method: 'DELETE' });
-    if (res.status === 200 || res.status === 204) {
+    if (isOk(res.status)) {
       router.back();
       return;
     }

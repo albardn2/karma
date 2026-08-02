@@ -7,6 +7,15 @@ import Constants from 'expo-constants';
 const API_BASE_URL: string =
   Constants.expoConfig?.extra?.apiBaseUrl ?? 'https://api-prod.karma-grp.com';
 
+/**
+ * Any 2xx is a success.
+ *
+ * Not every read in this API answers 200 — GET
+ * /customer-order/with-items-and-invoice/<uuid> returns 201 — and screens that
+ * tested for exactly 200 rendered a perfectly good response as a load failure.
+ */
+export const isOk = (status: number) => status >= 200 && status < 300;
+
 interface ApiResponse<T = any> {
   data?: T;
   error?: string;

@@ -13,7 +13,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 
 interface InventoryLot {
@@ -59,11 +59,11 @@ export default function InventoryLotScreen() {
       setFailed(false);
       try {
         const res = await apiCall<InventoryLot>(`/inventory/${uuid}`);
-        if (res.status === 200 && res.data) {
+        if (isOk(res.status) && res.data) {
           setLot(res.data);
           if (res.data.warehouse_uuid) {
             const w = await apiCall<any>(`/warehouse/${res.data.warehouse_uuid}`);
-            setWarehouse(w.status === 200 ? (w.data?.name ?? null) : null);
+            setWarehouse(isOk(w.status) ? (w.data?.name ?? null) : null);
           }
         } else {
           setFailed(true);

@@ -13,7 +13,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 
 interface Material {
@@ -42,7 +42,7 @@ export default function MaterialDetailScreen() {
       setFailed(false);
       try {
         const res = await apiCall<Material>(`/material/${uuid}`);
-        if (res.status === 200 && res.data) setMaterial(res.data);
+        if (isOk(res.status) && res.data) setMaterial(res.data);
         else setFailed(true);
       } catch {
         setFailed(true);

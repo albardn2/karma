@@ -15,7 +15,7 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { BarChart, ChartLegend, SERIES_COLOURS } from '@/components/Chart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 
 interface Bucket {
   period: string;
@@ -90,7 +90,7 @@ export default function ExpenseAnalyticsScreen() {
         }
         if (currency) q.append('currency', currency);
         const res = await apiCall<Analytics>(`/expense/analytics/over-time?${q.toString()}`);
-        if (res.status === 200 && res.data) setData(res.data);
+        if (isOk(res.status) && res.data) setData(res.data);
         else setFailed(true);
       } catch {
         setFailed(true);

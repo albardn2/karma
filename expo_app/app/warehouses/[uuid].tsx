@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { ChartLegend, LineChart } from '@/components/Chart';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 
 interface Warehouse {
@@ -85,8 +85,8 @@ export default function WarehousesDetailScreen() {
           `&bucket=${preset.bucket}&start_date=${encodeURIComponent(naiveIso(from))}`,
       ),
     ]);
-    setStock(stateRes.status === 200 ? (stateRes.data?.items ?? []) : []);
-    if (timeRes.status === 200) {
+    setStock(isOk(stateRes.status) ? (stateRes.data?.items ?? []) : []);
+    if (isOk(timeRes.status)) {
       setSeries(timeRes.data?.series ?? []);
       setBucket(timeRes.data?.bucket ?? preset.bucket);
     } else {

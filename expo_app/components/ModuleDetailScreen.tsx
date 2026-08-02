@@ -14,7 +14,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 
 export type DetailRow = [label: string, value: string];
 
@@ -91,7 +91,7 @@ export function ModuleDetailScreen<T>({
       setFailed(false);
       try {
         const res = await apiCall<T>(endpoint);
-        if (res.status === 200 && res.data) setItem(res.data);
+        if (isOk(res.status) && res.data) setItem(res.data);
         else setFailed(true);
       } catch {
         setFailed(true);

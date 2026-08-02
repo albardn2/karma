@@ -13,7 +13,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 
 interface InventoryEvent {
@@ -45,12 +45,12 @@ export default function InventoryEventDetailScreen() {
       setFailed(false);
       try {
         const res = await apiCall<InventoryEvent>(`/inventory-event/${uuid}`);
-        if (res.status === 200 && res.data) {
+        if (isOk(res.status) && res.data) {
           setEvent(res.data);
           if (res.data.inventory_uuid) {
             // the lot this moved, so the event can be traced back to stock
             const inv = await apiCall<any>(`/inventory/${res.data.inventory_uuid}`);
-            setLot(inv.status === 200 ? (inv.data?.lot_id ?? null) : null);
+            setLot(isOk(inv.status) ? (inv.data?.lot_id ?? null) : null);
           }
         } else {
           setFailed(true);

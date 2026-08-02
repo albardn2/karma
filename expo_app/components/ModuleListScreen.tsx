@@ -14,7 +14,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 
 export const PER_PAGE = 20;
 
@@ -115,7 +115,7 @@ export function ModuleListScreen<T>({
           query.append(searchParam, appliedSearch.trim());
         }
         const res = await apiCall<any>(`${endpoint}?${query.toString()}`);
-        if (res.status === 200 && res.data) {
+        if (isOk(res.status) && res.data) {
           setItems(res.data[itemsKey] ?? []);
           setTotalPages(res.data.pages ?? 1);
           setTotalCount(res.data.total_count ?? 0);

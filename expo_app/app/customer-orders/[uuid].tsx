@@ -1,19 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { ModuleGuard } from '@/components/ModuleGuard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 
 interface OrderItem {
@@ -21,196 +12,192 @@ interface OrderItem {
   material_name?: string | null;
   quantity: number;
   unit?: string | null;
-  is_fulfilled: boolean;
+  is_fulfilled?: boolean | null;
 }
 
-interface OrderDetail {
+interface Invoice {
   uuid: string;
-  created_at: string;
-  is_fulfilled: boolean;
-  is_overdue: boolean;
-  is_paid?: boolean | null;
   currency?: string | null;
-  total_adjusted_amount: number;
+  due_date?: string | null;
+  is_paid?: boolean | null;
+  is_overdue?: boolean | null;
   net_amount_due?: number | null;
   net_amount_paid?: number | null;
+  total_adjusted_amount?: number | null;
+}
+
+interface Order {
+  uuid: string;
+  created_at: string;
+  currency?: string | null;
+  is_fulfilled: boolean;
+  is_paid?: boolean | null;
+  is_overdue: boolean;
+  total_adjusted_amount: number;
+  net_amount_paid?: number | null;
+  net_amount_due?: number | null;
   customer_company_name?: string | null;
   customer_full_name?: string | null;
+  notes?: string | null;
   customer_order_items?: OrderItem[] | null;
 }
 
+/** The with-items-and-invoice endpoint wraps the record. */
+interface OrderPayload {
+  customer_order: Order;
+  invoices?: Invoice[] | null;
+}
+
 /**
- * One order, with its lines.
+ * One order: what was sold, what is owed, and the two things a rep does about it.
  *
- * Reads the with-items-and-invoice endpoint rather than the plain one: the list
- * already showed everything the plain record holds, so opening a row has to add
- * the lines or the tap was not worth making.
+ * The fulfil-and-take-payment flow is NOT rebuilt here. The app already has that
+ * screen at app/distribution/order.tsx, and it reads tripStopUuid as optional and
+ * sends `trip_stop_uuid: tripStopUuid || null` — so it works perfectly well entered
+ * from the menu rather than from a trip. Routing to it keeps one implementation of
+ * the money path instead of a second one that drifts.
  */
 export default function CustomerOrderDetailScreen() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      try {
-        const res = await apiCall<any>(`/customer-order/with-items-and-invoice/${uuid}`);
-        if (res.status === 200 && res.data?.customer_order) {
-          setOrder(res.data.customer_order);
-        } else {
-          setFailed(true);
-        }
-      } catch {
-        setFailed(true);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [uuid],
-  );
+  const money = (n?: number | null, c?: string | null) =>
+    n == null ? '—' : `${Number(n).toFixed(2)}${c ? ` ${c}` : ''}`;
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const money = (amount?: number | null) =>
-    amount == null
-      ? '—'
-      : `${Number(amount).toFixed(2)}${order?.currency ? ` ${order.currency}` : ''}`;
+  const remove = async () => {
+    // the with-items variant so line items and the invoice go too, rather than
+    // leaving orphans behind the order
+    const res = await apiCall(`/customer-order/with-items-and-invoice/${uuid}`, {
+      method: 'DELETE',
+    });
+    if (isOk(res.status)) router.back();
+    else
+      Alert.alert(
+        t('detail.delete'),
+        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+      );
+  };
 
   return (
-    <ModuleGuard module="customer-orders">
-      <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => router.back()} testID="order-back" hitSlop={12}>
-            <ThemedText style={styles.back}>‹</ThemedText>
-          </TouchableOpacity>
-          <ThemedText style={styles.topTitle} numberOfLines={1}>
-            {t('menu.customerOrders')}
-          </ThemedText>
-          <View style={styles.backSpacer} />
-        </View>
-
-        {loading ? (
-          <View style={styles.centre}>
-            <ActivityIndicator size="large" color="#5469D4" />
-          </View>
-        ) : failed || !order ? (
-          <View style={styles.centre}>
-            <ThemedText style={styles.stateIcon}>⚠️</ThemedText>
-            <ThemedText style={styles.stateText} testID="order-detail-error">
-              {t('moduleList.failed')}
+    <ModuleDetailScreen<OrderPayload>
+      module="customer-orders"
+      title={t('menu.customerOrders')}
+      endpoint={`/customer-order/with-items-and-invoice/${uuid}`}
+      reloadKey={reloadKey}
+      heading={(d) =>
+        d.customer_order.customer_company_name ||
+        d.customer_order.customer_full_name ||
+        t('customerOrders.noCustomer')
+      }
+      subheading={(d) => {
+        const o = d.customer_order;
+        return (
+          <View style={styles.badges}>
+            <ThemedText style={[styles.badge, o.is_fulfilled ? styles.ok : styles.pending]}>
+              {o.is_fulfilled ? t('customerOrders.fulfilled') : t('customerOrders.unfulfilled')}
             </ThemedText>
-            <TouchableOpacity style={styles.retry} onPress={() => load()}>
-              <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <ScrollView
-            contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => {
-                  setRefreshing(true);
-                  load(true);
-                }}
-              />
-            }
-          >
-            <ThemedText style={styles.customer} testID="order-customer">
-              {order.customer_company_name ||
-                order.customer_full_name ||
-                t('customerOrders.noCustomer')}
+            <ThemedText style={[styles.badge, o.is_paid ? styles.ok : styles.due]}>
+              {o.is_paid ? t('customerOrders.paid') : t('customerOrders.unpaid')}
             </ThemedText>
-            <ThemedText style={styles.date}>
-              {formatNumericDate(new Date(order.created_at))}
-            </ThemedText>
-
-            <View style={styles.badges}>
-              <ThemedText
-                style={[styles.badge, order.is_fulfilled ? styles.badgeOk : styles.badgePending]}
-              >
-                {order.is_fulfilled
-                  ? t('customerOrders.fulfilled')
-                  : t('customerOrders.unfulfilled')}
+            {o.is_overdue && (
+              <ThemedText style={[styles.badge, styles.overdue]}>
+                {t('customerOrders.overdue')}
               </ThemedText>
-              <ThemedText style={[styles.badge, order.is_paid ? styles.badgeOk : styles.badgeDue]}>
-                {order.is_paid ? t('customerOrders.paid') : t('customerOrders.unpaid')}
-              </ThemedText>
-              {order.is_overdue && (
-                <ThemedText style={[styles.badge, styles.badgeOverdue]}>
-                  {t('customerOrders.overdue')}
-                </ThemedText>
-              )}
-            </View>
-
-            <View style={styles.card}>
-              {[
-                [t('customerOrders.total'), money(order.total_adjusted_amount)],
-                [t('customerOrders.paidAmount'), money(order.net_amount_paid)],
-                [t('customerOrders.due'), money(order.net_amount_due)],
-              ].map(([label, value]) => (
-                <View key={label} style={styles.row}>
-                  <ThemedText style={styles.rowLabel}>{label}</ThemedText>
-                  <ThemedText style={styles.rowValue}>{value}</ThemedText>
+            )}
+          </View>
+        );
+      }}
+      rows={(d): DetailRow[] => {
+        const o = d.customer_order;
+        return [
+          [t('customerOrders.total'), money(o.total_adjusted_amount, o.currency)],
+          [t('customerOrders.paidAmount'), money(o.net_amount_paid, o.currency)],
+          [t('customerOrders.due'), money(o.net_amount_due, o.currency)],
+          [t('payments.received'), formatNumericDate(new Date(o.created_at))],
+          [t('inventory.notes'), o.notes || '—'],
+        ];
+      }}
+      sections={[
+        {
+          title: t('customerOrders.itemsTitle'),
+          isEmpty: (d) => !(d.customer_order.customer_order_items ?? []).length,
+          emptyText: t('customerOrders.noItems'),
+          render: (d) => (
+            <>
+              {(d.customer_order.customer_order_items ?? []).map((it) => (
+                <View key={it.uuid} style={styles.line}>
+                  <ThemedText style={styles.lineName} numberOfLines={1}>
+                    {it.material_name || '—'}
+                  </ThemedText>
+                  <ThemedText style={styles.lineQty}>
+                    {it.quantity}
+                    {it.unit ? ` ${it.unit}` : ''}
+                  </ThemedText>
+                  {/* per-line, because an order is routinely part-delivered */}
+                  <ThemedText
+                    style={[styles.badge, it.is_fulfilled ? styles.ok : styles.pending]}
+                  >
+                    {it.is_fulfilled
+                      ? t('customerOrders.fulfilled')
+                      : t('customerOrders.unfulfilled')}
+                  </ThemedText>
                 </View>
               ))}
-            </View>
-
-            <ThemedText style={styles.sectionTitle}>
-              {t('customerOrders.items', { count: order.customer_order_items?.length ?? 0 })}
-            </ThemedText>
-
-            <View style={styles.card}>
-              {(order.customer_order_items ?? []).length === 0 ? (
-                <ThemedText style={styles.rowLabel}>{t('customerOrders.noItems')}</ThemedText>
-              ) : (
-                (order.customer_order_items ?? []).map((it) => (
-                  <View key={it.uuid} style={styles.row}>
-                    <ThemedText style={styles.rowLabel} numberOfLines={1}>
-                      {it.material_name || '—'}
+            </>
+          ),
+        },
+        {
+          title: t('customerOrders.invoices'),
+          isEmpty: (d) => !(d.invoices ?? []).length,
+          emptyText: t('customerOrders.noInvoices'),
+          render: (d) => (
+            <>
+              {(d.invoices ?? []).map((inv) => (
+                <View key={inv.uuid} style={styles.invoice}>
+                  <View style={styles.invoiceTop}>
+                    <ThemedText style={styles.invoiceAmount}>
+                      {money(inv.net_amount_due, inv.currency)} {t('customerOrders.due')}
                     </ThemedText>
-                    <ThemedText style={styles.rowValue}>
-                      {it.quantity}
-                      {it.unit ? ` ${it.unit}` : ''}
-                    </ThemedText>
+                    {inv.is_overdue && (
+                      <ThemedText style={[styles.badge, styles.overdue]}>
+                        {t('customerOrders.overdue')}
+                      </ThemedText>
+                    )}
                   </View>
-                ))
-              )}
-            </View>
-          </ScrollView>
-        )}
-      </ThemedView>
-    </ModuleGuard>
+                  <ThemedText style={styles.invoiceMeta}>
+                    {t('customerOrders.paidAmount')} {money(inv.net_amount_paid, inv.currency)}
+                    {inv.due_date ? ` · ${formatNumericDate(new Date(inv.due_date))}` : ''}
+                  </ThemedText>
+                </View>
+              ))}
+            </>
+          ),
+        },
+      ]}
+      actions={[
+        {
+          label: t('customerOrders.fulfilAndPay'),
+          testID: 'order-fulfil-pay',
+          onPress: () => {
+            setReloadKey((k) => k + 1);
+            router.push({ pathname: '/distribution/order', params: { orderUuid: uuid } });
+          },
+        },
+        {
+          label: t('detail.delete'),
+          destructive: true,
+          testID: 'order-delete',
+          onPress: remove,
+        },
+      ]}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  back: { fontSize: 30, lineHeight: 34, color: '#5469D4', fontWeight: '700' },
-  backSpacer: { width: 24 },
-  topTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600' },
-  body: { paddingHorizontal: 20, paddingTop: 6 },
-  customer: { fontSize: 22, fontWeight: '700', color: '#1f2937' },
-  date: { fontSize: 13, opacity: 0.55, marginTop: 2 },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   badge: {
     fontSize: 11,
     fontWeight: '600',
@@ -219,30 +206,15 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     overflow: 'hidden',
   },
-  badgeOk: { backgroundColor: '#dcfce7', color: '#166534' },
-  badgePending: { backgroundColor: '#f3f4f6', color: '#4b5563' },
-  badgeDue: { backgroundColor: '#fef3c7', color: '#92400e' },
-  badgeOverdue: { backgroundColor: '#fee2e2', color: '#991b1b' },
-  sectionTitle: { fontSize: 15, fontWeight: '700', marginTop: 22, marginBottom: 8 },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 16,
-    gap: 10,
-  },
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  rowLabel: { flex: 1, fontSize: 14, opacity: 0.65 },
-  rowValue: { fontSize: 14, fontWeight: '600', color: '#1f2937' },
-  centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  stateIcon: { fontSize: 34 },
-  stateText: { fontSize: 15, opacity: 0.6, textAlign: 'center' },
-  retry: {
-    marginTop: 6,
-    backgroundColor: '#5469D4',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  retryText: { color: '#fff', fontWeight: '600' },
+  ok: { backgroundColor: '#dcfce7', color: '#166534' },
+  pending: { backgroundColor: '#f3f4f6', color: '#4b5563' },
+  due: { backgroundColor: '#fef3c7', color: '#92400e' },
+  overdue: { backgroundColor: '#fee2e2', color: '#991b1b' },
+  line: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
+  lineName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1f2937' },
+  lineQty: { fontSize: 14, opacity: 0.7 },
+  invoice: { paddingVertical: 6 },
+  invoiceTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  invoiceAmount: { flex: 1, fontSize: 14, fontWeight: '700', color: '#1f2937' },
+  invoiceMeta: { fontSize: 12, opacity: 0.6, marginTop: 2 },
 });
