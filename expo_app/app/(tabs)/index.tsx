@@ -46,6 +46,18 @@ const ALL_MENU_ITEMS: MenuItem[] = [
 
 const LANGS: Lang[] = ['en', 'ar'];
 
+// The sections field crew may see. Distribution is the trip flow itself; the price list
+// is part of doing that job — a rep standing in a shop taking an order needs the price,
+// and before this they were expected to remember it.
+//
+// This is an allowlist of SECTIONS, not a widening of permissions. Every entry still
+// passes through the module filter below, so revoking `pricing` from a driver removes
+// the tile exactly as revoking Distribution does. Anything not listed here stays hidden
+// from field crew no matter what their API grants say — which is the whole point of the
+// cap, and also the trap it set: a new tile is invisible to drivers and reps unless it
+// is named here, however generous their permissions are.
+const FIELD_SECTIONS = new Set(['distribution', 'pricing']);
+
 // Field crews only work the trip flow, so their menu is capped at Distribution — capped,
 // not fixed: it is still subject to the module filter below, so revoking Distribution
 // from a driver empties their menu rather than being quietly ignored.
@@ -97,7 +109,7 @@ export default function HomeScreen() {
       // tile. Returning early here instead — as this did — made the field menu an
       // override rather than an intersection, so a driver's menu was the one thing in
       // the app the console could never change.
-      if (fieldOnly && i.section !== 'distribution') return false;
+      if (fieldOnly && !FIELD_SECTIONS.has(i.section)) return false;
       if (i.adminOnly && !isAdmin) return false;
       return granted ? granted.includes(i.module) : true;
     });
