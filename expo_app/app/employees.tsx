@@ -30,6 +30,7 @@ export default function EmployeesScreen() {
         title={t('menu.employees')}
         endpoint="/employee/"
         itemsKey="employees"
+        onCreate={() => router.push('/employees/create')}
         searchParam="full_name"
         searchPlaceholder={t('employees.searchPlaceholder')}
         filters={[

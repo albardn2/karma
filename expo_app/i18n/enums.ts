@@ -24,6 +24,8 @@ const ENUM_AR: Record<string, string> = {
   prepared: 'مُحضَّر',
   machinery_and_equipment: 'آلات ومعدات',
   vehicle: 'مركبة',
+  inactive: 'غير نشط',
+  active: 'نشط',
   // material types
   product: 'منتج',
   raw_material: 'مادة خام',

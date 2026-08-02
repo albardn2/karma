@@ -33,6 +33,13 @@ export interface DetailAction<T> {
   /** destructive actions get a confirm and red styling */
   destructive?: boolean;
   testID?: string;
+  /**
+   * Hide the action for records it does not apply to — e.g. no "record a payout" on
+   * an expense that is already settled, which the server would refuse anyway. The
+   * item is only known after the fetch, so this cannot be decided by the caller when
+   * it builds the array.
+   */
+  visible?: (item: T) => boolean;
 }
 
 interface ModuleDetailScreenProps<T> {
@@ -107,6 +114,11 @@ export function ModuleDetailScreen<T>({
     load();
   }, [load, reloadKey]);
 
+  // an action with no `visible` predicate always shows; one with a predicate is asked
+  const shownActions = item
+    ? (actions ?? []).filter((a) => (a.visible ? a.visible(item) : true))
+    : [];
+
   return (
     <ModuleGuard module={module}>
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
@@ -180,9 +192,9 @@ export function ModuleDetailScreen<T>({
               </View>
             ))}
 
-            {!!actions?.length && (
+            {!!shownActions.length && (
               <View style={styles.actions}>
-                {actions.map((a) => (
+                {shownActions.map((a) => (
                   <TouchableOpacity
                     key={a.label}
                     style={[styles.action, a.destructive && styles.actionDestructive]}

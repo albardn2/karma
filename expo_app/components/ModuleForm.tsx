@@ -16,16 +16,25 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
+import { PickerField, PickerSpec } from '@/components/PickerField';
 
 export interface FormField {
   name: string;
   label: string;
-  kind?: 'text' | 'number' | 'multiline' | 'select';
+  kind?: 'text' | 'number' | 'multiline' | 'select' | 'boolean' | 'picker';
   required?: boolean;
   placeholder?: string;
-  /** for kind 'select' */
+  /** for kind 'select'; for 'boolean' the values must be 'true' and 'false' */
   options?: Array<{ value: string; label: string }>;
+  /** for kind 'picker' — choose one record from a list endpoint */
+  picker?: PickerSpec;
+  /**
+   * Show this field only for certain answers to earlier ones. A hidden field is not
+   * rendered, not validated and not submitted — otherwise a `required` field the user
+   * cannot see would block the form with an error pointing at nothing.
+   */
+  visibleWhen?: (values: Record<string, string>) => boolean;
   keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
 }
 
@@ -35,6 +44,30 @@ interface ModuleFormProps {
   fields: FormField[];
   /** initial values — supply for an edit, omit for a create */
   initial?: Record<string, any>;
+  /**
+   * Fixed body values the user does not choose, merged into every submission.
+   *
+   * For actions taken *against* an existing record: the link uuid and any field the
+   * server requires to agree with it. A payout against an expense must carry that
+   * expense's currency exactly — offering it as an input would only let someone pick
+   * the one value guaranteed to be rejected.
+   */
+  extra?: Record<string, any>;
+  /**
+   * Reshape the flat field/value body into whatever the endpoint wants, after
+   * validation and after `extra` is merged.
+   *
+   * Some writes are not flat: fulfill-items takes {items: [{…}]}, a batch shape even
+   * for one line. Rather than teach the field spec about nesting, the form collects
+   * flat answers and the screen states the shape.
+   */
+  transform?: (body: Record<string, any>) => any;
+  /**
+   * A short explanation shown above the fields — for a constraint the form cannot
+   * express by omitting an input, e.g. that a receipt is always the full ordered
+   * quantity. Leaving the user to discover that from a rejection is worse.
+   */
+  note?: string;
   /** POST to create, PUT to edit */
   method: 'POST' | 'PUT';
   endpoint: string;
@@ -64,6 +97,9 @@ export function ModuleForm({
   title,
   fields,
   initial,
+  extra,
+  transform,
+  note,
   method,
   endpoint,
   onDone,
@@ -87,11 +123,14 @@ export function ModuleForm({
     setErrors((prev) => (prev[name] ? { ...prev, [name]: '' } : prev));
   };
 
+  // recomputed every render, so a field can appear the moment its condition is met
+  const shownFields = fields.filter((f) => (f.visibleWhen ? f.visibleWhen(values) : true));
+
   const build = (): Record<string, any> | null => {
     const body: Record<string, any> = {};
     const found: Record<string, string> = {};
 
-    for (const f of fields) {
+    for (const f of shownFields) {
       const raw = (values[f.name] ?? '').trim();
       if (f.required && !raw) {
         found[f.name] = t('form.required');
@@ -106,6 +145,11 @@ export function ModuleForm({
           found[f.name] = t('form.mustBeNumber');
           continue;
         }
+      } else if (f.kind === 'boolean') {
+        // a real JSON boolean, not the string "true" — the DTO field is typed bool
+        // and relying on Pydantic's lax coercion to fix our payload is a bet we do
+        // not need to take
+        parsed = raw === 'true';
       }
       // on an edit, skip anything the user did not actually change
       if (method === 'PUT' && initial && String(initial[f.name] ?? '') === raw) continue;
@@ -120,9 +164,12 @@ export function ModuleForm({
   };
 
   const submit = async () => {
-    const body = build();
-    if (!body) return;
-    if (method === 'PUT' && Object.keys(body).length === 0) {
+    const built = build();
+    if (!built) return;
+    // extra last: a fixed value is not the user's to override
+    const flat = { ...built, ...(extra ?? {}) };
+    const body = transform ? transform(flat) : flat;
+    if (method === 'PUT' && Object.keys(flat).length === 0) {
       // nothing changed — a PUT with an empty body is a pointless round trip and
       // some update DTOs reject it outright
       router.back();
@@ -131,7 +178,7 @@ export function ModuleForm({
     setSaving(true);
     try {
       const res = await apiCall(endpoint, { method, body: JSON.stringify(body) });
-      if (res.status === 200 || res.status === 201) {
+      if (isOk(res.status)) {
         onDone ? onDone() : router.back();
       } else {
         // surface what the server actually said — a 422 names the offending field,
@@ -165,14 +212,22 @@ export function ModuleForm({
           keyboardVerticalOffset={insets.top + 50}
         >
           <ScrollView contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}>
-            {fields.map((f) => (
+            {!!note && <ThemedText style={styles.note}>{note}</ThemedText>}
+            {shownFields.map((f) => (
               <View key={f.name} style={styles.field}>
                 <ThemedText style={styles.label}>
                   {f.label}
                   {f.required ? ' *' : ''}
                 </ThemedText>
 
-                {f.kind === 'select' ? (
+                {f.kind === 'picker' && f.picker ? (
+                  <PickerField
+                    spec={f.picker}
+                    value={values[f.name] ?? ''}
+                    onChange={(v) => set(f.name, v)}
+                    testID={`form-${f.name}`}
+                  />
+                ) : f.kind === 'select' || f.kind === 'boolean' ? (
                   <View style={styles.options}>
                     {(f.options ?? []).map((o) => {
                       const on = values[f.name] === o.value;
@@ -244,6 +299,7 @@ const styles = StyleSheet.create({
   topTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600' },
   body: { paddingHorizontal: 20, paddingTop: 6 },
   field: { marginBottom: 16 },
+  note: { fontSize: 13, opacity: 0.7, lineHeight: 19, marginBottom: 16 },
   label: { fontSize: 14, fontWeight: '600', marginBottom: 6, opacity: 0.75 },
   input: {
     backgroundColor: '#fff',

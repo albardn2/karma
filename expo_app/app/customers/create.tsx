@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useRouter, Stack } from 'expo-router';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -138,7 +138,7 @@ export default function CreateCustomerScreen() {
       });
 
       console.log('API response:', response);
-      if (response.status === 200 || response.status === 201) {
+      if (isOk(response.status)) {
         showBanner('success', t('custcreate.createSuccess'));
         setTimeout(() => {
           // Navigate back and trigger refresh
