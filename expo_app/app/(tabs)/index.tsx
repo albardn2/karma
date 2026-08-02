@@ -24,6 +24,7 @@ interface MenuItem {
 }
 
 const ALL_MENU_ITEMS: MenuItem[] = [
+  { id: 17, titleKey: 'menu.dashboard', icon: '📊', section: 'dashboard', color: '#334155', module: 'dashboard' },
   { id: 1, titleKey: 'menu.customers', icon: '👥', section: 'customers', color: '#5469D4', module: 'customers' },
   { id: 2, titleKey: 'menu.customerOrders', icon: '📋', section: 'customer_orders', color: '#e74c3c', module: 'customer-orders' },
   { id: 3, titleKey: 'menu.distribution', icon: '🚚', section: 'distribution', color: '#16a34a', module: 'workflow-execution' },
@@ -116,40 +117,12 @@ export default function HomeScreen() {
     );
   };
 
+  // Every tile's route is its section with underscores swapped for hyphens — verified
+  // against all sixteen branches this replaced, which were mechanically identical. The
+  // tile list is now the only place a module is declared, so a new one cannot be added
+  // to the menu and then silently fail to navigate.
   const handleMenuPress = (item: MenuItem) => {
-    if (item.section === 'customers') {
-      router.push('/customers');
-    } else if (item.section === 'distribution') {
-      router.push('/distribution');
-    } else if (item.section === 'trips') {
-      router.push('/trips');
-    } else if (item.section === 'customer_orders') {
-      router.push('/customer-orders');
-    } else if (item.section === 'inventory') {
-      router.push('/inventory');
-    } else if (item.section === 'materials') {
-      router.push('/materials');
-    } else if (item.section === 'payments') {
-      router.push('/payments');
-    } else if (item.section === 'inventory_events') {
-      router.push('/inventory-events');
-    } else if (item.section === 'vendors') {
-      router.push('/vendors');
-    } else if (item.section === 'warehouses') {
-      router.push('/warehouses');
-    } else if (item.section === 'employees') {
-      router.push('/employees');
-    } else if (item.section === 'vehicles') {
-      router.push('/vehicles');
-    } else if (item.section === 'financial_accounts') {
-      router.push('/financial-accounts');
-    } else if (item.section === 'expenses') {
-      router.push('/expenses');
-    } else if (item.section === 'payouts') {
-      router.push('/payouts');
-    } else if (item.section === 'purchase_orders') {
-      router.push('/purchase-orders');
-    }
+    router.push(`/${item.section.replace(/_/g, '-')}` as never);
   };
 
   const bottomPadding = useMemo(() => 
