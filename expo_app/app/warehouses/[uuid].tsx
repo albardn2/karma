@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { ChartLegend, LineChart } from '@/components/Chart';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useHasModule } from '@/hooks/useModuleAccess';
 import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 
@@ -70,6 +71,9 @@ export default function WarehousesDetailScreen() {
   const [series, setSeries] = useState<OverTimeSeries[] | null>(null);
   const [range, setRange] = useState<(typeof RANGES)[number]['id']>('90d');
   const [bucket, setBucket] = useState<string>('week');
+  const [reloadKey, setReloadKey] = useState(0);
+  // adding stock is an inventory-module write even though it starts here
+  const canAddStock = useHasModule('inventory');
 
   const loadAnalytics = useCallback(async () => {
     const preset = RANGES.find((r) => r.id === range)!;
@@ -96,7 +100,9 @@ export default function WarehousesDetailScreen() {
 
   useEffect(() => {
     loadAnalytics();
-  }, [loadAnalytics]);
+    // reloadKey so stock and the chart reflect a lot added moments ago, not just the
+    // warehouse record itself
+  }, [loadAnalytics, reloadKey]);
 
   // The four biggest materials only: a phone-width chart with twenty series is a
   // smear, and the tail is where the uninteresting ones live.
@@ -123,6 +129,7 @@ export default function WarehousesDetailScreen() {
       module="warehouses"
       title={t('menu.warehouses')}
       endpoint={`/warehouse/${uuid}`}
+      reloadKey={reloadKey}
       heading={(x) => x.name}
       rows={(x): DetailRow[] => [
         [t('warehouses.address'), x.address || '—'],
@@ -192,7 +199,8 @@ export default function WarehousesDetailScreen() {
         {
           label: t('detail.edit'),
           testID: 'warehouse-edit',
-          onPress: (x) =>
+          onPress: (x) => {
+            setReloadKey((k) => k + 1);
             router.push({
               pathname: '/warehouses/create',
               params: {
@@ -201,8 +209,24 @@ export default function WarehousesDetailScreen() {
                 address: x.address ?? '',
                 notes: x.notes ?? '',
               },
-            }),
+            });
+          },
         },
+        ...(canAddStock
+          ? [
+              {
+                label: t('inventory.addStock'),
+                testID: 'warehouse-add-stock',
+                onPress: (x: Warehouse) => {
+                  setReloadKey((k) => k + 1);
+                  router.push({
+                    pathname: '/warehouses/add-stock',
+                    params: { warehouse_uuid: x.uuid, warehouse_name: x.name ?? '' },
+                  });
+                },
+              },
+            ]
+          : []),
       ]}
     />
   );
