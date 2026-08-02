@@ -28,6 +28,7 @@ export default function WarehousesScreen() {
         title={t('menu.warehouses')}
         endpoint="/warehouse/"
         itemsKey="warehouses"
+        onCreate={() => router.push('/warehouses/create')}
         searchParam="name"
         searchPlaceholder={t('warehouses.searchPlaceholder')}
         keyExtractor={(x) => x.uuid}
