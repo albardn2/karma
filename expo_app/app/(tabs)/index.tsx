@@ -43,6 +43,8 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 16, titleKey: 'menu.purchaseOrders', icon: '📥', section: 'purchase_orders', color: '#1d4ed8', module: 'purchase-orders' },
   { id: 18, titleKey: 'menu.pricing', icon: '🏷️', section: 'pricing', color: '#7c2d12', module: 'pricing' },
   { id: 19, titleKey: 'menu.serviceAreas', icon: '🗺️', section: 'service_areas', color: '#0369a1', module: 'service-areas' },
+  { id: 20, titleKey: 'menu.transactions', icon: '🔁', section: 'transactions', color: '#155e75', module: 'transactions' },
+  { id: 21, titleKey: 'menu.processes', icon: '🏭', section: 'processes', color: '#6d28d9', module: 'processes' },
 ];
 
 const LANGS: Lang[] = ['en', 'ar'];
