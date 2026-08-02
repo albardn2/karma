@@ -30,6 +30,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 4, titleKey: 'menu.trips', icon: '🗺️', section: 'trips', color: '#d97706', adminOnly: true, module: 'trips' },
   { id: 5, titleKey: 'menu.inventory', icon: '📦', section: 'inventory', color: '#0891b2', module: 'inventory' },
   { id: 6, titleKey: 'menu.materials', icon: '🧱', section: 'materials', color: '#7c3aed', module: 'materials' },
+  { id: 7, titleKey: 'menu.payments', icon: '💵', section: 'payments', color: '#16a34a', module: 'payments' },
 ];
 
 const LANGS: Lang[] = ['en', 'ar'];
@@ -119,6 +120,8 @@ export default function HomeScreen() {
       router.push('/inventory');
     } else if (item.section === 'materials') {
       router.push('/materials');
+    } else if (item.section === 'payments') {
+      router.push('/payments');
     }
   };
 

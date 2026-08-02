@@ -191,6 +191,17 @@ export const translations: Record<Lang, Record<string, string>> = {
   'materials.type': 'Type',
   'materials.created': 'Created',
   'materials.description': 'Description',
+  'menu.payments': 'Payments',
+  'payments.againstInvoice': 'Against invoice',
+  'payments.againstDebitNote': 'Against debit note',
+  'payments.unlinked': 'Not linked',
+  'payments.payer': 'From',
+  'payments.method': 'Method',
+  'payments.account': 'Deposited to',
+  'payments.appliedTo': 'Applied to',
+  'payments.received': 'Received',
+  'payments.notes': 'Notes',
+
 
 
 
@@ -717,6 +728,17 @@ export const translations: Record<Lang, Record<string, string>> = {
   'materials.type': 'النوع',
   'materials.created': 'تاريخ الإنشاء',
   'materials.description': 'الوصف',
+  'menu.payments': 'المدفوعات',
+  'payments.againstInvoice': 'مقابل فاتورة',
+  'payments.againstDebitNote': 'مقابل إشعار مدين',
+  'payments.unlinked': 'غير مرتبط',
+  'payments.payer': 'من',
+  'payments.method': 'طريقة الدفع',
+  'payments.account': 'أُودع في',
+  'payments.appliedTo': 'مطبَّق على',
+  'payments.received': 'تاريخ الاستلام',
+  'payments.notes': 'ملاحظات',
+
 
 
 
