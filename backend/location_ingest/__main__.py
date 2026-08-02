@@ -54,8 +54,40 @@ _messages: "queue.Queue[tuple[str, bytes]]" = queue.Queue(maxsize=10000)
 
 
 def _on_connect(client, userdata, flags, reason_code, properties):
-    log.info("connected to %s:%s (rc=%s); subscribing %s/+", BROKER_HOST, BROKER_PORT, reason_code, TOPIC_PREFIX)
+    # Two patterns, deliberately.
+    #
+    # `{PREFIX}/{account}/{user}` is the current shape: topics are namespaced per
+    # account so one tenant's wildcard subscription cannot see another's drivers.
+    #
+    # `{PREFIX}/{user}` is the old shape, kept subscribed because an app build in
+    # someone's pocket goes on publishing to it until it next reads
+    # /location/client-config. Dropping it at deploy time would silently stop
+    # ingesting those users' pings — a data hole with no error anywhere. Remove this
+    # once no client can still be on the old topic.
+    log.info(
+        "connected to %s:%s (rc=%s); subscribing %s/+/+ and %s/+ (legacy)",
+        BROKER_HOST, BROKER_PORT, reason_code, TOPIC_PREFIX, TOPIC_PREFIX,
+    )
+    client.subscribe(f"{TOPIC_PREFIX}/+/+", qos=0)
     client.subscribe(f"{TOPIC_PREFIX}/+", qos=0)
+
+
+def _split_topic(topic: str) -> tuple[str | None, str | None]:
+    """(account_uuid, user_uuid) from a location topic.
+
+    Handles both shapes we subscribe to: `{PREFIX}/{account}/{user}` gives both, and
+    the legacy `{PREFIX}/{user}` gives (None, user). Anything not under PREFIX, or
+    with more segments than expected, yields (None, None) so the caller drops it
+    rather than guessing.
+    """
+    if not topic.startswith(f"{TOPIC_PREFIX}/"):
+        return None, None
+    rest = topic[len(TOPIC_PREFIX) + 1:].split("/")
+    if len(rest) == 1:
+        return None, rest[0] or None
+    if len(rest) == 2:
+        return (rest[0] or None), (rest[1] or None)
+    return None, None
 
 
 def _on_message(client, userdata, msg):
@@ -165,7 +197,7 @@ class Ingestor:
             data = json.loads(payload.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             return
-        topic_user = topic.rsplit("/", 1)[-1]
+        topic_account, topic_user = _split_topic(topic)
         if not topic_user or data.get("user_uuid") != topic_user:
             return
         coords = data.get("coordinates")
@@ -182,6 +214,18 @@ class Ingestor:
 
             user = uow.user_repository.find_one(uuid=topic_user, is_deleted=False)
             if not user or not user.track_location:
+                return
+            # A namespaced topic must name the user's OWN account. The broker is
+            # public and authenticates nobody, so without this anyone could publish
+            # under another tenant's namespace and have it stored as that tenant's
+            # data. The user lookup proves the user exists; this proves the namespace
+            # was not forged. Legacy topics carry no account segment and are trusted
+            # exactly as far as they were before.
+            if topic_account is not None and topic_account != user.account_uuid:
+                log.warning(
+                    "dropping ping for user %s: topic account %s != user account %s",
+                    topic_user, topic_account, user.account_uuid,
+                )
                 return
 
             trip_uuid = self._active_trip_uuid(uow, user)

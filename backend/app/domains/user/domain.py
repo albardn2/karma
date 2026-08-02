@@ -138,10 +138,21 @@ class UserDomain:
         for key in ("track_location", "location_ping_seconds", "is_active"):
             if updates.get(key) is None:
                 updates.pop(key, None)
+        # The password NEVER goes through the generic setattr loop below. It used to,
+        # and `if payload.password:` only hashed it afterwards when it was truthy — so
+        # PUT {"password": ""} wrote the empty string straight into the column and
+        # skipped hashing entirely, leaving a non-hash there and locking the account
+        # out of every login. Popping it first makes that impossible to reintroduce by
+        # adding a field, and an empty or whitespace-only password is now refused
+        # rather than silently applied.
+        new_password = updates.pop("password", None)
+        if new_password is not None and not new_password.strip():
+            raise BadRequestError("Password cannot be empty")
+
         for field, val in updates.items():
             setattr(user, field, val)
-        if payload.password:
-            user.set_password(payload.password)
+        if new_password:
+            user.set_password(new_password)
 
         uow.user_repository.save(model=user, commit=False)
 
