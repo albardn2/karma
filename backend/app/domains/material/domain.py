@@ -43,8 +43,24 @@ class MaterialDomain:
         if not m:
             raise NotFoundError('Material not found')
 
-        if any(field in MaterialDomain.SENSITIVE_UPDATE_FIELDS for field in data.keys()) and not MaterialDomain.validate_no_relation_exists(uow,m):
-            raise BadRequestError('Material cannot be updated because it has relations')
+        # Unit, sku and type are frozen once a material is in use — changing
+        # them would silently restate existing stock, prices and history. The
+        # test is whether the value actually CHANGES, not whether the client
+        # mentioned the field: the web form posts the whole material on every
+        # save, so keying on presence rejected harmless edits (renaming, or
+        # adding a description) for any material that had ever been stocked,
+        # priced or ordered — which is nearly all of them.
+        changed_sensitive = [
+            field for field in data
+            if field in MaterialDomain.SENSITIVE_UPDATE_FIELDS
+            and data[field] != getattr(m, field)
+        ]
+        if changed_sensitive and not MaterialDomain.validate_no_relation_exists(uow, m):
+            raise BadRequestError(
+                f"Cannot change {', '.join(sorted(changed_sensitive))} on a material that is "
+                f"already in use (it has stock, pricing, orders or history). "
+                f"Its name and description can still be edited."
+            )
 
         for field, val in data.items():
             setattr(m, field, val)
