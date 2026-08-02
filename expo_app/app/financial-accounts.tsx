@@ -36,6 +36,7 @@ export default function FinancialAccountsScreen() {
         title={t('menu.financialAccounts')}
         endpoint="/financial-account/"
         itemsKey="accounts"
+        onCreate={() => router.push('/financial-accounts/create')}
         keyExtractor={(x) => x.uuid}
         renderItem={(x) => (
           <TouchableOpacity

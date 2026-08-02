@@ -37,6 +37,7 @@ export default function ExpensesScreen() {
         title={t('menu.expenses')}
         endpoint="/expense/"
         itemsKey="expenses"
+        onCreate={() => router.push('/expenses/create')}
         onAnalytics={() => router.push('/expenses/analytics')}
         filters={[
           { id: 'pending', label: tef('pending'), params: { status: 'pending' } },

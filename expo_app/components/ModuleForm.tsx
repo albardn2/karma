@@ -21,10 +21,10 @@ import { apiCall } from '@/utils/api';
 export interface FormField {
   name: string;
   label: string;
-  kind?: 'text' | 'number' | 'multiline' | 'select';
+  kind?: 'text' | 'number' | 'multiline' | 'select' | 'boolean';
   required?: boolean;
   placeholder?: string;
-  /** for kind 'select' */
+  /** for kind 'select'; for 'boolean' the values must be 'true' and 'false' */
   options?: Array<{ value: string; label: string }>;
   keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
 }
@@ -106,6 +106,11 @@ export function ModuleForm({
           found[f.name] = t('form.mustBeNumber');
           continue;
         }
+      } else if (f.kind === 'boolean') {
+        // a real JSON boolean, not the string "true" — the DTO field is typed bool
+        // and relying on Pydantic's lax coercion to fix our payload is a bet we do
+        // not need to take
+        parsed = raw === 'true';
       }
       // on an edit, skip anything the user did not actually change
       if (method === 'PUT' && initial && String(initial[f.name] ?? '') === raw) continue;
@@ -172,7 +177,7 @@ export function ModuleForm({
                   {f.required ? ' *' : ''}
                 </ThemedText>
 
-                {f.kind === 'select' ? (
+                {f.kind === 'select' || f.kind === 'boolean' ? (
                   <View style={styles.options}>
                     {(f.options ?? []).map((o) => {
                       const on = values[f.name] === o.value;

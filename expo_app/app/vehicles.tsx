@@ -34,6 +34,7 @@ export default function VehiclesScreen() {
         title={t('menu.vehicles')}
         endpoint="/vehicle/"
         itemsKey="items"
+        onCreate={() => router.push('/vehicles/create')}
         searchParam="plate_number"
         searchPlaceholder={t('vehicles.searchPlaceholder')}
         filters={[
