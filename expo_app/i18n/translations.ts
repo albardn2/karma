@@ -282,6 +282,11 @@ export const translations: Record<Lang, Record<string, string>> = {
   'vehicles.one': 'vehicle',
   'vehicles.plate': 'Plate number',
   'vehicles.vin': 'VIN',
+  'vehicles.onBoard': 'On board',
+  'vehicles.noStock': 'Nothing loaded on this vehicle',
+  'vehicles.movements': 'Stock movements',
+  'vehicles.noMovements': 'No movements in this period',
+
   'employees.one': 'employee',
   'employees.name': 'Full name',
   'employees.address': 'Address',
@@ -943,6 +948,11 @@ export const translations: Record<Lang, Record<string, string>> = {
   'vehicles.one': 'مركبة',
   'vehicles.plate': 'رقم اللوحة',
   'vehicles.vin': 'رقم الهيكل',
+  'vehicles.onBoard': 'المحمّل حالياً',
+  'vehicles.noStock': 'لا توجد مواد محمّلة على هذه المركبة',
+  'vehicles.movements': 'حركة المخزون',
+  'vehicles.noMovements': 'لا توجد حركة في هذه الفترة',
+
   'employees.one': 'موظف',
   'employees.name': 'الاسم الكامل',
   'employees.address': 'العنوان',
