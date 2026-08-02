@@ -28,6 +28,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 2, titleKey: 'menu.customerOrders', icon: '📋', section: 'customer_orders', color: '#e74c3c', module: 'customer-orders' },
   { id: 3, titleKey: 'menu.distribution', icon: '🚚', section: 'distribution', color: '#16a34a', module: 'workflow-execution' },
   { id: 4, titleKey: 'menu.trips', icon: '🗺️', section: 'trips', color: '#d97706', adminOnly: true, module: 'trips' },
+  { id: 5, titleKey: 'menu.inventory', icon: '📦', section: 'inventory', color: '#0891b2', module: 'inventory' },
 ];
 
 const LANGS: Lang[] = ['en', 'ar'];
@@ -113,6 +114,8 @@ export default function HomeScreen() {
       router.push('/trips');
     } else if (item.section === 'customer_orders') {
       router.push('/customer-orders');
+    } else if (item.section === 'inventory') {
+      router.push('/inventory');
     }
   };
 
