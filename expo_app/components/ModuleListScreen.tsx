@@ -49,6 +49,8 @@ interface ModuleListScreenProps<T> {
   filters?: Array<{ id: string; label: string; params: Record<string, string> }>;
   /** rendered above the list, for anything a module needs beyond chips */
   header?: React.ReactNode;
+  /** shows a + in the header; omit for modules the app cannot create */
+  onCreate?: () => void;
 }
 
 /**
@@ -76,6 +78,7 @@ export function ModuleListScreen<T>({
   params,
   filters,
   header,
+  onCreate,
 }: ModuleListScreenProps<T>) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -154,11 +157,18 @@ export function ModuleListScreen<T>({
 
         <View style={styles.headerRow}>
           <ThemedText style={styles.title}>{title}</ThemedText>
-          {!loading && !failed && (
-            <ThemedText style={styles.count} testID="module-list-count">
-              {t('moduleList.count', { count: totalCount })}
-            </ThemedText>
-          )}
+          <View style={styles.headerRight}>
+            {!loading && !failed && (
+              <ThemedText style={styles.count} testID="module-list-count">
+                {t('moduleList.count', { count: totalCount })}
+              </ThemedText>
+            )}
+            {!!onCreate && (
+              <TouchableOpacity style={styles.add} onPress={onCreate} testID="module-list-add">
+                <ThemedText style={styles.addText}>+</ThemedText>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {searchParam && (
@@ -276,6 +286,16 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 24, fontWeight: '700' },
   count: { fontSize: 13, opacity: 0.6 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  add: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#5469D4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addText: { color: '#fff', fontSize: 22, lineHeight: 26, fontWeight: '700' },
   search: {
     marginHorizontal: 20,
     marginVertical: 10,

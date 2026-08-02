@@ -14,7 +14,15 @@ interface Vendor {
   category?: string | null;
   email_address?: string | null;
   full_address?: string | null;
+  balance_per_currency?: Record<string, number> | null;
 }
+
+/** Only non-zero balances are worth the space on a narrow row. */
+const owedSummary = (b?: Record<string, number> | null) =>
+  Object.entries(b ?? {})
+    .filter(([, amount]) => Math.abs(Number(amount)) > 0.005)
+    .map(([currency, amount]) => `${Math.abs(Number(amount)).toFixed(2)} ${currency}`)
+    .join(' · ');
 
 /**
  * Suppliers.
@@ -34,6 +42,7 @@ export default function VendorsScreen() {
         title={t('menu.vendors')}
         endpoint="/vendor/"
         itemsKey="vendors"
+        onCreate={() => router.push('/vendors/create')}
         searchParam="company_name"
         searchPlaceholder={t('vendors.searchPlaceholder')}
         filters={[
@@ -54,6 +63,11 @@ export default function VendorsScreen() {
               <ThemedText style={styles.title} numberOfLines={1}>
                 {x.company_name}
               </ThemedText>
+              {!!owedSummary(x.balance_per_currency) && (
+                <ThemedText style={styles.owed}>
+                  {owedSummary(x.balance_per_currency)}
+                </ThemedText>
+              )}
             </View>
             <View style={styles.cardBottom}>
               <ThemedText style={styles.subtitle} numberOfLines={1}>
@@ -90,6 +104,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: { flex: 1, fontSize: 16, fontWeight: '600', color: '#1f2937' },
+  owed: { fontSize: 14, fontWeight: '700', color: '#991b1b' },
   value: { fontSize: 16, fontWeight: '700', color: '#1f2937' },
   cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   subtitle: { flex: 1, fontSize: 13, opacity: 0.55 },

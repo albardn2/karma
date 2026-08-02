@@ -257,6 +257,23 @@ export const translations: Record<Lang, Record<string, string>> = {
   'purchaseOrders.status': 'Status',
   'purchaseOrders.overdue': 'Overdue',
   'purchaseOrders.when': 'Date',
+  'form.required': 'Required',
+  'form.mustBeNumber': 'Must be a number',
+  'form.save': 'Save',
+  'form.saveFailed': "Couldn't save",
+  'form.tryAgain': 'Please try again.',
+  'form.createTitle': 'New {what}',
+  'form.editTitle': 'Edit {what}',
+  'detail.confirmDestructive': 'This cannot be undone.',
+  'detail.edit': 'Edit',
+  'detail.delete': 'Delete',
+  'vendors.one': 'vendor',
+  'vendors.company': 'Company',
+  'vendors.balanceIn': 'Balance ({currency})',
+  'vendors.owed': '{amount} owed to them',
+  'vendors.credit': '{amount} in credit',
+
+
 
 
 
@@ -852,6 +869,23 @@ export const translations: Record<Lang, Record<string, string>> = {
   'purchaseOrders.status': 'الحالة',
   'purchaseOrders.overdue': 'متأخر',
   'purchaseOrders.when': 'التاريخ',
+  'form.required': 'مطلوب',
+  'form.mustBeNumber': 'يجب أن يكون رقماً',
+  'form.save': 'حفظ',
+  'form.saveFailed': 'تعذر الحفظ',
+  'form.tryAgain': 'يرجى المحاولة مرة أخرى.',
+  'form.createTitle': '{what} جديد',
+  'form.editTitle': 'تعديل {what}',
+  'detail.confirmDestructive': 'لا يمكن التراجع عن هذا.',
+  'detail.edit': 'تعديل',
+  'detail.delete': 'حذف',
+  'vendors.one': 'مورد',
+  'vendors.company': 'الشركة',
+  'vendors.balanceIn': 'الرصيد ({currency})',
+  'vendors.owed': 'مستحق لهم {amount}',
+  'vendors.credit': 'رصيد دائن {amount}',
+
+
 
 
 

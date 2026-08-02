@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,23 @@ import { apiCall } from '@/utils/api';
 
 export type DetailRow = [label: string, value: string];
 
+export interface DetailSection<T> {
+  title: string;
+  /** rows to render; an empty array shows the empty note instead */
+  render: (item: T) => React.ReactNode;
+  /** shown when the section has nothing */
+  emptyText?: string;
+  isEmpty?: (item: T) => boolean;
+}
+
+export interface DetailAction<T> {
+  label: string;
+  onPress: (item: T) => void;
+  /** destructive actions get a confirm and red styling */
+  destructive?: boolean;
+  testID?: string;
+}
+
 interface ModuleDetailScreenProps<T> {
   module: string;
   /** shown in the top bar */
@@ -28,8 +46,14 @@ interface ModuleDetailScreenProps<T> {
   /** optional line under the heading — an amount, a status */
   subheading?: (item: T) => React.ReactNode;
   rows: (item: T) => DetailRow[];
+  /** related records — line items, stock, invoices */
+  sections?: DetailSection<T>[];
+  /** edit / delete / record-a-payment, rendered as buttons under the record */
+  actions?: DetailAction<T>[];
   /** free-text block rendered last, e.g. notes */
   footer?: (item: T) => React.ReactNode;
+  /** bumped by a caller to force a refetch after a write */
+  reloadKey?: number;
 }
 
 /**
@@ -48,7 +72,10 @@ export function ModuleDetailScreen<T>({
   heading,
   subheading,
   rows,
+  sections,
+  actions,
   footer,
+  reloadKey,
 }: ModuleDetailScreenProps<T>) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -78,7 +105,7 @@ export function ModuleDetailScreen<T>({
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, reloadKey]);
 
   return (
     <ModuleGuard module={module}>
@@ -138,6 +165,48 @@ export function ModuleDetailScreen<T>({
               ))}
             </View>
 
+            {sections?.map((sec) => (
+              <View key={sec.title}>
+                <ThemedText style={styles.sectionTitle}>{sec.title}</ThemedText>
+                <View style={styles.card}>
+                  {sec.isEmpty?.(item) ? (
+                    <ThemedText style={styles.rowLabel}>
+                      {sec.emptyText ?? t('moduleList.empty')}
+                    </ThemedText>
+                  ) : (
+                    sec.render(item)
+                  )}
+                </View>
+              </View>
+            ))}
+
+            {!!actions?.length && (
+              <View style={styles.actions}>
+                {actions.map((a) => (
+                  <TouchableOpacity
+                    key={a.label}
+                    style={[styles.action, a.destructive && styles.actionDestructive]}
+                    testID={a.testID}
+                    onPress={() => {
+                      if (!a.destructive) return a.onPress(item);
+                      // a destructive action always asks first: these screens are
+                      // used one-handed in a van, and a mis-tap should not delete
+                      Alert.alert(a.label, t('detail.confirmDestructive'), [
+                        { text: t('common.cancel'), style: 'cancel' },
+                        { text: a.label, style: 'destructive', onPress: () => a.onPress(item) },
+                      ]);
+                    }}
+                  >
+                    <ThemedText
+                      style={[styles.actionText, a.destructive && styles.actionTextDestructive]}
+                    >
+                      {a.label}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             {footer?.(item)}
           </ScrollView>
         )}
@@ -159,6 +228,17 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   rowLabel: { flex: 1, fontSize: 14, opacity: 0.65 },
   rowValue: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1f2937', textAlign: 'right' },
+  sectionTitle: { fontSize: 15, fontWeight: '700', marginTop: 22, marginBottom: -6 },
+  actions: { marginTop: 22, gap: 10 },
+  action: {
+    backgroundColor: '#5469D4',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  actionDestructive: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#fecaca' },
+  actionText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  actionTextDestructive: { color: '#dc2626' },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
   stateIcon: { fontSize: 34 },
   stateText: { fontSize: 15, opacity: 0.6, textAlign: 'center' },
