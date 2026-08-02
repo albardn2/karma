@@ -182,6 +182,16 @@ export const translations: Record<Lang, Record<string, string>> = {
   'inventory.expiry': 'Expiry',
   'inventory.received': 'Created',
   'inventory.notes': 'Notes',
+  'menu.materials': 'Materials',
+  'materials.searchPlaceholder': 'Search by name',
+  'materials.product': 'Products',
+  'materials.rawMaterial': 'Raw materials',
+  'materials.sku': 'SKU',
+  'materials.unit': 'Unit',
+  'materials.type': 'Type',
+  'materials.created': 'Created',
+  'materials.description': 'Description',
+
 
 
 
@@ -698,6 +708,16 @@ export const translations: Record<Lang, Record<string, string>> = {
   'inventory.expiry': 'تاريخ الانتهاء',
   'inventory.received': 'تاريخ الإنشاء',
   'inventory.notes': 'ملاحظات',
+  'menu.materials': 'المواد',
+  'materials.searchPlaceholder': 'البحث بالاسم',
+  'materials.product': 'منتجات',
+  'materials.rawMaterial': 'مواد خام',
+  'materials.sku': 'رمز الصنف',
+  'materials.unit': 'الوحدة',
+  'materials.type': 'النوع',
+  'materials.created': 'تاريخ الإنشاء',
+  'materials.description': 'الوصف',
+
 
 
 
