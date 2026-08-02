@@ -35,6 +35,15 @@ interface ModuleFormProps {
   fields: FormField[];
   /** initial values — supply for an edit, omit for a create */
   initial?: Record<string, any>;
+  /**
+   * Fixed body values the user does not choose, merged into every submission.
+   *
+   * For actions taken *against* an existing record: the link uuid and any field the
+   * server requires to agree with it. A payout against an expense must carry that
+   * expense's currency exactly — offering it as an input would only let someone pick
+   * the one value guaranteed to be rejected.
+   */
+  extra?: Record<string, any>;
   /** POST to create, PUT to edit */
   method: 'POST' | 'PUT';
   endpoint: string;
@@ -64,6 +73,7 @@ export function ModuleForm({
   title,
   fields,
   initial,
+  extra,
   method,
   endpoint,
   onDone,
@@ -125,8 +135,10 @@ export function ModuleForm({
   };
 
   const submit = async () => {
-    const body = build();
-    if (!body) return;
+    const built = build();
+    if (!built) return;
+    // extra last: a fixed value is not the user's to override
+    const body = { ...built, ...(extra ?? {}) };
     if (method === 'PUT' && Object.keys(body).length === 0) {
       // nothing changed — a PUT with an empty body is a pointless round trip and
       // some update DTOs reject it outright

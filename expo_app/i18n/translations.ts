@@ -271,6 +271,9 @@ export const translations: Record<Lang, Record<string, string>> = {
   'expenses.totalSpend': 'Total spend',
   'expenses.paidOut': 'Paid out',
   'expenses.stillOwed': 'Still owed',
+  'expenses.recordPayout': 'Record payout',
+  'payouts.record': 'Record payout',
+
   'expenses.entries': 'Entries',
   'expenses.overTime': 'Spend over time',
   'expenses.byCategory': 'By category',
@@ -937,6 +940,9 @@ export const translations: Record<Lang, Record<string, string>> = {
   'expenses.totalSpend': 'إجمالي الإنفاق',
   'expenses.paidOut': 'المدفوع',
   'expenses.stillOwed': 'المتبقي',
+  'expenses.recordPayout': 'تسجيل دفعة',
+  'payouts.record': 'تسجيل دفعة',
+
   'expenses.entries': 'عدد القيود',
   'expenses.overTime': 'الإنفاق عبر الزمن',
   'expenses.byCategory': 'حسب الفئة',
