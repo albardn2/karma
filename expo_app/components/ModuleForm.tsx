@@ -16,7 +16,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 
 export interface FormField {
   name: string;
@@ -136,7 +136,7 @@ export function ModuleForm({
     setSaving(true);
     try {
       const res = await apiCall(endpoint, { method, body: JSON.stringify(body) });
-      if (res.status === 200 || res.status === 201) {
+      if (isOk(res.status)) {
         onDone ? onDone() : router.back();
       } else {
         // surface what the server actually said — a 422 names the offending field,
