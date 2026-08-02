@@ -31,6 +31,15 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 5, titleKey: 'menu.inventory', icon: '📦', section: 'inventory', color: '#0891b2', module: 'inventory' },
   { id: 6, titleKey: 'menu.materials', icon: '🧱', section: 'materials', color: '#7c3aed', module: 'materials' },
   { id: 7, titleKey: 'menu.payments', icon: '💵', section: 'payments', color: '#16a34a', module: 'payments' },
+  { id: 8, titleKey: 'menu.inventoryEvents', icon: '🔄', section: 'inventory_events', color: '#0284c7', module: 'inventory-events' },
+  { id: 9, titleKey: 'menu.vendors', icon: '🏭', section: 'vendors', color: '#b45309', module: 'vendors' },
+  { id: 10, titleKey: 'menu.warehouses', icon: '🏬', section: 'warehouses', color: '#0f766e', module: 'warehouses' },
+  { id: 11, titleKey: 'menu.employees', icon: '🧑‍🔧', section: 'employees', color: '#be185d', module: 'employees' },
+  { id: 12, titleKey: 'menu.vehicles', icon: '🚐', section: 'vehicles', color: '#4338ca', module: 'vehicles' },
+  { id: 13, titleKey: 'menu.financialAccounts', icon: '🏦', section: 'financial_accounts', color: '#065f46', module: 'financial-accounts' },
+  { id: 14, titleKey: 'menu.expenses', icon: '🧾', section: 'expenses', color: '#c2410c', module: 'expenses' },
+  { id: 15, titleKey: 'menu.payouts', icon: '💸', section: 'payouts', color: '#9f1239', module: 'payouts' },
+  { id: 16, titleKey: 'menu.purchaseOrders', icon: '📥', section: 'purchase_orders', color: '#1d4ed8', module: 'purchase-orders' },
 ];
 
 const LANGS: Lang[] = ['en', 'ar'];
@@ -122,6 +131,24 @@ export default function HomeScreen() {
       router.push('/materials');
     } else if (item.section === 'payments') {
       router.push('/payments');
+    } else if (item.section === 'inventory_events') {
+      router.push('/inventory-events');
+    } else if (item.section === 'vendors') {
+      router.push('/vendors');
+    } else if (item.section === 'warehouses') {
+      router.push('/warehouses');
+    } else if (item.section === 'employees') {
+      router.push('/employees');
+    } else if (item.section === 'vehicles') {
+      router.push('/vehicles');
+    } else if (item.section === 'financial_accounts') {
+      router.push('/financial-accounts');
+    } else if (item.section === 'expenses') {
+      router.push('/expenses');
+    } else if (item.section === 'payouts') {
+      router.push('/payouts');
+    } else if (item.section === 'purchase_orders') {
+      router.push('/purchase-orders');
     }
   };
 

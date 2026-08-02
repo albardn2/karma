@@ -4,6 +4,23 @@ import { Lang } from './translations';
 // The RAW value keeps flowing to (and being compared against) the API —
 // only what the user sees changes.
 const ENUM_AR: Record<string, string> = {
+  raw_materials: 'مواد خام',
+  services: 'خدمات',
+  sold: 'مُباع',
+  retired: 'مسحوب',
+  utilized: 'قيد الاستخدام',
+  pending: 'قيد الانتظار',
+  paid: 'مدفوع',
+  void: 'ملغى',
+  manager: 'مدير',
+  employee: 'موظف',
+  // inventory event types
+  sale: 'بيع',
+  purchase_order: 'أمر شراء',
+  process: 'عملية إنتاج',
+  manual: 'يدوي',
+  transfer: 'نقل',
+  adjustment: 'تسوية',
   // material types
   product: 'منتج',
   raw_material: 'مادة خام',
