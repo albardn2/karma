@@ -55,9 +55,9 @@ export default function ReceiveLineScreen() {
       picker: {
         endpoint: '/warehouse/',
         itemsKey: 'warehouses',
-        // `name` is the only usable filter here: /warehouse/?uuid= is a hard 500
-        // (the DTO types uuid as UUID while the column is varchar(36)) and
-        // ?within_polygon= 500s too
+        // `name` is the only filter that suits a search box: WarehouseListParams
+        // otherwise offers uuid (an exact match, useless for typing) and
+        // within_polygon (a WKT geometry, not text)
         searchParam: 'name',
         label: (w) => w.name ?? '—',
         value: (w) => w.uuid,
