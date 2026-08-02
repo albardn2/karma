@@ -25,7 +25,6 @@ interface MenuItem {
 
 const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 17, titleKey: 'menu.dashboard', icon: '📊', section: 'dashboard', color: '#334155', module: 'dashboard' },
-  { id: 18, titleKey: 'menu.pricing', icon: '🏷️', section: 'pricing', color: '#7c2d12', module: 'pricing' },
   { id: 1, titleKey: 'menu.customers', icon: '👥', section: 'customers', color: '#5469D4', module: 'customers' },
   { id: 2, titleKey: 'menu.customerOrders', icon: '📋', section: 'customer_orders', color: '#e74c3c', module: 'customer-orders' },
   { id: 3, titleKey: 'menu.distribution', icon: '🚚', section: 'distribution', color: '#16a34a', module: 'workflow-execution' },
@@ -42,6 +41,8 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 14, titleKey: 'menu.expenses', icon: '🧾', section: 'expenses', color: '#c2410c', module: 'expenses' },
   { id: 15, titleKey: 'menu.payouts', icon: '💸', section: 'payouts', color: '#9f1239', module: 'payouts' },
   { id: 16, titleKey: 'menu.purchaseOrders', icon: '📥', section: 'purchase_orders', color: '#1d4ed8', module: 'purchase-orders' },
+  { id: 18, titleKey: 'menu.pricing', icon: '🏷️', section: 'pricing', color: '#7c2d12', module: 'pricing' },
+  { id: 19, titleKey: 'menu.serviceAreas', icon: '🗺️', section: 'service_areas', color: '#0369a1', module: 'service-areas' },
 ];
 
 const LANGS: Lang[] = ['en', 'ar'];
