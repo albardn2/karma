@@ -132,6 +132,11 @@ export const translations: Record<Lang, Record<string, string>> = {
     'menu.customerOrders': 'Customer Orders',
     'menu.customers': 'Customers',
   'menu.dashboard': 'Dashboard',
+  'menu.pricing': 'Price list',
+  'pricing.searchPlaceholder': 'Search a material or SKU',
+  'pricing.empty': 'No prices recorded yet',
+  'pricing.truncated': 'Showing the first {shown} prices. Search to narrow it down.',
+
   'dashboard.range.7d': '7 days',
   'dashboard.range.30d': '30 days',
   'dashboard.range.90d': '90 days',
@@ -835,6 +840,11 @@ export const translations: Record<Lang, Record<string, string>> = {
     'menu.customerOrders': 'طلبات العملاء',
     'menu.customers': 'العملاء',
   'menu.dashboard': 'لوحة المعلومات',
+  'menu.pricing': 'قائمة الأسعار',
+  'pricing.searchPlaceholder': 'ابحث عن مادة أو رمز',
+  'pricing.empty': 'لا توجد أسعار مسجلة بعد',
+  'pricing.truncated': 'يتم عرض أول {shown} سعر. استخدم البحث للتصفية.',
+
   'dashboard.range.7d': '٧ أيام',
   'dashboard.range.30d': '٣٠ يوماً',
   'dashboard.range.90d': '٩٠ يوماً',
