@@ -53,6 +53,14 @@ services:
     image: karma-backend:local
     restart: unless-stopped
     command: ["gunicorn", "--bind", "0.0.0.0:5000", "--reload", "run:app"]
+    # Mount the source, or --reload above is a lie: gunicorn watches files
+    # inside the image, which only change when the image is rebuilt. Without
+    # this the local API silently serves whatever the image was built from —
+    # it sat five days behind the checkout, and a bug that had already been
+    # fixed and deployed still reproduced locally. The frontend service below
+    # has always mounted its source; this is the missing half.
+    volumes:
+      - ./backend:/karma
     environment:
       SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
       JWT_SECRET_KEY: "local-dev-only-not-a-secret"
