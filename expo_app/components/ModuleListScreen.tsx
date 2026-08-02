@@ -51,6 +51,8 @@ interface ModuleListScreenProps<T> {
   header?: React.ReactNode;
   /** shows a + in the header; omit for modules the app cannot create */
   onCreate?: () => void;
+  /** shows a chart button; omit for modules with no analytics endpoint */
+  onAnalytics?: () => void;
 }
 
 /**
@@ -79,6 +81,7 @@ export function ModuleListScreen<T>({
   filters,
   header,
   onCreate,
+  onAnalytics,
 }: ModuleListScreenProps<T>) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -162,6 +165,15 @@ export function ModuleListScreen<T>({
               <ThemedText style={styles.count} testID="module-list-count">
                 {t('moduleList.count', { count: totalCount })}
               </ThemedText>
+            )}
+            {!!onAnalytics && (
+              <TouchableOpacity
+                style={styles.headerBtn}
+                onPress={onAnalytics}
+                testID="module-list-analytics"
+              >
+                <ThemedText style={styles.headerBtnText}>📊</ThemedText>
+              </TouchableOpacity>
             )}
             {!!onCreate && (
               <TouchableOpacity style={styles.add} onPress={onCreate} testID="module-list-add">
@@ -296,6 +308,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addText: { color: '#fff', fontSize: 22, lineHeight: 26, fontWeight: '700' },
+  headerBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+  },
+  headerBtnText: { fontSize: 15, lineHeight: 20 },
   search: {
     marginHorizontal: 20,
     marginVertical: 10,
