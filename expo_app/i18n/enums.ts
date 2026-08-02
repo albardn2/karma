@@ -21,6 +21,9 @@ const ENUM_AR: Record<string, string> = {
   manual: 'يدوي',
   transfer: 'نقل',
   adjustment: 'تسوية',
+  prepared: 'مُحضَّر',
+  machinery_and_equipment: 'آلات ومعدات',
+  vehicle: 'مركبة',
   // material types
   product: 'منتج',
   raw_material: 'مادة خام',

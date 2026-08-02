@@ -38,11 +38,13 @@ export default function MaterialsScreen() {
         title={t('menu.materials')}
         endpoint="/material/"
         itemsKey="materials"
+        onCreate={() => router.push('/materials/create')}
         searchParam="name"
         searchPlaceholder={t('materials.searchPlaceholder')}
         filters={[
           { id: 'product', label: t('materials.product'), params: { type: 'product' } },
           { id: 'raw', label: t('materials.rawMaterial'), params: { type: 'raw_material' } },
+          { id: 'prepared', label: tef('prepared'), params: { type: 'prepared' } },
         ]}
         keyExtractor={(m) => m.uuid}
         renderItem={(m) => (
