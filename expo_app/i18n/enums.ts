@@ -4,6 +4,29 @@ import { Lang } from './translations';
 // The RAW value keeps flowing to (and being compared against) the API —
 // only what the user sees changes.
 const ENUM_AR: Record<string, string> = {
+  raw_materials: 'مواد خام',
+  services: 'خدمات',
+  sold: 'مُباع',
+  retired: 'مسحوب',
+  utilized: 'قيد الاستخدام',
+  pending: 'قيد الانتظار',
+  paid: 'مدفوع',
+  void: 'ملغى',
+  manager: 'مدير',
+  employee: 'موظف',
+  // inventory event types
+  sale: 'بيع',
+  purchase_order: 'أمر شراء',
+  process: 'عملية إنتاج',
+  manual: 'يدوي',
+  transfer: 'نقل',
+  adjustment: 'تسوية',
+  prepared: 'مُحضَّر',
+  machinery_and_equipment: 'آلات ومعدات',
+  vehicle: 'مركبة',
+  // material types
+  product: 'منتج',
+  raw_material: 'مادة خام',
   // User roles. The app had none of these, so a role name rendered as its raw key
   // in Arabic — the whole set is here rather than only the two being added, since
   // the gap is the same for all of them.
