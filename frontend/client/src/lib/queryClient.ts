@@ -55,6 +55,34 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+/**
+ * The human-readable part of an error thrown by `apiRequest`.
+ *
+ * apiRequest throws `"<status>: <raw body>"`, and the body is normally
+ * `{"error": ...}` (domain errors) or `{"msg": ...}` (auth/ACL) — so handing
+ * `error.message` straight to a toast shows the user raw JSON. Parsing lives
+ * here, next to the throw that defines the format, rather than in each caller.
+ *
+ * Falls back to the raw message, so an unexpected shape still says something.
+ */
+export function apiErrorMessage(error: unknown, fallback = ""): string {
+  const raw = (error as any)?.message;
+  if (typeof raw !== "string" || !raw) return fallback;
+
+  const match = raw.match(/^(\d{3}):\s*([\s\S]*)$/);
+  if (!match) return raw;
+
+  const [, status, body] = match;
+  let detail = body.trim();
+  try {
+    const parsed = JSON.parse(body);
+    detail = parsed?.error || parsed?.msg || parsed?.message || detail;
+  } catch {
+    // non-JSON body (werkzeug's HTML error pages) — keep the text as-is
+  }
+  return detail ? `${detail} (${status})` : `${fallback} (${status})`;
+}
+
 export async function apiRequest(
   url: string,
   options: { method?: string; body?: unknown } = {}

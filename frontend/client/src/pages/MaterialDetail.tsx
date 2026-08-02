@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MaterialInventorySection } from "@/components/materials/MaterialInventorySection";
 import { Button } from "@/components/ui/button";
@@ -107,10 +107,15 @@ export default function MaterialDetail() {
 
       setIsEditing(false);
     },
-    onError: () => {
+    onError: (error: unknown) => {
+      // Show what the server actually said. The backend distinguishes "this
+      // material is in use, so its unit/sku/type are frozen" from a permission
+      // denial from a validation error — collapsing all of it into one
+      // hardcoded string left the user (and anyone they reported it to) with
+      // nothing to act on.
       toast({
         title: t('common.error'),
-        description: t('materials.updateFailed'),
+        description: apiErrorMessage(error, t('materials.updateFailed')),
         variant: "destructive",
       });
     },
