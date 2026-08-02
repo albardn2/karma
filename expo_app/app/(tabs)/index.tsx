@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Lang, LANGUAGE_LABELS } from '@/i18n/translations';
+import { useGrantedModules } from '@/hooks/useModuleAccess';
 
 interface MenuItem {
   id: number;
@@ -58,6 +59,8 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<'home' | 'menu'>(tab === 'menu' ? 'menu' : 'home');
   const insets = useSafeAreaInsets();
 
+  const granted = useGrantedModules();
+
   const menuItems: MenuItem[] = useMemo(() => {
     const scopes: string[] = (user?.permission_scope || '')
       .split(',')
@@ -74,18 +77,6 @@ export default function HomeScreen() {
     //
     // Same rule as the web sidebar: the user's own grants intersected with the
     // account's feature cap, with null meaning unrestricted (admins, platform owner).
-    const userModules: string[] | null =
-      !isAdmin && Array.isArray(user?.effective_permissions?.modules)
-        ? user.effective_permissions.modules
-        : null;
-    const accountModules: string[] | null = Array.isArray(user?.account_permissions?.modules)
-      ? user.account_permissions.modules
-      : null;
-    const granted: string[] | null =
-      userModules && accountModules
-        ? userModules.filter((m: string) => accountModules.includes(m))
-        : userModules ?? accountModules;
-
     return ALL_MENU_ITEMS.filter((i) => {
       // Field crew work the trip flow alone. This narrows the menu, it does not widen
       // it: an admin who revokes Distribution from a driver must actually lose the
@@ -96,7 +87,7 @@ export default function HomeScreen() {
       if (i.adminOnly && !isAdmin) return false;
       return granted ? granted.includes(i.module) : true;
     });
-  }, [user?.permission_scope, user?.effective_permissions, user?.account_permissions]);
+  }, [user?.permission_scope, granted]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -121,7 +112,7 @@ export default function HomeScreen() {
     } else if (item.section === 'trips') {
       router.push('/trips');
     } else if (item.section === 'customer_orders') {
-      Alert.alert(t('menu.comingSoon'), t('menu.comingSoonMsg'));
+      router.push('/customer-orders');
     }
   };
 
