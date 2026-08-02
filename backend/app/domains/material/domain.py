@@ -15,9 +15,18 @@ from app.entrypoint.routes.common.errors import BadRequestError
 
 class MaterialDomain:
 
+    # Frozen once a material is in use, because existing rows would silently
+    # change meaning: quantities and costs already recorded are denominated in
+    # measure_unit, and type decides how the material is handled (a PO of a
+    # raw_material becomes stock; a product does not).
+    #
+    # sku is deliberately NOT here. It is a label, not a unit of account: no
+    # table stores a copy of it, and every report joins on material_uuid and
+    # reads the current value — so correcting a mistyped code re-labels the
+    # history rather than misstating it. It stays globally unique, which
+    # update_material checks before writing.
     SENSITIVE_UPDATE_FIELDS = [
         'measure_unit',
-        'sku',
         'type'
     ]
 
@@ -50,6 +59,24 @@ class MaterialDomain:
         # save, so keying on presence rejected harmless edits (renaming, or
         # adding a description) for any material that had ever been stocked,
         # priced or ordered — which is nearly all of them.
+        # sku is unique across the whole table, so a collision would otherwise
+        # surface as an IntegrityError 500 on commit. Checked with a raw query
+        # because the constraint is global while the repositories are scoped to
+        # one account — a clash with another tenant's code still has to be
+        # reported as a clash, not as a server error.
+        if 'sku' in data and data['sku'] != m.sku:
+            clash = (
+                uow.session.query(MaterialModel)
+                .filter(
+                    MaterialModel.sku == data['sku'],
+                    MaterialModel.uuid != m.uuid,
+                    MaterialModel.is_deleted == False,  # noqa: E712
+                )
+                .first()
+            )
+            if clash:
+                raise BadRequestError(f"SKU {data['sku']!r} is already used by another material")
+
         changed_sensitive = [
             field for field in data
             if field in MaterialDomain.SENSITIVE_UPDATE_FIELDS
