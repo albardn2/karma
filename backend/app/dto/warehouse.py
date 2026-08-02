@@ -78,7 +78,11 @@ class WarehouseRead(WarehouseBase):
 class WarehouseListParams(BaseModel):
     """Pagination parameters for listing warehouses."""
     model_config = ConfigDict(extra="forbid")
-    uuid : Optional[UUID] = None
+    # str, not UUID: warehouse.uuid is character varying(36), so a UUID here binds
+    # as ::uuid and Postgres refuses the comparison outright —
+    # "operator does not exist: character varying = uuid" — turning the filter into
+    # a 500. Every other list DTO in the codebase types uuid as str for this reason.
+    uuid: Optional[str] = None
     name: Optional[str] = None
     within_polygon: Optional[str] = None  # WKT Polygon
     page:     int = Field(1, gt=0, description="Page number (>=1)")

@@ -15,8 +15,15 @@ class PurchaseOrderItemBase(BaseModel):
     material_uuid:       str
     quantity:            int
     price_per_unit:      float
-    currency:            Optional[Currency] = None
-    unit:                Optional[UnitOfMeasure] = None
+    # Required, because purchase_order_item.currency and .unit are both NOT NULL and
+    # nothing fills them in — neither the single-item route nor
+    # PurchaseOrderItemDomain.create_items, which dumps this DTO straight into the
+    # model. Declaring them Optional meant an omitted currency reached the database
+    # and came back as 409 "Conflicts with an existing record" from the global
+    # IntegrityError handler: a schema mismatch reported as a conflict the caller
+    # caused, with no mention of the field at fault. Now it is a 422 that names it.
+    currency:            Currency
+    unit:                UnitOfMeasure
 
 class PurchaseOrderItemCreate(PurchaseOrderItemBase):
     """Fields required to create a new purchase order item."""

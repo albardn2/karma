@@ -1,6 +1,7 @@
 from flask import request, jsonify
 from geoalchemy2 import WKTElement
 from pydantic import ValidationError
+from shapely import wkt as shapely_wkt
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.dto.warehouse import (
     WarehouseCreate,
@@ -120,6 +121,14 @@ def list_warehouses():
     if params.name:
         filters.append(WarehouseModel.name.ilike(f"%{params.name}%"))
     if params.within_polygon:
+        # WKTElement does not parse, so a malformed polygon used to sail through this
+        # block and fail inside the query instead — psycopg2 InternalError_ "parse
+        # error - invalid geometry", raised outside the try below and served as a 500.
+        # Bad user input is a 400, so the WKT is parsed here, before it reaches SQL.
+        try:
+            shapely_wkt.loads(params.within_polygon)
+        except Exception as e:
+            raise BadRequestError(f"Invalid polygon: {e}")
         try:
             # Wrap your WKT string in a WKTElement (with the correct SRID)
             poly = WKTElement(
@@ -134,12 +143,10 @@ def list_warehouses():
 
             )
             filters.append(WarehouseModel.coordinates.is_not(None))  # ensure coordinates are not None
-            # bump per_page so your polygon filter returns everything
-            params.per_page = 10000
         except ValidationError as e:
             raise BadRequestError(f"Invalid polygon: {e}")
-    if params.within_polygon:
-        # make per page a very high number to avoid pagination
+        # bump per_page so the polygon filter returns everything. Set after the DTO
+        # has validated, so it is deliberately above the le=100 ceiling.
         params.per_page = 10000
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.warehouse_repository.find_all_by_filters_paginated(
