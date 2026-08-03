@@ -30,6 +30,16 @@ export interface FormField {
   /** for kind 'picker' — choose one record from a list endpoint */
   picker?: PickerSpec;
   /**
+   * Bounds for kind 'number', inclusive, and whether a fraction is legal.
+   *
+   * Worth stating in the spec rather than only in the label: the server's own bounds
+   * are inclusive and its 422 arrives as one unattributed blob, so an out-of-range
+   * value would otherwise be rejected without saying which field caused it.
+   */
+  min?: number;
+  max?: number;
+  integer?: boolean;
+  /**
    * Show this field only for certain answers to earlier ones. A hidden field is not
    * rendered, not validated and not submitted — otherwise a `required` field the user
    * cannot see would block the form with an error pointing at nothing.
@@ -149,6 +159,18 @@ export function ModuleForm({
         parsed = Number(raw);
         if (Number.isNaN(parsed)) {
           found[f.name] = t('form.mustBeNumber');
+          continue;
+        }
+        if (f.integer && !Number.isInteger(parsed)) {
+          found[f.name] = t('form.mustBeWhole');
+          continue;
+        }
+        if (f.min != null && parsed < f.min) {
+          found[f.name] = t('form.minValue', { min: f.min });
+          continue;
+        }
+        if (f.max != null && parsed > f.max) {
+          found[f.name] = t('form.maxValue', { max: f.max });
           continue;
         }
       } else if (f.kind === 'boolean') {

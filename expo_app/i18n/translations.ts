@@ -148,13 +148,15 @@ export const translations: Record<Lang, Record<string, string>> = {
   'workflows.searchPlaceholder': 'Search a workflow by name',
   'workflows.note': 'Platform-wide templates: one row is inherited by every tenant, and names are globally unique. Read-only here — creating, editing or deleting one changes every customer\u2019s process, so it stays on the web where you can see the diff first.',
 
+  'workflows.tagFilterNote': 'A tag filter hides untagged workflows, including the one distribution runs use — clear the filter to see everything.',
+
   'superAdmin.tabRoles': 'Role presets',
   'superAdmin.tabRolesBlurb': 'Default permissions each role starts with',
-  'roles.note': 'Defaults each role starts with, generated from the API routes themselves. Editing the full permission matrix stays on the web — it is nearly two hundred switches per role. Resetting restores what the code says the role should have.',
+  'roles.note': 'Defaults each role starts with, generated from the API routes themselves. Editing the full permission matrix stays on the web — it is nearly two hundred switches per role. Resetting restores what the code says the role should have. Counts are a lower bound: someone holding two roles at once is not counted under either. And “default” means nothing is overriding the role, not that nothing is stored for it.',
   'roles.changed': 'changed',
   'roles.default': 'default',
   'roles.breadth': '{modules} menu items · {grants} endpoint grants',
-  'roles.following': '{n} users on this role',
+  'roles.followingApprox': 'at least {n} users on this role',
   'roles.reset': 'Reset to default',
   'roles.resetting': 'Resetting…',
   'roles.resetConfirm': 'Put {role} back to the generated default? Any customisation to this role is discarded.',
@@ -164,6 +166,8 @@ export const translations: Record<Lang, Record<string, string>> = {
   'tracking.historyCadence': 'Outside a trip, store every … seconds (1–86400)',
   'tracking.retention': 'Keep non-trip history … days (1–365)',
   'tracking.note': 'Applies to your own account — there is no endpoint to set another tenant\u2019s cadence. A tighter cadence stores more rows; a longer retention keeps them longer. Values outside the ranges shown are rejected, not rounded, and zero is not accepted as \u201coff\u201d. Leaving a field untouched leaves it unchanged.',
+
+  'tracking.loadFailed': 'Could not load the current settings, so the form is not shown — filling in empty inputs would overwrite live values.',
 
   'superAdmin.users': '{n} users',
   'superAdmin.blocked': 'Blocked',
@@ -472,6 +476,9 @@ export const translations: Record<Lang, Record<string, string>> = {
 
   'form.required': 'Required',
   'form.mustBeNumber': 'Must be a number',
+  'form.mustBeWhole': 'Must be a whole number',
+  'form.minValue': 'At least {min}',
+  'form.maxValue': 'At most {max}',
   'form.save': 'Save',
   'form.saveFailed': "Couldn't save",
   'form.tryAgain': 'Please try again.',
@@ -973,13 +980,15 @@ export const translations: Record<Lang, Record<string, string>> = {
   'workflows.searchPlaceholder': 'ابحث عن سياق عمل بالاسم',
   'workflows.note': 'قوالب على مستوى المنصة: الصف الواحد يرثه كل المستأجرين، والأسماء فريدة عالمياً. للعرض فقط هنا — الإنشاء أو التعديل أو الحذف يغيّر عملية كل عميل، لذا يبقى على الويب حيث يمكن رؤية الفرق أولاً.',
 
+  'workflows.tagFilterNote': 'التصفية بوسم تُخفي سياقات العمل غير الموسومة، ومنها السياق الذي تستخدمه رحلات التوزيع — أزل التصفية لرؤية الكل.',
+
   'superAdmin.tabRoles': 'أدوار افتراضية',
   'superAdmin.tabRolesBlurb': 'الصلاحيات الافتراضية لكل دور',
-  'roles.note': 'الصلاحيات الافتراضية لكل دور، مولّدة من مسارات الـAPI نفسها. تعديل مصفوفة الصلاحيات الكاملة يبقى على الويب — فهي قرابة مئتي مفتاح لكل دور. إعادة التعيين تستعيد ما تحدده الشيفرة.',
+  'roles.note': 'الصلاحيات الافتراضية لكل دور، مولّدة من مسارات الـAPI نفسها. تعديل مصفوفة الصلاحيات الكاملة يبقى على الويب — فهي قرابة مئتي مفتاح لكل دور. إعادة التعيين تستعيد ما تحدده الشيفرة. الأعداد حدٌّ أدنى: من يحمل دورين معاً لا يُحسب في أيٍّ منهما. و«افتراضي» تعني أن لا شيء يتجاوز الدور، لا أنه لا شيء مخزَّن له.',
   'roles.changed': 'مُعدّل',
   'roles.default': 'افتراضي',
   'roles.breadth': '{modules} عنصر قائمة · {grants} صلاحية مسار',
-  'roles.following': '{n} مستخدمين على هذا الدور',
+  'roles.followingApprox': '{n} مستخدمين على الأقل على هذا الدور',
   'roles.reset': 'إعادة للافتراضي',
   'roles.resetting': 'جارٍ الإعادة…',
   'roles.resetConfirm': 'إعادة {role} إلى الافتراضي المولّد؟ سيتم إلغاء أي تخصيص لهذا الدور.',
@@ -989,6 +998,8 @@ export const translations: Record<Lang, Record<string, string>> = {
   'tracking.historyCadence': 'خارج الرحلة، التخزين كل … ثانية (١–٨٦٤٠٠)',
   'tracking.retention': 'الاحتفاظ بسجل غير الرحلات … يوم (١–٣٦٥)',
   'tracking.note': 'ينطبق على حسابك أنت — لا يوجد مسار لتعيين معدل مستأجر آخر. المعدل الأقصر يخزّن صفوفاً أكثر، والاحتفاظ الأطول يبقيها لمدة أطول. القيم خارج النطاقات المذكورة تُرفض ولا تُقرَّب، والصفر غير مقبول بمعنى «إيقاف». ترك أي حقل دون تغيير يبقيه كما هو.',
+
+  'tracking.loadFailed': 'تعذّر تحميل الإعدادات الحالية، لذا لا يُعرض النموذج — تعبئة حقول فارغة ستستبدل القيم الفعلية.',
 
   'superAdmin.users': '{n} مستخدمين',
   'superAdmin.blocked': 'محجوب',
@@ -1297,6 +1308,9 @@ export const translations: Record<Lang, Record<string, string>> = {
 
   'form.required': 'مطلوب',
   'form.mustBeNumber': 'يجب أن يكون رقماً',
+  'form.mustBeWhole': 'يجب أن يكون رقماً صحيحاً',
+  'form.minValue': '{min} على الأقل',
+  'form.maxValue': '{max} على الأكثر',
   'form.save': 'حفظ',
   'form.saveFailed': 'تعذر الحفظ',
   'form.tryAgain': 'يرجى المحاولة مرة أخرى.',

@@ -157,7 +157,11 @@ export default function RolePresetsScreen() {
                         grants: grants(r.permissions),
                       })}
                       {' · '}
-                      {t('roles.following', { n: r.following ?? 0 })}
+                      {/* a lower bound, not a count: the backend groups by the raw
+                          permission_scope column, so a user holding "superuser,admin"
+                          lands under that composite key and is counted under neither
+                          role — live data has exactly that case */}
+                      {t('roles.followingApprox', { n: r.following ?? 0 })}
                     </ThemedText>
                     {r.is_overridden && (
                       <TouchableOpacity

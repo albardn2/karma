@@ -23,11 +23,19 @@ interface Workflow {
  * Each write is refused for a specific reason rather than for scope:
  *  - CREATE means naming a platform-global template under a global uniqueness constraint,
  *    with a JSONB parameters blob and a callback list that have no phone-shaped editor.
- *  - EDIT takes tags as free text and the DTO accepts an unvalidated List[str], so one
- *    bad value puts a row outside the two legal tags and out of reach of its own filter.
+ *    `callback_fns` is typed Optional[List[str]] with no validation against the three real
+ *    entries in CALLBACK_FN_MAPPER, and the executor looks each name up by bare subscript,
+ *    so a typo is accepted on write and surfaces as a KeyError when someone else's driver
+ *    completes a task, in another tenant, possibly hours later.
+ *  - A soft-deleted name stays reserved: validate_unique_name does not filter is_deleted
+ *    while the list does, so reusing it fails naming a row the operator cannot see.
  *  - DELETE is a soft delete with no cascade to tasks and no check for in-flight
  *    executions, so a mis-tap orphans work that is already running.
  * All three stay on the web, where a diff is visible before you commit to it.
+ *
+ * Not among the reasons, though it looks like one: a bad `tags` value cannot be persisted
+ * by the API. update_workflow builds WorkflowRead.from_orm BEFORE the route commits, so an
+ * illegal tag raises during serialisation and the transaction never lands.
  *
  * Rows are not tappable: there is a GET by uuid, but the only extra it carries is a wide
  * parameters blob and a callback list, which is reference material rather than something
@@ -53,11 +61,18 @@ export default function WorkflowsScreen() {
       searchPlaceholder={t('workflows.searchPlaceholder')}
       filters={[
         // the two legal WorkflowTags values; the param is a comma-joined string with no
-        // spaces, and matching is overlap (any), not all
+        // spaces, and matching is overlap (any), not all — so an UNTAGGED row is excluded
+        // by every chip, which is why the header warns about it rather than leaving someone
+        // to conclude a workflow disappeared
         { id: 'distribution', label: tef('distribution'), params: { tags: 'distribution' } },
         { id: 'coated_peanuts', label: tef('coated_peanuts'), params: { tags: 'coated_peanuts' } },
       ]}
-      header={<ThemedText style={styles.note}>{t('workflows.note')}</ThemedText>}
+      header={
+        <View>
+          <ThemedText style={styles.note}>{t('workflows.note')}</ThemedText>
+          <ThemedText style={styles.note}>{t('workflows.tagFilterNote')}</ThemedText>
+        </View>
+      }
       keyExtractor={(w) => w.uuid}
       renderItem={(w) => (
         <View style={styles.row}>
