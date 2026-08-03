@@ -7,10 +7,22 @@ import { ThemedView } from '@/components/ThemedView';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasModule } from '@/hooks/useModuleAccess';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ModuleGuardProps {
   /** menu-module id this screen belongs to, matching the backend MODULES registry */
-  module: string;
+  module?: string;
+  /**
+   * A permission scope the caller must hold, e.g. 'superuser'.
+   *
+   * Some screens are not gated by a module at all: the platform-owner console has no
+   * entry in the MODULES registry, because it is not a tenant feature that an account
+   * could be granted. Its routes are superuser-only server-side, so the client gate has
+   * to key on the same thing rather than on a module id that does not exist.
+   *
+   * Both may be supplied, and then both must pass.
+   */
+  requireScope?: string;
   children: React.ReactNode;
 }
 
@@ -30,8 +42,15 @@ interface ModuleGuardProps {
  * authorization — it is the UI telling the truth about a decision the server has
  * already made.
  */
-export function ModuleGuard({ module, children }: ModuleGuardProps) {
-  const allowed = useHasModule(module);
+export function ModuleGuard({ module, requireScope, children }: ModuleGuardProps) {
+  const { user } = useAuth();
+  const hasModule = useHasModule(module ?? '');
+  const scopes = String(user?.permission_scope ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const allowed =
+    (module ? hasModule : true) && (requireScope ? scopes.includes(requireScope) : true);
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();

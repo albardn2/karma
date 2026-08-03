@@ -19,6 +19,12 @@ interface MenuItem {
   section: string;
   color: string;
   adminOnly?: boolean;
+  /**
+   * Platform-owner only. Separate from adminOnly because `isAdmin` is true for a tenant
+   * admin as well as the platform owner, and this must not be: the super-admin routes
+   * 403 a tenant admin, so showing them the tile would offer a screen that cannot load.
+   */
+  superAdminOnly?: boolean;
   /** Menu-module id this tile needs, matching the ids in the backend's MODULES. */
   module: string;
 }
@@ -47,6 +53,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 21, titleKey: 'menu.processes', icon: '🏭', section: 'processes', color: '#6d28d9', module: 'processes' },
   { id: 22, titleKey: 'menu.liveMap', icon: '📍', section: 'live-map', color: '#be123c', module: 'live-map' },
   { id: 23, titleKey: 'menu.exchangeRates', icon: '💱', section: 'exchange-rates', color: '#0f766e', module: 'exchange-rates' },
+  { id: 24, titleKey: 'menu.superAdmin', icon: '🛠️', section: 'super-admin', color: '#1f2937', module: '', superAdminOnly: true },
 ];
 
 const LANGS: Lang[] = ['en', 'ar'];
@@ -99,6 +106,8 @@ export default function HomeScreen() {
       .filter(Boolean);
     const fieldOnly = scopes.length > 0 && scopes.every((s) => FIELD_ROLES.has(s));
     const isAdmin = scopes.includes('admin') || scopes.includes('superuser');
+    // deliberately NOT isAdmin: a tenant admin is refused by the super-admin routes
+    const isSuperAdmin = scopes.includes('superuser');
 
     // Show only what this user's permissions will actually answer. The menu was
     // role-name-driven alone, so a role whose preset denies a resource was still
@@ -116,6 +125,10 @@ export default function HomeScreen() {
       // the app the console could never change.
       if (fieldOnly && !FIELD_SECTIONS.has(i.section)) return false;
       if (i.adminOnly && !isAdmin) return false;
+      if (i.superAdminOnly && !isSuperAdmin) return false;
+      // a tile with no module is gated by scope alone — the platform-owner console has
+      // no MODULES entry because it is not a tenant feature an account could be granted
+      if (!i.module) return true;
       return granted ? granted.includes(i.module) : true;
     });
   }, [user?.permission_scope, granted]);
