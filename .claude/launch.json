@@ -30,6 +30,15 @@
         "cd expo_app && npx expo start --web --port 8081"
       ],
       "port": 8081
+    },
+    {
+      "name": "expo-metro-8090",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd expo_app && npx expo start --port 8090"
+      ],
+      "port": 8090
     }
   ]
 }
