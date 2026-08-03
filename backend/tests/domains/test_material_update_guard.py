@@ -54,12 +54,29 @@ class _Repo:
         self.saved = model
 
 
+class _Session:
+    """Stands in for the raw query the sku-uniqueness check makes."""
+
+    def __init__(self, clash=None):
+        self._clash = clash
+
+    def query(self, _model):
+        return self
+
+    def filter(self, *_args):
+        return self
+
+    def first(self):
+        return self._clash
+
+
 class _Uow:
     """Every relation repository reports the same answer, which is enough:
     the guard only asks 'is this material referenced anywhere'."""
 
-    def __init__(self, material, in_use):
+    def __init__(self, material, in_use, sku_clash=None):
         self.material_repository = _Repo(material)
+        self.session = _Session(sku_clash)
         for name in (
             "pricing_repository", "customer_order_item_repository",
             "inventory_repository", "purchase_order_item_repository",
@@ -68,8 +85,8 @@ class _Uow:
             setattr(self, name, _Repo(has_relation=in_use))
 
 
-def _update(material, in_use, **fields):
-    uow = _Uow(material, in_use)
+def _update(material, in_use, sku_clash=None, **fields):
+    uow = _Uow(material, in_use, sku_clash)
     dto = MaterialDomain.update_material(
         uow=uow, uuid=material.uuid, payload=MaterialUpdate(**fields)
     )
@@ -104,10 +121,36 @@ def test_changing_the_unit_of_an_in_use_material_is_refused():
         _update(m, in_use=True, measure_unit="liters")
 
 
-def test_changing_the_sku_of_an_in_use_material_is_refused():
+def test_the_sku_of_an_in_use_material_CAN_be_changed():
+    """A sku is a label, not a unit of account: nothing stores a copy, and
+    every report joins on material_uuid and reads the current value — so
+    correcting a mistyped code re-labels history rather than misstating it."""
     m = make_material()
-    with pytest.raises(BadRequestError, match="sku"):
-        _update(m, in_use=True, sku="PNT-2")
+    _, dto = _update(m, in_use=True, sku="PNT-CORRECTED")
+    assert dto.sku == "PNT-CORRECTED"
+
+
+def test_sku_and_name_can_be_changed_together_on_an_in_use_material():
+    m = make_material()
+    _, dto = _update(m, in_use=True, name="Roasted peanuts", sku="RPNT-1")
+    assert (dto.name, dto.sku) == ("Roasted peanuts", "RPNT-1")
+
+
+def test_a_sku_already_taken_is_refused_cleanly():
+    """The column is globally unique, so without this the collision would
+    surface as an IntegrityError 500 at commit."""
+    m = make_material()
+    with pytest.raises(BadRequestError, match="already used"):
+        _update(m, in_use=True, sku="TAKEN-1", sku_clash=object())
+
+
+def test_reposting_the_same_sku_is_not_treated_as_a_collision():
+    """The form sends sku on every save; matching itself must not trip the
+    uniqueness check (the query excludes the row being edited, but the
+    equality short-circuit means it is never even run)."""
+    m = make_material()
+    _, dto = _update(m, in_use=True, name="Renamed", sku=m.sku, sku_clash=object())
+    assert dto.name == "Renamed"
 
 
 def test_changing_the_type_of_an_in_use_material_is_refused():
@@ -119,9 +162,9 @@ def test_changing_the_type_of_an_in_use_material_is_refused():
 def test_the_refusal_names_every_offending_field():
     m = make_material()
     with pytest.raises(BadRequestError) as exc:
-        _update(m, in_use=True, sku="PNT-2", measure_unit="liters", name="fine")
+        _update(m, in_use=True, type="product", measure_unit="liters", name="fine")
     message = str(exc.value)
-    assert "sku" in message and "measure_unit" in message
+    assert "type" in message and "measure_unit" in message
 
 
 def test_a_refused_change_leaves_the_material_untouched():
