@@ -1,10 +1,55 @@
 name: CD – Prod Deploy
 
-# 1) Trigger on merges/pushes to main
+# Only pushes to main that can actually change production.
+#
+# WHY THIS LIST IS COMPLETE: the image build context is ./backend with `COPY . .`
+# (backend/Dockerfile) and there is no .dockerignore anywhere in this repo, so
+# backend/** IS the image. `.github/**` is listed as a whole directory rather than
+# just this one file, because the day the remote script moves into a composite
+# action or a reusable workflow, deploy logic stops living here. .github/ currently
+# holds only workflow files, so over-triggering costs nothing.
+#
+# WHAT INVALIDATES IT: adding backend/.dockerignore. That file's entire job is to
+# change what reaches production, which makes "backend/** == the image" false.
+#
+# SECRETS ARE NOT FILES. Rotating PROD_JWT_SECRET_KEY, CR_PAT or the droplet
+# password changes nothing on the host until this workflow runs. Previously any
+# merge of anything rewrote .env, so rotation appeared to take effect on its own.
+# It no longer does — use workflow_dispatch after rotating a secret.
+#
+# ADDING a path here is free. FORGETTING one means a real backend change merges
+# with no deploy and no red X anywhere: the absence of a run is invisible. Before
+# narrowing this list, make sure something else is watching for that.
+#
+# On 2026-08-03 five mobile-only merges each triggered a full backend deploy, all
+# five ran concurrently against the same droplet, and the API was unreachable for
+# roughly 100 seconds. Under this filter those five merges trigger nothing.
 on:
   push:
     branches:
       - main
+    paths:
+      - 'backend/**'
+      - '.github/**'
+  # Redeploy without a commit — needed after rotating a secret, and to force a
+  # deploy when a path filter turns out to have been too narrow.
+  workflow_dispatch:
+
+# One deploy at a time against one droplet.
+#
+# WORKFLOW-LEVEL, not job-level, on purpose: the build pushes the mutable
+# :latest-prod tag, so two concurrent builds can leave production running the
+# OLDER commit while both runs report green. Scoping this to the deploy job alone
+# would reinstate exactly that race.
+#
+# cancel-in-progress is FALSE on purpose. Cancelling a run mid-SSH abandons the
+# droplet half-converged — on 2026-08-03 four concurrent runs were cancelled by
+# hand and one was already inside its deploy step. Queueing is slower and safe;
+# cancelling is faster and is how the stack gets left in pieces. The cost is that
+# a stuck run holds the queue, which is what the timeouts below bound.
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -12,17 +57,17 @@ permissions:
 
 env:
   REGISTRY_URL: ghcr.io/albardn2/karma-backend
-  # adjust these for prod:
   PROD_HOST: ${{ secrets.PROD_DROPLET_HOST }}
   PROD_USER: root
   PROD_PASS: ${{ secrets.PROD_DROPLET_PASSWORD }}
-  APP_HOST: api-prod.karma-grp.com      # your prod domain
+  APP_HOST: api-prod.karma-grp.com
   EMAIL: zaid.bardan@gmail.com
 
 jobs:
   build:
     name: Build & Push Prod Image
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -54,6 +99,7 @@ jobs:
     name: Run prod migrations
     runs-on: ubuntu-latest
     needs: build
+    timeout-minutes: 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -77,27 +123,71 @@ jobs:
           password: ${{ secrets.PROD_DROPLET_PASSWORD }}
           port: 22
           script: |
+            set -euo pipefail
             cd /root/app/backend
-            cat <<EOF > .env
-            APP_HOST=${APP_HOST}
-            REGISTRY_URL=${REGISTRY_URL}
-            EMAIL=${EMAIL}
-            JWT_SECRET_KEY=${{ secrets.PROD_JWT_SECRET_KEY }}
-            EOF
+            # Quoted heredoc: the remote shell must not touch these values, and
+            # every value is single-quoted so docker compose does not either.
+            # Compose performs variable substitution on .env, so an unquoted
+            # secret containing a '$' is silently truncated — verified locally,
+            # JWT_SECRET_KEY=aB3$xY9#tail reaches the container as aB3#tail.
+            #
+            # These four were previously written as ${APP_HOST} etc. Those are
+            # shell variables on the DROPLET, not GitHub expressions, so they
+            # expanded to empty. That mattered: VIRTUAL_HOST comes from APP_HOST,
+            # so if a run stopped after this job, a manual `up -d` recovery would
+            # start nginx-proxy with no hostname — every container healthy and the
+            # API answering 503 with nothing to show why.
+            cat <<'ENVEOF' > .env
+            APP_HOST='api-prod.karma-grp.com'
+            REGISTRY_URL='ghcr.io/albardn2/karma-backend'
+            EMAIL='zaid.bardan@gmail.com'
+            JWT_SECRET_KEY='${{ secrets.PROD_JWT_SECRET_KEY }}'
+            ENVEOF
             # Auth to GHCR + reclaim disk before pulling the private image.
             # Without this, expired creds or a full disk make `pull` silently
             # no-op and stale code keeps running despite a "successful" deploy.
+            # set -euo pipefail above is what makes that failure loud rather than
+            # merely commented about.
             echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u albardn2 --password-stdin
             docker image prune -af
             docker builder prune -af
             docker compose -f docker-compose.prod.yaml down
             docker compose -f docker-compose.prod.yaml pull
-            docker compose -f docker-compose.prod.yaml run --rm migrate
+            # --no-deps: without it, `run` recreates any dependency whose config
+            # has changed — including the database container. Verified locally.
+            docker compose -f docker-compose.prod.yaml run --rm --no-deps migrate
+
+      # THE POINT OF THIS STEP: the deploy job declares `needs: migrate`, and the
+      # step above takes the whole stack down before migrating. So a failed
+      # migration used to leave production down indefinitely — nothing brought it
+      # back, because the job that starts containers never ran.
+      #
+      # Bringing the old image back up is safe here specifically because
+      # backend/migrations/env.py runs the whole upgrade in ONE transaction, so a
+      # failed migration leaves the schema untouched rather than half-applied. The
+      # containers therefore come back against exactly the schema they shipped
+      # against. If that ever changes — per-migration transactions, or anything
+      # using CONCURRENTLY — this step stops being safe and must be reconsidered.
+      - name: Restore the stack if the migration failed
+        if: failure()
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_DROPLET_HOST }}
+          username: root
+          password: ${{ secrets.PROD_DROPLET_PASSWORD }}
+          port: 22
+          script: |
+            set -euo pipefail
+            cd /root/app/backend
+            echo "Migration failed — restarting the stack so the API serves again."
+            docker compose -f docker-compose.prod.yaml up -d --scale migrate=0 --remove-orphans
+            docker compose -f docker-compose.prod.yaml ps
 
   deploy:
     name: Deploy prod stack
     runs-on: ubuntu-latest
     needs: migrate
+    timeout-minutes: 20
     steps:
       - name: SSH & deploy
         uses: appleboy/ssh-action@v0.1.7
@@ -107,13 +197,14 @@ jobs:
           password: ${{ env.PROD_PASS }}
           port: 22
           script: |
+            set -euo pipefail
             cd /root/app/backend
-            cat <<EOF > .env
-            APP_HOST=api-prod.karma-grp.com
-            REGISTRY_URL=ghcr.io/albardn2/karma-backend
-            EMAIL=zaid.bardan@gmail.com
-            JWT_SECRET_KEY=${{ secrets.PROD_JWT_SECRET_KEY }}
-            EOF
+            cat <<'ENVEOF' > .env
+            APP_HOST='api-prod.karma-grp.com'
+            REGISTRY_URL='ghcr.io/albardn2/karma-backend'
+            EMAIL='zaid.bardan@gmail.com'
+            JWT_SECRET_KEY='${{ secrets.PROD_JWT_SECRET_KEY }}'
+            ENVEOF
             # Auth to GHCR + reclaim disk before pulling the private image.
             # Without this, expired creds or a full disk make `pull` silently
             # no-op and stale code keeps running despite a "successful" deploy.
@@ -123,3 +214,23 @@ jobs:
             docker compose -f docker-compose.prod.yaml down
             docker compose -f docker-compose.prod.yaml pull
             docker compose -f docker-compose.prod.yaml up -d --scale migrate=0 --remove-orphans
+
+      # A deploy that finishes is not a deploy that works. Nothing here previously
+      # checked that the API came back, so a broken image reported green.
+      - name: Verify the API is serving
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+              "https://${{ env.APP_HOST }}/auth/me" || echo 000)
+            echo "attempt $i: /auth/me -> $code"
+            # 401 is the healthy answer to an anonymous call: the app is up and
+            # enforcing auth. 200 would mean the route stopped requiring a token.
+            if [ "$code" = "401" ]; then
+              echo "API is serving."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "API did not return 401 within 5 minutes of the deploy finishing."
+          exit 1

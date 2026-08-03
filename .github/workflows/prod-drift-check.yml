@@ -1,0 +1,79 @@
+name: Prod Drift Check
+
+# Is the image running in production actually built from the tip of main?
+#
+# WHY THIS EXISTS: prod-deploy.yml is now path-filtered, and a path filter's only
+# failure mode is silence. A backend change under a path nobody added to the list
+# merges with no deploy and NO red X anywhere — the absence of a workflow run is
+# invisible in the Actions tab. The same silence covers a run that failed and was
+# never retried, and a deploy that reported green while `docker pull` no-opped
+# against a full disk or expired credentials.
+#
+# This is the only thing watching for that. Do not delete it when the deploy looks
+# reliable; a reliable deploy is exactly when nobody is checking.
+#
+# A cron trigger ignores `paths:`, which is the point.
+on:
+  schedule:
+    # 06:00 UTC = 09:00 Damascus, deliberately not 02:00 UTC when daily-tasks
+    # charges subscriptions
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Compare prod image to main
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Ask the droplet what it is running
+        id: prod
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_DROPLET_HOST }}
+          username: root
+          password: ${{ secrets.PROD_DROPLET_PASSWORD }}
+          port: 22
+          # Read-only. This workflow must never change production — if it starts
+          # repairing drift instead of reporting it, the report becomes worthless.
+          script: |
+            set -euo pipefail
+            cd /root/app/backend
+            echo "=== running image digest ==="
+            docker inspect --format '{{index .Config.Image}} {{.Image}}' \
+              "$(docker compose -f docker-compose.prod.yaml ps -q web)"
+            echo "=== container state ==="
+            docker compose -f docker-compose.prod.yaml ps
+            echo "=== schema version ==="
+            docker exec -i "$(docker compose -f docker-compose.prod.yaml ps -q db)" \
+              psql -U local -d backend -tAc "SELECT version_num FROM alembic_version;"
+            echo "=== disk ==="
+            df -h / | tail -1
+            echo "=== restart counts (a climbing count is a crashlooping service) ==="
+            for s in web location-ingest daily-tasks db; do
+              cid=$(docker compose -f docker-compose.prod.yaml ps -q "$s" 2>/dev/null || true)
+              if [ -n "$cid" ]; then
+                printf '%s restarts=%s\n' "$s" "$(docker inspect -f '{{.RestartCount}}' "$cid")"
+              fi
+            done
+            echo "=== .env sanity: an empty APP_HOST means nginx-proxy cannot route ==="
+            grep -c "^APP_HOST='\?..*" .env || echo "APP_HOST IS EMPTY OR MISSING"
+
+      - name: Expected head revision from the repo
+        run: |
+          set -euo pipefail
+          echo "main SHA: ${GITHUB_SHA::7}"
+          echo "migration files in repo: $(ls backend/migrations/versions/*.py | wc -l)"
+
+      - name: Report
+        run: |
+          set -euo pipefail
+          echo "Compare the running image digest above against the :latest-prod"
+          echo "digest on GHCR, and the schema version against 'alembic heads'."
+          echo "A mismatch means production is not running the tip of main."
