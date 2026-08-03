@@ -55,6 +55,11 @@ interface ModuleFormProps {
    * settings with no MODULES entry, such as the platform console's.
    */
   requireScope?: string;
+  /**
+   * Admin or platform owner — see ModuleGuard's requireAdmin for why neither a module
+   * nor a scope can express that set.
+   */
+  requireAdmin?: boolean;
   title: string;
   fields: FormField[];
   /** initial values — supply for an edit, omit for a create */
@@ -110,6 +115,7 @@ interface ModuleFormProps {
 export function ModuleForm({
   module,
   requireScope,
+  requireAdmin,
   title,
   fields,
   initial,
@@ -221,7 +227,7 @@ export function ModuleForm({
   };
 
   return (
-    <ModuleGuard module={module} requireScope={requireScope}>
+    <ModuleGuard module={module} requireScope={requireScope} requireAdmin={requireAdmin}>
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>

@@ -54,6 +54,11 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 22, titleKey: 'menu.liveMap', icon: '📍', section: 'live-map', color: '#be123c', module: 'live-map' },
   { id: 23, titleKey: 'menu.exchangeRates', icon: '💱', section: 'exchange-rates', color: '#0f766e', module: 'exchange-rates' },
   { id: 24, titleKey: 'menu.superAdmin', icon: '🛠️', section: 'super-admin', color: '#1f2937', module: '', superAdminOnly: true },
+  // module: '' rather than 'users' — the backend has a `users` id in MODULES but nothing
+  // can grant it (RESOURCES has no `auth` entry by design, because user management stays
+  // admin-only), so gating on it would hide the tile from everyone. adminOnly is the real
+  // gate and matches the routes, which accept an admin or the platform owner.
+  { id: 25, titleKey: 'menu.users', icon: '👤', section: 'users', color: '#a21caf', module: '', adminOnly: true },
 ];
 
 const LANGS: Lang[] = ['en', 'ar'];
@@ -89,7 +94,9 @@ const FIELD_SECTIONS = new Set(['distribution', 'pricing']);
 const FIELD_ROLES = new Set(['sales', 'sales_associate', 'driver']);
 
 export default function HomeScreen() {
-  const { user, logout } = useAuth();
+  // isAdmin here is for the Account-section row below; the menu filter derives its own
+  // from `scopes` inside the useMemo, which also needs the superuser distinction
+  const { user, logout, isAdmin } = useAuth();
   const { t, lang, setLang } = useLanguage();
   const router = useRouter();
   // modules navigate back here with ?tab=menu so the menu view is restored
@@ -210,6 +217,27 @@ export default function HomeScreen() {
               </View>
 
               <View style={styles.accountItems}>
+                {/* The company's own subscription and bill. A row here rather than a tile
+                    in the grid above: it is not a module — there is no account, billing or
+                    settings id anywhere in the backend MODULES registry — and it belongs
+                    beside the other two account-level controls. Gated on isAdmin, not on a
+                    module, because the admin of a tenant whose feature set is capped still
+                    gets a 200 from this route and most needs to read their bill. */}
+                {isAdmin && (
+                  <TouchableOpacity
+                    style={styles.accountItem}
+                    onPress={() => router.push('/account-settings')}
+                    activeOpacity={0.7}
+                    testID="menu-account-settings"
+                  >
+                    <View style={styles.accountContent}>
+                      <ThemedText style={styles.languageLabel}>
+                        {t('menu.accountSettings')}
+                      </ThemedText>
+                    </View>
+                  </TouchableOpacity>
+                )}
+
                 {/* preferred language — persisted to the user profile */}
                 <View style={styles.accountItem}>
                   <View style={styles.accountContent}>
