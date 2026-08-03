@@ -43,7 +43,12 @@ export interface DetailAction<T> {
 }
 
 interface ModuleDetailScreenProps<T> {
-  module: string;
+  module?: string;
+  /**
+   * A scope the caller must hold instead of (or as well as) a module — for screens with
+   * no MODULES entry to gate on, such as the platform-owner console.
+   */
+  requireScope?: string;
   /** shown in the top bar */
   title: string;
   /** full path to the single record, e.g. "/vendor/abc-123" */
@@ -74,6 +79,7 @@ interface ModuleDetailScreenProps<T> {
  */
 export function ModuleDetailScreen<T>({
   module,
+  requireScope,
   title,
   endpoint,
   heading,
@@ -120,7 +126,7 @@ export function ModuleDetailScreen<T>({
     : [];
 
   return (
-    <ModuleGuard module={module}>
+    <ModuleGuard module={module} requireScope={requireScope}>
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
 

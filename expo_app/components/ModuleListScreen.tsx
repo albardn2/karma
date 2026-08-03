@@ -20,7 +20,12 @@ export const PER_PAGE = 20;
 
 interface ModuleListScreenProps<T> {
   /** menu-module id — gates the route, same rule the menu grid uses */
-  module: string;
+  module?: string;
+  /**
+   * A scope the caller must hold instead of (or as well as) a module — for screens with
+   * no MODULES entry to gate on, such as the platform-owner console.
+   */
+  requireScope?: string;
   title: string;
   /** API path without query string, e.g. "/customer-order/" */
   endpoint: string;
@@ -41,6 +46,13 @@ interface ModuleListScreenProps<T> {
   searchPlaceholder?: string;
   /** extra fixed query params */
   params?: Record<string, string>;
+  /**
+   * Envelope field holding the page count. Almost every module calls it `pages`, but
+   * the platform-owner endpoints call it `total_pages` — and reading the wrong one is
+   * silent: it defaults to 1, so the list looks complete while hiding every page after
+   * the first.
+   */
+  pagesKey?: string;
   /**
    * Mutually-exclusive filter chips. The scaffold owns the selection and folds the
    * chosen chip's params into the query, because every module wants this and none
@@ -70,6 +82,7 @@ interface ModuleListScreenProps<T> {
  */
 export function ModuleListScreen<T>({
   module,
+  requireScope,
   title,
   endpoint,
   itemsKey,
@@ -78,6 +91,7 @@ export function ModuleListScreen<T>({
   searchParam,
   searchPlaceholder,
   params,
+  pagesKey = 'pages',
   filters,
   header,
   onCreate,
@@ -117,7 +131,7 @@ export function ModuleListScreen<T>({
         const res = await apiCall<any>(`${endpoint}?${query.toString()}`);
         if (isOk(res.status) && res.data) {
           setItems(res.data[itemsKey] ?? []);
-          setTotalPages(res.data.pages ?? 1);
+          setTotalPages(res.data[pagesKey] ?? 1);
           setTotalCount(res.data.total_count ?? 0);
         } else {
           // 403 included on purpose: the server is the authority, and a role
@@ -154,7 +168,7 @@ export function ModuleListScreen<T>({
   };
 
   return (
-    <ModuleGuard module={module}>
+    <ModuleGuard module={module} requireScope={requireScope}>
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ title, headerShown: false }} />
 
