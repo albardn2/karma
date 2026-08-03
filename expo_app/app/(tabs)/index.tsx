@@ -45,6 +45,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 19, titleKey: 'menu.serviceAreas', icon: '🗺️', section: 'service_areas', color: '#0369a1', module: 'service-areas' },
   { id: 20, titleKey: 'menu.transactions', icon: '🔁', section: 'transactions', color: '#155e75', module: 'transactions' },
   { id: 21, titleKey: 'menu.processes', icon: '🏭', section: 'processes', color: '#6d28d9', module: 'processes' },
+  { id: 22, titleKey: 'menu.liveMap', icon: '📍', section: 'live-map', color: '#be123c', module: 'live-map' },
 ];
 
 const LANGS: Lang[] = ['en', 'ar'];
