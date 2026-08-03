@@ -33,6 +33,15 @@ class DebitNoteItemCreate(DebitNoteItemBase):
         cu = bool(values.get("customer_uuid"))
         ii = bool(values.get("invoice_item_uuid"))
 
+        # EXACTLY one, not at most one. Without the first check a debit note with no
+        # reference at all was accepted with a 201 and became a ledger row attached to
+        # no customer, vendor, invoice or purchase order — money owed by nobody, and
+        # invisible from every screen that reaches debit notes through their parent.
+        # credit_note_item.py has always had this guard; this file was missing it.
+        if not (po or ii or v or cu):
+            raise BadRequestError(
+                "At least one of purchase_order_item_uuid, customer_order_item_uuid, vendor_uuid or customer_uuid must be set."
+            )
         if (po + ii + v + cu) > 1:
             raise BadRequestError(
                 "Only one of purchase_order_item_uuid, customer_order_item_uuid, vendor_uuid or customer_uuid can be set."

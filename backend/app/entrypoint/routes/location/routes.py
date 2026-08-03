@@ -23,14 +23,36 @@ from models.common import (
 
 # Broker/topic settings are environment-driven so prod can move off the
 # public EMQX broker without an app release (clients re-read this endpoint).
-def _broker_config():
+def _broker_base_prefix() -> str:
     env = os.environ.get("KARMA_ENV", "dev")
+    return os.environ.get("MQTT_TOPIC_PREFIX", f"karma-grp/location/{env}")
+
+
+def _broker_config(account_uuid: str):
+    """Broker settings plus the caller's OWN topic namespace.
+
+    topic_prefix is per ACCOUNT, not per environment. It used to be
+    `karma-grp/location/{env}` for everybody, and this endpoint hands it to every
+    authenticated user — so any user of any tenant could subscribe to `{prefix}/+`
+    and receive every other tenant's driver positions. The web live map does exactly
+    that subscribe and stores whatever arrives (LiveMap.tsx), so this was a live
+    cross-tenant leak, not a theoretical one.
+
+    Appending the account uuid fixes it at the only place that has to change: both
+    web consumers build their topics from this prefix, so a tenant's wildcard now
+    spans only its own users and no client code needs touching.
+
+    This raises the bar; it is not a wall. The broker is public and authenticates
+    nobody, so the leak now requires guessing an account uuid instead of being the
+    default view. The real fix is a broker with per-tenant ACLs, which is a
+    deployment change rather than a code one.
+    """
     host = os.environ.get("MQTT_BROKER_HOST", "broker.emqx.io")
     return {
         "host": host,
         "ws_url": os.environ.get("MQTT_BROKER_WS_URL", f"wss://{host}:8084/mqtt"),
         "tcp_port": int(os.environ.get("MQTT_BROKER_TCP_PORT", "1883")),
-        "topic_prefix": os.environ.get("MQTT_TOPIC_PREFIX", f"karma-grp/location/{env}"),
+        "topic_prefix": f"{_broker_base_prefix()}/{account_uuid}",
     }
 
 
@@ -84,7 +106,8 @@ def client_config():
         user = uow.user_repository.find_one(uuid=current_uuid, is_deleted=False)
         if not user:
             raise NotFoundError("User not found")
-        broker = _broker_config()
+        # the caller's own account, so the namespace cannot be chosen by the client
+        broker = _broker_config(uow.account_uuid)
         result = {
             "track_location": bool(user.track_location),
             "ping_seconds": int(user.location_ping_seconds or 15),
