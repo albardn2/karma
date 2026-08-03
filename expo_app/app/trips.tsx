@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
+import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -463,6 +464,8 @@ export default function TripsScreen() {
         tripUuids={selected}
         onClose={() => setShowSummary(false)}
       />
+
+      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
     </ThemedView>
   );
 }

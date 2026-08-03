@@ -1,7 +1,9 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
+import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { money, perCurrency } from '@/utils/money';
 import { formatNumericDate, plainDate, plainDayOfMonth, todayPlain } from '@/utils/date';
@@ -60,6 +62,7 @@ interface Billing {
  */
 export default function AccountSettingsScreen() {
   const { t, tef } = useLanguage();
+  const router = useRouter();
 
   const TYPE_LABEL: Record<string, string> = {
     charge: t('account.typeCharge'),
@@ -120,78 +123,82 @@ export default function AccountSettingsScreen() {
   };
 
   return (
-    <ModuleDetailScreen<Billing>
-      requireAdmin
-      title={t('menu.accountSettings')}
-      // exactly this path: a trailing slash is a 404 here, not a redirect
-      endpoint="/account/billing"
-      heading={(b) => b.company_name || t('account.noName')}
-      rows={rows}
-      sections={[
-        {
-          title: t('account.history'),
-          isEmpty: (b) => !b.entries?.length,
-          emptyText: t('account.noHistory'),
-          render: (b) => (
-            <>
-              {(b.entries ?? []).map((e) => (
-                <View key={e.uuid} style={styles.entry}>
-                  <View style={styles.entryTop}>
-                    <ThemedText style={styles.type}>
-                      {TYPE_LABEL[e.entry_type] ?? tef(e.entry_type)}
-                    </ThemedText>
-                    <ThemedText
-                      style={[
-                        styles.amount,
-                        e.amount < 0 ? styles.amountOut : styles.amountIn,
-                      ]}
-                    >
-                      {money(e.amount, e.currency)}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.entryTop}>
-                    <ThemedText style={styles.period} numberOfLines={1}>
-                      {period(e)}
-                    </ThemedText>
-                    {/* loose == null on purpose: the key is ABSENT on a payment or an
-                        adjustment, and null-filled by the platform-owner route, so an
-                        `in`-based test would make the two screens disagree */}
-                    {e.is_paid != null && (
-                      <ThemedText style={e.is_paid ? styles.paid : styles.due}>
-                        {e.is_paid ? t('account.paid') : t('account.due')}
+    <View style={styles.screen}>
+      <ModuleDetailScreen<Billing>
+        requireAdmin
+        title={t('menu.accountSettings')}
+        // exactly this path: a trailing slash is a 404 here, not a redirect
+        endpoint="/account/billing"
+        heading={(b) => b.company_name || t('account.noName')}
+        rows={rows}
+        sections={[
+          {
+            title: t('account.history'),
+            isEmpty: (b) => !b.entries?.length,
+            emptyText: t('account.noHistory'),
+            render: (b) => (
+              <>
+                {(b.entries ?? []).map((e) => (
+                  <View key={e.uuid} style={styles.entry}>
+                    <View style={styles.entryTop}>
+                      <ThemedText style={styles.type}>
+                        {TYPE_LABEL[e.entry_type] ?? tef(e.entry_type)}
+                      </ThemedText>
+                      <ThemedText
+                        style={[
+                          styles.amount,
+                          e.amount < 0 ? styles.amountOut : styles.amountIn,
+                        ]}
+                      >
+                        {money(e.amount, e.currency)}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.entryTop}>
+                      <ThemedText style={styles.period} numberOfLines={1}>
+                        {period(e)}
+                      </ThemedText>
+                      {/* loose == null on purpose: the key is ABSENT on a payment or an
+                          adjustment, and null-filled by the platform-owner route, so an
+                          `in`-based test would make the two screens disagree */}
+                      {e.is_paid != null && (
+                        <ThemedText style={e.is_paid ? styles.paid : styles.due}>
+                          {e.is_paid ? t('account.paid') : t('account.due')}
+                        </ThemedText>
+                      )}
+                    </View>
+                    {!!e.notes && (
+                      <ThemedText style={styles.notes} numberOfLines={2}>
+                        {e.notes}
                       </ThemedText>
                     )}
-                  </View>
-                  {!!e.notes && (
-                    <ThemedText style={styles.notes} numberOfLines={2}>
-                      {e.notes}
+                    <ThemedText style={styles.when}>
+                      {e.created_at ? formatNumericDate(new Date(e.created_at)) : ''}
                     </ThemedText>
-                  )}
-                  <ThemedText style={styles.when}>
-                    {e.created_at ? formatNumericDate(new Date(e.created_at)) : ''}
-                  </ThemedText>
-                </View>
-              ))}
-            </>
-          ),
-        },
-      ]}
-      footer={(b) => (
-        <>
-          <ThemedText style={styles.footer}>{t('account.readOnly')}</ThemedText>
-          {/* the ledger is hard-capped server-side with no total and no working page
-              param, so a full page is the only truncation signal that exists and there is
-              nothing a "load more" control could send */}
-          {b.entries?.length === 100 && (
-            <ThemedText style={styles.footer}>{t('account.truncated')}</ThemedText>
-          )}
-        </>
-      )}
-    />
+                  </View>
+                ))}
+              </>
+            ),
+          },
+        ]}
+        footer={(b) => (
+          <>
+            <ThemedText style={styles.footer}>{t('account.readOnly')}</ThemedText>
+            {/* the ledger is hard-capped server-side with no total and no working page
+                param, so a full page is the only truncation signal that exists and there is
+                nothing a "load more" control could send */}
+            {b.entries?.length === 100 && (
+              <ThemedText style={styles.footer}>{t('account.truncated')}</ThemedText>
+            )}
+          </>
+        )}
+      />
+      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   entry: {
     paddingVertical: 10,
     borderTopWidth: StyleSheet.hairlineWidth,

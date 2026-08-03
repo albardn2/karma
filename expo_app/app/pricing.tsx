@@ -12,6 +12,7 @@ import { Stack, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
+import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
@@ -260,6 +261,7 @@ export default function PricingScreen() {
             )}
           </ScrollView>
         )}
+        <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
       </ThemedView>
     </ModuleGuard>
   );

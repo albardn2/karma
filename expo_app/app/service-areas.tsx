@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
+import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatNumericDate } from '@/utils/date';
 
@@ -68,57 +69,61 @@ export default function ServiceAreasScreen() {
   }, [near, t]);
 
   return (
-    <ModuleListScreen<ServiceArea>
-      module="service-areas"
-      title={t('menu.serviceAreas')}
-      endpoint="/service-area/"
-      itemsKey="items"
-      searchParam="name"
-      searchPlaceholder={t('serviceAreas.searchPlaceholder')}
-      params={params}
-      keyExtractor={(a) => a.uuid}
-      header={
-        <TouchableOpacity
-          style={[styles.nearChip, !!near && styles.nearChipOn]}
-          onPress={toggleNear}
-          disabled={locating}
-          testID="service-areas-near"
-        >
-          <ThemedText style={[styles.nearText, !!near && styles.nearTextOn]}>
-            {locating
-              ? t('serviceAreas.locating')
-              : near
-                ? t('serviceAreas.nearOn')
-                : t('serviceAreas.nearOff')}
-          </ThemedText>
-        </TouchableOpacity>
-      }
-      renderItem={(a) => (
-        <TouchableOpacity
-          style={styles.row}
-          onPress={() => router.push(`/service-areas/${a.uuid}`)}
-          testID={`service-area-${a.uuid}`}
-        >
-          <View style={styles.rowLeft}>
-            <ThemedText style={styles.name} numberOfLines={1}>
-              {a.name}
+    <View style={styles.screen}>
+      <ModuleListScreen<ServiceArea>
+        module="service-areas"
+        title={t('menu.serviceAreas')}
+        endpoint="/service-area/"
+        itemsKey="items"
+        searchParam="name"
+        searchPlaceholder={t('serviceAreas.searchPlaceholder')}
+        params={params}
+        keyExtractor={(a) => a.uuid}
+        header={
+          <TouchableOpacity
+            style={[styles.nearChip, !!near && styles.nearChipOn]}
+            onPress={toggleNear}
+            disabled={locating}
+            testID="service-areas-near"
+          >
+            <ThemedText style={[styles.nearText, !!near && styles.nearTextOn]}>
+              {locating
+                ? t('serviceAreas.locating')
+                : near
+                  ? t('serviceAreas.nearOn')
+                  : t('serviceAreas.nearOff')}
             </ThemedText>
-            {!!a.description && (
-              <ThemedText style={styles.desc} numberOfLines={1}>
-                {a.description}
+          </TouchableOpacity>
+        }
+        renderItem={(a) => (
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => router.push(`/service-areas/${a.uuid}`)}
+            testID={`service-area-${a.uuid}`}
+          >
+            <View style={styles.rowLeft}>
+              <ThemedText style={styles.name} numberOfLines={1}>
+                {a.name}
               </ThemedText>
-            )}
-          </View>
-          <ThemedText style={styles.when}>
-            {a.created_at ? formatNumericDate(new Date(a.created_at)) : ''}
-          </ThemedText>
-        </TouchableOpacity>
-      )}
-    />
+              {!!a.description && (
+                <ThemedText style={styles.desc} numberOfLines={1}>
+                  {a.description}
+                </ThemedText>
+              )}
+            </View>
+            <ThemedText style={styles.when}>
+              {a.created_at ? formatNumericDate(new Date(a.created_at)) : ''}
+            </ThemedText>
+          </TouchableOpacity>
+        )}
+      />
+      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   nearChip: {
     alignSelf: 'flex-start',
     paddingHorizontal: 14,

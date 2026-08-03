@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
+import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
@@ -101,51 +102,55 @@ export default function TransactionsScreen() {
   const nameOf = (u?: string | null) => (u && accounts[u]?.account_name) || null;
 
   return (
-    <ModuleListScreen<Transaction>
-      module="transactions"
-      title={t('menu.transactions')}
-      endpoint="/transaction/"
-      itemsKey="transactions"
-      filters={filters}
-      keyExtractor={(x) => x.uuid}
-      renderItem={(x) => {
-        const out = money(x.from_amount, x.from_currency);
-        const into = money(x.to_amount, x.to_currency);
-        const from = nameOf(x.from_account_uuid);
-        const to = nameOf(x.to_account_uuid);
-        // a transfer shows both sides; a one-sided movement shows only the side it has
-        const amount = out && into ? `${out} → ${into}` : (out ?? into ?? '—');
-        const route = from && to ? `${from} → ${to}` : (from ?? to ?? '—');
-        return (
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => router.push(`/transactions/${x.uuid}`)}
-            testID={`transaction-${x.uuid}`}
-          >
-            <View style={styles.rowLeft}>
-              <ThemedText style={styles.amount} numberOfLines={1}>
-                {amount}
-              </ThemedText>
-              <ThemedText style={styles.route} numberOfLines={1}>
-                {route}
-              </ThemedText>
-              {!!x.notes && (
-                <ThemedText style={styles.notes} numberOfLines={1}>
-                  {x.notes}
+    <View style={styles.screen}>
+      <ModuleListScreen<Transaction>
+        module="transactions"
+        title={t('menu.transactions')}
+        endpoint="/transaction/"
+        itemsKey="transactions"
+        filters={filters}
+        keyExtractor={(x) => x.uuid}
+        renderItem={(x) => {
+          const out = money(x.from_amount, x.from_currency);
+          const into = money(x.to_amount, x.to_currency);
+          const from = nameOf(x.from_account_uuid);
+          const to = nameOf(x.to_account_uuid);
+          // a transfer shows both sides; a one-sided movement shows only the side it has
+          const amount = out && into ? `${out} → ${into}` : (out ?? into ?? '—');
+          const route = from && to ? `${from} → ${to}` : (from ?? to ?? '—');
+          return (
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => router.push(`/transactions/${x.uuid}`)}
+              testID={`transaction-${x.uuid}`}
+            >
+              <View style={styles.rowLeft}>
+                <ThemedText style={styles.amount} numberOfLines={1}>
+                  {amount}
                 </ThemedText>
-              )}
-            </View>
-            <ThemedText style={styles.when}>
-              {x.created_at ? formatNumericDate(new Date(x.created_at)) : ''}
-            </ThemedText>
-          </TouchableOpacity>
-        );
-      }}
-    />
+                <ThemedText style={styles.route} numberOfLines={1}>
+                  {route}
+                </ThemedText>
+                {!!x.notes && (
+                  <ThemedText style={styles.notes} numberOfLines={1}>
+                    {x.notes}
+                  </ThemedText>
+                )}
+              </View>
+              <ThemedText style={styles.when}>
+                {x.created_at ? formatNumericDate(new Date(x.created_at)) : ''}
+              </ThemedText>
+            </TouchableOpacity>
+          );
+        }}
+      />
+      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   rowLeft: { flex: 1 },
   amount: { fontSize: 15, fontWeight: '700', color: '#1f2937' },

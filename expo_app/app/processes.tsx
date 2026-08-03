@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
+import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
@@ -57,46 +58,50 @@ export default function ProcessesScreen() {
   const count = (a?: unknown[] | null) => (Array.isArray(a) ? a.length : 0);
 
   return (
-    <ModuleListScreen<ProcessRow>
-      module="processes"
-      title={t('menu.processes')}
-      endpoint="/process/"
-      itemsKey="items"
-      filters={filters}
-      keyExtractor={(p) => p.uuid}
-      renderItem={(p) => (
-        <TouchableOpacity
-          style={styles.row}
-          onPress={() => router.push(`/processes/${p.uuid}`)}
-          testID={`process-${p.uuid}`}
-        >
-          <View style={styles.rowLeft}>
-            <ThemedText style={styles.type} numberOfLines={1}>
-              {p.type ? tef(p.type) : '—'}
-            </ThemedText>
-            <ThemedText style={styles.meta}>
-              {t('processes.inOut', {
-                inputs: count(p.data?.inputs),
-                outputs: count(p.data?.outputs),
-              })}
-              {p.workflow_execution_uuid ? ` · ${t('processes.fromWorkflow')}` : ''}
-            </ThemedText>
-            {!!p.notes && (
-              <ThemedText style={styles.notes} numberOfLines={1}>
-                {p.notes}
+    <View style={styles.screen}>
+      <ModuleListScreen<ProcessRow>
+        module="processes"
+        title={t('menu.processes')}
+        endpoint="/process/"
+        itemsKey="items"
+        filters={filters}
+        keyExtractor={(p) => p.uuid}
+        renderItem={(p) => (
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => router.push(`/processes/${p.uuid}`)}
+            testID={`process-${p.uuid}`}
+          >
+            <View style={styles.rowLeft}>
+              <ThemedText style={styles.type} numberOfLines={1}>
+                {p.type ? tef(p.type) : '—'}
               </ThemedText>
-            )}
-          </View>
-          <ThemedText style={styles.when}>
-            {p.created_at ? formatNumericDate(new Date(p.created_at)) : ''}
-          </ThemedText>
-        </TouchableOpacity>
-      )}
-    />
+              <ThemedText style={styles.meta}>
+                {t('processes.inOut', {
+                  inputs: count(p.data?.inputs),
+                  outputs: count(p.data?.outputs),
+                })}
+                {p.workflow_execution_uuid ? ` · ${t('processes.fromWorkflow')}` : ''}
+              </ThemedText>
+              {!!p.notes && (
+                <ThemedText style={styles.notes} numberOfLines={1}>
+                  {p.notes}
+                </ThemedText>
+              )}
+            </View>
+            <ThemedText style={styles.when}>
+              {p.created_at ? formatNumericDate(new Date(p.created_at)) : ''}
+            </ThemedText>
+          </TouchableOpacity>
+        )}
+      />
+      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   rowLeft: { flex: 1 },
   type: { fontSize: 15, fontWeight: '600', color: '#1f2937' },
