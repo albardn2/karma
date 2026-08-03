@@ -26,6 +26,11 @@ interface ModuleListScreenProps<T> {
    * no MODULES entry to gate on, such as the platform-owner console.
    */
   requireScope?: string;
+  /**
+   * Admin or platform owner — see ModuleGuard's requireAdmin for why neither a module
+   * nor a scope can express that set.
+   */
+  requireAdmin?: boolean;
   title: string;
   /** API path without query string, e.g. "/customer-order/" */
   endpoint: string;
@@ -83,6 +88,7 @@ interface ModuleListScreenProps<T> {
 export function ModuleListScreen<T>({
   module,
   requireScope,
+  requireAdmin,
   title,
   endpoint,
   itemsKey,
@@ -168,7 +174,7 @@ export function ModuleListScreen<T>({
   };
 
   return (
-    <ModuleGuard module={module} requireScope={requireScope}>
+    <ModuleGuard module={module} requireScope={requireScope} requireAdmin={requireAdmin}>
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ title, headerShown: false }} />
 

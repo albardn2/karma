@@ -42,6 +42,11 @@ const ENUM_AR: Record<string, string> = {
   sales_associate: 'مندوب مبيعات',
   sales_manager: 'مدير مبيعات',
   warehouse_keeper: 'أمين مستودع',
+  // account subscription types (Account.subscription_type) — the platform console's
+  // detail screen already calls tef() on this field, so in Arabic it has been rendering
+  // the raw `per_user`; these two entries fix that as well
+  flat: 'ثابت',
+  per_user: 'لكل مستخدم',
   // customer categories (CustomerCategory)
   roastery: 'محمصة',
   restaurant: 'مطعم',

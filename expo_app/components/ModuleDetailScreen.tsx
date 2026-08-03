@@ -40,6 +40,15 @@ export interface DetailAction<T> {
    * it builds the array.
    */
   visible?: (item: T) => boolean;
+  /**
+   * Replace the confirm body for a destructive action.
+   *
+   * The default says the change cannot be undone, which is true of a delete and false
+   * of a reversible one like deactivating a user. Marking such an action
+   * non-destructive instead would drop the confirm altogether and lose the red
+   * styling, so the wording is what varies, not the mechanism.
+   */
+  confirmText?: string;
 }
 
 interface ModuleDetailScreenProps<T> {
@@ -49,6 +58,11 @@ interface ModuleDetailScreenProps<T> {
    * no MODULES entry to gate on, such as the platform-owner console.
    */
   requireScope?: string;
+  /**
+   * Admin or platform owner — see ModuleGuard's requireAdmin for why neither a module
+   * nor a scope can express that set.
+   */
+  requireAdmin?: boolean;
   /** shown in the top bar */
   title: string;
   /** full path to the single record, e.g. "/vendor/abc-123" */
@@ -80,6 +94,7 @@ interface ModuleDetailScreenProps<T> {
 export function ModuleDetailScreen<T>({
   module,
   requireScope,
+  requireAdmin,
   title,
   endpoint,
   heading,
@@ -126,7 +141,7 @@ export function ModuleDetailScreen<T>({
     : [];
 
   return (
-    <ModuleGuard module={module} requireScope={requireScope}>
+    <ModuleGuard module={module} requireScope={requireScope} requireAdmin={requireAdmin}>
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
 
@@ -209,7 +224,7 @@ export function ModuleDetailScreen<T>({
                       if (!a.destructive) return a.onPress(item);
                       // a destructive action always asks first: these screens are
                       // used one-handed in a van, and a mis-tap should not delete
-                      Alert.alert(a.label, t('detail.confirmDestructive'), [
+                      Alert.alert(a.label, a.confirmText ?? t('detail.confirmDestructive'), [
                         { text: t('common.cancel'), style: 'cancel' },
                         { text: a.label, style: 'destructive', onPress: () => a.onPress(item) },
                       ]);

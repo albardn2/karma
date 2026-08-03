@@ -23,6 +23,22 @@ interface ModuleGuardProps {
    * Both may be supplied, and then both must pass.
    */
   requireScope?: string;
+  /**
+   * The caller must be an admin OR the platform owner — the set the backend actually
+   * gates user management and billing on, `scopes_required(ADMIN, SUPER_ADMIN)`.
+   *
+   * This exists because neither of the other two props can express that set. A module
+   * cannot: for an admin the per-user grant list is null, so useGrantedModules falls
+   * through to the ACCOUNT's feature cap, and the admin of a tenant capped to a couple
+   * of modules would be refused a screen the API serves them. A scope cannot either:
+   * the test below is exact membership, and the platform owner's permission_scope is
+   * the single value 'superuser', so requireScope="admin" would lock out the one person
+   * who is allowed everywhere.
+   *
+   * useAuth already derives precisely this set as `isAdmin`, so this keeps the client
+   * gate identical to the server's rather than approximating it.
+   */
+  requireAdmin?: boolean;
   children: React.ReactNode;
 }
 
@@ -42,15 +58,17 @@ interface ModuleGuardProps {
  * authorization — it is the UI telling the truth about a decision the server has
  * already made.
  */
-export function ModuleGuard({ module, requireScope, children }: ModuleGuardProps) {
-  const { user } = useAuth();
+export function ModuleGuard({ module, requireScope, requireAdmin, children }: ModuleGuardProps) {
+  const { user, isAdmin } = useAuth();
   const hasModule = useHasModule(module ?? '');
   const scopes = String(user?.permission_scope ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
   const allowed =
-    (module ? hasModule : true) && (requireScope ? scopes.includes(requireScope) : true);
+    (module ? hasModule : true) &&
+    (requireScope ? scopes.includes(requireScope) : true) &&
+    (requireAdmin ? isAdmin : true);
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
