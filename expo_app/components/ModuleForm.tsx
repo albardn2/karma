@@ -39,7 +39,12 @@ export interface FormField {
 }
 
 interface ModuleFormProps {
-  module: string;
+  module?: string;
+  /**
+   * A scope the caller must hold instead of (or as well as) a module — for forms over
+   * settings with no MODULES entry, such as the platform console's.
+   */
+  requireScope?: string;
   title: string;
   fields: FormField[];
   /** initial values — supply for an edit, omit for a create */
@@ -94,6 +99,7 @@ interface ModuleFormProps {
  */
 export function ModuleForm({
   module,
+  requireScope,
   title,
   fields,
   initial,
@@ -193,7 +199,7 @@ export function ModuleForm({
   };
 
   return (
-    <ModuleGuard module={module}>
+    <ModuleGuard module={module} requireScope={requireScope}>
       <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
