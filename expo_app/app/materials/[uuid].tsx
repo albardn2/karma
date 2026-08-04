@@ -198,14 +198,6 @@ export default function MaterialDetailScreen() {
       ]}
       sections={[
         {
-          title: t('materials.stockOverTime'),
-          isEmpty: () => !(summary?.events ?? []).length,
-          emptyText: t('materials.noEvents'),
-          render: () => (
-            <LineChart series={series} width={width - 72} step />
-          ),
-        },
-        {
           title: t('materials.lots'),
           isEmpty: () => !lots?.length,
           emptyText: t('materials.noLots'),
@@ -261,7 +253,10 @@ export default function MaterialDetailScreen() {
                         {qty(Number(l.current_quantity))}
                         {l.unit ? ` ${l.unit}` : ''}
                       </ThemedText>
+                      {/* a bordered pill, not bare red text: as a plain label it read
+                          as a status word rather than something you could tap */}
                       <TouchableOpacity
+                        style={styles.zeroOutBtn}
                         onPress={() => zeroOut(l)}
                         hitSlop={8}
                         testID={`zero-out-${l.uuid}`}
@@ -280,6 +275,14 @@ export default function MaterialDetailScreen() {
                 </ThemedText>
               )}
             </>
+          ),
+        },
+        {
+          title: t('materials.stockOverTime'),
+          isEmpty: () => !(summary?.events ?? []).length,
+          emptyText: t('materials.noEvents'),
+          render: () => (
+            <LineChart series={series} width={width - 72} step />
           ),
         },
       ]}
@@ -345,6 +348,15 @@ const styles = StyleSheet.create({
   lotRight: { alignItems: 'flex-end', gap: 3 },
   lotQty: { fontSize: 14, fontWeight: '700', color: '#1f2937' },
   lotQtyBad: { color: '#991b1b' },
+  zeroOutBtn: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    backgroundColor: '#fef2f2',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
   zeroOut: { fontSize: 12, fontWeight: '700', color: '#dc2626' },
   note: { fontSize: 11, opacity: 0.6, marginTop: 8, fontStyle: 'italic' },
   descBlock: { marginTop: 22 },
