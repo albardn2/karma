@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
@@ -30,6 +30,9 @@ interface Material {
 export default function MaterialsScreen() {
   const router = useRouter();
   const { t, tef } = useLanguage();
+  // both are real, verified list-DTO filters (ilike-contains); the toggle decides
+  // which one the search box feeds
+  const [searchMode, setSearchMode] = useState<'name' | 'sku'>('name');
 
   return (
     <View style={styles.root}>
@@ -39,12 +42,40 @@ export default function MaterialsScreen() {
         endpoint="/material/"
         itemsKey="materials"
         onCreate={() => router.push('/materials/create')}
-        searchParam="name"
-        searchPlaceholder={t('materials.searchPlaceholder')}
+        searchParam={searchMode}
+        searchPlaceholder={
+          searchMode === 'name'
+            ? t('materials.searchPlaceholder')
+            : t('materials.searchBySkuPlaceholder')
+        }
+        header={
+          <View style={styles.modeRow}>
+            {(['name', 'sku'] as const).map((m) => (
+              <TouchableOpacity
+                key={m}
+                style={[styles.modeChip, searchMode === m && styles.modeChipOn]}
+                onPress={() => setSearchMode(m)}
+                testID={`material-search-${m}`}
+              >
+                <ThemedText style={[styles.modeText, searchMode === m && styles.modeTextOn]}>
+                  {m === 'name' ? t('materials.name') : t('materials.sku')}
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </View>
+        }
         filters={[
+          // all five MaterialType values — the last two were missing, so machinery and
+          // vehicles were reachable only by scrolling
           { id: 'product', label: t('materials.product'), params: { type: 'product' } },
           { id: 'raw', label: t('materials.rawMaterial'), params: { type: 'raw_material' } },
           { id: 'prepared', label: tef('prepared'), params: { type: 'prepared' } },
+          {
+            id: 'machinery',
+            label: tef('machinery_and_equipment'),
+            params: { type: 'machinery_and_equipment' },
+          },
+          { id: 'vehicle', label: tef('vehicle'), params: { type: 'vehicle' } },
         ]}
         keyExtractor={(m) => m.uuid}
         renderItem={(m) => (
@@ -87,6 +118,18 @@ export default function MaterialsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  modeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  modeChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  modeChipOn: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
+  modeText: { fontSize: 12, fontWeight: '600', color: '#374151' },
+  modeTextOn: { color: '#fff' },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,

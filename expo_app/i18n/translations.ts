@@ -912,6 +912,20 @@ export const translations: Record<Lang, Record<string, string>> = {
   'customers.newOrder': 'New order',
   'customers.viewOrders': 'View orders',
   'order.loadFailed': 'Could not load this order. You may not have permission to view it — the trip flow still works without this screen.',
+
+  // materials parity (delete, stock chart, zero-out, add stock, sku search)
+  'materials.deleteConfirm': 'Delete this material? This cannot be undone from the app.',
+  'materials.deleteBlocked': 'This material cannot be deleted while it still has stock lots, movement history, prices, or order lines — zeroing a lot out is not enough. Remove those first.',
+  'materials.deleteFailed': 'Failed to delete material',
+  'materials.stockOverTime': 'Stock over time',
+  'materials.stockValue': 'Value',
+  'materials.noEvents': 'No stock movements yet.',
+  'materials.uuid': 'ID',
+  'materials.zeroOut': 'Zero out',
+  'materials.zeroOutConfirm': 'Write off the remaining quantity of lot {lot} to zero?',
+  'materials.zeroOutFailed': 'Failed to zero out lot',
+  'materials.addStockFor': 'Add stock — {what}',
+  'materials.searchBySkuPlaceholder': 'Search by SKU',
   },
   ar: {
     // trips module (admin)
@@ -1813,5 +1827,19 @@ export const translations: Record<Lang, Record<string, string>> = {
   'customers.newOrder': 'طلب جديد',
   'customers.viewOrders': 'عرض الطلبات',
   'order.loadFailed': 'تعذّر تحميل هذا الطلب. قد لا تملك صلاحية عرضه — سير الرحلة يعمل دون هذه الشاشة.',
+
+  // materials parity (delete, stock chart, zero-out, add stock, sku search)
+  'materials.deleteConfirm': 'هل تريد حذف هذه المادة؟ لا يمكن التراجع عن هذا الإجراء من التطبيق.',
+  'materials.deleteBlocked': 'لا يمكن حذف هذه المادة طالما لديها دفعات مخزون أو سجل حركات أو أسعار أو بنود طلبات — تصفير الدفعة لا يكفي. احذف تلك أولاً.',
+  'materials.deleteFailed': 'فشل حذف المادة',
+  'materials.stockOverTime': 'المخزون عبر الزمن',
+  'materials.stockValue': 'القيمة',
+  'materials.noEvents': 'لا توجد حركات مخزون بعد.',
+  'materials.uuid': 'المعرف',
+  'materials.zeroOut': 'تصفير',
+  'materials.zeroOutConfirm': 'تصفير الكمية المتبقية من الدفعة {lot}؟',
+  'materials.zeroOutFailed': 'فشل تصفير الدفعة',
+  'materials.addStockFor': 'إضافة مخزون — {what}',
+  'materials.searchBySkuPlaceholder': 'البحث برمز المادة (SKU)',
   },
 };
