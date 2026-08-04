@@ -42,9 +42,17 @@ export default function MaterialsScreen() {
         searchParam="name"
         searchPlaceholder={t('materials.searchPlaceholder')}
         filters={[
+          // all five MaterialType values — the last two were missing, so machinery and
+          // vehicles were reachable only by scrolling
           { id: 'product', label: t('materials.product'), params: { type: 'product' } },
           { id: 'raw', label: t('materials.rawMaterial'), params: { type: 'raw_material' } },
           { id: 'prepared', label: tef('prepared'), params: { type: 'prepared' } },
+          {
+            id: 'machinery',
+            label: tef('machinery_and_equipment'),
+            params: { type: 'machinery_and_equipment' },
+          },
+          { id: 'vehicle', label: tef('vehicle'), params: { type: 'vehicle' } },
         ]}
         keyExtractor={(m) => m.uuid}
         renderItem={(m) => (

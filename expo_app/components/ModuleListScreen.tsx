@@ -12,6 +12,7 @@ import { Stack, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
+import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
@@ -231,26 +232,27 @@ export function ModuleListScreen<T>({
         )}
 
         {filters && filters.length > 0 && (
-          <View style={styles.chips}>
+          /* one scrolling row in the trips design rather than wrapping pills:
+             wrapping left one chip orphaned on its own line as soon as a module
+             had more than a phone-width of filters, and Arabic labels overflow at
+             a different point again */
+          <ScrollingChipRow>
             {[{ id: '__all', label: t('moduleList.all'), params: {} }, ...filters].map((f) => {
               const on = (f.id === '__all' && activeFilter === null) || f.id === activeFilter;
               return (
-                <TouchableOpacity
+                <FilterChip
                   key={f.id}
-                  style={[styles.chip, on && styles.chipOn]}
+                  label={f.label}
+                  active={on}
                   onPress={() => {
                     setPage(1);
                     setActiveFilter(f.id === '__all' ? null : f.id);
                   }}
                   testID={`module-filter-${f.id}`}
-                >
-                  <ThemedText style={[styles.chipText, on && styles.chipTextOn]}>
-                    {f.label}
-                  </ThemedText>
-                </TouchableOpacity>
+                />
               );
             })}
-          </View>
+          </ScrollingChipRow>
         )}
 
         {header}
@@ -368,18 +370,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.08)',
   },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingBottom: 8 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
-  },
-  chipOn: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
-  chipText: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  chipTextOn: { color: '#fff' },
   list: { paddingHorizontal: 20, paddingTop: 6 },
   listEmpty: { flexGrow: 1 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },

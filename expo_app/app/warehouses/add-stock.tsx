@@ -62,6 +62,11 @@ export default function AddStockScreen() {
       kind: 'select',
       options: ['USD', 'SYP'].map((v) => ({ value: v, label: tef(v) })),
     },
+    {
+      name: 'expiration_date',
+      label: t('inventory.expiry'),
+      placeholder: 'YYYY-MM-DD',
+    },
     { name: 'notes', label: t('warehouses.notes'), kind: 'multiline' },
   ];
 
@@ -75,6 +80,15 @@ export default function AddStockScreen() {
       }
       fields={fields}
       extra={{ warehouse_uuid }}
+      transform={(body) => {
+        // NAIVE local midnight, no Z and no offset: the column is a naive timestamp
+        // and an offset is honoured — +03:00 midnight stores as the previous day's
+        // 21:00, silently shifting the expiry a day early
+        if (typeof body.expiration_date === 'string' && body.expiration_date.trim()) {
+          return { ...body, expiration_date: `${body.expiration_date.trim()}T00:00:00` };
+        }
+        return body;
+      }}
       method="POST"
       endpoint="/inventory/manual-add"
     />
