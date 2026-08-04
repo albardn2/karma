@@ -468,7 +468,12 @@ export default function CustomersScreen() {
   return (
     <ThemedView style={[
       styles.container,
-      isNative && { 
+      // The status-bar inset, which this screen never applied — it computed `insets`
+      // and used it nowhere, relying on the native header for that space. With the
+      // native header gone (it was the source of the "(tabs)" back label) the top row
+      // would sit under the status bar and its buttons would be unreachable.
+      { paddingTop: insets.top },
+      isNative && {
         paddingBottom: 0 // Let BottomNavigation handle bottom padding
       }
     ]}>
@@ -504,10 +509,10 @@ export default function CustomersScreen() {
           <ThemedText style={styles.backChevron}>‹</ThemedText>
         </TouchableOpacity>
 
-        {/* the screen title used to sit here; the row is the chevron plus the two
-            actions, and the menu tile the user just tapped already said "Customers" */}
-        <View style={styles.headerSpacer} />
-
+        {/* No spacer and no title: styles.header is already justifyContent:
+            'space-between', so with just these two children the chevron sits left and
+            the actions sit right on their own. The menu tile tapped to get here
+            already said "Customers". */}
         <View style={styles.headerActions}>
           {/* Filters Button for Mobile */}
           {(isMobileWeb || isNative) && (
@@ -876,7 +881,6 @@ const styles = StyleSheet.create({
     width: '100%',
     overflow: 'hidden',
   },
-  headerSpacer: { flex: 1 },
   backChevron: { fontSize: 30, lineHeight: 34, color: '#5469D4', fontWeight: '700', marginRight: 4 },
   loadingContainer: {
     flex: 1,
