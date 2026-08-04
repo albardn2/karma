@@ -393,7 +393,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   'warehouses.noMovements': 'No movements in this period.',
   'warehouses.lots': '{count} lot(s)',
   'warehouses.topMaterials': 'Showing the {shown} largest materials',
-  'warehouses.topMaterialsChip': 'Top materials',
+  'warehouses.showTopMaterials': 'Top materials',
 
   'employees.searchPlaceholder': 'Search by name',
   'employees.role': 'Role',
@@ -1336,7 +1336,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   'warehouses.noMovements': 'لا حركات في هذه الفترة.',
   'warehouses.lots': '{count} دفعة',
   'warehouses.topMaterials': 'أكبر {shown} مواد',
-  'warehouses.topMaterialsChip': 'الأكثر مخزوناً',
+  'warehouses.showTopMaterials': 'الأكثر مخزوناً',
 
   'employees.searchPlaceholder': 'البحث بالاسم',
   'employees.role': 'الدور',

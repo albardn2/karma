@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { ChartLegend, LineChart } from '@/components/Chart';
-import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
+import { PickerField } from '@/components/PickerField';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasModule } from '@/hooks/useModuleAccess';
 import { apiCall, isOk } from '@/utils/api';
@@ -80,6 +80,8 @@ export default function WarehousesDetailScreen() {
   const [range, setRange] = useState<(typeof RANGES)[number]['id']>('90d');
   /** '' = let the server pick the biggest holders; otherwise one material's uuid */
   const [material, setMaterial] = useState('');
+  /** the chosen material's name, so the closed dropdown reads as a name not a uuid */
+  const [materialName, setMaterialName] = useState('');
   const [bucket, setBucket] = useState<string>('week');
   const [reloadKey, setReloadKey] = useState(0);
   // adding stock is an inventory-module write even though it starts here
@@ -196,30 +198,55 @@ export default function WarehousesDetailScreen() {
                 ))}
               </View>
 
-              {/* Which material to chart. The chips are built from the stock list
-                  above, so every uuid here came from the server for THIS warehouse —
-                  which matters: a uuid the tenant does not own is not rejected, it is
-                  silently dropped and the response falls back to the top holders, so a
-                  chip would look selected while the chart showed something else. */}
-              {(stock ?? []).length > 1 && (
-                <ScrollingChipRow>
-                  <FilterChip
-                    label={t('warehouses.topMaterialsChip')}
-                    active={!material}
-                    onPress={() => setMaterial('')}
-                    testID="wh-material-all"
-                  />
-                  {(stock ?? []).map((it) => (
-                    <FilterChip
-                      key={it.material_uuid}
-                      label={it.material_name}
-                      active={material === it.material_uuid}
-                      onPress={() => setMaterial(it.material_uuid)}
-                      testID={`wh-material-${it.material_uuid}`}
-                    />
-                  ))}
-                </ScrollingChipRow>
-              )}
+              {/* Which material to chart: a dropdown with search, because a warehouse
+                  can hold dozens of materials and their names are long.
+
+                  Its rows come from THIS warehouse's own stock, not the material
+                  catalogue, for two reasons. Offering a material the warehouse does
+                  not hold would chart nothing, and — worse — a uuid outside the
+                  tenant is not rejected by the chart endpoint but silently dropped,
+                  falling back to the top holders, so the dropdown would read as
+                  filtered while the chart showed something else.
+
+                  warehouse-state has no name filter and ignores unknown params, so
+                  PickerField falls back to filtering the rows it already fetched —
+                  which is the whole list, since that endpoint does not paginate. */}
+              <View style={styles.materialFilter}>
+                <ThemedText style={styles.filterLabel}>{t('inventory.material')}</ThemedText>
+                <PickerField
+                  spec={{
+                    endpoint: '/inventory/analytics/warehouse-state',
+                    params: { warehouse_uuid: String(uuid) },
+                    itemsKey: 'items',
+                    label: (m) => m.material_name ?? '—',
+                    sublabel: (m) =>
+                      [m.sku, m.unit && `${m.quantity} ${m.unit}`].filter(Boolean).join(' · ') ||
+                      undefined,
+                    value: (m) => m.material_uuid,
+                  }}
+                  value={material}
+                  onChange={(v, label) => {
+                    setMaterial(v);
+                    setMaterialName(label);
+                  }}
+                  initialLabel={materialName || undefined}
+                  testID="wh-material-picker"
+                />
+                {!!material && (
+                  <TouchableOpacity
+                    style={styles.clearBtn}
+                    onPress={() => {
+                      setMaterial('');
+                      setMaterialName('');
+                    }}
+                    testID="wh-material-clear"
+                  >
+                    <ThemedText style={styles.clearText}>
+                      {t('warehouses.showTopMaterials')}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+              </View>
 
               {charted.length ? (
                 <>
@@ -296,5 +323,9 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: '#5469D4' },
   chipText: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
   chipTextOn: { color: '#fff' },
+  materialFilter: { marginBottom: 10 },
+  filterLabel: { fontSize: 12, fontWeight: '600', opacity: 0.6, marginBottom: 6 },
+  clearBtn: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 },
+  clearText: { fontSize: 13, color: '#5469D4', fontWeight: '600' },
   more: { fontSize: 11, opacity: 0.5, marginTop: 8 },
 });
