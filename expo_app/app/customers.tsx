@@ -489,6 +489,21 @@ export default function CustomersScreen() {
         isDesktop && styles.desktopHeader,
         (isMobileWeb || isNative) && styles.mobileHeader
       ]}>
+        {/* This screen predates the shared scaffolds and draws its own header, so it
+            never picked up the back chevron the scaffolds provide. Same glyph, same
+            colour, same fallback as everywhere else. */}
+        <TouchableOpacity
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)?tab=menu'))}
+          hitSlop={12}
+          testID="customers-back"
+        >
+          <ThemedText
+            style={{ fontSize: 30, lineHeight: 34, color: '#5469D4', fontWeight: '700', marginRight: 4 }}
+          >
+            ‹
+          </ThemedText>
+        </TouchableOpacity>
+
         <ThemedText style={[
           styles.title,
           isDesktop && styles.desktopTitle,

@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
@@ -103,6 +103,7 @@ export function ModuleListScreen<T>({
   onCreate,
   onAnalytics,
 }: ModuleListScreenProps<T>) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const [items, setItems] = useState<T[]>([]);
@@ -179,7 +180,20 @@ export function ModuleListScreen<T>({
         <Stack.Screen options={{ title, headerShown: false }} />
 
         <View style={styles.headerRow}>
-          <ThemedText style={styles.title}>{title}</ThemedText>
+          {/* Every other shared scaffold draws one of these; this one did not, which
+              left 19 of the app's list screens with no way back to the menu except the
+              hardware gesture. The chevron is the same glyph and colour the detail and
+              form scaffolds use, so the affordance is identical everywhere. */}
+          <TouchableOpacity
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)?tab=menu'))}
+            hitSlop={12}
+            testID="module-list-back"
+          >
+            <ThemedText style={styles.back}>‹</ThemedText>
+          </TouchableOpacity>
+          <ThemedText style={styles.title} numberOfLines={1}>
+            {title}
+          </ThemedText>
           <View style={styles.headerRight}>
             {!loading && !failed && (
               <ThemedText style={styles.count} testID="module-list-count">
@@ -310,13 +324,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f1f5f9' },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    // 'center' rather than 'baseline': a 30pt chevron next to a 24pt title on a
+    // shared baseline sits visibly low
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 4,
   },
-  title: { fontSize: 24, fontWeight: '700' },
+  back: { fontSize: 30, lineHeight: 34, color: '#5469D4', fontWeight: '700' },
+  title: { flex: 1, fontSize: 24, fontWeight: '700' },
   count: { fontSize: 13, opacity: 0.6 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   add: {
