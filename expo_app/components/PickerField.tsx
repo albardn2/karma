@@ -26,6 +26,12 @@ interface PickerFieldProps {
   spec: PickerSpec;
   value: string;
   onChange: (value: string, label: string) => void;
+  /**
+   * Label for a value that arrived already chosen — an edit form seeded from a record
+   * holds the uuid but not the name, and without this the field reads as a raw uuid
+   * until the user opens it.
+   */
+  initialLabel?: string;
   testID?: string;
 }
 
@@ -43,7 +49,7 @@ const PAGE = 20;
  * It keeps the chosen row's LABEL as well as its uuid, so the field can show "Sugar"
  * rather than the uuid the body carries.
  */
-export function PickerField({ spec, value, onChange, testID }: PickerFieldProps) {
+export function PickerField({ spec, value, onChange, initialLabel, testID }: PickerFieldProps) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -86,7 +92,7 @@ export function PickerField({ spec, value, onChange, testID }: PickerFieldProps)
         testID={testID}
       >
         <ThemedText style={[styles.triggerText, !value && styles.placeholder]} numberOfLines={1}>
-          {value ? chosen || value : t('picker.choose')}
+          {value ? chosen || initialLabel || value : t('picker.choose')}
         </ThemedText>
         <ThemedText style={styles.chevron}>{open ? '⌃' : '⌄'}</ThemedText>
       </TouchableOpacity>

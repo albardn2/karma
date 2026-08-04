@@ -24,6 +24,7 @@ const ENUM_AR: Record<string, string> = {
   process: 'عملية إنتاج',
   manual: 'يدوي',
   transfer: 'نقل',
+  return: 'مرتجع',
   adjustment: 'تسوية',
   prepared: 'مُحضَّر',
   machinery_and_equipment: 'آلات ومعدات',

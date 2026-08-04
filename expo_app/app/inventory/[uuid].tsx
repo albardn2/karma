@@ -1,205 +1,311 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { ModuleGuard } from '@/components/ModuleGuard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/ModuleDetailScreen';
+import { CostCurrencyToggle, CostCcy } from '@/components/CostCurrencyToggle';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { apiCall, isOk } from '@/utils/api';
-import { formatNumericDate } from '@/utils/date';
+import { formatMonthDayTime, formatNumericDate, parseTs, plainDate } from '@/utils/date';
 
-interface InventoryLot {
+interface Lot {
   uuid: string;
   lot_id: string;
+  material_uuid?: string | null;
   material_name?: string | null;
   unit?: string | null;
   current_quantity: number;
   original_quantity: number;
-  expiration_date?: string | null;
-  is_active: boolean;
-  notes?: string | null;
-  created_at: string;
-  warehouse_uuid?: string | null;
   cost_per_unit?: number | null;
   total_original_cost?: number | null;
   cost_currency?: string | null;
+  warehouse_uuid?: string | null;
+  expiration_date?: string | null;
+  notes?: string | null;
+  is_active: boolean;
+  created_at: string;
+  created_by_uuid?: string | null;
+}
+
+interface Movement {
+  uuid: string;
+  event_type: string;
+  quantity: number;
+  cost_per_unit?: number | null;
+  currency?: string | null;
+  created_at: string;
 }
 
 /**
- * One lot.
+ * One lot of stock: what it holds, what it cost, how it got there, and what can be done
+ * about it.
  *
- * The warehouse name is fetched separately because the inventory row carries only
- * warehouse_uuid, and "which warehouse" is the first thing a keeper asks about a
- * lot — a uuid on screen would make them go and look it up. It is a best-effort
- * second request: if it fails the lot still renders, since the lot is the point
- * and the name is context.
+ * Rewritten onto ModuleDetailScreen. The previous version hand-rolled its own top bar,
+ * loading and failure states, which is exactly why it had nowhere to put an action — the
+ * whole module was read-only. It also showed "Couldn't load this list" on a single record.
+ *
+ * COST IS REPORTED, NOT STORED. Neither cost_per_unit nor total_original_cost is a
+ * column; both are derived from this lot's own movements and converted into whichever
+ * currency the toggle asks for. Two consequences the labels have to respect. A cost of
+ * 0.00 is a real recorded cost and is not the same fact as "not recorded", so every
+ * check here is `!= null` rather than falsy. And total_original_cost is cost × ORIGINAL
+ * quantity — what the lot cost on arrival, not what the remaining stock is worth — so it
+ * is labelled receipt value, and the worth of what is actually on hand is computed
+ * separately from cost × current.
+ *
+ * Deleting a lot is admin-only AND refused once it has any movement, which in practice
+ * is every real lot. So the button appears only where it can succeed, and the refusal
+ * points at zero-out, which keeps both the history and the cost.
  */
-export default function InventoryLotScreen() {
+export default function LotDetailScreen() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { t } = useLanguage();
-  const [lot, setLot] = useState<InventoryLot | null>(null);
-  const [warehouse, setWarehouse] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      try {
-        const res = await apiCall<InventoryLot>(`/inventory/${uuid}`);
-        if (isOk(res.status) && res.data) {
-          setLot(res.data);
-          if (res.data.warehouse_uuid) {
-            const w = await apiCall<any>(`/warehouse/${res.data.warehouse_uuid}`);
-            setWarehouse(isOk(w.status) ? (w.data?.name ?? null) : null);
-          }
-        } else {
-          setFailed(true);
-        }
-      } catch {
-        setFailed(true);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [uuid],
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { t, tef } = useLanguage();
+  const { isAdmin } = useAuth();
+  const [ccy, setCcy] = useState<CostCcy>('USD');
+  const [reloadKey, setReloadKey] = useState(0);
+  const [whName, setWhName] = useState<string | null>(null);
+  const [moves, setMoves] = useState<Movement[] | null>(null);
 
   const qty = (n?: number | null) =>
     n == null ? '—' : Number.isInteger(n) ? String(n) : Number(n).toFixed(2);
-  const money = (n?: number | null) =>
-    n == null ? '—' : `${Number(n).toFixed(2)}${lot?.cost_currency ? ` ${lot.cost_currency}` : ''}`;
+  const money = (n?: number | null, c?: string | null) =>
+    n == null ? t('inventory.costUnknown') : `${Number(n).toFixed(2)} ${c ?? ccy}`;
 
-  const rows: Array<[string, string]> = lot
-    ? [
-        [t('inventory.warehouse'), warehouse ?? '—'],
-        [t('inventory.lotId'), lot.lot_id],
-        [t('inventory.current'), `${qty(lot.current_quantity)}${lot.unit ? ` ${lot.unit}` : ''}`],
-        [t('inventory.original'), `${qty(lot.original_quantity)}${lot.unit ? ` ${lot.unit}` : ''}`],
-        [t('inventory.costPerUnit'), money(lot.cost_per_unit)],
-        [t('inventory.totalCost'), money(lot.total_original_cost)],
-        [
-          t('inventory.expiry'),
-          lot.expiration_date ? formatNumericDate(new Date(lot.expiration_date)) : '—',
-        ],
-        [t('inventory.received'), formatNumericDate(new Date(lot.created_at))],
-      ]
-    : [];
+  // this lot's own movements — inventory_uuid IS a real applied filter here, unlike
+  // material_uuid on the same route, which 422s
+  const loadMoves = useCallback(async () => {
+    const res = await apiCall<{ events: Movement[] }>(
+      `/inventory-event/?inventory_uuid=${uuid}&page=1&per_page=100`,
+    );
+    if (isOk(res.status)) setMoves(res.data?.events ?? []);
+    else setMoves((prev) => prev ?? []);
+  }, [uuid]);
+
+  const resolveWarehouse = useCallback(async (id?: string | null) => {
+    if (!id) return;
+    const res = await apiCall<{ name?: string }>(`/warehouse/${id}`);
+    if (isOk(res.status)) setWhName(res.data?.name ?? null);
+  }, []);
+
+  // focus, not mount: edit, add-stock and zero-out all change what this shows, and a
+  // stack pop does not remount
+  useFocusEffect(
+    useCallback(() => {
+      loadMoves();
+      setReloadKey((k) => k + 1);
+    }, [loadMoves]),
+  );
+
+  const moveCount = (moves ?? []).length;
+
+  const zeroOut = (l: Lot) =>
+    Alert.alert(t('materials.zeroOut'), t('materials.zeroOutConfirm', { lot: l.lot_id }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('materials.zeroOut'),
+        style: 'destructive',
+        onPress: async () => {
+          // the delta is computed server-side from the lot's own events, so a stale
+          // screen cannot overshoot — and a negative lot is corrected upward
+          const res = await apiCall(`/inventory/${uuid}/zero-out`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+          });
+          if (isOk(res.status)) {
+            loadMoves();
+            setReloadKey((k) => k + 1);
+          } else if (res.status === 400) {
+            Alert.alert(t('materials.zeroOut'), t('inventory.alreadyZero'));
+          } else {
+            Alert.alert(
+              t('materials.zeroOutFailed'),
+              String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+            );
+          }
+        },
+      },
+    ]);
+
+  const remove = async () => {
+    const res = await apiCall(`/inventory/${uuid}`, { method: 'DELETE' });
+    if (isOk(res.status)) {
+      router.replace('/inventory');
+      return;
+    }
+    // a business rule wearing a 404: the lot still has movements
+    if (res.status === 404) Alert.alert(t('detail.delete'), t('inventory.deleteBlocked'));
+    else
+      Alert.alert(
+        t('inventory.deleteFailed'),
+        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+      );
+  };
+
+  const rows = (l: Lot): DetailRow[] => {
+    if (l.warehouse_uuid && whName === null) resolveWarehouse(l.warehouse_uuid);
+    return [
+      [t('inventory.warehouse'), whName ?? t('materials.unknownWarehouse')],
+      [t('inventory.lotId'), l.lot_id],
+      [t('inventory.current'), `${qty(l.current_quantity)}${l.unit ? ` ${l.unit}` : ''}`],
+      [t('inventory.original'), `${qty(l.original_quantity)}${l.unit ? ` ${l.unit}` : ''}`],
+      [t('inventory.costPerUnit'), money(l.cost_per_unit, l.cost_currency)],
+      [
+        t('inventory.valueOnHand'),
+        l.cost_per_unit != null && Number(l.current_quantity) > 0
+          ? `${(Number(l.cost_per_unit) * Number(l.current_quantity)).toFixed(2)} ${
+              l.cost_currency ?? ccy
+            }`
+          : '—',
+      ],
+      [t('inventory.receiptValue'), money(l.total_original_cost, l.cost_currency)],
+      [t('inventory.expiry'), l.expiration_date ? plainDate(l.expiration_date.slice(0, 10)) : '—'],
+      [t('inventory.received'), formatNumericDate(parseTs(l.created_at))],
+      [t('inventory.createdBy'), l.created_by_uuid ?? '—'],
+      [t('inventory.notes'), l.notes || '—'],
+      [t('materials.uuid'), l.uuid],
+    ];
+  };
+
+  const actions: DetailAction<Lot>[] = [
+    {
+      label: t('inventory.addStock'),
+      testID: 'lot-add-stock',
+      onPress: (l) =>
+        router.push({
+          pathname: '/inventory/add-stock',
+          params: {
+            material_uuid: l.material_uuid ?? '',
+            material_name: l.material_name ?? '',
+            warehouse_uuid: l.warehouse_uuid ?? '',
+            warehouse_name: whName ?? '',
+          },
+        }),
+    },
+    {
+      label: t('detail.edit'),
+      testID: 'lot-edit',
+      onPress: (l) =>
+        router.push({
+          pathname: '/inventory/edit',
+          params: {
+            uuid: l.uuid,
+            lot_id: l.lot_id,
+            warehouse_uuid: l.warehouse_uuid ?? '',
+            warehouse_name: whName ?? '',
+            notes: l.notes ?? '',
+            expiration_date: l.expiration_date ? l.expiration_date.slice(0, 10) : '',
+            is_active: String(l.is_active),
+          },
+        }),
+    },
+    {
+      label: t('materials.zeroOut'),
+      destructive: true,
+      testID: 'lot-zero-out',
+      // `!== 0`, not `> 0`: the same call corrects a negative lot upward
+      visible: (l) => Number(l.current_quantity) !== 0,
+      onPress: zeroOut,
+    },
+    {
+      label: t('detail.delete'),
+      destructive: true,
+      confirmText: t('inventory.deleteConfirmShort'),
+      testID: 'lot-delete',
+      // admin-only server-side, and refused once the lot has any movement — which is
+      // every real lot. Showing it otherwise ships a button that always fails.
+      visible: () => isAdmin && moveCount === 0,
+      onPress: remove,
+    },
+  ];
 
   return (
-    <ModuleGuard module="inventory">
-      <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => router.back()} testID="lot-back" hitSlop={12}>
-            <ThemedText style={styles.back}>‹</ThemedText>
-          </TouchableOpacity>
-          <ThemedText style={styles.topTitle} numberOfLines={1}>
-            {t('menu.inventory')}
-          </ThemedText>
-          <View style={styles.backSpacer} />
+    <ModuleDetailScreen<Lot>
+      module="inventory"
+      title={t('menu.inventory')}
+      // the reporting currency rides in the query string, and the scaffold keys its
+      // fetch on `endpoint` — so flipping the toggle refetches by itself
+      endpoint={`/inventory/${uuid}?cost_currency=${ccy}`}
+      reloadKey={reloadKey}
+      heading={(l) => l.material_name || t('inventory.unknownMaterial')}
+      subheading={(l) => (
+        <View style={styles.sub}>
+          <CostCurrencyToggle value={ccy} onChange={setCcy} testIDPrefix="lot" />
+          {!l.is_active && (
+            <ThemedText style={styles.inactive}>{t('inventory.inactive')}</ThemedText>
+          )}
         </View>
-
-        {loading ? (
-          <View style={styles.centre}>
-            <ActivityIndicator size="large" color="#5469D4" />
-          </View>
-        ) : failed || !lot ? (
-          <View style={styles.centre}>
-            <ThemedText style={styles.stateIcon}>⚠️</ThemedText>
-            <ThemedText style={styles.stateText} testID="lot-error">
-              {t('moduleList.failed')}
-            </ThemedText>
-            <TouchableOpacity style={styles.retry} onPress={() => load()}>
-              <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <ScrollView
-            contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => {
-                  setRefreshing(true);
-                  load(true);
-                }}
-              />
-            }
-          >
-            <ThemedText style={styles.material} testID="lot-material">
-              {lot.material_name || t('inventory.unknownMaterial')}
-            </ThemedText>
-            {!lot.is_active && (
-              <ThemedText style={styles.inactiveNote}>{t('inventory.inactiveNote')}</ThemedText>
-            )}
-
-            <View style={styles.card}>
-              {rows.map(([label, value]) => (
-                <View key={label} style={styles.row}>
-                  <ThemedText style={styles.rowLabel}>{label}</ThemedText>
-                  <ThemedText style={styles.rowValue}>{value}</ThemedText>
-                </View>
+      )}
+      rows={rows}
+      sections={[
+        {
+          title: t('inventory.movements'),
+          isEmpty: () => !moves?.length,
+          emptyText: t('inventory.noMovements'),
+          render: () => (
+            <>
+              {(moves ?? []).map((m) => (
+                <TouchableOpacity
+                  key={m.uuid}
+                  style={styles.move}
+                  onPress={() => router.push(`/inventory-events/${m.uuid}`)}
+                  testID={`lot-move-${m.uuid}`}
+                >
+                  <View style={styles.moveLeft}>
+                    <ThemedText style={styles.moveType}>{tef(m.event_type)}</ThemedText>
+                    <ThemedText style={styles.moveMeta}>
+                      {formatMonthDayTime(parseTs(m.created_at))}
+                      {m.cost_per_unit != null
+                        ? ` · ${Number(m.cost_per_unit).toFixed(2)} ${m.currency ?? ''}`
+                        : ''}
+                    </ThemedText>
+                  </View>
+                  <ThemedText
+                    style={[
+                      styles.moveQty,
+                      Number(m.quantity) < 0 ? styles.moveOut : styles.moveIn,
+                    ]}
+                  >
+                    {Number(m.quantity) > 0 ? '+' : ''}
+                    {qty(m.quantity)}
+                  </ThemedText>
+                </TouchableOpacity>
               ))}
-            </View>
-
-            {!!lot.notes && (
-              <>
-                <ThemedText style={styles.sectionTitle}>{t('inventory.notes')}</ThemedText>
-                <View style={styles.card}>
-                  <ThemedText style={styles.notes}>{lot.notes}</ThemedText>
-                </View>
-              </>
-            )}
-          </ScrollView>
-        )}
-      </ThemedView>
-    </ModuleGuard>
+            </>
+          ),
+        },
+      ]}
+      actions={actions}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
-  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 },
-  back: { fontSize: 30, lineHeight: 34, color: '#5469D4', fontWeight: '700' },
-  backSpacer: { width: 24 },
-  topTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600' },
-  body: { paddingHorizontal: 20, paddingTop: 6 },
-  material: { fontSize: 22, fontWeight: '700', color: '#1f2937' },
-  inactiveNote: { fontSize: 13, color: '#92400e', marginTop: 6 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginTop: 16, gap: 10 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  rowLabel: { flex: 1, fontSize: 14, opacity: 0.65 },
-  rowValue: { fontSize: 14, fontWeight: '600', color: '#1f2937' },
-  sectionTitle: { fontSize: 15, fontWeight: '700', marginTop: 22, marginBottom: -6 },
-  notes: { fontSize: 14, lineHeight: 20, opacity: 0.8 },
-  centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  stateIcon: { fontSize: 34 },
-  stateText: { fontSize: 15, opacity: 0.6, textAlign: 'center' },
-  retry: {
-    marginTop: 6,
-    backgroundColor: '#5469D4',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
+  sub: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' },
+  inactive: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4b5563',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
   },
-  retryText: { color: '#fff', fontWeight: '600' },
+  move: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0,0,0,0.06)',
+  },
+  moveLeft: { flex: 1 },
+  moveType: { fontSize: 14, fontWeight: '600', color: '#1f2937' },
+  moveMeta: { fontSize: 11, opacity: 0.55, marginTop: 1 },
+  moveQty: { fontSize: 14, fontWeight: '700' },
+  moveIn: { color: '#166534' },
+  moveOut: { color: '#991b1b' },
 });
