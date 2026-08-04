@@ -12,6 +12,10 @@ const ENUM_AR: Record<string, string> = {
   pending: 'قيد الانتظار',
   paid: 'مدفوع',
   void: 'ملغى',
+  // invoice statuses not already present (pending/paid/void are shared above)
+  refunded: 'مُسترد',
+  partially_refunded: 'مُسترد جزئياً',
+  partially_paid: 'مدفوع جزئياً',
   manager: 'مدير',
   employee: 'موظف',
   // inventory event types

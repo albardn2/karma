@@ -73,7 +73,7 @@ const LANGS: Lang[] = ['en', 'ar'];
 // from field crew no matter what their API grants say — which is the whole point of the
 // cap, and also the trap it set: a new tile is invisible to drivers and reps unless it
 // is named here, however generous their permissions are.
-const FIELD_SECTIONS = new Set(['distribution', 'pricing']);
+const FIELD_SECTIONS = new Set(['distribution', 'pricing', 'customer_orders']);
 
 // Field crews only work the trip flow, so their menu is capped at Distribution — capped,
 // not fixed: it is still subject to the module filter below, so revoking Distribution

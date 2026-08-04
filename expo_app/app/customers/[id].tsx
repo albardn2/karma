@@ -809,6 +809,43 @@ export default function CustomerDetailScreen() {
             </View>
           </View>
 
+          {/* Orders: the two things someone opens a customer to do. The list is
+              pre-filtered to this customer; create pre-fills the picker. */}
+          <View style={styles.orderActionsRow}>
+            <TouchableOpacity
+              style={styles.orderActionBtn}
+              onPress={() =>
+                router.push({
+                  pathname: '/customer-orders/create',
+                  params: {
+                    customerUuid: customer.uuid,
+                    customerName: customer.company_name || customer.full_name || '',
+                  },
+                })
+              }
+              testID="customer-new-order"
+            >
+              <ThemedText style={styles.orderActionText}>{t('customers.newOrder')}</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.orderActionBtn, styles.orderActionSecondary]}
+              onPress={() =>
+                router.push({
+                  pathname: '/customer-orders',
+                  params: {
+                    customerUuid: customer.uuid,
+                    customerName: customer.company_name || customer.full_name || '',
+                  },
+                })
+              }
+              testID="customer-view-orders"
+            >
+              <ThemedText style={[styles.orderActionText, styles.orderActionTextSecondary]}>
+                {t('customers.viewOrders')}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+
           {/* Contact Information */}
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>
@@ -1087,6 +1124,21 @@ export default function CustomerDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  orderActionsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  orderActionBtn: {
+    flex: 1,
+    backgroundColor: '#5469D4',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  orderActionSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#5469D4',
+  },
+  orderActionText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  orderActionTextSecondary: { color: '#5469D4' },
   container: {
     flex: 1,
     backgroundColor: "#f8fafc",

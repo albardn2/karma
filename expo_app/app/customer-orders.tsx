@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
+import { PickerField } from '@/components/PickerField';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatNumericDate } from '@/utils/date';
+import { money } from '@/utils/money';
 
 interface CustomerOrder {
   uuid: string;
@@ -32,13 +34,35 @@ interface CustomerOrder {
  * unfulfilled, and overdue is about the invoice rather than the goods. Collapsing
  * them into a single "status" is what makes a rep think a delivered order has
  * been settled.
+ *
+ * The customer filter is a picker rather than a search box, deliberately. The
+ * list DTO accepts exactly uuid/customer_uuid/is_paid/is_fulfilled/is_overdue —
+ * there is no text-search param, and this codebase's list DTOs 422 the WHOLE
+ * request on an unknown param rather than ignoring it. So free-text search over
+ * orders cannot exist here; picking the customer (whose own endpoint DOES search
+ * server-side, case-insensitive) covers the real need: "show me this shop's
+ * orders". There is no date filter for the same reason — the web offers one and
+ * it 422s the entire list on use, a bug this screen does not inherit.
  */
 export default function CustomerOrdersScreen() {
   const router = useRouter();
   const { t } = useLanguage();
+  // arriving from a customer's detail screen pre-applies that customer
+  const { customerUuid, customerName } = useLocalSearchParams<{
+    customerUuid?: string;
+    customerName?: string;
+  }>();
+  const [customer, setCustomer] = useState<{ uuid: string; label: string }>({
+    uuid: customerUuid ?? '',
+    label: customerName ?? '',
+  });
 
-  const money = (amount: number, currency?: string | null) =>
-    `${Number(amount ?? 0).toFixed(2)}${currency ? ` ${currency}` : ''}`;
+  // a stable object per chosen customer: ModuleListScreen dep-tracks `params` by
+  // identity, so an inline literal would re-fetch on every render
+  const params = useMemo(
+    () => (customer.uuid ? { customer_uuid: customer.uuid } : undefined),
+    [customer.uuid],
+  );
 
   return (
     <View style={styles.root}>
@@ -47,6 +71,36 @@ export default function CustomerOrdersScreen() {
         title={t('menu.customerOrders')}
         endpoint="/customer-order/"
         itemsKey="orders"
+        params={params}
+        onCreate={() => router.push('/customer-orders/create')}
+        header={
+          <View style={styles.customerFilter}>
+            <PickerField
+              spec={{
+                endpoint: '/customer/',
+                itemsKey: 'customers',
+                searchParam: 'company_name',
+                label: (c) => c.company_name || c.full_name || c.uuid,
+                sublabel: (c) => (c.company_name ? c.full_name || undefined : undefined),
+                value: (c) => c.uuid,
+              }}
+              value={customer.uuid}
+              onChange={(uuid, label) => setCustomer({ uuid, label })}
+              testID="orders-customer-filter"
+            />
+            {!!customer.uuid && (
+              <TouchableOpacity
+                style={styles.clearBtn}
+                onPress={() => setCustomer({ uuid: '', label: '' })}
+                testID="orders-customer-clear"
+              >
+                <ThemedText style={styles.clearText}>
+                  {t('customerOrders.allCustomers')}
+                </ThemedText>
+              </TouchableOpacity>
+            )}
+          </View>
+        }
         filters={[
           // Exactly the filters the endpoint accepts. The list DTO forbids extra
           // params, so offering a field it does not support 422s every request
@@ -58,6 +112,7 @@ export default function CustomerOrdersScreen() {
             params: { is_fulfilled: 'false' },
           },
           { id: 'overdue', label: t('customerOrders.overdue'), params: { is_overdue: 'true' } },
+          { id: 'paid', label: t('customerOrders.paid'), params: { is_paid: 'true' } },
         ]}
         keyExtractor={(o) => o.uuid}
         renderItem={(o) => (
@@ -106,6 +161,9 @@ export default function CustomerOrdersScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  customerFilter: { marginBottom: 12 },
+  clearBtn: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 },
+  clearText: { fontSize: 13, color: '#5469D4', fontWeight: '600' },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,

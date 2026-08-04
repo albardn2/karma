@@ -897,6 +897,21 @@ export const translations: Record<Lang, Record<string, string>> = {
   'account.settles': 'settles {range}',
   'account.truncated': 'Showing the 100 most recent entries. The full ledger is on the web.',
   'account.readOnly': 'Read-only. Your company details, subscription and payments are recorded by the platform owner — there is nothing to change here.',
+
+  // customer-orders parity (create, notes, void, unfulfil, per-invoice payment)
+  'customerOrders.allCustomers': 'All customers',
+  'customerOrders.notes': 'Notes',
+  'customerOrders.notesPlaceholder': 'Order notes…',
+  'customerOrders.editNotes': 'Edit notes',
+  'customerOrders.void': 'Void order (admin)',
+  'customerOrders.voidConfirm': 'Voids this order and reverses everything it did: line items, the invoice, ALL RECORDED PAYMENTS, and stock movements. This works even on paid and fulfilled orders. This cannot be undone from the app.',
+  'customerOrders.unfulfil': 'Unfulfil',
+  'customerOrders.unfulfilConfirm': 'Return this item to pending and restore its stock?',
+  'customerOrders.recordPayment': 'Record payment',
+  'createorder.selectCustomer': 'Select customer',
+  'customers.newOrder': 'New order',
+  'customers.viewOrders': 'View orders',
+  'order.loadFailed': 'Could not load this order. You may not have permission to view it — the trip flow still works without this screen.',
   },
   ar: {
     // trips module (admin)
@@ -1783,5 +1798,20 @@ export const translations: Record<Lang, Record<string, string>> = {
   'account.settles': 'تسدّد {range}',
   'account.truncated': 'يتم عرض أحدث ١٠٠ حركة. السجل الكامل على الويب.',
   'account.readOnly': 'للعرض فقط. بيانات شركتك واشتراكك ودفعاتك يسجّلها مالك المنصة — لا يوجد ما يمكن تغييره هنا.',
+
+  // customer-orders parity (create, notes, void, unfulfil, per-invoice payment)
+  'customerOrders.allCustomers': 'كل العملاء',
+  'customerOrders.notes': 'ملاحظات',
+  'customerOrders.notesPlaceholder': 'ملاحظات الطلب…',
+  'customerOrders.editNotes': 'تعديل الملاحظات',
+  'customerOrders.void': 'إلغاء الطلب (مسؤول)',
+  'customerOrders.voidConfirm': 'سيؤدي إلغاء هذا الطلب إلى عكس كل ما نتج عنه: البنود والفاتورة وجميع الدفعات المسجلة وحركات المخزون، حتى لو كان الطلب مدفوعاً ومنفذاً. لا يمكن التراجع عن هذا من التطبيق.',
+  'customerOrders.unfulfil': 'إلغاء التنفيذ',
+  'customerOrders.unfulfilConfirm': 'إعادة هذا البند إلى قيد التنفيذ واسترجاع مخزونه؟',
+  'customerOrders.recordPayment': 'تسجيل دفعة',
+  'createorder.selectCustomer': 'اختر العميل',
+  'customers.newOrder': 'طلب جديد',
+  'customers.viewOrders': 'عرض الطلبات',
+  'order.loadFailed': 'تعذّر تحميل هذا الطلب. قد لا تملك صلاحية عرضه — سير الرحلة يعمل دون هذه الشاشة.',
   },
 };
