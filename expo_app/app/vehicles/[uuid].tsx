@@ -293,7 +293,15 @@ const styles = StyleSheet.create({
   stockQty: { fontSize: 14, fontWeight: '700', color: '#1f2937' },
   stockQtyBad: { color: '#991b1b' },
   chips: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#f3f4f6' },
+  // the trips filter-chip design — one look for every filter bar
+  chip: {
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
   chipOn: { backgroundColor: '#5469D4' },
   chipText: { fontSize: 12, fontWeight: '600', color: '#374151' },
   chipTextOn: { color: '#fff' },

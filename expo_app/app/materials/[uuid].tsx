@@ -344,15 +344,16 @@ export default function MaterialDetailScreen() {
 const styles = StyleSheet.create({
   ccyRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   ccyChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: '#fff',
+    // the trips filter-chip design
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
+    borderColor: '#E5E7EB',
   },
   ccyChipOn: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
-  ccyText: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  ccyText: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
   ccyTextOn: { color: '#fff' },
   lot: {
     flexDirection: 'row',

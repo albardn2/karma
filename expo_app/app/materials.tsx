@@ -120,15 +120,16 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   modeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   modeChip: {
-    paddingHorizontal: 14,
+    // the trips filter-chip design
+    borderRadius: 16,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#fff',
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
+    borderColor: '#E5E7EB',
   },
   modeChipOn: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
-  modeText: { fontSize: 12, fontWeight: '600', color: '#374151' },
+  modeText: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
   modeTextOn: { color: '#fff' },
   card: {
     backgroundColor: '#fff',
