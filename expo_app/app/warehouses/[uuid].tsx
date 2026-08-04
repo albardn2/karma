@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { ChartLegend, LineChart } from '@/components/Chart';
+import { PickerField } from '@/components/PickerField';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasModule } from '@/hooks/useModuleAccess';
 import { apiCall, isOk } from '@/utils/api';
@@ -33,6 +34,13 @@ interface OverTimeSeries {
   baseline: number;
   buckets: Array<{ period: string; delta: number }>;
 }
+
+/**
+ * How many materials to chart when no single one is chosen. Four is what fits: a
+ * phone-width chart with twenty series is a smear. The server does the ranking now,
+ * so this is a request rather than a client-side trim of a bigger response.
+ */
+const TOP_N = 4;
 
 const RANGES = [
   { id: '30d', days: 30, bucket: 'day' },
@@ -70,6 +78,10 @@ export default function WarehousesDetailScreen() {
   const [stock, setStock] = useState<StockItem[] | null>(null);
   const [series, setSeries] = useState<OverTimeSeries[] | null>(null);
   const [range, setRange] = useState<(typeof RANGES)[number]['id']>('90d');
+  /** '' = let the server pick the biggest holders; otherwise one material's uuid */
+  const [material, setMaterial] = useState('');
+  /** the chosen material's name, so the closed dropdown reads as a name not a uuid */
+  const [materialName, setMaterialName] = useState('');
   const [bucket, setBucket] = useState<string>('week');
   const [reloadKey, setReloadKey] = useState(0);
   // adding stock is an inventory-module write even though it starts here
@@ -86,7 +98,10 @@ export default function WarehousesDetailScreen() {
       ),
       apiCall<{ bucket: string; series: OverTimeSeries[] }>(
         `/inventory/analytics/warehouse-over-time?warehouse_uuid=${uuid}` +
-          `&bucket=${preset.bucket}&start_date=${encodeURIComponent(naiveIso(from))}`,
+          `&bucket=${preset.bucket}&start_date=${encodeURIComponent(naiveIso(from))}` +
+          // the endpoint filters and ranks server-side; the app used to fetch the
+          // default five and throw one away
+          (material ? `&material_uuids=${encodeURIComponent(material)}` : `&top_n=${TOP_N}`),
       ),
     ]);
     setStock(isOk(stateRes.status) ? (stateRes.data?.items ?? []) : []);
@@ -96,7 +111,7 @@ export default function WarehousesDetailScreen() {
     } else {
       setSeries([]);
     }
-  }, [uuid, range]);
+  }, [uuid, range, material]);
 
   useEffect(() => {
     loadAnalytics();
@@ -104,12 +119,9 @@ export default function WarehousesDetailScreen() {
     // warehouse record itself
   }, [loadAnalytics, reloadKey]);
 
-  // The four biggest materials only: a phone-width chart with twenty series is a
-  // smear, and the tail is where the uninteresting ones live.
+  // whatever the server returned for the current selection: one material when the
+  // filter is set, its top TOP_N holders otherwise
   const charted = (series ?? [])
-    .slice()
-    .sort((a, b) => Math.abs(Number(b.baseline ?? 0)) - Math.abs(Number(a.baseline ?? 0)))
-    .slice(0, 4)
     .map((s) => {
       let level = Number(s.baseline ?? 0);
       return {
@@ -166,8 +178,9 @@ export default function WarehousesDetailScreen() {
         },
         {
           title: t('warehouses.stockOverTime'),
-          isEmpty: () => !charted.length,
-          emptyText: t('warehouses.noMovements'),
+          // deliberately NO isEmpty: the filter chips live inside this section, so
+          // collapsing it on an empty result would strand whoever picked a material
+          // with no movements in the range — with no way back to All
           render: () => (
             <>
               <View style={styles.chips}>
@@ -184,9 +197,67 @@ export default function WarehousesDetailScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-              <LineChart series={charted} width={width - 72} step />
-              <ChartLegend names={charted.map((c) => c.name)} />
-              {(series ?? []).length > charted.length && (
+
+              {/* Which material to chart: a dropdown with search, because a warehouse
+                  can hold dozens of materials and their names are long.
+
+                  Its rows come from THIS warehouse's own stock, not the material
+                  catalogue, for two reasons. Offering a material the warehouse does
+                  not hold would chart nothing, and — worse — a uuid outside the
+                  tenant is not rejected by the chart endpoint but silently dropped,
+                  falling back to the top holders, so the dropdown would read as
+                  filtered while the chart showed something else.
+
+                  warehouse-state has no name filter and ignores unknown params, so
+                  PickerField falls back to filtering the rows it already fetched —
+                  which is the whole list, since that endpoint does not paginate. */}
+              <View style={styles.materialFilter}>
+                <ThemedText style={styles.filterLabel}>{t('inventory.material')}</ThemedText>
+                <PickerField
+                  spec={{
+                    endpoint: '/inventory/analytics/warehouse-state',
+                    params: { warehouse_uuid: String(uuid) },
+                    itemsKey: 'items',
+                    label: (m) => m.material_name ?? '—',
+                    sublabel: (m) =>
+                      [m.sku, m.unit && `${m.quantity} ${m.unit}`].filter(Boolean).join(' · ') ||
+                      undefined,
+                    value: (m) => m.material_uuid,
+                  }}
+                  value={material}
+                  onChange={(v, label) => {
+                    setMaterial(v);
+                    setMaterialName(label);
+                  }}
+                  initialLabel={materialName || undefined}
+                  testID="wh-material-picker"
+                />
+                {!!material && (
+                  <TouchableOpacity
+                    style={styles.clearBtn}
+                    onPress={() => {
+                      setMaterial('');
+                      setMaterialName('');
+                    }}
+                    testID="wh-material-clear"
+                  >
+                    <ThemedText style={styles.clearText}>
+                      {t('warehouses.showTopMaterials')}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {charted.length ? (
+                <>
+                  <LineChart series={charted} width={width - 72} step />
+                  <ChartLegend names={charted.map((c) => c.name)} />
+                </>
+              ) : (
+                <ThemedText style={styles.more}>{t('warehouses.noMovements')}</ThemedText>
+              )}
+              {/* only meaningful while the server is choosing for us */}
+              {!material && (stock ?? []).length > charted.length && (
                 <ThemedText style={styles.more}>
                   {t('warehouses.topMaterials', { shown: charted.length })}
                 </ThemedText>
@@ -252,5 +323,9 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: '#5469D4' },
   chipText: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
   chipTextOn: { color: '#fff' },
+  materialFilter: { marginBottom: 10 },
+  filterLabel: { fontSize: 12, fontWeight: '600', opacity: 0.6, marginBottom: 6 },
+  clearBtn: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 },
+  clearText: { fontSize: 13, color: '#5469D4', fontWeight: '600' },
   more: { fontSize: 11, opacity: 0.5, marginTop: 8 },
 });
