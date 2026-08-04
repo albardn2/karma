@@ -3,7 +3,7 @@ import { StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityInd
 import { View } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { apiCall } from '@/utils/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapViewComponent } from '@/components/MapView';
@@ -472,6 +472,10 @@ export default function CustomersScreen() {
         paddingBottom: 0 // Let BottomNavigation handle bottom padding
       }
     ]}>
+      {/* No native header: its back button carries the previous route's title, which
+          reads "(tabs)". This screen draws its own chevron below, like every other. */}
+      <Stack.Screen options={{ headerShown: false }} />
+
       {/* Banner */}
       {banner && (
         <Animated.View style={[
@@ -497,20 +501,12 @@ export default function CustomersScreen() {
           hitSlop={12}
           testID="customers-back"
         >
-          <ThemedText
-            style={{ fontSize: 30, lineHeight: 34, color: '#5469D4', fontWeight: '700', marginRight: 4 }}
-          >
-            ‹
-          </ThemedText>
+          <ThemedText style={styles.backChevron}>‹</ThemedText>
         </TouchableOpacity>
 
-        <ThemedText style={[
-          styles.title,
-          isDesktop && styles.desktopTitle,
-          (isMobileWeb || isNative) && styles.mobileTitle
-        ]}>
-          {t('customers.title')}
-        </ThemedText>
+        {/* the screen title used to sit here; the row is the chevron plus the two
+            actions, and the menu tile the user just tapped already said "Customers" */}
+        <View style={styles.headerSpacer} />
 
         <View style={styles.headerActions}>
           {/* Filters Button for Mobile */}
@@ -861,19 +857,27 @@ export default function CustomersScreen() {
         </Modal>
       )}
 
+      {/* The reason the footer never showed: this was imported and mentioned in a
+          comment above, but never rendered. The scroll area already reserves 100pt
+          for it, and the bar is absolutely positioned, so nothing else moves. */}
+      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
       </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    // no height: '100vh' — a web unit, invalid as a native DimensionValue, and it
+    // defeated StyleSheet.create's type inference for this entire file. flex: 1
+    // already fills the screen.
     flex: 1,
     backgroundColor: '#f8fafc',
     position: 'relative',
     width: '100%',
-    height: '100vh',
     overflow: 'hidden',
   },
+  headerSpacer: { flex: 1 },
+  backChevron: { fontSize: 30, lineHeight: 34, color: '#5469D4', fontWeight: '700', marginRight: 4 },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
