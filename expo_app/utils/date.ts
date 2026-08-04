@@ -39,3 +39,14 @@ export const todayPlain = (): string => {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
+
+/**
+ * Parse a backend timestamp that has no zone. The columns are naive UTC, so a bare
+ * `new Date(s)` reads them as LOCAL and shifts the result by the viewer's offset —
+ * appending Z is what makes two screens agree about the same row.
+ *
+ * Only for timestamps. A date-only column (expiration_date, billing_day) must go
+ * through plainDate instead: it is a calendar day, and parsing it at all is the bug.
+ */
+export const parseTs = (s?: string | null): Date =>
+  new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(String(s ?? '')) ? String(s) : `${String(s ?? '')}Z`);

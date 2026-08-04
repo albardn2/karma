@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
+import { CostCurrencyToggle, CostCcy } from '@/components/CostCurrencyToggle';
+import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatNumericDate } from '@/utils/date';
+import { apiCall, isOk } from '@/utils/api';
+import { plainDate } from '@/utils/date';
 
 interface InventoryLot {
   uuid: string;
@@ -16,6 +19,10 @@ interface InventoryLot {
   original_quantity: number;
   expiration_date?: string | null;
   is_active: boolean;
+  warehouse_uuid?: string | null;
+  /** derived server-side, already converted into the requested reporting currency */
+  cost_per_unit?: number | null;
+  cost_currency?: string | null;
 }
 
 /** A lot at or below zero is the thing a warehouse keeper needs to see first. */
@@ -57,6 +64,30 @@ function expiryState(iso?: string | null): 'none' | 'soon' | 'expired' {
 export default function InventoryScreen() {
   const router = useRouter();
   const { t } = useLanguage();
+  const [ccy, setCcy] = useState<CostCcy>('USD');
+  const [wh, setWh] = useState('');
+  const [warehouses, setWarehouses] = useState<Array<{ uuid: string; name: string }>>([]);
+
+  // neither list route returns a warehouse name — only its uuid — so resolve them once
+  useEffect(() => {
+    (async () => {
+      const res = await apiCall<{ warehouses: Array<{ uuid: string; name: string }> }>(
+        '/warehouse/?page=1&per_page=100',
+      );
+      if (isOk(res.status)) setWarehouses(res.data?.warehouses ?? []);
+    })();
+  }, []);
+  const whName = useMemo(
+    () => Object.fromEntries(warehouses.map((w) => [w.uuid, w.name])),
+    [warehouses],
+  );
+
+  // memoised: ModuleListScreen dep-tracks `params` by identity, so a fresh literal
+  // each render would re-fetch forever
+  const params = useMemo(
+    () => ({ cost_currency: ccy, ...(wh ? { warehouse_uuid: wh } : {}) }),
+    [ccy, wh],
+  );
 
   const qty = (n: number) => (Number.isInteger(n) ? String(n) : Number(n).toFixed(2));
 
@@ -67,6 +98,32 @@ export default function InventoryScreen() {
         title={t('menu.inventory')}
         endpoint="/inventory/"
         itemsKey="inventories"
+        params={params}
+        onCreate={() => router.push('/inventory/add-stock')}
+        header={
+          <View style={styles.headerBlock}>
+            <CostCurrencyToggle value={ccy} onChange={setCcy} testIDPrefix="inventory-list" />
+            {warehouses.length > 1 && (
+              <ScrollingChipRow>
+                <FilterChip
+                  label={t('inventory.allWarehouses')}
+                  active={!wh}
+                  onPress={() => setWh('')}
+                  testID="inventory-wh-all"
+                />
+                {warehouses.map((w) => (
+                  <FilterChip
+                    key={w.uuid}
+                    label={w.name}
+                    active={wh === w.uuid}
+                    onPress={() => setWh(w.uuid)}
+                    testID={`inventory-wh-${w.uuid}`}
+                  />
+                ))}
+              </ScrollingChipRow>
+            )}
+          </View>
+        }
         filters={[
           // The only status filter the endpoint takes. material_name is on the row
           // but is NOT a filter — passing it 422s the request, same trap as orders.
@@ -96,7 +153,8 @@ export default function InventoryScreen() {
 
               <View style={styles.cardBottom}>
                 <ThemedText style={styles.lot} numberOfLines={1}>
-                  {l.lot_id}
+                  {(l.warehouse_uuid && whName[l.warehouse_uuid]) ||
+                    t('materials.unknownWarehouse')}
                 </ThemedText>
                 <View style={styles.badges}>
                   <ThemedText style={styles.ofOriginal}>
@@ -125,11 +183,27 @@ export default function InventoryScreen() {
                 </View>
               </View>
 
+              {/* the cost line — the thing this list was missing. `!= null` because a
+                  recorded cost of 0.00 is a fact, and "not recorded" is a different one */}
+              <ThemedText style={styles.costLine} numberOfLines={1}>
+                {l.cost_per_unit != null
+                  ? `${Number(l.cost_per_unit).toFixed(2)} ${l.cost_currency ?? ccy}${
+                      l.unit ? `/${l.unit}` : ''
+                    }`
+                  : t('inventory.costUnknown')}
+                {l.cost_per_unit != null && Number(l.current_quantity) > 0
+                  ? ` · ${t('inventory.valueOnHand')} ${(
+                      Number(l.cost_per_unit) * Number(l.current_quantity)
+                    ).toFixed(2)} ${l.cost_currency ?? ccy}`
+                  : ''}
+                {` · ${l.lot_id}`}
+              </ThemedText>
+
               {l.expiration_date && expiry !== 'none' && (
                 <ThemedText style={styles.expiryLine}>
-                  {t('inventory.expires', {
-                    date: formatNumericDate(new Date(l.expiration_date)),
-                  })}
+                  {/* date-only column: split it, never parse — new Date() on a bare
+                      date is UTC midnight and reads a day early west of Greenwich */}
+                  {t('inventory.expires', { date: plainDate(l.expiration_date.slice(0, 10)) })}
                 </ThemedText>
               )}
             </TouchableOpacity>
@@ -143,6 +217,8 @@ export default function InventoryScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  headerBlock: { marginBottom: 8, gap: 4 },
+  costLine: { fontSize: 12, opacity: 0.55, marginTop: 6 },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,

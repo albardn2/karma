@@ -29,6 +29,8 @@ export interface FormField {
   options?: Array<{ value: string; label: string }>;
   /** for kind 'picker' — choose one record from a list endpoint */
   picker?: PickerSpec;
+  /** label for a picker value that arrives pre-chosen, so an edit shows a name not a uuid */
+  pickerInitialLabel?: string;
   /**
    * Bounds for kind 'number', inclusive, and whether a fraction is legal.
    *
@@ -259,6 +261,7 @@ export function ModuleForm({
                     spec={f.picker}
                     value={values[f.name] ?? ''}
                     onChange={(v) => set(f.name, v)}
+                    initialLabel={f.pickerInitialLabel}
                     testID={`form-${f.name}`}
                   />
                 ) : f.kind === 'select' || f.kind === 'boolean' ? (

@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatNumericDate } from '@/utils/date';
+import { formatMonthDayTime, parseTs } from '@/utils/date';
 
 interface InventoryEvent {
   uuid: string;
@@ -14,6 +14,10 @@ interface InventoryEvent {
   quantity: number;
   created_at: string;
   notes?: string | null;
+  cost_per_unit?: number | null;
+  currency?: string | null;
+  /** true on a receipt, false on a correction — why zeroing a lot preserves its cost */
+  affect_original?: boolean | null;
 }
 
 /**
@@ -23,10 +27,18 @@ interface InventoryEvent {
  * whole content of a row, so it is rendered explicitly with a leading + and
  * coloured, rather than shown as a bare number that reads as a quantity on hand.
  *
- * Chips cover the event types that actually occur in the data (sale, process,
- * purchase order, manual). The enum has three more — transfer, return, adjustment —
- * deliberately left off: seven chips do not fit a phone, and a filter that always
- * returns nothing is worse than no filter.
+ * All seven event types are offered as chips. They used to be four, on the reasoning
+ * that seven do not fit a phone — but the chip row scrolls sideways with an arrow now,
+ * so the constraint is gone and a type absent from today's data is not absent forever.
+ *
+ * The row shows the TIME, not just the date, which is the difference between a usable
+ * list and an unusable one: six consecutive movements of the same material on the same
+ * day are otherwise identical except for their quantity, which is exactly what a busy
+ * day looks like.
+ *
+ * The cost shown is the STORED cost in its own currency, with no reporting-currency
+ * toggle — unlike the lot screens. This route takes no cost_currency parameter, and its
+ * list DTO forbids unknown ones, so offering a toggle here would 422 the whole page.
  */
 export default function InventoryEventsScreen() {
   const router = useRouter();
@@ -44,6 +56,9 @@ export default function InventoryEventsScreen() {
           { id: 'po', label: tef('purchase_order'), params: { event_type: 'purchase_order' } },
           { id: 'process', label: tef('process'), params: { event_type: 'process' } },
           { id: 'manual', label: tef('manual'), params: { event_type: 'manual' } },
+          { id: 'transfer', label: tef('transfer'), params: { event_type: 'transfer' } },
+          { id: 'return', label: tef('return'), params: { event_type: 'return' } },
+          { id: 'adjustment', label: tef('adjustment'), params: { event_type: 'adjustment' } },
         ]}
         keyExtractor={(e) => e.uuid}
         renderItem={(e) => {
@@ -65,12 +80,24 @@ export default function InventoryEventsScreen() {
                 </ThemedText>
               </View>
               <View style={styles.cardBottom}>
-                <ThemedText style={styles.date}>
-                  {formatNumericDate(new Date(e.created_at))}
+                <ThemedText style={styles.date} numberOfLines={1}>
+                  {/* the time matters: without it, a day's worth of movements on one
+                      material are indistinguishable rows */}
+                  {formatMonthDayTime(parseTs(e.created_at))}
+                  {e.cost_per_unit != null
+                    ? ` · ${Number(e.cost_per_unit).toFixed(2)} ${e.currency ?? ''}`
+                    : ''}
                 </ThemedText>
-                {!!e.event_type && (
-                  <ThemedText style={styles.type}>{tef(e.event_type)}</ThemedText>
-                )}
+                <View style={styles.tags}>
+                  {e.affect_original === true && (
+                    <ThemedText style={styles.affects}>
+                      {t('inventoryEvents.affectsOriginal')}
+                    </ThemedText>
+                  )}
+                  {!!e.event_type && (
+                    <ThemedText style={styles.type}>{tef(e.event_type)}</ThemedText>
+                  )}
+                </View>
               </View>
             </TouchableOpacity>
           );
@@ -83,6 +110,17 @@ export default function InventoryEventsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  tags: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  affects: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#4b5563',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,

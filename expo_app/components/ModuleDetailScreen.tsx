@@ -187,32 +187,6 @@ export function ModuleDetailScreen<T>({
             </ThemedText>
             {subheading?.(item)}
 
-            <View style={styles.card}>
-              {rows(item).map(([label, value]) => (
-                <View key={label} style={styles.row}>
-                  <ThemedText style={styles.rowLabel}>{label}</ThemedText>
-                  <ThemedText style={styles.rowValue} numberOfLines={3}>
-                    {value}
-                  </ThemedText>
-                </View>
-              ))}
-            </View>
-
-            {sections?.map((sec) => (
-              <View key={sec.title}>
-                <ThemedText style={styles.sectionTitle}>{sec.title}</ThemedText>
-                <View style={styles.card}>
-                  {sec.isEmpty?.(item) ? (
-                    <ThemedText style={styles.rowLabel}>
-                      {sec.emptyText ?? t('moduleList.empty')}
-                    </ThemedText>
-                  ) : (
-                    sec.render(item)
-                  )}
-                </View>
-              </View>
-            ))}
-
             {!!shownActions.length && (
               <View style={styles.actions}>
                 {shownActions.map((a) => (
@@ -240,6 +214,33 @@ export function ModuleDetailScreen<T>({
               </View>
             )}
 
+            <View style={styles.card}>
+              {rows(item).map(([label, value]) => (
+                <View key={label} style={styles.row}>
+                  <ThemedText style={styles.rowLabel}>{label}</ThemedText>
+                  <ThemedText style={styles.rowValue} numberOfLines={3}>
+                    {value}
+                  </ThemedText>
+                </View>
+              ))}
+            </View>
+
+            {sections?.map((sec) => (
+              <View key={sec.title}>
+                <ThemedText style={styles.sectionTitle}>{sec.title}</ThemedText>
+                <View style={styles.card}>
+                  {sec.isEmpty?.(item) ? (
+                    <ThemedText style={styles.rowLabel}>
+                      {sec.emptyText ?? t('moduleList.empty')}
+                    </ThemedText>
+                  ) : (
+                    sec.render(item)
+                  )}
+                </View>
+              </View>
+            ))}
+
+
             {footer?.(item)}
           </ScrollView>
         )}
@@ -262,7 +263,9 @@ const styles = StyleSheet.create({
   rowLabel: { flex: 1, fontSize: 14, opacity: 0.65 },
   rowValue: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1f2937', textAlign: 'right' },
   sectionTitle: { fontSize: 15, fontWeight: '700', marginTop: 22, marginBottom: -6 },
-  actions: { marginTop: 22, gap: 10 },
+  // above the record, not below it: what you came to DO should be in reach
+  // without scrolling past everything there is to read
+  actions: { marginTop: 18, gap: 10 },
   action: {
     backgroundColor: '#5469D4',
     borderRadius: 12,

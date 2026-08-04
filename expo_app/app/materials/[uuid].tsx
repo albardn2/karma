@@ -5,9 +5,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { LineChart } from '@/components/Chart';
+import { CostCurrencyToggle, CostCcy } from '@/components/CostCurrencyToggle';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
-import { formatMonthDayTime, formatNumericDate, plainDate } from '@/utils/date';
+import { formatMonthDayTime, formatNumericDate, parseTs, plainDate } from '@/utils/date';
 
 interface Material {
   uuid: string;
@@ -37,8 +38,6 @@ interface Summary {
   lots: SummaryLot[];
 }
 
-/** Naive backend timestamps are UTC — parse them as such, or the time shifts. */
-const parseTs = (s: string) => new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z');
 
 /**
  * A material: what it is, where its stock sits, how the level moved, and the writes
@@ -69,11 +68,11 @@ export default function MaterialDetailScreen() {
   const { t, tef } = useLanguage();
   const { width } = useWindowDimensions();
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [ccy, setCcy] = useState<'USD' | 'SYP'>('USD');
+  const [ccy, setCcy] = useState<CostCcy>('USD');
   const [reloadKey, setReloadKey] = useState(0);
 
   const loadSummary = useCallback(
-    async (currency: 'USD' | 'SYP') => {
+    async (currency: CostCcy) => {
       // cost_currency is a reporting currency, not a filter: every lot's cost is
       // converted server-side at the rate nearest its own events
       const res = await apiCall<Summary>(
@@ -199,33 +198,14 @@ export default function MaterialDetailScreen() {
       ]}
       sections={[
         {
-          title: t('materials.stockOverTime'),
-          isEmpty: () => !(summary?.events ?? []).length,
-          emptyText: t('materials.noEvents'),
-          render: () => (
-            <LineChart series={series} width={width - 72} step />
-          ),
-        },
-        {
           title: t('materials.lots'),
           isEmpty: () => !lots?.length,
           emptyText: t('materials.noLots'),
           render: (x) => (
             <>
-              {/* reporting-currency toggle: refetches with costs converted server-side */}
+              {/* one shared toggle, same control as the lot screens */}
               <View style={styles.ccyRow}>
-                {(['USD', 'SYP'] as const).map((c) => (
-                  <TouchableOpacity
-                    key={c}
-                    style={[styles.ccyChip, ccy === c && styles.ccyChipOn]}
-                    onPress={() => setCcy(c)}
-                    testID={`material-ccy-${c}`}
-                  >
-                    <ThemedText style={[styles.ccyText, ccy === c && styles.ccyTextOn]}>
-                      {tef(c)}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
+                <CostCurrencyToggle value={ccy} onChange={setCcy} testIDPrefix="material" />
               </View>
               {(lots ?? []).map((l) => {
                 const value =
@@ -273,7 +253,10 @@ export default function MaterialDetailScreen() {
                         {qty(Number(l.current_quantity))}
                         {l.unit ? ` ${l.unit}` : ''}
                       </ThemedText>
+                      {/* a bordered pill, not bare red text: as a plain label it read
+                          as a status word rather than something you could tap */}
                       <TouchableOpacity
+                        style={styles.zeroOutBtn}
                         onPress={() => zeroOut(l)}
                         hitSlop={8}
                         testID={`zero-out-${l.uuid}`}
@@ -292,6 +275,14 @@ export default function MaterialDetailScreen() {
                 </ThemedText>
               )}
             </>
+          ),
+        },
+        {
+          title: t('materials.stockOverTime'),
+          isEmpty: () => !(summary?.events ?? []).length,
+          emptyText: t('materials.noEvents'),
+          render: () => (
+            <LineChart series={series} width={width - 72} step />
           ),
         },
       ]}
@@ -343,18 +334,6 @@ export default function MaterialDetailScreen() {
 
 const styles = StyleSheet.create({
   ccyRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  ccyChip: {
-    // the trips filter-chip design
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  ccyChipOn: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
-  ccyText: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
-  ccyTextOn: { color: '#fff' },
   lot: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -369,6 +348,15 @@ const styles = StyleSheet.create({
   lotRight: { alignItems: 'flex-end', gap: 3 },
   lotQty: { fontSize: 14, fontWeight: '700', color: '#1f2937' },
   lotQtyBad: { color: '#991b1b' },
+  zeroOutBtn: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    backgroundColor: '#fef2f2',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
   zeroOut: { fontSize: 12, fontWeight: '700', color: '#dc2626' },
   note: { fontSize: 11, opacity: 0.6, marginTop: 8, fontStyle: 'italic' },
   descBlock: { marginTop: 22 },
