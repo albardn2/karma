@@ -238,11 +238,29 @@ export default function PurchaseOrdersDetailScreen() {
       endpoint={`/purchase-order/${uuid}`}
       reloadKey={reloadKey}
       heading={(x) => x.vendor_name || t('purchaseOrders.noVendor')}
-      subheading={(x) =>
-        x.is_overdue === true ? (
-          <ThemedText style={styles.overdue}>{t('purchaseOrders.overdue')}</ThemedText>
-        ) : null
-      }
+      subheading={(x) => (
+        <View style={styles.subhead}>
+          {/* the vendor is the heading, so the link rides here rather than becoming a
+              fifth button above the card */}
+          {!!x.vendor_uuid && (
+            <TouchableOpacity
+              onPress={() => router.push(`/vendors/${x.vendor_uuid}`)}
+              testID="po-view-vendor"
+              hitSlop={8}
+            >
+              <ThemedText style={styles.vendorLink}>
+                {t('purchaseOrders.vendor')} ›
+              </ThemedText>
+            </TouchableOpacity>
+          )}
+          {/* null is UNKNOWN, not false: the model dereferences payout_due_date.tzinfo
+              before its own None check and pydantic swallows the error into the
+              Optional default, so 26 of 63 production orders report null */}
+          {x.is_overdue === true && (
+            <ThemedText style={styles.overdue}>{t('purchaseOrders.overdue')}</ThemedText>
+          )}
+        </View>
+      )}
       rows={rows}
       actions={actions}
       sections={[
@@ -365,6 +383,8 @@ const styles = StyleSheet.create({
   done: { fontSize: 12, fontWeight: '700', color: '#16a34a' },
   awaiting: { fontSize: 12, opacity: 0.55 },
   blocked: { fontSize: 11, opacity: 0.5, lineHeight: 16, marginTop: 10 },
+  subhead: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  vendorLink: { fontSize: 13, fontWeight: '700', color: '#5469D4', marginTop: 4 },
   overdue: {
     fontSize: 12,
     fontWeight: '700',
