@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
@@ -30,9 +30,6 @@ interface Material {
 export default function MaterialsScreen() {
   const router = useRouter();
   const { t, tef } = useLanguage();
-  // both are real, verified list-DTO filters (ilike-contains); the toggle decides
-  // which one the search box feeds
-  const [searchMode, setSearchMode] = useState<'name' | 'sku'>('name');
 
   return (
     <View style={styles.root}>
@@ -42,28 +39,8 @@ export default function MaterialsScreen() {
         endpoint="/material/"
         itemsKey="materials"
         onCreate={() => router.push('/materials/create')}
-        searchParam={searchMode}
-        searchPlaceholder={
-          searchMode === 'name'
-            ? t('materials.searchPlaceholder')
-            : t('materials.searchBySkuPlaceholder')
-        }
-        header={
-          <View style={styles.modeRow}>
-            {(['name', 'sku'] as const).map((m) => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.modeChip, searchMode === m && styles.modeChipOn]}
-                onPress={() => setSearchMode(m)}
-                testID={`material-search-${m}`}
-              >
-                <ThemedText style={[styles.modeText, searchMode === m && styles.modeTextOn]}>
-                  {m === 'name' ? t('materials.name') : t('materials.sku')}
-                </ThemedText>
-              </TouchableOpacity>
-            ))}
-          </View>
-        }
+        searchParam="name"
+        searchPlaceholder={t('materials.searchPlaceholder')}
         filters={[
           // all five MaterialType values — the last two were missing, so machinery and
           // vehicles were reachable only by scrolling
@@ -118,19 +95,6 @@ export default function MaterialsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  modeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  modeChip: {
-    // the trips filter-chip design
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  modeChipOn: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
-  modeText: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
-  modeTextOn: { color: '#fff' },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,

@@ -925,7 +925,6 @@ export const translations: Record<Lang, Record<string, string>> = {
   'materials.zeroOutConfirm': 'Write off the remaining quantity of lot {lot} to zero?',
   'materials.zeroOutFailed': 'Failed to zero out lot',
   'materials.addStockFor': 'Add stock — {what}',
-  'materials.searchBySkuPlaceholder': 'Search by SKU',
   },
   ar: {
     // trips module (admin)
@@ -1840,6 +1839,5 @@ export const translations: Record<Lang, Record<string, string>> = {
   'materials.zeroOutConfirm': 'تصفير الكمية المتبقية من الدفعة {lot}؟',
   'materials.zeroOutFailed': 'فشل تصفير الدفعة',
   'materials.addStockFor': 'إضافة مخزون — {what}',
-  'materials.searchBySkuPlaceholder': 'البحث برمز المادة (SKU)',
   },
 };
