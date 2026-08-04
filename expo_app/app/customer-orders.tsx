@@ -75,6 +75,11 @@ export default function CustomerOrdersScreen() {
         onCreate={() => router.push('/customer-orders/create')}
         header={
           <View style={styles.customerFilter}>
+            {/* labelled, because unlabelled it reads as a stray form field rather than
+                a filter — the picker's own placeholder is just "Choose…" */}
+            <ThemedText style={styles.filterLabel}>
+              {t('customerOrders.filterCustomer')}
+            </ThemedText>
             <PickerField
               spec={{
                 endpoint: '/customer/',
@@ -162,6 +167,7 @@ export default function CustomerOrdersScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   customerFilter: { marginBottom: 12 },
+  filterLabel: { fontSize: 12, fontWeight: '600', opacity: 0.6, marginBottom: 6 },
   clearBtn: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 },
   clearText: { fontSize: 13, color: '#5469D4', fontWeight: '600' },
   card: {

@@ -900,6 +900,7 @@ export const translations: Record<Lang, Record<string, string>> = {
 
   // customer-orders parity (create, notes, void, unfulfil, per-invoice payment)
   'customerOrders.allCustomers': 'All customers',
+  'customerOrders.filterCustomer': 'Filter by customer',
   'customerOrders.notes': 'Notes',
   'customerOrders.notesPlaceholder': 'Order notes…',
   'customerOrders.editNotes': 'Edit notes',
@@ -1814,6 +1815,7 @@ export const translations: Record<Lang, Record<string, string>> = {
 
   // customer-orders parity (create, notes, void, unfulfil, per-invoice payment)
   'customerOrders.allCustomers': 'كل العملاء',
+  'customerOrders.filterCustomer': 'تصفية حسب العميل',
   'customerOrders.notes': 'ملاحظات',
   'customerOrders.notesPlaceholder': 'ملاحظات الطلب…',
   'customerOrders.editNotes': 'تعديل الملاحظات',
