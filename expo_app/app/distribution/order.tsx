@@ -23,10 +23,18 @@ const round2 = (n: number) => Math.round(Number(n) * 100) / 100;
 export default function OrderActionsScreen() {
   const { t, te } = useLanguage();
   const router = useRouter();
-  const { orderUuid, tripStopUuid } = useLocalSearchParams<{ orderUuid?: string; tripStopUuid?: string }>();
+  const { orderUuid, tripStopUuid, invoiceUuid } = useLocalSearchParams<{
+    orderUuid?: string;
+    tripStopUuid?: string;
+    invoiceUuid?: string;
+  }>();
 
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  // which unfulfilled lines this submit will fulfil — all of them by default, so
+  // the common case is still one tap; unticking is for the part-delivery
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [doFulfill, setDoFulfill] = useState(true);
   const [doPay, setDoPay] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -39,8 +47,12 @@ export default function OrderActionsScreen() {
 
   const load = async () => {
     setLoading(true);
+    setFailed(false);
     const res = await apiCall<any>(`/customer-order/with-items-and-invoice/${orderUuid}`);
     setData(res.data || null);
+    if (!res.data) setFailed(true);
+    const its = (res.data?.customer_order?.customer_order_items || []) as any[];
+    setPicked(new Set(its.filter((i) => !i.is_deleted && !i.is_fulfilled).map((i) => i.uuid)));
     setLoading(false);
   };
 
@@ -50,12 +62,17 @@ export default function OrderActionsScreen() {
   }, [orderUuid]);
 
   const order = data?.customer_order;
-  const invoice = data?.invoices?.[0];
+  // a specific invoice when the caller named one (per-invoice payment from the
+  // order detail); the first otherwise, as before
+  const invoice = invoiceUuid
+    ? (data?.invoices || []).find((i: any) => i.uuid === invoiceUuid) ?? data?.invoices?.[0]
+    : data?.invoices?.[0];
   const items = (order?.customer_order_items || []).filter((i: any) => !i.is_deleted);
   const unfulfilled = items.filter((i: any) => !i.is_fulfilled);
   const amountDue = invoice?.net_amount_due ?? order?.net_amount_due ?? 0;
   const currency = order?.currency || '';
-  const canFulfill = unfulfilled.length > 0;
+  const pickedCount = unfulfilled.filter((i: any) => picked.has(i.uuid)).length;
+  const canFulfill = pickedCount > 0;
   // matches the backend's MONEY_TOLERANCE: a balance it already treats as
   // settled must not offer a payment the guard would refuse
   const canPay = amountDue > 0.005;
@@ -94,7 +111,9 @@ export default function OrderActionsScreen() {
         const r = await apiCall('/customer-order-item/fulfill-items', {
           method: 'POST',
           body: JSON.stringify({
-            items: unfulfilled.map((i: any) => ({ customer_order_item_uuid: i.uuid })),
+            items: unfulfilled
+              .filter((i: any) => picked.has(i.uuid))
+              .map((i: any) => ({ customer_order_item_uuid: i.uuid })),
             trip_stop_uuid: tripStopUuid || null,
           }),
         });
@@ -157,8 +176,14 @@ export default function OrderActionsScreen() {
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))}
       />
 
-      {loading || !order ? (
+      {loading ? (
         <View style={styles.centered}><ActivityIndicator size="large" color="#5469D4" /></View>
+      ) : failed || !order ? (
+        <View style={styles.centered}>
+          <ThemedText style={styles.loadFailed} testID="order-load-failed">
+            {t('order.loadFailed')}
+          </ThemedText>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {/* header */}
@@ -176,14 +201,38 @@ export default function OrderActionsScreen() {
 
           {/* items */}
           <View style={styles.itemsBox}>
-            {items.map((i: any) => (
-              <View key={i.uuid} style={styles.itemRow}>
-                <ThemedText style={styles.itemName}>{i.material_name} × {i.quantity} {i.unit || ''}</ThemedText>
-                <ThemedText style={[styles.itemTag, i.is_fulfilled ? styles.tagGreen : styles.tagGray]}>
-                  {i.is_fulfilled ? t('order.itemFulfilled') : t('order.itemPending')}
-                </ThemedText>
-              </View>
-            ))}
+            {items.map((i: any) =>
+              i.is_fulfilled ? (
+                <View key={i.uuid} style={styles.itemRow}>
+                  <ThemedText style={styles.itemName}>{i.material_name} × {i.quantity} {i.unit || ''}</ThemedText>
+                  <ThemedText style={[styles.itemTag, styles.tagGreen]}>
+                    {t('order.itemFulfilled')}
+                  </ThemedText>
+                </View>
+              ) : (
+                // tappable: untick a line to leave it undelivered this time. All
+                // lines start ticked, so tapping nothing keeps the old behaviour.
+                <TouchableOpacity
+                  key={i.uuid}
+                  style={styles.itemRow}
+                  onPress={() =>
+                    setPicked((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(i.uuid)) next.delete(i.uuid);
+                      else next.add(i.uuid);
+                      return next;
+                    })
+                  }
+                  testID={`pick-item-${i.uuid}`}
+                >
+                  <ThemedText style={styles.check}>{picked.has(i.uuid) ? '☑' : '☐'}</ThemedText>
+                  <ThemedText style={styles.itemName}>{i.material_name} × {i.quantity} {i.unit || ''}</ThemedText>
+                  <ThemedText style={[styles.itemTag, styles.tagGray]}>
+                    {t('order.itemPending')}
+                  </ThemedText>
+                </TouchableOpacity>
+              )
+            )}
           </View>
 
           {savedBanner && (
@@ -204,7 +253,7 @@ export default function OrderActionsScreen() {
             <View style={styles.actions}>
               {canFulfill && (
                 <View style={styles.toggleRow}>
-                  <ThemedText style={styles.toggleLabel}>{unfulfilled.length > 1 ? t('order.markFulfilledMany', { count: unfulfilled.length }) : t('order.markFulfilledOne', { count: unfulfilled.length })}</ThemedText>
+                  <ThemedText style={styles.toggleLabel}>{pickedCount > 1 ? t('order.markFulfilledMany', { count: pickedCount }) : t('order.markFulfilledOne', { count: pickedCount })}</ThemedText>
                   <Switch value={doFulfill} onValueChange={setDoFulfill} trackColor={{ true: '#5469D4' }} testID="toggle-fulfill" />
                 </View>
               )}
@@ -288,6 +337,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.08)',
   },
   itemName: { fontSize: 14, flex: 1, marginRight: 8 },
+  check: { fontSize: 17, marginRight: 8, color: '#5469D4' },
+  loadFailed: { fontSize: 14, opacity: 0.65, textAlign: 'center', lineHeight: 20 },
   itemTag: { fontSize: 11, fontWeight: '600', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
   tagGreen: { backgroundColor: '#D1FAE5', color: '#047857' },
   tagGray: { backgroundColor: '#E5E7EB', color: '#4B5563' },

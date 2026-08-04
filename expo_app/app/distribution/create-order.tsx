@@ -15,6 +15,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
+import { PickerField } from '@/components/PickerField';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const CURRENCIES = ['SYP', 'USD'];
@@ -41,10 +42,22 @@ export default function CreateOrderScreen() {
     customerName?: string;
   }>();
 
+  // Entered from a trip stop (tripStopUuid present) or standalone from the
+  // customer-orders list/menu. The two differ in three ways only: standalone shows
+  // a customer picker and a notes field, and defaults fulfil/pay OFF — a back-office
+  // order is recorded, not handed over; at a stop the goods and cash move right now,
+  // so both default ON exactly as before.
+  const standalone = !tripStopUuid;
+
   const [currency, setCurrency] = useState('SYP');
   const [items, setItems] = useState<LineItem[]>([{ material_uuid: '', quantity: '', price_per_unit: '' }]);
-  const [markFulfilled, setMarkFulfilled] = useState(true);
-  const [markPaid, setMarkPaid] = useState(true);
+  const [customerSel, setCustomerSel] = useState<{ uuid: string; label: string }>({
+    uuid: customerUuid ?? '',
+    label: customerName ?? '',
+  });
+  const [notes, setNotes] = useState('');
+  const [markFulfilled, setMarkFulfilled] = useState(!standalone);
+  const [markPaid, setMarkPaid] = useState(!standalone);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -92,14 +105,14 @@ export default function CreateOrderScreen() {
   const removeItem = (i: number) => setItems((prev) => prev.filter((_, idx) => idx !== i));
 
   const validItems = items.filter((it) => it.material_uuid && parseInt(it.quantity, 10) > 0 && it.price_per_unit !== '');
-  const canSubmit = validItems.length > 0 && !submitting;
+  const canSubmit = validItems.length > 0 && !submitting && !!customerSel.uuid;
 
   const submit = async () => {
-    if (!canSubmit || !customerUuid) return;
+    if (!canSubmit) return;
     setSubmitting(true);
     try {
       const body: any = {
-        customer_uuid: customerUuid,
+        customer_uuid: customerSel.uuid,
         currency,
         trip_stop_uuid: tripStopUuid || null,
         items: validItems.map((it) => ({
@@ -114,14 +127,26 @@ export default function CreateOrderScreen() {
         body.financial_account_uuid = null; // default account by currency
         body.payment_method = 'cash';
       }
-      const res = await apiCall('/customer-order/with-items-and-invoice/checkout', {
+      // checkout accepts and persists notes (verified live); due_date it silently
+      // drops, which is why there is no due-date field to mislead anyone
+      if (standalone && notes.trim()) body.notes = notes.trim();
+      const res = await apiCall<any>('/customer-order/with-items-and-invoice/checkout', {
         method: 'POST',
         body: JSON.stringify(body),
       });
       if (res.status !== 201 && res.status !== 200) {
         throw new Error(res.error || t('createorder.createFailed'));
       }
-      router.back();
+      if (standalone) {
+        // land on the order just made — but via a fresh GET, never this response:
+        // checkout's 201 body reports stale derived fields (is_paid false while the
+        // payment row already exists), and the detail screen refetches
+        const created = res.data?.customer_order?.uuid;
+        if (created) router.replace(`/customer-orders/${created}`);
+        else router.back();
+      } else {
+        router.back();
+      }
     } catch (e: any) {
       Alert.alert(t('createorder.errorTitle'), e?.message || t('createorder.createError'));
     } finally {
@@ -141,7 +166,26 @@ export default function CreateOrderScreen() {
         <View style={styles.centered}><ActivityIndicator size="large" color="#5469D4" /></View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          {customerName ? <ThemedText style={styles.customer}>{customerName}</ThemedText> : null}
+          {standalone ? (
+            <View style={styles.customerPick}>
+              <ThemedText style={styles.sectionLabel}>{t('createorder.selectCustomer')}</ThemedText>
+              <PickerField
+                spec={{
+                  endpoint: '/customer/',
+                  itemsKey: 'customers',
+                  searchParam: 'company_name',
+                  label: (c) => c.company_name || c.full_name || c.uuid,
+                  sublabel: (c) => (c.company_name ? c.full_name || undefined : undefined),
+                  value: (c) => c.uuid,
+                }}
+                value={customerSel.uuid}
+                onChange={(uuid, label) => setCustomerSel({ uuid, label })}
+                testID="create-order-customer"
+              />
+            </View>
+          ) : customerName ? (
+            <ThemedText style={styles.customer}>{customerName}</ThemedText>
+          ) : null}
 
           {/* currency + total */}
           <View style={styles.currencyRow}>
@@ -205,6 +249,21 @@ export default function CreateOrderScreen() {
           <TouchableOpacity style={styles.addItem} onPress={addItem} testID="add-item">
             <ThemedText style={styles.addItemText}>{t('createorder.addItem')}</ThemedText>
           </TouchableOpacity>
+
+          {standalone && (
+            <>
+              <ThemedText style={styles.sectionLabel}>{t('customerOrders.notes')}</ThemedText>
+              <TextInput
+                style={styles.notesInput}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder={t('customerOrders.notesPlaceholder')}
+                placeholderTextColor="#9ca3af"
+                multiline
+                testID="create-order-notes"
+              />
+            </>
+          )}
 
           {/* toggles */}
           <View style={styles.toggleRow}>
@@ -289,6 +348,12 @@ const styles = StyleSheet.create({
   removeBtn: { padding: 6 },
   removeText: { fontSize: 16, color: '#dc2626' },
   removeDisabled: { color: '#d1d5db' },
+  customerPick: { marginBottom: 16 },
+  notesInput: {
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 8, backgroundColor: '#fff',
+    paddingHorizontal: 10, paddingVertical: 10, fontSize: 14, color: '#111827',
+    minHeight: 70, textAlignVertical: 'top', marginBottom: 12,
+  },
   addItem: { paddingVertical: 8 },
   addItemText: { color: '#5469D4', fontWeight: '600', fontSize: 14 },
   toggleRow: {
