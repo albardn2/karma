@@ -93,6 +93,14 @@ interface ModuleFormProps {
   /** POST to create, PUT to edit */
   method: 'POST' | 'PUT';
   endpoint: string;
+  /**
+   * Friendlier copy for specific failure statuses, e.g. {409: t('vehicles.plateTaken')}.
+   *
+   * apiCall surfaces res.error as raw response TEXT, so without this a duplicate plate
+   * shows the literal {"error":"Conflicts with an existing record"} and a 500 shows an
+   * HTML page. Only override statuses whose meaning is unambiguous for this form.
+   */
+  errorMessages?: Record<number, string>;
   /** where to go after a successful write */
   onDone?: () => void;
 }
@@ -126,6 +134,7 @@ export function ModuleForm({
   note,
   method,
   endpoint,
+  errorMessages,
   onDone,
 }: ModuleFormProps) {
   const router = useRouter();
@@ -219,7 +228,11 @@ export function ModuleForm({
       } else {
         // surface what the server actually said — a 422 names the offending field,
         // and hiding that behind "something went wrong" makes it unfixable
-        Alert.alert(t('form.saveFailed'), String(res.error ?? '').slice(0, 300) || t('form.tryAgain'));
+        Alert.alert(
+          t('form.saveFailed'),
+          errorMessages?.[res.status] ??
+            (String(res.error ?? '').slice(0, 300) || t('form.tryAgain')),
+        );
       }
     } catch (e) {
       Alert.alert(t('form.saveFailed'), t('form.tryAgain'));

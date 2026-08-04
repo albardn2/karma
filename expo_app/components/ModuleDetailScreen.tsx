@@ -47,8 +47,12 @@ export interface DetailAction<T> {
    * of a reversible one like deactivating a user. Marking such an action
    * non-destructive instead would drop the confirm altogether and lose the red
    * styling, so the wording is what varies, not the mechanism.
+   *
+   * Takes a function when the warning depends on the record — how many lines a delete
+   * takes with it, say. The caller builds this array before the fetch, so a count from
+   * the record itself is not available to a plain string.
    */
-  confirmText?: string;
+  confirmText?: string | ((item: T) => string);
 }
 
 interface ModuleDetailScreenProps<T> {
@@ -198,7 +202,11 @@ export function ModuleDetailScreen<T>({
                       if (!a.destructive) return a.onPress(item);
                       // a destructive action always asks first: these screens are
                       // used one-handed in a van, and a mis-tap should not delete
-                      Alert.alert(a.label, a.confirmText ?? t('detail.confirmDestructive'), [
+                      const body =
+                        typeof a.confirmText === 'function'
+                          ? a.confirmText(item)
+                          : a.confirmText;
+                      Alert.alert(a.label, body ?? t('detail.confirmDestructive'), [
                         { text: t('common.cancel'), style: 'cancel' },
                         { text: a.label, style: 'destructive', onPress: () => a.onPress(item) },
                       ]);

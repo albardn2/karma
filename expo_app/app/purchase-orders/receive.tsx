@@ -27,12 +27,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
  * paper over client-side.
  */
 export default function ReceiveLineScreen() {
-  const { purchase_order_item_uuid, material_name, quantity, unit } = useLocalSearchParams<{
-    purchase_order_item_uuid: string;
-    material_name?: string;
-    quantity?: string;
-    unit?: string;
-  }>();
+  const { purchase_order_item_uuid, material_name, material_uuid, quantity, unit } =
+    useLocalSearchParams<{
+      purchase_order_item_uuid: string;
+      material_name?: string;
+      material_uuid?: string;
+      quantity?: string;
+      unit?: string;
+    }>();
   const { t } = useLanguage();
 
   const fields: FormField[] = [
@@ -74,8 +76,15 @@ export default function ReceiveLineScreen() {
         endpoint: '/inventory/',
         itemsKey: 'inventories',
         // /inventory/ has no lot_id filter (422), so the picker filters its first
-        // page locally rather than sending a param that would fail the request
-        params: { is_active: 'true' },
+        // page locally rather than sending a param that would fail the request.
+        //
+        // material_uuid IS a valid filter, and narrowing to it is not cosmetic: a lot
+        // of the wrong material is 400 "Material not found in inventory", so an
+        // unfiltered list offers mostly wrong answers.
+        params: {
+          is_active: 'true',
+          ...(material_uuid ? { material_uuid } : {}),
+        },
         label: (i) => i.lot_id ?? i.uuid,
         value: (i) => i.uuid,
         sublabel: (i) =>
@@ -112,6 +121,11 @@ export default function ReceiveLineScreen() {
       })}
       method="POST"
       endpoint="/purchase-order-item/fulfill-items"
+      // a driver holds the inventory module and the purchase-orders module and is
+      // still 403 here, because fulfilment needs a purchase_order_item grant they do
+      // not have. The detail screen hides the button on that basis; this covers the
+      // case where the permission changed since the screen loaded.
+      errorMessages={{ 403: t('purchaseOrders.receiveForbidden') }}
     />
   );
 }

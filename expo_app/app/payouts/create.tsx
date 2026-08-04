@@ -4,13 +4,17 @@ import { ModuleForm, FormField } from '@/components/ModuleForm';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 /**
- * Record a payout against something — today, an expense.
+ * Record a payout against something — an expense or a purchase order.
  *
  * A payout is never a free-standing record: POST /payout/ requires exactly one of
  * purchase_order_uuid, expense_uuid, employee_uuid or credit_note_item_uuid, and
  * refuses both none and more than one. So this screen is always reached FROM the
  * thing being paid, which arrives as a param and is passed through `extra` rather
  * than offered as an input.
+ *
+ * EXACTLY ONE LINK IS FORWARDED, whichever arrived. Sending both keys — even with one
+ * empty — would be the "more than one" case the DTO refuses, so the link is selected
+ * here rather than spread.
  *
  * Three fields the user is deliberately not asked for, each verified against the
  * live API:
@@ -29,12 +33,17 @@ import { useLanguage } from '@/contexts/LanguageContext';
  * with negative amount due", and that message is shown to the user as-is.
  */
 export default function PayoutCreateScreen() {
-  const { expense_uuid, currency, amount_due } = useLocalSearchParams<{
-    expense_uuid: string;
+  const { expense_uuid, purchase_order_uuid, currency, amount_due } = useLocalSearchParams<{
+    expense_uuid?: string;
+    purchase_order_uuid?: string;
     currency: string;
     amount_due?: string;
   }>();
   const { t } = useLanguage();
+
+  const link = purchase_order_uuid
+    ? { purchase_order_uuid }
+    : { expense_uuid: expense_uuid as string };
 
   const fields: FormField[] = [
     {
@@ -52,7 +61,7 @@ export default function PayoutCreateScreen() {
       title={t('payouts.record')}
       fields={fields}
       initial={{ amount: amount_due ?? '' }}
-      extra={{ expense_uuid, currency }}
+      extra={{ ...link, currency }}
       method="POST"
       endpoint="/payout/"
     />

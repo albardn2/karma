@@ -17,6 +17,19 @@ export interface PickerSpec {
   searchParam?: string;
   /** extra fixed params, e.g. narrowing materials to a type */
   params?: Record<string, string>;
+  /**
+   * Rows the caller already holds, used INSTEAD of fetching.
+   *
+   * For a choice whose candidates are not addressable by any endpoint the reader is
+   * allowed to call. The purchase analytics chart filters by material, but its
+   * material list is the set that actually appears in the fetched orders — the
+   * catalogue is both wider (materials never purchased would chart nothing) and, for
+   * some readers, forbidden. So the caller passes what it derived.
+   *
+   * `endpoint` and `itemsKey` stay required so the type has no optional-pair trap;
+   * they are simply unused on this path.
+   */
+  rows?: any[];
   label: (item: any) => string;
   value: (item: any) => string;
   sublabel?: (item: any) => string | undefined;
@@ -59,6 +72,13 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
   const [chosen, setChosen] = useState<string>('');
 
   const load = useCallback(async () => {
+    // caller-supplied rows: nothing to fetch, and no failure state to enter
+    if (spec.rows) {
+      setRows(spec.rows);
+      setLoading(false);
+      setFailed(false);
+      return;
+    }
     setLoading(true);
     setFailed(false);
     const qs = new URLSearchParams({ per_page: String(PAGE), ...(spec.params ?? {}) });
@@ -70,7 +90,14 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
       setFailed(true);
     }
     setLoading(false);
-  }, [spec.endpoint, spec.itemsKey, spec.searchParam, JSON.stringify(spec.params), query]);
+  }, [
+    spec.endpoint,
+    spec.itemsKey,
+    spec.searchParam,
+    JSON.stringify(spec.params),
+    spec.rows,
+    query,
+  ]);
 
   useEffect(() => {
     if (!open) return;
