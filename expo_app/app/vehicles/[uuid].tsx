@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Alert, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { ChartLegend, LineChart } from '@/components/Chart';
+import { PickerField } from '@/components/PickerField';
+import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { apiCall, isOk } from '@/utils/api';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 
 interface Vehicle {
   uuid: string;
@@ -18,6 +21,8 @@ interface Vehicle {
   color?: string | null;
   vin?: string | null;
   notes?: string | null;
+  created_at?: string | null;
+  created_by_uuid?: string | null;
 }
 
 /** A material line carried on this vehicle. `current_quantity` is derived, not stored. */
@@ -40,16 +45,28 @@ interface LotEvent {
 }
 
 const RANGES = [
+  { id: '7d', days: 7 },
   { id: '30d', days: 30 },
   { id: '90d', days: 90 },
   { id: '12m', days: 365 },
+  // the web's own default: no start_date at all
+  { id: 'all', days: null },
 ] as const;
 
-/** Naive ISO — the backend rejects a zone suffix outright with "Invalid date". */
+/**
+ * Naive ISO, no zone suffix.
+ *
+ * NOT because this endpoint rejects one — it accepts `…Z` with a 200 and then
+ * silently shifts the window by the offset, which is worse than a rejection. The
+ * analytics routes DO reject it outright; this one does not. Same output, and the
+ * reason matters if anyone edits this.
+ */
 const naiveIso = (d: Date) => d.toISOString().replace(/\.\d+Z$/, '').replace(/Z$/, '');
 
+/** parseTs, not new Date: the column is naive UTC, so a bare parse shifts every
+ *  label near midnight by the viewer's offset. */
 const tick = (iso: string) => {
-  const d = new Date(iso);
+  const d = parseTs(iso);
   return isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}/${d.getDate()}`;
 };
 
@@ -90,6 +107,7 @@ const PER_PAGE = 100;
 export default function VehiclesDetailScreen() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
   const { t, tef } = useLanguage();
+  const { isAdmin } = useAuth();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [reloadKey, setReloadKey] = useState(0);
@@ -98,6 +116,16 @@ export default function VehiclesDetailScreen() {
     Array<{ name: string; points: Array<{ label: string; value: number }> }>
   >([]);
   const [range, setRange] = useState<(typeof RANGES)[number]['id']>('90d');
+  /**
+   * Which line to chart. Keyed on the LOT uuid rather than the material's, for two
+   * reasons: the event endpoint only accepts vehicle_inventory_uuid, and a unique
+   * index on (vehicle_uuid, material_uuid) where not deleted makes lot and material
+   * one-to-one within a vehicle — so the two keyings are the same thing here.
+   */
+  const [lot, setLot] = useState('');
+  const [lotName, setLotName] = useState('');
+  /** what would be orphaned by a delete: the API has no guard, so the app warns */
+  const [tripCount, setTripCount] = useState<number | null>(null);
   // a sub-fetch that FAILED must not read as a sub-fetch that returned nothing:
   // during development a per_page over the DTO's cap of 100 gave a 422, which the
   // empty-state fallback rendered as "no movements" and very nearly shipped
@@ -113,35 +141,51 @@ export default function VehiclesDetailScreen() {
     setLots(isOk(res.status) ? (res.data?.vehicle_inventories ?? []) : []);
   }, [uuid]);
 
+  // DELETE /vehicle/ has no server guard — it flips is_deleted and leaves the
+  // vehicle's stock rows live under a vehicle that then 404s. The confirm says what
+  // is about to be orphaned, which is the only place that can be said.
+  const loadTripCount = useCallback(async () => {
+    const res = await apiCall<{ total_count?: number }>(`/trip/?vehicle_uuid=${uuid}&per_page=1`);
+    setTripCount(isOk(res.status) ? (res.data?.total_count ?? 0) : null);
+  }, [uuid]);
+
   useEffect(() => {
     loadStock();
-  }, [loadStock, reloadKey]);
+    loadTripCount();
+  }, [loadStock, loadTripCount, reloadKey]);
 
   const loadMovements = useCallback(async () => {
     setMovesFailed(false);
     if (!lots?.length) return setCharted([]);
     const preset = RANGES.find((r) => r.id === range)!;
-    const from = new Date();
-    from.setDate(from.getDate() - preset.days);
+    let fromParam = '';
+    if (preset.days != null) {
+      const from = new Date();
+      from.setDate(from.getDate() - preset.days);
+      fromParam = `&start_date=${encodeURIComponent(naiveIso(from))}`;
+    }
 
     // Biggest lines only, so this is at most MAX_SERIES requests however long the
     // van's manifest is. There is no vehicle_uuid filter on the event endpoint, so
     // the alternative is fetching every vehicle's events and discarding most.
-    const top = lots
-      .slice()
-      .sort(
-        (a, b) => Math.abs(Number(b.current_quantity ?? 0)) - Math.abs(Number(a.current_quantity ?? 0)),
-      )
-      .slice(0, MAX_SERIES);
+    const top = lot
+      ? lots.filter((l) => l.uuid === lot)
+      : lots
+          .slice()
+          .sort(
+            (a, b) =>
+              Math.abs(Number(b.current_quantity ?? 0)) - Math.abs(Number(a.current_quantity ?? 0)),
+          )
+          .slice(0, MAX_SERIES);
 
     const results = await Promise.all(
-      top.map((lot) =>
+      top.map((l) =>
         apiCall<{ events: LotEvent[] }>(
-          `/vehicle-inventory-event/?vehicle_inventory_uuid=${lot.uuid}` +
-            `&start_date=${encodeURIComponent(naiveIso(from))}&per_page=${PER_PAGE}`,
+          `/vehicle-inventory-event/?vehicle_inventory_uuid=${l.uuid}` +
+            `${fromParam}&per_page=${PER_PAGE}`,
         ).then((res) => {
-          if (!isOk(res.status)) return { lot, events: [], ok: false };
-          return { lot, events: res.data?.events ?? [], ok: true };
+          if (!isOk(res.status)) return { lot: l, events: [], ok: false };
+          return { lot: l, events: res.data?.events ?? [], ok: true };
         }),
       ),
     );
@@ -167,7 +211,7 @@ export default function VehiclesDetailScreen() {
         })
         .filter((s) => s.points.length),
     );
-  }, [lots, range]);
+  }, [lots, range, lot]);
 
   useEffect(() => {
     loadMovements();
@@ -187,6 +231,13 @@ export default function VehiclesDetailScreen() {
         [t('vehicles.year'), x.year != null ? String(x.year) : '—'],
         [t('vehicles.color'), x.color || '—'],
         [t('vehicles.vin'), x.vin || '—'],
+        // parseTs, not new Date: created_at is naive UTC
+        [
+          t('inventory.received'),
+          x.created_at ? formatNumericDate(parseTs(x.created_at)) : '—',
+        ],
+        [t('inventory.createdBy'), x.created_by_uuid ?? '—'],
+        [t('materials.uuid'), x.uuid],
       ]}
       sections={[
         {
@@ -196,7 +247,23 @@ export default function VehiclesDetailScreen() {
           render: () => (
             <>
               {(lots ?? []).map((l) => (
-                <View key={l.uuid} style={styles.stockRow}>
+                // tappable: load, unload or correct this line's balance
+                <TouchableOpacity
+                  key={l.uuid}
+                  style={styles.stockRow}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/vehicles/stock-event',
+                      params: {
+                        vehicle_inventory_uuid: l.uuid,
+                        material_name: l.material_name ?? '',
+                        unit: l.unit ?? '',
+                        on_hand: String(l.current_quantity ?? 0),
+                      },
+                    })
+                  }
+                  testID={`veh-lot-${l.uuid}`}
+                >
                   <View style={styles.stockLeft}>
                     <ThemedText style={styles.stockName} numberOfLines={1}>
                       {l.material_name ?? '—'}
@@ -214,34 +281,85 @@ export default function VehiclesDetailScreen() {
                     {qty(Number(l.current_quantity ?? 0))}
                     {l.unit ? ` ${l.unit}` : ''}
                   </ThemedText>
-                </View>
+                </TouchableOpacity>
               ))}
             </>
           ),
         },
         {
           title: t('vehicles.movements'),
-          isEmpty: () => !charted.length,
-          emptyText: movesFailed ? t('moduleList.failed') : t('vehicles.noMovements'),
+          // deliberately NO isEmpty: the material filter lives inside this section, so
+          // collapsing it on an empty result would remove the very control that chose
+          // the quiet material, with no way back to the top lines
           render: () => (
             <>
-              <View style={styles.chips}>
+              {/* a scrolling row, not a plain one: five ranges do not fit 375pt and the
+                  fifth was clipped off the edge of the screen */}
+              <ScrollingChipRow>
                 {RANGES.map((r) => (
-                  <TouchableOpacity
+                  <FilterChip
                     key={r.id}
-                    style={[styles.chip, range === r.id && styles.chipOn]}
+                    label={r.id === '7d' ? t('vehicles.range7d') : t(`expenses.range.${r.id}`)}
+                    active={range === r.id}
                     onPress={() => setRange(r.id)}
                     testID={`veh-range-${r.id}`}
+                  />
+                ))}
+              </ScrollingChipRow>
+
+              {/* Which material to chart: a dropdown with search, sourced from this
+                  vehicle's OWN lots rather than the material catalogue — a material
+                  that is not on the truck would chart nothing. No searchParam: every
+                  vehicle list DTO is extra="forbid", so ?search= 422s the request
+                  rather than being ignored; per_page is raised instead so PickerField
+                  filters the full manifest locally. */}
+              <View style={styles.materialFilter}>
+                <ThemedText style={styles.filterLabel}>{t('inventory.material')}</ThemedText>
+                <PickerField
+                  spec={{
+                    endpoint: '/vehicle-inventory/',
+                    itemsKey: 'vehicle_inventories',
+                    params: { vehicle_uuid: String(uuid), per_page: String(PER_PAGE) },
+                    label: (r) => r.material_name ?? '—',
+                    sublabel: (r) =>
+                      `${qty(Number(r.current_quantity ?? 0))}${r.unit ? ` ${r.unit}` : ''}`,
+                    value: (r) => r.uuid,
+                  }}
+                  value={lot}
+                  onChange={(v, label) => {
+                    setLot(v);
+                    setLotName(label);
+                  }}
+                  initialLabel={lotName || undefined}
+                  testID="veh-material-picker"
+                />
+                {!!lot && (
+                  <TouchableOpacity
+                    style={styles.clearBtn}
+                    onPress={() => {
+                      setLot('');
+                      setLotName('');
+                    }}
+                    testID="veh-material-clear"
                   >
-                    <ThemedText style={[styles.chipText, range === r.id && styles.chipTextOn]}>
-                      {t(`expenses.range.${r.id}`)}
+                    <ThemedText style={styles.clearText}>
+                      {t('warehouses.showTopMaterials')}
                     </ThemedText>
                   </TouchableOpacity>
-                ))}
+                )}
               </View>
-              <LineChart series={charted} width={width - 72} step />
-              <ChartLegend names={charted.map((c) => c.name)} />
-              {(lots ?? []).length > charted.length && (
+
+              {charted.length ? (
+                <>
+                  <LineChart series={charted} width={width - 72} step />
+                  <ChartLegend names={charted.map((c) => c.name)} />
+                </>
+              ) : (
+                <ThemedText style={styles.more}>
+                  {movesFailed ? t('moduleList.failed') : t('vehicles.noMovements')}
+                </ThemedText>
+              )}
+              {!lot && (lots ?? []).length > charted.length && (
                 <ThemedText style={styles.more}>
                   {t('warehouses.topMaterials', { shown: charted.length })}
                 </ThemedText>
@@ -251,6 +369,17 @@ export default function VehiclesDetailScreen() {
         },
       ]}
       actions={[
+        {
+          label: t('vehicles.addMaterial'),
+          testID: 'vehicle-add-material',
+          onPress: (x) => {
+            setReloadKey((k) => k + 1);
+            router.push({
+              pathname: '/vehicles/add-material',
+              params: { vehicle_uuid: x.uuid, plate_number: x.plate_number ?? '' },
+            });
+          },
+        },
         {
           label: t('detail.edit'),
           testID: 'vehicle-edit',
@@ -271,6 +400,34 @@ export default function VehiclesDetailScreen() {
                 notes: x.notes ?? '',
               },
             });
+          },
+        },
+        {
+          label: t('detail.delete'),
+          destructive: true,
+          testID: 'vehicle-delete',
+          // admin-only server-side. There is NO server guard beyond that: the route
+          // flips is_deleted and leaves this vehicle's stock rows live under a
+          // vehicle that then 404s, and its trips keep pointing at it. Nothing can
+          // stop that from here, so the confirm at least says what is about to be
+          // orphaned — and that the plate is gone for good, since plate_number is
+          // unique across every tenant with no exemption for deleted rows.
+          visible: () => isAdmin,
+          confirmText:
+            t('vehicles.deleteConfirm') +
+            (lots?.length || tripCount
+              ? ` ${t('vehicles.deleteStillHas', {
+                  materials: lots?.length ?? 0,
+                  trips: tripCount ?? 0,
+                })}`
+              : ''),
+          onPress: async (x) => {
+            const res = await apiCall(`/vehicle/${x.uuid}`, { method: 'DELETE' });
+            if (isOk(res.status)) return router.replace('/vehicles');
+            Alert.alert(
+              t('vehicles.deleteFailed'),
+              String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+            );
           },
         },
       ]}
@@ -305,6 +462,10 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: '#5469D4' },
   chipText: { fontSize: 12, fontWeight: '600', color: '#374151' },
   chipTextOn: { color: '#fff' },
+  materialFilter: { marginBottom: 10 },
+  filterLabel: { fontSize: 12, fontWeight: '600', opacity: 0.6, marginBottom: 6 },
+  clearBtn: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 },
+  clearText: { fontSize: 13, color: '#5469D4', fontWeight: '600' },
   more: { fontSize: 11, opacity: 0.5, marginTop: 8 },
   notes: { marginTop: 18 },
   notesText: { fontSize: 13, opacity: 0.7, lineHeight: 19 },

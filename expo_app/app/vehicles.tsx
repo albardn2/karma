@@ -41,6 +41,11 @@ export default function VehiclesScreen() {
           { id: 'active', label: tef('active'), params: { status: 'active' } },
           { id: 'maintenance', label: tef('maintenance'), params: { status: 'maintenance' } },
           { id: 'inactive', label: tef('inactive'), params: { status: 'inactive' } },
+          // the remaining three VehicleStatus values — the enum has six and the list
+          // offered three, so sold/retired/utilized vehicles were unreachable by filter
+          { id: 'sold', label: tef('sold'), params: { status: 'sold' } },
+          { id: 'retired', label: tef('retired'), params: { status: 'retired' } },
+          { id: 'utilized', label: tef('utilized'), params: { status: 'utilized' } },
         ]}
         keyExtractor={(x) => x.uuid}
         renderItem={(x) => (
