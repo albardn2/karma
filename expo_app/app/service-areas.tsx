@@ -6,6 +6,8 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { formatNumericDate } from '@/utils/date';
 
 interface ServiceArea {
@@ -24,18 +26,27 @@ interface ServiceArea {
  * goes in as POINT(lon lat) — the transposition is silent, returning plausibly empty
  * results rather than an error.
  *
- * Two things deliberately absent. There is no create form: creating an area means
- * typing a WKT polygon, which is not a phone interaction, and a driver's POST is
- * refused anyway. And nothing renders the raw geometry string — the detail screen draws
- * it instead.
+ * Creating an area no longer means typing a WKT polygon — the create screen places a
+ * centre and generates the ring — but the raw geometry string is still never rendered
+ * here; the detail screen draws it instead.
+ *
+ * THE `+` IS DOUBLE-GATED, on the endpoint grant AND on admin, which is stricter than
+ * the rest of the app (vendors renders its create button unconditionally). The endpoint
+ * check alone is nearly right — a driver holds only `service_area: read` — but a
+ * hand-edited permission checklist can grant a non-admin `create`, and the route refuses
+ * them regardless: POST, PUT and DELETE here are admin-or-superuser at the decorator. A
+ * button whose only possible outcome is a 403 is worse than no button.
  *
  * Passing `intersects_polygon` makes the server force per_page to 10000, so that mode
  * is effectively unpaginated. That is the server's choice, not something to work
- * around, but it is why the chip is a filter rather than the default view.
+ * around, but it is why the chip is a filter rather than the default view — and why no
+ * page-size control may be added on top of it.
  */
 export default function ServiceAreasScreen() {
   const router = useRouter();
   const { t } = useLanguage();
+  const { isAdmin } = useAuth();
+  const canCreate = useHasEndpoint('service_area', 'create') && isAdmin;
   const [near, setNear] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
 
@@ -79,21 +90,32 @@ export default function ServiceAreasScreen() {
         searchPlaceholder={t('serviceAreas.searchPlaceholder')}
         params={params}
         keyExtractor={(a) => a.uuid}
+        onCreate={canCreate ? () => router.push('/service-areas/create') : undefined}
         header={
-          <TouchableOpacity
-            style={[styles.nearChip, !!near && styles.nearChipOn]}
-            onPress={toggleNear}
-            disabled={locating}
-            testID="service-areas-near"
-          >
-            <ThemedText style={[styles.nearText, !!near && styles.nearTextOn]}>
-              {locating
-                ? t('serviceAreas.locating')
-                : near
-                  ? t('serviceAreas.nearOn')
-                  : t('serviceAreas.nearOff')}
-            </ThemedText>
-          </TouchableOpacity>
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              style={[styles.nearChip, !!near && styles.nearChipOn]}
+              onPress={toggleNear}
+              disabled={locating}
+              testID="service-areas-near"
+            >
+              <ThemedText style={[styles.nearText, !!near && styles.nearTextOn]}>
+                {locating
+                  ? t('serviceAreas.locating')
+                  : near
+                    ? t('serviceAreas.nearOn')
+                    : t('serviceAreas.nearOff')}
+              </ThemedText>
+            </TouchableOpacity>
+            {/* not permission-gated: it reads the same list this screen already reads */}
+            <TouchableOpacity
+              style={styles.nearChip}
+              onPress={() => router.push('/service-areas/map')}
+              testID="service-areas-map"
+            >
+              <ThemedText style={styles.nearText}>{t('serviceAreas.mapView')}</ThemedText>
+            </TouchableOpacity>
+          </View>
         }
         renderItem={(a) => (
           <TouchableOpacity
@@ -124,6 +146,7 @@ export default function ServiceAreasScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  headerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   nearChip: {
     alignSelf: 'flex-start',
     paddingHorizontal: 14,
@@ -132,7 +155,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.1)',
-    marginBottom: 12,
   },
   nearChipOn: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
   nearText: { fontSize: 13, fontWeight: '600', color: '#374151' },
