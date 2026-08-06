@@ -5,6 +5,8 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 
@@ -23,11 +25,13 @@ interface ProcessRow {
 /**
  * Production runs — what was consumed and what came out.
  *
- * Read-only, deliberately. A process MOVES REAL STOCK: it draws its inputs from FIFO
- * lots and creates output inventory, so creating one from a phone would be a stock
- * movement typed one-handed in a van. The create form is also a poor fit on its own
- * terms — two variable-length material grids, no on-hand figures to check against, and
- * insufficient stock only surfaces as a 404 after the whole form is filled.
+ * A process MOVES REAL STOCK — it draws inputs from FIFO lots and creates output
+ * inventory — and this screen used to be read-only for that reason. The reasoning
+ * assumed the form needed lot pickers and had no on-hand to check against; that was
+ * wrong about the API. The client sends only a material and an amount, the server picks
+ * the lots, and on-hand is one request per chosen material. So creating is offered, with
+ * the shortfall shown while the amount is typed and the consequences stated before the
+ * write. See app/processes/create.tsx.
  *
  * There is no text search. ProcessListParams permits uuid, type, start_date, end_date,
  * created_by_uuid, page and per_page and nothing else, so `searchParam` is omitted
@@ -41,6 +45,8 @@ interface ProcessRow {
 export default function ProcessesScreen() {
   const router = useRouter();
   const { t, tef } = useLanguage();
+  const { user } = useAuth();
+  const canCreate = useHasEndpoint('process', 'create');
   const [types, setTypes] = useState<string[]>([]);
 
   useEffect(() => {
@@ -50,10 +56,29 @@ export default function ProcessesScreen() {
     });
   }, []);
 
-  const filters = useMemo(
-    () => types.map((ty) => ({ id: ty, label: tef(ty), params: { type: ty } })),
-    [types, tef],
-  );
+  /**
+   * Only params ProcessListParams actually declares: type, start_date, end_date,
+   * created_by_uuid, uuid, page, per_page. It is extra="forbid", so an invented filter
+   * would 422 the whole request rather than being ignored — which is why there is still
+   * no text search here.
+   *
+   * Dates are naive: a Z suffix or an offset is not what this backend parses.
+   */
+  const filters = useMemo(() => {
+    const since = (days: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - days);
+      return d.toISOString().replace(/\.\d+Z$/, '').replace(/Z$/, '');
+    };
+    const out: Array<{ id: string; label: string; params: Record<string, string> }> = [
+      { id: '__30d', label: t('processes.filter30d'), params: { start_date: since(30) } },
+      { id: '__90d', label: t('processes.filter90d'), params: { start_date: since(90) } },
+    ];
+    if (user?.uuid) {
+      out.push({ id: '__mine', label: t('processes.filterMine'), params: { created_by_uuid: user.uuid } });
+    }
+    return [...out, ...types.map((ty) => ({ id: ty, label: tef(ty), params: { type: ty } }))];
+  }, [types, tef, t, user?.uuid]);
 
   const count = (a?: unknown[] | null) => (Array.isArray(a) ? a.length : 0);
 
@@ -65,6 +90,7 @@ export default function ProcessesScreen() {
         endpoint="/process/"
         itemsKey="items"
         filters={filters}
+        onCreate={canCreate ? () => router.push('/processes/create') : undefined}
         keyExtractor={(p) => p.uuid}
         renderItem={(p) => (
           <TouchableOpacity
