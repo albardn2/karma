@@ -15,15 +15,24 @@ class PurchaseOrderItemBase(BaseModel):
     material_uuid:       str
     quantity:            int
     price_per_unit:      float
-    # Required, because purchase_order_item.currency and .unit are both NOT NULL and
-    # nothing fills them in — neither the single-item route nor
-    # PurchaseOrderItemDomain.create_items, which dumps this DTO straight into the
-    # model. Declaring them Optional meant an omitted currency reached the database
-    # and came back as 409 "Conflicts with an existing record" from the global
-    # IntegrityError handler: a schema mismatch reported as a conflict the caller
-    # caused, with no mention of the field at fault. Now it is a 422 that names it.
-    currency:            Currency
-    unit:                UnitOfMeasure
+    # Both columns are NOT NULL, and both are DERIVED rather than supplied:
+    # currency belongs to the order (one order, one currency — the with-items
+    # path overwrites whatever arrives with the order's own), and unit belongs
+    # to the material. Optional here, with
+    # PurchaseOrderItemDomain.resolve_currency_and_unit filling them on every
+    # create path before the model is built.
+    #
+    # They were briefly required instead, to stop an omitted currency reaching
+    # the database and returning 409 "Conflicts with an existing record" from
+    # the global IntegrityError handler. That named the field, but it also
+    # broke the only way the UI creates a purchase order: POST
+    # /purchase-order/with-items sends items without a currency — correctly,
+    # since the order's is authoritative — and every request 422'd on a field
+    # the server was about to overwrite anyway. Deriving them satisfies both:
+    # nothing NULL reaches the column, and no caller is asked for a value it
+    # does not own.
+    currency:            Optional[Currency] = None
+    unit:                Optional[UnitOfMeasure] = None
 
 class PurchaseOrderItemCreate(PurchaseOrderItemBase):
     """Fields required to create a new purchase order item."""

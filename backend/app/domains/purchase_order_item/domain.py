@@ -82,12 +82,44 @@ class PurchaseOrderItemDomain:
 
 
     @staticmethod
+    def resolve_currency_and_unit(uow: SqlAlchemyUnitOfWork, item: PurchaseOrderItemCreate) -> None:
+        """Fill the two NOT NULL columns the caller does not own.
+
+        `currency` belongs to the ORDER — one order, one currency — so it is
+        always taken from the parent, never from the item, even when the item
+        carries one. `unit` belongs to the MATERIAL; a supplied unit is only
+        allowed to agree with it.
+
+        Called on every create path, so no route can leave either column NULL
+        and have the database report it as a bogus 409 conflict.
+        """
+        material = uow.material_repository.find_one(uuid=item.material_uuid, is_deleted=False)
+        if not material:
+            raise NotFoundError("Material not found")
+
+        if item.unit and item.unit != material.measure_unit:
+            raise BadRequestError(
+                f"Invalid unit: {item.unit}. Expected: {material.measure_unit}"
+            )
+        item.unit = material.measure_unit
+
+        if not item.purchase_order_uuid:
+            raise BadRequestError("purchase_order_uuid is required")
+        po = uow.purchase_order_repository.find_one(
+            uuid=item.purchase_order_uuid, is_deleted=False
+        )
+        if not po:
+            raise NotFoundError("Purchase order not found")
+        item.currency = po.currency
+
+    @staticmethod
     def create_items(uow: SqlAlchemyUnitOfWork, items: list[PurchaseOrderItemCreate]) -> list[PurchaseOrderItemRead]:
         """
         Create purchase order items.
         """
         created_models = []
         for item in items:
+            PurchaseOrderItemDomain.resolve_currency_and_unit(uow=uow, item=item)
             data = item.model_dump(mode='json')
             po_item = PurchaseOrderItemModel(**data)
             created_models.append(po_item)

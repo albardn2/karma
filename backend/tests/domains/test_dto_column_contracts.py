@@ -9,6 +9,12 @@ the real cause.
 - purchase_order_item.currency and .unit are NOT NULL but were Optional, so an
   omitted currency reached the database and came back as 409 "Conflicts with an
   existing record" — a schema mismatch reported as a conflict the caller caused.
+  Tightening the DTO looked like the fix and was not: the fields are DERIVED
+  (currency from the order, unit from the material), and requiring them broke
+  every purchase order creation from the UI, which does not send them. They are
+  optional again, and PurchaseOrderItemDomain.resolve_currency_and_unit fills
+  them on every create path — which is the same conclusion this file already
+  reached for the other five pairs below.
 - Trip filters referenced TripModel.service_area_uuid and .geometry, neither of
   which exists on the model, so both params were AttributeError → 500.
 
@@ -119,22 +125,31 @@ def test_po_item_create_accepts_a_complete_payload():
 
 
 @pytest.mark.parametrize("missing", ["currency", "unit"])
-def test_po_item_create_rejects_a_missing_not_null_field(missing):
+def test_po_item_create_accepts_a_missing_derived_field(missing):
+    """These two are DERIVED, so they belong in the "deliberately optional"
+    group described above, not the tightened one.
+
+    Requiring them here looked like the same fix as WarehouseListParams.uuid,
+    but it broke the only way the UI creates a purchase order: POST
+    /purchase-order/with-items posts items with no currency — correctly, since
+    the order's is authoritative — so every creation 422'd on a field the
+    server was about to overwrite. The guarantee that nothing NULL reaches the
+    column now lives in PurchaseOrderItemDomain.resolve_currency_and_unit,
+    which runs on every create path (see
+    tests/domains/test_purchase_order_item_derivation.py).
+    """
     payload = _po_item()
     payload.pop(missing)
-    with pytest.raises(ValidationError) as exc:
-        PurchaseOrderItemCreate(**payload)
-    # the caller must be told WHICH field, which the old 409 never said
-    assert any(err["loc"] == (missing,) for err in exc.value.errors())
+    item = PurchaseOrderItemCreate(**payload)      # must not raise
+    assert getattr(item, missing) is None
 
 
-def test_po_item_create_reports_both_missing_fields_at_once():
+def test_po_item_create_accepts_both_derived_fields_missing():
+    """The exact item shape the web form posts."""
     payload = _po_item()
     del payload["currency"], payload["unit"]
-    with pytest.raises(ValidationError) as exc:
-        PurchaseOrderItemCreate(**payload)
-    locs = {err["loc"] for err in exc.value.errors()}
-    assert locs == {("currency",), ("unit",)}
+    item = PurchaseOrderItemCreate(**payload)
+    assert item.currency is None and item.unit is None
 
 
 def test_po_item_purchase_order_uuid_stays_optional():

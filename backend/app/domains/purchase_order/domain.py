@@ -19,19 +19,9 @@ class PurchaseOrderDomain:
 
         po = PurchaseOrderDomain.create_purchase_order(uow=uow, payload=payload.to_purchase_order_create())
         for item in payload.purchase_order_items:
-            material = uow.material_repository.find_one(uuid=item.material_uuid, is_deleted=False)
-            if not material:
-                raise NotFoundError("Material not found")
-
             item.purchase_order_uuid = po.uuid
-            item.currency = po.currency
-            if item.unit:
-                valid_unit = item.unit == material.measure_unit
-                if not valid_unit:
-                    raise BadRequestError(f"Invalid unit: {item.unit}. Expected: {material.measure_unit}")
-            else:
-                # Set the unit to the material's unit if not provided
-                item.unit = material.measure_unit
+        # currency (from this order) and unit (from the material) are resolved
+        # inside create_items, so both create paths derive them the same way
         PurchaseOrderItemDomain.create_items(uow=uow, items=payload.purchase_order_items)
         return PurchaseOrderRead.from_orm(po)
 
