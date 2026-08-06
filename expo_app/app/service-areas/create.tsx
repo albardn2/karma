@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import MapView, { Circle, Polygon, PROVIDER_GOOGLE, Region } from 'react-native-maps';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -20,7 +20,17 @@ import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
-import { circleRing, ringAreaM2, ringIsSane, ringToWkt } from '@/utils/wkt';
+import { PolygonEditor, useRingEditor } from '@/components/PolygonEditor';
+import {
+  canonicalRing,
+  checkRing,
+  circleRing,
+  formatKm2,
+  ringAreaM2,
+  ringIsSane,
+  ringsEqual,
+  ringToWkt,
+} from '@/utils/wkt';
 
 /** The repo's existing map fallback centre. */
 const DAMASCUS = { latitude: 33.5138, longitude: 36.2765 };
@@ -78,8 +88,16 @@ export default function ServiceAreaCreateScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  // deep-linkable, and the only way to open straight into the drawing surface without a
+  // tap — same reasoning as the list's ?view=map
+  const { shape } = useLocalSearchParams<{ shape?: string }>();
   const mapRef = useRef<MapView | null>(null);
 
+  const [mode, setMode] = useState<'circle' | 'custom'>(
+    shape === 'custom' ? 'custom' : 'circle',
+  );
+  const [converted, setConverted] = useState(false);
+  const editor = useRingEditor([]);
   const [centre, setCentre] = useState(DAMASCUS);
   const [radiusM, setRadiusM] = useState(2000);
   const [accuracyM, setAccuracyM] = useState<number | null>(null);
@@ -93,7 +111,12 @@ export default function ServiceAreaCreateScreen() {
     () => circleRing(centre.latitude, centre.longitude, radiusM, SEGMENTS),
     [centre, radiusM],
   );
-  const km2 = useMemo(() => (ringAreaM2(ring) / 1e6).toFixed(1), [ring]);
+  const km2 = useMemo(() => formatKm2(ringAreaM2(ring) / 1e6), [ring]);
+  // only in custom mode: a generated circle cannot be invalid by construction
+  const problem = useMemo(
+    () => (mode === 'custom' ? checkRing(editor.ring) : null),
+    [mode, editor.ring],
+  );
 
   const setRadius = (m: number) => setRadiusM(Math.min(MAX_R, Math.max(MIN_R, m)));
 
@@ -126,22 +149,64 @@ export default function ServiceAreaCreateScreen() {
     }
   };
 
+
+  /**
+   * Circle -> custom hands over a 12-GON, not the 48 the preview draws.
+   *
+   * Measured for a 390x420pt map: a 12-gon leaves an 86pt chord between neighbouring
+   * corners, so every one is individually tappable; a 24-gon leaves 43.6pt, which is
+   * already at the 44pt touch minimum, and the 48-gon leaves 21.8pt — exactly the
+   * density that makes the existing areas unpickable. 12 is also the median corner
+   * count of the real corpus, so the result reads as surveyed rather than machine-made,
+   * and a 12-gon is convex so it validates immediately.
+   */
+  const toCustom = () => {
+    editor.reset(circleRing(centre.latitude, centre.longitude, radiusM, 12));
+    setConverted(true);
+    setMode('custom');
+  };
+
+  /** Going back to a circle discards hand-placed corners, so it asks — unless nothing
+   *  has actually been moved since the conversion. */
+  const toCircle = () => {
+    const drawn = canonicalRing(editor.ring);
+    const untouched =
+      drawn.length === 0 ||
+      ringsEqual(drawn, circleRing(centre.latitude, centre.longitude, radiusM, 12));
+    if (untouched) return setMode('circle');
+    Alert.alert(t('serviceAreas.shapeSwitchToCircle'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('serviceAreas.shapeCircle'),
+        style: 'destructive',
+        onPress: () => setMode('circle'),
+      },
+    ]);
+  };
+
   const submit = async () => {
     const trimmed = name.trim();
     // both of these are the client's job because the server does neither: a
     // 121-character name is a 500 with an HTML body, and an empty name is a 201
     if (!trimmed) return setNameError(t('form.required'));
     if (trimmed.length > 120) return setNameError(t('serviceAreas.nameTooLong'));
-    if (radiusM < MIN_R || radiusM > MAX_R) {
-      return Alert.alert(t('serviceAreas.radiusRange'));
+    // the ring that gets sent: generated from the centre, or hand-placed
+    const finalRing = mode === 'circle' ? ring : editor.ring;
+    if (mode === 'circle') {
+      if (radiusM < MIN_R || radiusM > MAX_R) {
+        return Alert.alert(t('serviceAreas.radiusRange'));
+      }
+      if (!ringIsSane(finalRing)) return Alert.alert(t('serviceAreas.badCentre'));
+    } else if (checkRing(finalRing)) {
+      // Save is already disabled on a problem; this is the belt to that braces
+      return;
     }
-    if (!ringIsSane(ring)) return Alert.alert(t('serviceAreas.badCentre'));
 
     setSaving(true);
     try {
       const body: Record<string, unknown> = {
         name: trimmed,
-        geometry: ringToWkt(ring),
+        geometry: ringToWkt(finalRing),
       };
       if (description.trim()) body.description = description.trim();
 
@@ -166,8 +231,10 @@ export default function ServiceAreaCreateScreen() {
       }
       Alert.alert(
         t('form.saveFailed'),
-        res.status === 403
-          ? t('serviceAreas.notAllowed')
+        res.status === 400
+          ? t('serviceAreas.badGeometry')
+          : res.status === 403
+            ? t('serviceAreas.notAllowed')
           : // res.error is raw response TEXT — for a 500 it is an HTML page, so it is
             // truncated and never parsed
             String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
@@ -202,6 +269,38 @@ export default function ServiceAreaCreateScreen() {
             contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
             keyboardShouldPersistTaps="handled"
           >
+            <ScrollingChipRow>
+              <FilterChip
+                label={t('serviceAreas.shapeCircle')}
+                active={mode === 'circle'}
+                onPress={toCircle}
+                testID="sa-shape-circle"
+              />
+              <FilterChip
+                label={t('serviceAreas.shapeCustom')}
+                active={mode === 'custom'}
+                onPress={mode === 'custom' ? () => {} : toCustom}
+                testID="sa-shape-custom"
+              />
+            </ScrollingChipRow>
+
+            {mode === 'custom' && converted && (
+              <ThemedText style={styles.hintLine}>
+                {t('serviceAreas.shapeConverted')}
+              </ThemedText>
+            )}
+
+            {mode === 'custom' ? (
+              <PolygonEditor
+                ring={editor.ring}
+                onChange={editor.commit}
+                onUndo={editor.undo}
+                canUndo={editor.canUndo}
+                problem={problem}
+                initialRegion={{ ...centre, latitudeDelta: 0.09, longitudeDelta: 0.09 }}
+                testIDPrefix="sa-create"
+              />
+            ) : (
             <View style={styles.mapWrap}>
               <MapView
                 ref={mapRef}
@@ -241,7 +340,10 @@ export default function ServiceAreaCreateScreen() {
                 <ThemedText style={styles.hint}>{t('serviceAreas.centreHint')}</ThemedText>
               </View>
             </View>
+            )}
 
+            {mode === 'circle' && (
+              <>
             <View style={styles.locRow}>
               <TouchableOpacity
                 style={styles.locBtn}
@@ -300,16 +402,26 @@ export default function ServiceAreaCreateScreen() {
                 <ThemedText style={styles.stepText}>+</ThemedText>
               </TouchableOpacity>
             </View>
+              </>
+            )}
 
             {/* two rows, not one sentence: Latin digits and km² inside an Arabic
                 sentence get reordered around the separator by bidi */}
-            <ThemedText style={styles.readout} testID="sa-area">
-              {t('serviceAreas.areaSize', { km2 })}
+            {/* circle mode only: the editor draws its own readout, and two of them on
+                one screen is just a bug that happens to render */}
+            {mode === 'circle' && (
+              <>
+                <ThemedText style={styles.readout} testID="sa-area">
+                  {t('serviceAreas.areaSize', { km2 })}
+                </ThemedText>
+                <ThemedText style={styles.readoutSmall} testID="sa-points">
+                  {t('serviceAreas.pointCount', { points: String(ring.length) })}
+                </ThemedText>
+              </>
+            )}
+            <ThemedText style={styles.note}>
+              {mode === 'circle' ? t('serviceAreas.provisional') : t('serviceAreas.drawNote')}
             </ThemedText>
-            <ThemedText style={styles.readoutSmall} testID="sa-points">
-              {t('serviceAreas.pointCount', { points: String(ring.length) })}
-            </ThemedText>
-            <ThemedText style={styles.note}>{t('serviceAreas.provisional')}</ThemedText>
 
             <ThemedText style={[styles.label, styles.spaced]}>
               {t('serviceAreas.name')} *
@@ -340,9 +452,9 @@ export default function ServiceAreaCreateScreen() {
             />
 
             <TouchableOpacity
-              style={[styles.submit, saving && styles.submitOff]}
+              style={[styles.submit, (saving || (mode === 'custom' && !!problem)) && styles.submitOff]}
               onPress={submit}
-              disabled={saving}
+              disabled={saving || (mode === 'custom' && !!problem)}
               testID="form-submit"
             >
               {saving ? (
@@ -419,6 +531,7 @@ const styles = StyleSheet.create({
   readout: { fontSize: 20, lineHeight: 26, fontWeight: '700', color: '#1f2937', marginTop: 14 },
   readoutSmall: { fontSize: 12, opacity: 0.6, marginTop: 2 },
   note: { fontSize: 12, opacity: 0.6, lineHeight: 18, marginTop: 10 },
+  hintLine: { fontSize: 12, color: '#6B7280', lineHeight: 18, marginBottom: 10 },
   input: {
     backgroundColor: '#fff',
     borderRadius: 10,

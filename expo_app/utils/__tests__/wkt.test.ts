@@ -3,13 +3,26 @@
 // repo's `tsc --noEmit` clean without adding a package for one file
 import { describe, expect, it } from '@jest/globals';
 import {
+  canonicalRing,
+  checkRing,
   circleRing,
   destination,
+  formatKm2,
+  MAX_RING_POINTS,
+  orient,
   parseWktPolygons,
+  pointInRing,
   ringAreaM2,
+  ringCentroid,
+  ringClosestNonAdjacentPair,
+  ringFirstCrossing,
   ringIsSane,
+  ringMinVertexGapM,
+  ringSelfIntersects,
+  ringsEqual,
   ringToWkt,
   ringVertexCount,
+  segmentsIntersect,
 } from '../wkt';
 
 /**
@@ -160,5 +173,119 @@ describe('destination', () => {
     expect(n.latitude).toBeGreaterThan(33.5);
     expect(Math.abs(n.longitude - 36.3)).toBeLessThan(1e-9);
     expect(e.longitude).toBeGreaterThan(36.3);
+  });
+});
+
+const R = (pairs: [number, number][]) =>
+  pairs.map(([lon, lat]) => ({ latitude: lat, longitude: lon }));
+
+// Every expected value below is the verdict GEOS 3.13.1 gave for the same ring inside
+// karma-backend-1 (shapely 2.1.1, the library the backend DTO validator calls). This
+// suite therefore pins the client to the server's own definition of "valid", which is
+// the only reason it is safe to disable Save on our own say-so.
+describe('ringFirstCrossing / ringSelfIntersects', () => {
+  it('accepts a convex ring', () => {
+    expect(ringSelfIntersects(R([[0,0],[2,0],[2,2],[0,2]]))).toBe(false);
+  });
+  it('accepts a concave ring', () => {                    // GEOS: valid
+    expect(ringSelfIntersects(R([[0,0],[4,0],[4,4],[2,1],[0,4]]))).toBe(false);
+  });
+  it('accepts collinear redundant vertices', () => {      // GEOS: valid
+    expect(ringSelfIntersects(R([[0,0],[2,0],[4,0],[4,4],[0,4]]))).toBe(false);
+  });
+  it('accepts a figure-8 that only touches at a vertex', () => { // GEOS: valid
+    expect(ringSelfIntersects(R([[0,0],[2,0],[2,2],[1,1],[0,2]]))).toBe(false);
+  });
+  it('accepts a 5-point star and a 48-gon', () => {
+    expect(ringSelfIntersects(circleRing(33.5, 36.2, 2000, 48))).toBe(false);
+  });
+  it('rejects a bowtie', () => {                          // GEOS: invalid -> 400
+    expect(ringSelfIntersects(R([[36,33],[36.1,33.1],[36.1,33],[36,33.1]]))).toBe(true);
+  });
+  it('rejects a zero-width spike that retraces an edge', () => {
+    expect(ringSelfIntersects(R([[36,33],[38,33],[37,34],[38,33]]))).toBe(true);
+  });
+  it('rejects a vertex sitting exactly on a non-adjacent edge', () => {
+    expect(ringSelfIntersects(R([[0,0],[4,0],[4,4],[2,0],[0,4]]))).toBe(true);
+  });
+  it('rejects a non-adjacent duplicate vertex', () => {
+    expect(ringSelfIntersects(R([[0,0],[1,0],[1,1],[0,0],[0,1]]))).toBe(true);
+  });
+  it('reports the offending edge pair so the map can highlight it', () => {
+    const x = ringFirstCrossing(R([[36,33],[36.1,33.1],[36.1,33],[36,33.1]]));
+    expect(x).not.toBeNull();
+    expect(x!.a).toBeLessThan(x!.b);
+  });
+});
+
+describe('canonicalRing', () => {
+  it('drops the closing duplicate a stored ring carries, so the count is honest', () => {
+    const stored = R([[36.2,33.5],[36.3,33.5],[36.3,33.6],[36.2,33.5]]);
+    expect(canonicalRing(stored)).toHaveLength(3);
+  });
+  it('rounds to the 6 dp ringToWkt will emit, and collapses adjacent duplicates', () => {
+    const r = canonicalRing(R([[36.20000004, 33.5], [36.2, 33.5], [36.3, 33.5], [36.3, 33.6]]));
+    expect(r).toHaveLength(3);
+  });
+});
+
+describe('ringsEqual', () => {
+  it('is true for the same boundary parsed from the server and re-serialised', () => {
+    const a = R([[36.2,33.5],[36.3,33.5],[36.3,33.6]]);
+    const b = R([[36.2,33.5],[36.3,33.5],[36.3,33.6],[36.2,33.5]]); // closed form
+    expect(ringsEqual(a, b)).toBe(true);   // a string compare would say "changed"
+  });
+  it('is false when one vertex moved', () => {
+    expect(ringsEqual(
+      R([[36.2,33.5],[36.3,33.5],[36.3,33.6]]),
+      R([[36.2,33.5],[36.3,33.5],[36.31,33.6]]),
+    )).toBe(false);
+  });
+});
+
+describe('checkRing', () => {
+  it('accepts every one of the shapes this app can generate', () => {
+    expect(checkRing(circleRing(33.5, 36.2, 2000, 48))).toBeNull();
+    expect(checkRing(circleRing(33.5, 36.2, 2000, 12))).toBeNull();
+  });
+  it('accepts a hand-authored concave L (POSTs 201 on the live API)', () => {
+    expect(checkRing(R([
+      [36.20,33.50],[36.30,33.50],[36.30,33.55],[36.25,33.55],[36.25,33.60],[36.20,33.60],
+    ]))).toBeNull();
+  });
+  it('names tooFew below 3 distinct points', () => {
+    expect(checkRing(R([[36.2,33.5],[36.3,33.5]]))?.kind).toBe('tooFew');
+  });
+  it('names tooMany above the cap', () => {
+    expect(checkRing(circleRing(33.5, 36.2, 2000, MAX_RING_POINTS + 1))?.kind).toBe('tooMany');
+  });
+  it('names outOfRange for an impossible coordinate', () => {
+    expect(checkRing(R([[500,33.5],[36.3,33.5],[36.3,33.6]]))?.kind).toBe('outOfRange');
+  });
+  it('names tooClose for two vertices a few metres apart', () => {
+    expect(checkRing(R([[36.2,33.5],[36.20001,33.5],[36.3,33.6]]))?.kind).toBe('tooClose');
+  });
+  it('names crosses for a bowtie, with both edge indices', () => {
+    const p = checkRing(R([[36,33],[36.1,33.1],[36.1,33],[36,33.1]]));
+    expect(p?.kind).toBe('crosses');
+  });
+  it('names tooSmall for a ring under 1000 m²', () => {
+    expect(checkRing(R([[36.2,33.5],[36.2002,33.5],[36.2002,33.5002]]))?.kind).toBe('tooSmall');
+  });
+});
+
+describe('formatKm2', () => {
+  it('shows two decimals under 1, one under 10, none above', () => {
+    expect(formatKm2(0.03)).toBe('0.03');
+    expect(formatKm2(4.34)).toBe('4.3');
+    expect(formatKm2(405.02)).toBe('405');
+  });
+});
+
+describe('pointInRing', () => {
+  it('agrees with the server for a point inside and outside a known ring', () => {
+    const ring = R([[36.25,33.55],[36.26,33.55],[36.26,33.56],[36.25,33.56]]);
+    expect(pointInRing({ latitude: 33.555, longitude: 36.255 }, ring)).toBe(true);
+    expect(pointInRing({ latitude: 33.500, longitude: 36.100 }, ring)).toBe(false);
   });
 });

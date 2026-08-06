@@ -6,16 +6,18 @@ import { useLanguage } from '@/contexts/LanguageContext';
 /**
  * Rename a service area, or reword its description. Nothing else.
  *
- * GEOMETRY IS NOT A FIELD HERE, AND THAT IS THE POINT. `ModuleForm` sends only the keys
- * that changed and drops empty values rather than nulling them, which is exactly the
- * behaviour this endpoint needs: `{"geometry": null}` is a 400, `{"name": null}` is a
- * 422, and echoing the read model back is a 422 on `uuid`/`created_at`/`is_deleted`. A
- * form whose field list is two strings cannot trip any of those. `created_by_uuid` is
- * the sharpest of them — it is *accepted* on PUT and silently reassigns authorship — and
- * the only reliable defence is that no code path here can send it.
+ * GEOMETRY IS NOT A FIELD HERE, but not because the endpoint refuses one. An earlier
+ * version of this file claimed PUT accepts only {name, description}; that was wrong, and
+ * the mistake came from generalising a single probe. `{"geometry": null}` is indeed a
+ * 400 — but `{"geometry": "POLYGON((…))"}` returns 200 and really does replace the
+ * stored ring, leaving name and description untouched. The boundary lives on its own
+ * screen (`boundary.tsx`) because it needs a map, not because it is read-only.
  *
- * Editing the boundary is deliberately absent rather than missing; the note says where
- * to do it. See the create screen's docstring for the measurement behind that.
+ * What this form still protects against is real: `ModuleForm` sends only the keys that
+ * changed and drops empty values rather than nulling them, so a two-string field list
+ * cannot send `{"name": null}` (422), cannot echo the read model back (422 on
+ * `uuid`/`created_at`/`is_deleted`), and — sharpest of all — cannot send
+ * `created_by_uuid`, which IS accepted on PUT and silently reassigns authorship.
  *
  * A separate file from create, unlike vendors which uses one screen for both. Two
  * reasons, both structural: create is a bespoke map rather than a `ModuleForm`, and the
@@ -48,7 +50,7 @@ export default function ServiceAreaEditScreen() {
       // the rename warning is not decoration: trips record the area by a NAME
       // snapshot with no foreign key, so renaming silently drops every historical
       // trip out of that area's trip filter
-      note={`${t('serviceAreas.editNote')} ${t('serviceAreas.renameWarning')}`}
+      note={t('serviceAreas.renameWarning')}
       fields={fields}
       initial={{ name: name ?? '', description: description ?? '' }}
       method="PUT"

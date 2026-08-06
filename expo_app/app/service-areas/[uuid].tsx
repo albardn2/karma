@@ -10,7 +10,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
-import { parseWktPolygons, ringAreaM2, ringVertexCount, LatLng } from '@/utils/wkt';
+import {
+  formatKm2,
+  parseWktPolygons,
+  regionFor,
+  ringAreaM2,
+  ringVertexCount,
+} from '@/utils/wkt';
 
 interface ServiceArea {
   uuid: string;
@@ -19,24 +25,6 @@ interface ServiceArea {
   /** WKT POLYGON, "lon lat" pairs */
   geometry?: string | null;
   created_at: string;
-}
-
-/** Fit a region around every ring, with a little breathing room. */
-function regionFor(points: LatLng[]) {
-  if (!points.length) return null;
-  const lats = points.map((p) => p.latitude);
-  const lngs = points.map((p) => p.longitude);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  return {
-    latitude: (minLat + maxLat) / 2,
-    longitude: (minLng + maxLng) / 2,
-    // a degenerate area (all points equal) would give a zero span and a blank map
-    latitudeDelta: Math.max((maxLat - minLat) * 1.4, 0.01),
-    longitudeDelta: Math.max((maxLng - minLng) * 1.4, 0.01),
-  };
 }
 
 /**
@@ -104,7 +92,7 @@ export default function ServiceAreaDetailScreen() {
       [
         t('serviceAreas.size'),
         outer.length
-          ? t('serviceAreas.areaSize', { km2: (ringAreaM2(outer) / 1e6).toFixed(1) })
+          ? t('serviceAreas.areaSize', { km2: formatKm2(ringAreaM2(outer) / 1e6) })
           : '—',
       ],
     ];
@@ -121,6 +109,17 @@ export default function ServiceAreaDetailScreen() {
           pathname: '/service-areas/edit',
           params: { uuid: a.uuid, name: a.name, description: a.description ?? '' },
         });
+      },
+    },
+    {
+      // #106 said the boundary could not be changed from the app. That was wrong about
+      // the API — PUT accepts geometry — so here is the editor.
+      label: t('serviceAreas.boundaryTitle'),
+      testID: 'service-area-boundary',
+      visible: () => canUpdate,
+      onPress: (a) => {
+        setReloadKey((k) => k + 1);
+        router.push({ pathname: '/service-areas/boundary', params: { uuid: a.uuid } });
       },
     },
     {

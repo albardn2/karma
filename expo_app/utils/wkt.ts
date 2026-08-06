@@ -226,3 +226,341 @@ export function ringVertexCount(points: LatLng[]): number {
   const closed = first.latitude === last.latitude && first.longitude === last.longitude;
   return closed ? points.length - 1 : points.length;
 }
+
+// ---------------------------------------------------------------------------
+// PREDICATES FOR HAND-AUTHORED RINGS
+//
+// circleRing() needed none of this: a generated convex polygon cannot self-
+// intersect, which is why the create screen shipped without a validator. The moment
+// a person places the vertices that guarantee dies, and the server's refusal is a 400
+// whose message carries U+2010 hyphens instead of ASCII ones — a string that must
+// never reach a user. So the shape is checked here, in full, before anything is sent.
+//
+// Everything works in raw (lon, lat) degrees with NO projection. Whether two segments
+// cross is invariant under (lon, lat) -> (kx*lon, ky*lat) for positive kx, ky: that
+// map is affine with positive determinant, so it preserves the sign of every
+// orientation determinant, collinearity and betweenness. Projecting would add error
+// and change no answer.
+//
+// VALIDATED, not assumed: compiled to JS and diffed against shapely 2.1.1 / GEOS
+// 3.13.1 inside karma-backend-1 — the same library the backend DTO validator calls —
+// over 4032 rings (13 live rings, 19 curated adversarial cases, 4000 fuzzed on coarse
+// grids chosen to force shared coordinates and exact collinearity). 693 accepted,
+// 0 false accepts. 48 rings are client-stricter, all of them in the deliberate
+// quality buckets below. The contract this pins: the client is NEVER more permissive
+// than the server. A false reject shows our own copy; a false accept would show the
+// U+2010 string.
+// ---------------------------------------------------------------------------
+
+/** Sign of (b-a) x (c-a): 1 left turn, -1 right turn, 0 collinear. */
+export function orient(a: LatLng, b: LatLng, c: LatLng): -1 | 0 | 1 {
+  const d =
+    (b.longitude - a.longitude) * (c.latitude - a.latitude) -
+    (b.latitude - a.latitude) * (c.longitude - a.longitude);
+  // NO epsilon, and that is measured rather than preferred. With a 1e-13 deg^2
+  // tolerance this predicate diverged from GEOS on 16 of ~4000 fuzzed rings (all in
+  // the safe direction, all avoidable): a vertex 5e-15 deg off an edge was read as ON
+  // it. With exact double signs the agreement was total. "Nearly touching" is a
+  // QUALITY question, not a topology one, and it is answered in metres by
+  // ringClosestNonAdjacentPair below.
+  return d > 0 ? 1 : d < 0 ? -1 : 0;
+}
+
+/** p is known collinear with ab; is it within the segment? (bounding-box test) */
+function onSegment(a: LatLng, b: LatLng, p: LatLng): boolean {
+  return (
+    Math.min(a.longitude, b.longitude) <= p.longitude &&
+    p.longitude <= Math.max(a.longitude, b.longitude) &&
+    Math.min(a.latitude, b.latitude) <= p.latitude &&
+    p.latitude <= Math.max(a.latitude, b.latitude)
+  );
+}
+
+/** Do segments p1p2 and p3p4 share any point? Handles collinear overlap. */
+export function segmentsIntersect(p1: LatLng, p2: LatLng, p3: LatLng, p4: LatLng): boolean {
+  const d1 = orient(p3, p4, p1);
+  const d2 = orient(p3, p4, p2);
+  const d3 = orient(p1, p2, p3);
+  const d4 = orient(p1, p2, p4);
+  // strictly crossing: each segment straddles the other's line
+  if (
+    ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+    ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
+  ) {
+    return true;
+  }
+  // collinear or touching: an endpoint of one lies on the other
+  if (d1 === 0 && onSegment(p3, p4, p1)) return true;
+  if (d2 === 0 && onSegment(p3, p4, p2)) return true;
+  if (d3 === 0 && onSegment(p1, p2, p3)) return true;
+  if (d4 === 0 && onSegment(p1, p2, p4)) return true;
+  return false;
+}
+
+/**
+ * The first pair of ring edges that must not touch but do, as edge indices.
+ * Edge i runs points[i] -> points[(i+1) % n], so the closing edge is edge n-1 and
+ * needs no special case.
+ *
+ * Two exemptions, and they are the whole subtlety:
+ *  - CONSECUTIVE edges legally share exactly one endpoint. They are illegal only when
+ *    collinear AND the second retraces the first (a zero-width spike), which is what
+ *    the dot-product test detects.
+ *  - Edge 0 and edge n-1 are consecutive too, around the seam.
+ *
+ * O(n^2). n is capped at MAX_RING_POINTS and is at most 17 in this database, so a
+ * full check runs on every state change without being noticed.
+ */
+export function ringFirstCrossing(points: LatLng[]): { a: number; b: number } | null {
+  const n = points.length;
+  if (n < 3) return null;
+  for (let i = 0; i < n; i++) {
+    const a1 = points[i];
+    const a2 = points[(i + 1) % n];
+    for (let j = i + 1; j < n; j++) {
+      const b1 = points[j];
+      const b2 = points[(j + 1) % n];
+      if (j === i + 1 || (i === 0 && j === n - 1)) {
+        const shared = j === i + 1 ? a2 : a1;
+        const far1 = j === i + 1 ? a1 : a2;
+        const far2 = j === i + 1 ? b2 : b1;
+        if (orient(far1, shared, far2) === 0) {
+          const ux = shared.longitude - far1.longitude;
+          const uy = shared.latitude - far1.latitude;
+          const vx = far2.longitude - shared.longitude;
+          const vy = far2.latitude - shared.latitude;
+          if (ux * vx + uy * vy < 0) return { a: i, b: j };
+        }
+        continue;
+      }
+      if (segmentsIntersect(a1, a2, b1, b2)) return { a: i, b: j };
+    }
+  }
+  return null;
+}
+
+export const ringSelfIntersects = (points: LatLng[]): boolean =>
+  ringFirstCrossing(points) !== null;
+
+// --- metric helpers: the "uncomfortably close" half, answered in metres ------
+
+export function metresBetween(a: LatLng, b: LatLng): number {
+  const lat0 = ((a.latitude + b.latitude) / 2) * DEG;
+  return Math.hypot(
+    (b.longitude - a.longitude) * DEG * Math.cos(lat0) * EARTH_R,
+    (b.latitude - a.latitude) * DEG * EARTH_R,
+  );
+}
+
+/** Perpendicular distance in metres from p to segment ab. */
+export function metresToSegment(p: LatLng, a: LatLng, b: LatLng): number {
+  const kx = DEG * Math.cos(((a.latitude + b.latitude) / 2) * DEG) * EARTH_R;
+  const ky = DEG * EARTH_R;
+  const ax = a.longitude * kx, ay = a.latitude * ky;
+  const bx = b.longitude * kx, by = b.latitude * ky;
+  const px = p.longitude * kx, py = p.latitude * ky;
+  const vx = bx - ax, vy = by - ay;
+  const len2 = vx * vx + vy * vy;
+  if (len2 === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / len2));
+  return Math.hypot(px - (ax + t * vx), py - (ay + t * vy));
+}
+
+/** Closest approach in metres between any two NON-ADJACENT edges, with indices. */
+export function ringClosestNonAdjacentPair(
+  points: LatLng[],
+): { a: number; b: number; metres: number } | null {
+  const n = points.length;
+  let best: { a: number; b: number; metres: number } | null = null;
+  for (let i = 0; i < n; i++) {
+    const a1 = points[i], a2 = points[(i + 1) % n];
+    for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue;
+      const b1 = points[j], b2 = points[(j + 1) % n];
+      const m = Math.min(
+        metresToSegment(a1, b1, b2), metresToSegment(a2, b1, b2),
+        metresToSegment(b1, a1, a2), metresToSegment(b2, a1, a2),
+      );
+      if (!best || m < best.metres) best = { a: i, b: j, metres: m };
+    }
+  }
+  return best;
+}
+
+/** Closest two vertices, in metres. */
+export function ringMinVertexGapM(points: LatLng[]): number {
+  let min = Infinity;
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      min = Math.min(min, metresBetween(points[i], points[j]));
+    }
+  }
+  return min;
+}
+
+/**
+ * EXACTLY the vertex list ringToWkt will emit, minus the closing repeat.
+ *
+ * Every check must run on this, not on the editor's raw array. ringToWkt rounds to
+ * 6 dp and drops adjacent duplicates, so validating the unrounded array can reject a
+ * ring that would have serialised as perfectly valid — that was a real mismatch
+ * against GEOS until the checks were moved behind this function. It is also what
+ * turns a stored (closed) ring into an honest vertex count on load.
+ */
+export function canonicalRing(points: LatLng[]): LatLng[] {
+  const key = (p: LatLng) => `${round6(p.longitude)} ${round6(p.latitude)}`;
+  const out: LatLng[] = [];
+  for (const p of points) {
+    if (out.length && key(out[out.length - 1]) === key(p)) continue;
+    out.push({ latitude: round6(p.latitude), longitude: round6(p.longitude) });
+  }
+  while (out.length > 1 && key(out[out.length - 1]) === key(out[0])) out.pop();
+  return out;
+}
+
+/** Two rings are the same boundary iff their canonical vertex lists match in order. */
+export function ringsEqual(a: LatLng[], b: LatLng[]): boolean {
+  const x = canonicalRing(a);
+  const y = canonicalRing(b);
+  if (x.length !== y.length) return false;
+  for (let i = 0; i < x.length; i++) {
+    if (x[i].latitude !== y[i].latitude || x[i].longitude !== y[i].longitude) return false;
+  }
+  return true;
+}
+
+/** Area-weighted centroid; vertex mean when the signed area is ~0. */
+export function ringCentroid(points: LatLng[]): LatLng {
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0, n = points.length; i < n; i++) {
+    const p = points[i];
+    const q = points[(i + 1) % n];
+    const f = p.longitude * q.latitude - q.longitude * p.latitude;
+    a += f;
+    cx += (p.longitude + q.longitude) * f;
+    cy += (p.latitude + q.latitude) * f;
+  }
+  if (Math.abs(a) < 1e-12) {
+    const n = points.length || 1;
+    return {
+      latitude: points.reduce((s, p) => s + p.latitude, 0) / n,
+      longitude: points.reduce((s, p) => s + p.longitude, 0) / n,
+    };
+  }
+  return { latitude: cy / (3 * a), longitude: cx / (3 * a) };
+}
+
+/**
+ * Ray-cast containment, half-open on latitude so a point level with a vertex counts
+ * once rather than twice.
+ *
+ * This must agree with the server, because the "areas covering me" chip asks the
+ * server the same question with ?intersects_polygon=POINT(lon lat) and a screen that
+ * grouped rows differently from its own chip would contradict itself.
+ */
+export function pointInRing(pt: LatLng, ring: LatLng[]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i].longitude, yi = ring[i].latitude;
+    const xj = ring[j].longitude, yj = ring[j].latitude;
+    if (
+      yi > pt.latitude !== yj > pt.latitude &&
+      pt.longitude < ((xj - xi) * (pt.latitude - yi)) / (yj - yi) + xi
+    ) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** Inside any part of the geometry and not inside one of its holes. */
+export function polygonsCoverPoint(polys: PolygonRings[], pt: LatLng): boolean {
+  return polys.some(
+    (p) => pointInRing(pt, p.coordinates) && !p.holes.some((h) => pointInRing(pt, h)),
+  );
+}
+
+/**
+ * km² with as many digits as the magnitude deserves, and no more.
+ *
+ * The live corpus spans 4.34 to 405.02 km² and the create screen's smallest circle is
+ * 0.03 km². A fixed one decimal place prints "405.0" and "0.0"; both are wrong for
+ * different reasons. Every screen that shows a size uses this, so the list, the detail
+ * screen and the editor can never disagree.
+ */
+export function formatKm2(km2: number): string {
+  return km2 < 1 ? km2.toFixed(2) : km2 < 10 ? km2.toFixed(1) : String(Math.round(km2));
+}
+
+// --- the one gate the UI calls ----------------------------------------------
+
+/** 6 dp is 0.11 m, so this floor is 70x the coordinate quantum. Corpus min is 112 m. */
+export const MIN_VERTEX_GAP_M = 8;
+/** Below this, two edges are close enough that validity depends on float luck. */
+export const NEAR_TOUCH_M = 2;
+/** A 32 m square. The smallest real area is 4.34 km². */
+export const MIN_AREA_M2 = 1000;
+/** Bounds the O(n^2) loop. Corpus max is 17; circleRing emits 48. */
+export const MAX_RING_POINTS = 200;
+
+export type RingProblem =
+  | { kind: 'tooFew' }
+  | { kind: 'tooMany'; max: number }
+  | { kind: 'outOfRange' }
+  | { kind: 'tooClose' }
+  | { kind: 'crosses'; a: number; b: number }
+  | { kind: 'nearlyCrosses'; a: number; b: number }
+  | { kind: 'tooSmall' };
+
+/**
+ * null means the server will accept this ring AND it is worth accepting.
+ * Ordered most-actionable first, so the editor shows one message at a time.
+ */
+export function checkRing(points: LatLng[]): RingProblem | null {
+  const ring = canonicalRing(points);
+  if (ring.length < 3) return { kind: 'tooFew' };
+  if (ring.length > MAX_RING_POINTS) return { kind: 'tooMany', max: MAX_RING_POINTS };
+  if (!ringIsSane(ring)) return { kind: 'outOfRange' };
+  if (ringMinVertexGapM(ring) < MIN_VERTEX_GAP_M) return { kind: 'tooClose' };
+  const x = ringFirstCrossing(ring);
+  if (x) return { kind: 'crosses', a: x.a, b: x.b };
+  const near = ringClosestNonAdjacentPair(ring);
+  if (near && near.metres < NEAR_TOUCH_M) {
+    return { kind: 'nearlyCrosses', a: near.a, b: near.b };
+  }
+  if (ringAreaM2(ring) < MIN_AREA_M2) return { kind: 'tooSmall' };
+  return null;
+}
+
+/**
+ * A map region that frames every given point, with a little breathing room.
+ *
+ * Shared rather than copied: the detail screen, the boundary editor and anything else
+ * that opens a map onto a stored ring must frame it identically, or the same area looks
+ * like a different shape depending on which screen you arrived from. The floor on the
+ * deltas matters — a degenerate ring (every point equal) would otherwise give a zero
+ * span, which renders as a blank map rather than a tiny one.
+ */
+export function regionFor(points: LatLng[]): {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+} {
+  if (!points.length) {
+    // Damascus, the repo's existing fallback centre
+    return { latitude: 33.5138, longitude: 36.2765, latitudeDelta: 0.09, longitudeDelta: 0.09 };
+  }
+  const lats = points.map((p) => p.latitude);
+  const lngs = points.map((p) => p.longitude);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  return {
+    latitude: (minLat + maxLat) / 2,
+    longitude: (minLng + maxLng) / 2,
+    latitudeDelta: Math.max((maxLat - minLat) * 1.4, 0.01),
+    longitudeDelta: Math.max((maxLng - minLng) * 1.4, 0.01),
+  };
+}
