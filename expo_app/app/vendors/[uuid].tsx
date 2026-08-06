@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { apiCall, isOk } from '@/utils/api';
 
 interface Vendor {
@@ -23,6 +24,7 @@ export default function VendorsDetailScreen() {
   const router = useRouter();
   const { t, tef } = useLanguage();
   const [reloadKey, setReloadKey] = useState(0);
+  const canCreatePo = useHasEndpoint('purchase_order', 'create');
 
   /**
    * Balance is signed, and the sign is the whole point: negative means money is
@@ -66,6 +68,18 @@ export default function VendorsDetailScreen() {
         ...balanceRows(x),
       ]}
       actions={[
+        {
+          // raising an order is the thing you came to a supplier's page to do; the
+          // create screen seeds its vendor picker from these two params
+          label: t('purchaseOrders.create'),
+          testID: 'vendor-new-po',
+          visible: () => canCreatePo,
+          onPress: (x) =>
+            router.push({
+              pathname: '/purchase-orders/create',
+              params: { vendor_uuid: x.uuid, vendor_name: x.company_name ?? '' },
+            }),
+        },
         {
           label: t('detail.edit'),
           testID: 'vendor-edit',
