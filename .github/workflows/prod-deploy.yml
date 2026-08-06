@@ -5,6 +5,13 @@ on:
   push:
     branches:
       - main
+  # Manual re-run. Without this, a prod deploy that fails or gets wedged has no
+  # retry path: the only way to trigger it is another push to main, so a fix
+  # already merged can sit undeployed while someone invents a commit to nudge
+  # it. Happened on 94aebe5 — the build hung for 15 minutes, was cancelled,
+  # both deploy jobs skipped, and re-running the run left it queued
+  # indefinitely.
+  workflow_dispatch:
 
 permissions:
   contents: read
