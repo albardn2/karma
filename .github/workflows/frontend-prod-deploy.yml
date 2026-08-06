@@ -8,6 +8,11 @@ on:
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend-prod-deploy.yml'
+  # Manual re-run, for the same reason as the backend deploy: a failed or
+  # wedged run otherwise needs a fresh push to main to retry. The path filter
+  # above also means a backend-only merge never refreshes the frontend, so
+  # this is the only way to redeploy it on demand.
+  workflow_dispatch:
 
 permissions:
   contents: read
