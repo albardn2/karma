@@ -1,120 +1,89 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import * as Location from 'expo-location';
+import React, { useState } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
+import { ServiceAreaCard, ServiceAreaRow } from '@/components/ServiceAreaCard';
+import { ServiceAreasMap } from '@/components/ServiceAreasMap';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatNumericDate } from '@/utils/date';
+import { useAuth } from '@/contexts/AuthContext';
+import { useHasEndpoint } from '@/hooks/useModuleAccess';
 
-interface ServiceArea {
-  uuid: string;
-  name: string;
-  description?: string | null;
-  created_at: string;
-}
+type View2 = 'list' | 'map';
 
 /**
  * Service areas — the polygons the business delivers into.
  *
- * The reason this is worth a screen rather than a config page: `intersects_polygon`
- * answers "which area am I standing in" in one request, which is a question a driver
- * actually asks and cannot otherwise answer. WKT wants LONGITUDE FIRST, so a GPS fix
- * goes in as POINT(lon lat) — the transposition is silent, returning plausibly empty
- * results rather than an error.
+ * TWO VIEWS OF ONE SET OF RECORDS, as tabs rather than as two routes. They answer
+ * different questions: the list answers "which areas exist and how big are they", the
+ * map answers "where are they and do they overlap" — and this corpus contains
+ * overlapping and nested pairs that no table can reveal. Keeping both inside the one
+ * scaffold means they share the same back chevron, record count and create button
+ * instead of two screens reproducing all three and drifting apart.
  *
- * Two things deliberately absent. There is no create form: creating an area means
- * typing a WKT polygon, which is not a phone interaction, and a driver's POST is
- * refused anyway. And nothing renders the raw geometry string — the detail screen draws
- * it instead.
+ * The tab is deep-linkable as `?view=map`, which is not only for convenience: it is the
+ * only way to reach the map view without a tap, so the map can be opened directly from
+ * a notification or a test.
  *
- * Passing `intersects_polygon` makes the server force per_page to 10000, so that mode
- * is effectively unpaginated. That is the server's choice, not something to work
- * around, but it is why the chip is a filter rather than the default view.
+ * THE `+` IS DOUBLE-GATED, on the endpoint grant AND on admin, which is stricter than
+ * the rest of the app. The endpoint check alone is nearly right — a driver holds only
+ * `service_area: read` — but a hand-edited permission checklist can grant a non-admin
+ * `create`, and the route refuses them regardless: POST, PUT and DELETE are
+ * admin-or-superuser at the decorator. A button whose only possible outcome is a 403 is
+ * worse than no button.
  */
 export default function ServiceAreasScreen() {
   const router = useRouter();
+  const { view } = useLocalSearchParams<{ view?: string }>();
   const { t } = useLanguage();
-  const [near, setNear] = useState<string | null>(null);
-  const [locating, setLocating] = useState(false);
+  const { isAdmin } = useAuth();
+  const insets = useSafeAreaInsets();
+  const canCreate = useHasEndpoint('service_area', 'create') && isAdmin;
 
-  // memoised: ModuleListScreen refetches when this object's identity changes, so a
-  // fresh literal every render would loop
-  const params = useMemo(() => {
-    const p: Record<string, string> = {};
-    if (near) p.intersects_polygon = near;
-    return p;
-  }, [near]);
-
-  const toggleNear = useCallback(async () => {
-    if (near) return setNear(null);
-    setLocating(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(t('serviceAreas.locationDenied'));
-        return;
-      }
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      // lon first — WKT is (x y), not (lat lon)
-      setNear(`POINT(${pos.coords.longitude} ${pos.coords.latitude})`);
-    } catch {
-      Alert.alert(t('serviceAreas.locationFailed'));
-    } finally {
-      setLocating(false);
-    }
-  }, [near, t]);
+  const [mode, setMode] = useState<View2>(view === 'map' ? 'map' : 'list');
+  const tabs = (
+    <View style={styles.tabs}>
+      {(
+        [
+          ['list', t('serviceAreas.tabList')],
+          ['map', t('serviceAreas.tabMap')],
+        ] as const
+      ).map(([id, label]) => (
+        <TouchableOpacity
+          key={id}
+          style={[styles.tab, mode === id && styles.tabOn]}
+          onPress={() => setMode(id)}
+          testID={`sa-tab-${id}`}
+        >
+          <ThemedText style={[styles.tabText, mode === id && styles.tabTextOn]}>
+            {label}
+          </ThemedText>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
 
   return (
     <View style={styles.screen}>
-      <ModuleListScreen<ServiceArea>
+      <ModuleListScreen<ServiceAreaRow>
         module="service-areas"
         title={t('menu.serviceAreas')}
         endpoint="/service-area/"
         itemsKey="items"
         searchParam="name"
         searchPlaceholder={t('serviceAreas.searchPlaceholder')}
-        params={params}
         keyExtractor={(a) => a.uuid}
-        header={
-          <TouchableOpacity
-            style={[styles.nearChip, !!near && styles.nearChipOn]}
-            onPress={toggleNear}
-            disabled={locating}
-            testID="service-areas-near"
-          >
-            <ThemedText style={[styles.nearText, !!near && styles.nearTextOn]}>
-              {locating
-                ? t('serviceAreas.locating')
-                : near
-                  ? t('serviceAreas.nearOn')
-                  : t('serviceAreas.nearOff')}
-            </ThemedText>
-          </TouchableOpacity>
+        onCreate={canCreate ? () => router.push('/service-areas/create') : undefined}
+        tabs={tabs}
+        // the map owns the whole body in map mode; the list's fetch still runs so the
+        // header count stays truthful and the search survives a trip through the map
+        body={
+          mode === 'map' ? <ServiceAreasMap footerOffset={78 + insets.bottom} /> : undefined
         }
         renderItem={(a) => (
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => router.push(`/service-areas/${a.uuid}`)}
-            testID={`service-area-${a.uuid}`}
-          >
-            <View style={styles.rowLeft}>
-              <ThemedText style={styles.name} numberOfLines={1}>
-                {a.name}
-              </ThemedText>
-              {!!a.description && (
-                <ThemedText style={styles.desc} numberOfLines={1}>
-                  {a.description}
-                </ThemedText>
-              )}
-            </View>
-            <ThemedText style={styles.when}>
-              {a.created_at ? formatNumericDate(new Date(a.created_at)) : ''}
-            </ThemedText>
-          </TouchableOpacity>
+          <ServiceAreaCard area={a} onPress={() => router.push(`/service-areas/${a.uuid}`)} />
         )}
       />
       <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
@@ -124,22 +93,25 @@ export default function ServiceAreasScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  nearChip: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
+  // a segmented control rather than two chips: these are mutually exclusive views of
+  // the same records, and chips in this app mean additive filters
+  tabs: {
+    flexDirection: 'row',
+    backgroundColor: '#E5E7EB',
+    borderRadius: 10,
+    padding: 3,
+    marginHorizontal: 20,
     marginBottom: 12,
   },
-  nearChipOn: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
-  nearText: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  nearTextOn: { color: '#fff' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
-  rowLeft: { flex: 1 },
-  name: { fontSize: 15, fontWeight: '600', color: '#1f2937' },
-  desc: { fontSize: 12, opacity: 0.55, marginTop: 2 },
-  when: { fontSize: 11, opacity: 0.5 },
+  tab: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
+  tabOn: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  tabText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
+  tabTextOn: { color: '#111827' },
 });

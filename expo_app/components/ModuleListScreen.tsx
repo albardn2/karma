@@ -67,6 +67,24 @@ interface ModuleListScreenProps<T> {
   filters?: Array<{ id: string; label: string; params: Record<string, string> }>;
   /** rendered above the list, for anything a module needs beyond chips */
   header?: React.ReactNode;
+  /**
+   * A view-mode strip rendered directly under the title, above the search box.
+   *
+   * For a module with a genuinely different way of looking at the same records — the
+   * service areas map, which answers "where are these and do they overlap" and a table
+   * never can. It sits inside this scaffold rather than being a separate route so both
+   * modes keep the identical back chevron, record count and create button; a sibling
+   * screen would have to reproduce all three and would drift.
+   */
+  tabs?: React.ReactNode;
+  /**
+   * Replaces the search box, the filter chips and the list itself.
+   *
+   * Set by a caller whose non-list tab owns the whole body. The fetch still runs, which
+   * is deliberate: the header count stays truthful and the search/filter state survives
+   * a round trip through the other tab.
+   */
+  body?: React.ReactNode;
   /** shows a + in the header; omit for modules the app cannot create */
   onCreate?: () => void;
   /** shows a chart button; omit for modules with no analytics endpoint */
@@ -101,6 +119,8 @@ export function ModuleListScreen<T>({
   pagesKey = 'pages',
   filters,
   header,
+  tabs,
+  body,
   onCreate,
   onAnalytics,
 }: ModuleListScreenProps<T>) {
@@ -218,7 +238,9 @@ export function ModuleListScreen<T>({
           </View>
         </View>
 
-        {searchParam && (
+        {tabs}
+
+        {!body && searchParam && (
           <TextInput
             style={styles.search}
             value={search}
@@ -231,7 +253,7 @@ export function ModuleListScreen<T>({
           />
         )}
 
-        {filters && filters.length > 0 && (
+        {!body && filters && filters.length > 0 && (
           /* one scrolling row in the trips design rather than wrapping pills:
              wrapping left one chip orphaned on its own line as soon as a module
              had more than a phone-width of filters, and Arabic labels overflow at
@@ -255,9 +277,11 @@ export function ModuleListScreen<T>({
           </ScrollingChipRow>
         )}
 
-        {header}
+        {!body && header}
 
-        {loading ? (
+        {body ? (
+          body
+        ) : loading ? (
           <View style={styles.centre}>
             <ActivityIndicator size="large" color="#5469D4" />
           </View>
