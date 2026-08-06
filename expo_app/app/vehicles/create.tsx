@@ -21,7 +21,9 @@ export default function VehicleFormScreen() {
     { name: 'plate_number', label: t('vehicles.plate'), required: !editing },
     { name: 'make', label: t('vehicles.make'), required: !editing },
     { name: 'model', label: t('vehicles.model'), required: !editing },
-    { name: 'year', label: t('vehicles.year'), required: !editing, kind: 'number' },
+    // the server has NO year bounds at all: 0, -5 and 99999 are all accepted, and a
+    // 32-bit overflow comes back as an HTML 500 page. This is the only guard.
+    { name: 'year', label: t('vehicles.year'), kind: 'number', integer: true, min: 1900, max: new Date().getFullYear() + 1 },
     { name: 'color', label: t('vehicles.color'), required: !editing },
     {
       name: 'status',
@@ -43,6 +45,7 @@ export default function VehicleFormScreen() {
       title={t(editing ? 'form.editTitle' : 'form.createTitle', { what: t('vehicles.one') })}
       fields={fields}
       initial={editing ? initial : undefined}
+      errorMessages={{ 409: t('vehicles.plateTaken') }}
       method={editing ? 'PUT' : 'POST'}
       endpoint={editing ? `/vehicle/${uuid}` : '/vehicle/'}
     />

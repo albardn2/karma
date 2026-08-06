@@ -954,6 +954,24 @@ export const translations: Record<Lang, Record<string, string>> = {
   'inventoryEvents.costWarning': 'Leaving the cost blank keeps the current cost. Costs cannot be cleared from the app.',
   'inventoryEvents.deleteConfirm': 'Delete this movement? The lot\'s quantity will change as a result.',
   'inventoryEvents.deleteFailed': 'Failed to delete movement',
+
+  // vehicles parity (delete, stock writes, chart material filter)
+  'vehicles.range7d': '7 days',
+  'vehicles.deleteConfirm': 'Delete this vehicle? Its trips and any stock still loaded on it stay in the system but will no longer belong to a vehicle. The plate number can never be used again.',
+  'vehicles.deleteStillHas': 'It still carries {materials} material line(s) and has {trips} trip(s).',
+  'vehicles.deleteFailed': 'Couldn\'t delete this vehicle',
+  'vehicles.plateTaken': 'That plate number or VIN is already registered. Both are unique across the whole system, not just your company.',
+  'vehicles.addMaterial': 'Add a material',
+  'vehicles.addMaterialTo': 'Add a material — {plate}',
+  'vehicles.addMaterialNote': 'This puts the material on the vehicle with a balance of zero. Load a quantity onto it afterwards by tapping its line.',
+  'vehicles.materialAlreadyOn': 'That material is already on this vehicle.',
+  'vehicles.updateStock': 'Stock — {material}',
+  'vehicles.movement': 'Movement',
+  'vehicles.eventManual': 'Load on',
+  'vehicles.eventUnload': 'Unload',
+  'vehicles.eventAdjust': 'Correct',
+  'vehicles.qtyNote': 'Load and unload take a positive amount. A correction may be negative to take stock off.',
+  'vehicles.insufficient': 'The vehicle does not hold that much. Check what is on hand and try a smaller amount.',
   },
   ar: {
     // trips module (admin)
@@ -1897,5 +1915,23 @@ export const translations: Record<Lang, Record<string, string>> = {
   'inventoryEvents.costWarning': 'ترك التكلفة فارغة يحافظ على التكلفة الحالية. لا يمكن مسح التكلفة من التطبيق.',
   'inventoryEvents.deleteConfirm': 'هل تريد حذف هذه الحركة؟ سيتغير رصيد الدفعة نتيجة لذلك.',
   'inventoryEvents.deleteFailed': 'فشل حذف الحركة',
+
+  // vehicles parity (delete, stock writes, chart material filter)
+  'vehicles.range7d': '٧ أيام',
+  'vehicles.deleteConfirm': 'حذف هذه المركبة؟ ستبقى رحلاتها وأي مخزون محمّل عليها في النظام لكن لن تعود تابعة لأي مركبة. ولا يمكن استخدام رقم اللوحة مرة أخرى.',
+  'vehicles.deleteStillHas': 'ما زالت تحمل {materials} بنداً من المواد ولها {trips} رحلة.',
+  'vehicles.deleteFailed': 'تعذر حذف هذه المركبة',
+  'vehicles.plateTaken': 'رقم اللوحة أو رقم الهيكل مُسجَّل مسبقاً. كلاهما فريد على مستوى النظام بالكامل، وليس على مستوى شركتك فقط.',
+  'vehicles.addMaterial': 'إضافة مادة',
+  'vehicles.addMaterialTo': 'إضافة مادة — {plate}',
+  'vehicles.addMaterialNote': 'يضيف هذا المادة إلى المركبة برصيد صفر. حمّل الكمية عليها بعد ذلك بالضغط على بندها.',
+  'vehicles.materialAlreadyOn': 'هذه المادة موجودة على هذه المركبة بالفعل.',
+  'vehicles.updateStock': 'المخزون — {material}',
+  'vehicles.movement': 'نوع الحركة',
+  'vehicles.eventManual': 'تحميل',
+  'vehicles.eventUnload': 'تنزيل',
+  'vehicles.eventAdjust': 'تصحيح',
+  'vehicles.qtyNote': 'التحميل والتنزيل يأخذان كمية موجبة. أما التصحيح فيمكن أن يكون سالباً لخفض الرصيد.',
+  'vehicles.insufficient': 'لا تحمل المركبة هذه الكمية. راجع المتوفر وجرّب كمية أقل.',
   },
 };
