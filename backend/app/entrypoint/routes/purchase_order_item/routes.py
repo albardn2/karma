@@ -61,6 +61,11 @@ def create_item():
     payload = PurchaseOrderItemCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
         add_logged_user_to_payload(uow=uow, user_uuid=current_user_uuid, payload=payload)
+        # derive currency (from the order) and unit (from the material), the
+        # same way the with-items path does — this route used to build the
+        # model straight from the payload, so an omitted currency reached a
+        # NOT NULL column
+        PurchaseOrderItemDomain.resolve_currency_and_unit(uow=uow, item=payload)
         data = payload.model_dump(mode='json')
         item = PurchaseOrderItemModel(**data)
         uow.purchase_order_item_repository.save(model=item, commit=True)
