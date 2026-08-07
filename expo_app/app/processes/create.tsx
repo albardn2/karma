@@ -18,6 +18,7 @@ import { PickerField } from '@/components/PickerField';
 import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { apiCall, isOk } from '@/utils/api';
 import {
   availableOf,
@@ -72,6 +73,93 @@ const blankOut = (): OutLine => ({
   quantity: '',
 });
 
+
+/** A prefill source, already normalised — nothing downstream ever touches a raw blob. */
+interface Recipe {
+  /** the uuid. Never the name: duplicate names are permitted and there is no index. */
+  key: string;
+  source: 'template' | 'run';
+  name: string;
+  /** RAW AND UNTRUSTED: `type` is a free varchar on a template, not the closed enum */
+  type: string;
+  createdAt: string;
+  notes: string;
+  inputs: { material_uuid: string; quantity: number }[];
+  outputs: { material_uuid: string; quantity: number }[];
+  warehouse: string;
+  /** rows the merge collapsed — reported, never applied silently */
+  collapsed: number;
+  /** rows dropped for having no material or no positive amount */
+  skipped: number;
+}
+
+/**
+ * Whitelist every row down to the two fields a preset may contribute, then collapse
+ * repeats.
+ *
+ * A WHITELIST, NOT A BLACKLIST, and that is the load-bearing decision. `data` is a
+ * free-form dict the API does not validate, but ProcessData is extra="forbid" while
+ * still declaring inventory_uuid, cost_per_unit, total_cost and inputs_used as
+ * Optional — so a stored run's blob replayed verbatim PASSES validation and then does
+ * the wrong thing. The worst of those is an output's inventory_uuid: the domain mints a
+ * lot only when it is absent, so replaying it appends this run's output onto the
+ * ORIGINAL run's lot, ignores the chosen warehouse, and leaves both runs sharing a lot
+ * that a delete would soft-delete underneath the other.
+ *
+ * The Array.isArray guard is not decoration: `data.inputs` can legally be the string
+ * "nope", and .map would throw inside a render path.
+ */
+const cleanRows = (raw: unknown) => {
+  const src = Array.isArray(raw) ? raw : [];
+  const kept = src
+    .map((r: any) => ({
+      material_uuid: typeof r?.material_uuid === 'string' ? r.material_uuid.trim() : '',
+      quantity: num(String(r?.quantity ?? '')),
+    }))
+    .filter((r) => r.material_uuid && Number.isFinite(r.quantity) && r.quantity > 0);
+  const merged = mergeByMaterial(kept).map((m) => ({
+    material_uuid: m.material_uuid,
+    quantity: round6(m.quantity),
+  }));
+  return { rows: merged, dropped: src.length - kept.length, collapsed: kept.length - merged.length };
+};
+
+/**
+ * One normaliser for both sources, so a saved recipe and a cloned run cannot diverge.
+ *
+ * MERGING IS MANDATORY FOR A CLONED RUN. The server rewrites data.inputs with one row
+ * per lot it drew from — a single 443.13 line comes back as 433.13 + 10.0 — so an
+ * unmerged clone would show two cards for one material and ask for a multiple of what
+ * was intended. Nothing server-side catches that: the duplicate-input validator is
+ * commented out. Outputs are merged too, because a duplicate output IS rejected, with a
+ * 400 the user could otherwise not act on.
+ *
+ * Returns null for anything that could not produce a runnable form. Not tidiness:
+ * POST /process/ with inputs: [] answers 201 and mints stock out of nothing, and most
+ * templates here carry an empty data blob — offering one would hand the user a
+ * permanently blocked form with no explanation.
+ */
+const toRecipe = (src: any, source: 'template' | 'run'): Recipe | null => {
+  const d = src?.data && typeof src.data === 'object' && !Array.isArray(src.data) ? src.data : {};
+  const i = cleanRows(d.inputs);
+  const o = cleanRows(d.outputs);
+  if (!i.rows.length || !o.rows.length) return null;
+  return {
+    key: String(src?.uuid ?? ''),
+    source,
+    name: source === 'template' ? String(src?.name ?? '') : '',
+    type: typeof src?.type === 'string' ? src.type : '',
+    createdAt: String(src?.created_at ?? ''),
+    // a recipe's note is part of the recipe; a run's note is about that Tuesday
+    notes: source === 'template' ? String(src?.notes ?? '') : '',
+    inputs: i.rows,
+    outputs: o.rows,
+    warehouse: typeof d.output_warehouse_uuid === 'string' ? d.output_warehouse_uuid.trim() : '',
+    collapsed: i.collapsed + o.collapsed,
+    skipped: i.dropped + o.dropped,
+  };
+};
+
 /** The list DTO caps per_page at 100; 101 is a 422 rather than a clamp. */
 const PER_PAGE = 100;
 /** Bound the oldest-first walk for a material with a very long lot history. */
@@ -123,6 +211,16 @@ export default function ProcessCreateScreen() {
   const [outputs, setOutputs] = useState<OutLine[]>([blankOut()]);
   const [showProblems, setShowProblems] = useState(false);
   const [saving, setSaving] = useState(false);
+  // prefill
+  const canReadTpl = useHasEndpoint('process_template', 'read');
+  const canWriteTpl = useHasEndpoint('process_template', 'create');
+  const canDeleteTpl = useHasEndpoint('process_template', 'delete');
+  const [openStart, setOpenStart] = useState(false);
+  const [recipes, setRecipes] = useState<{ tpl: Recipe[]; runs: Recipe[] } | null>(null);
+  const [loadingRecipes, setLoadingRecipes] = useState(false);
+  const [applied, setApplied] = useState<string[]>([]);
+  const [recipeName, setRecipeName] = useState('');
+  const [savingRecipe, setSavingRecipe] = useState(false);
   /** synchronous latch: the server sleeps a second per output, so a double tap is easy */
   const busy = useRef(false);
 
@@ -361,6 +459,152 @@ export default function ProcessCreateScreen() {
     }
   };
 
+
+  /**
+   * Fetched only when the row is opened, never at mount.
+   *
+   * A single run item is about 3 KB with its data blob and 251 bytes without, and there
+   * is no way to ask for the list without it — so a mount-time fetch would tax every
+   * open of this screen to serve a minority. Production currently has zero templates,
+   * which makes that trade worse still.
+   */
+  const loadRecipes = useCallback(async () => {
+    setLoadingRecipes(true);
+    const [tplRes, runRes] = await Promise.all([
+      // a driver is 403 here but 200 on /process/, so the two are fetched independently
+      // and a refusal drops that section rather than the whole row
+      canReadTpl
+        ? apiCall<{ items?: unknown[] }>('/process-template/?per_page=100')
+        : Promise.resolve({ status: 403, data: undefined, error: undefined }),
+      apiCall<{ items?: unknown[] }>('/process/?per_page=8'),
+    ]);
+    const norm = (rows: unknown[] | undefined, src: 'template' | 'run'): Recipe[] =>
+      (rows ?? []).map((r) => toRecipe(r, src)).filter((r): r is Recipe => r !== null);
+    setRecipes({
+      tpl: isOk(tplRes.status) ? norm(tplRes.data?.items, 'template') : [],
+      runs: isOk(runRes.status) ? norm(runRes.data?.items, 'run') : [],
+    });
+    setLoadingRecipes(false);
+  }, [canReadTpl]);
+
+  /**
+   * Fill the form from a normalised recipe.
+   *
+   * `type` is TESTED for membership rather than assigned: it is a free string on a
+   * template, so a recipe can name a process the enum no longer contains, and assigning
+   * it would show a chip row with nothing selected and a 422 at the end.
+   *
+   * The warehouse is likewise verified rather than trusted — the one real template here
+   * stores a blank one, which is a 409 at create.
+   *
+   * Every prefilled input then fetches its own lots, because a recipe records what was
+   * once possible, not what is in stock today. That is the whole reason the amounts are
+   * left editable and the user is told to check them.
+   */
+  const applyRecipe = useCallback(
+    (r: Recipe) => {
+      const notes: string[] = [];
+      if (r.type && types.includes(r.type)) setType(r.type);
+      else if (r.type) notes.push(t('processes.typeNotUsable'));
+
+      if (r.warehouse) setWarehouse(r.warehouse);
+      else notes.push(t('processes.warehouseNotUsable'));
+
+      const ins = r.inputs.map((row) => ({
+        ...blankIn(),
+        material_uuid: row.material_uuid,
+        quantity: String(row.quantity),
+      }));
+      const outs = r.outputs.map((row) => ({
+        ...blankOut(),
+        material_uuid: row.material_uuid,
+        quantity: String(row.quantity),
+      }));
+      setInputs(ins);
+      setOutputs(outs);
+      if (r.notes) setNotes(r.notes);
+      if (r.name) setRecipeName(r.name);
+
+      if (r.collapsed) notes.push(t('processes.mergedRows', { count: String(r.collapsed) }));
+      if (r.skipped) notes.push(t('processes.skippedRows', { count: String(r.skipped) }));
+      notes.unshift(
+        r.source === 'template' ? t('processes.applied', { name: r.name }) : t('processes.appliedRun'),
+      );
+      notes.push(t('processes.checkAmounts'));
+      setApplied(notes);
+      setOpenStart(false);
+      setShowProblems(false);
+
+      // resolve names, units and on-hand for everything just filled in
+      ins.forEach((l) => pickInputMaterial(l.key, l.material_uuid, ''));
+      outs.forEach((l) => pickOutputMaterial(l.key, l.material_uuid, ''));
+    },
+    [types, t, pickInputMaterial, pickOutputMaterial],
+  );
+
+  const saveRecipe = async () => {
+    const name = recipeName.trim();
+    if (!name) return Alert.alert(t('processes.saveAsTemplate'), t('processes.recipeNameRequired'));
+    if (!merged.length || !completeOut.length) {
+      return Alert.alert(t('processes.saveAsTemplate'), t('processes.recipeNeedsRows'));
+    }
+    setSavingRecipe(true);
+    try {
+      // exactly what a recipe is allowed to carry — no lot, no cost, no currency
+      const res = await apiCall('/process-template/', {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          type,
+          ...(notes.trim() ? { notes: notes.trim() } : {}),
+          data: {
+            inputs: merged.map((m) => ({
+              material_uuid: m.material_uuid,
+              quantity: round6(m.quantity),
+            })),
+            outputs: completeOut.map((o) => ({
+              material_uuid: o.material_uuid,
+              quantity: round6(num(o.quantity)),
+            })),
+            ...(warehouse ? { output_warehouse_uuid: warehouse } : {}),
+          },
+        }),
+      });
+      if (isOk(res.status)) {
+        Alert.alert(t('processes.recipeSaved', { name }));
+        setRecipes(null);
+        return;
+      }
+      Alert.alert(
+        t('processes.recipeSaveFailed'),
+        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+      );
+    } finally {
+      setSavingRecipe(false);
+    }
+  };
+
+  const deleteRecipe = (r: Recipe) =>
+    Alert.alert(
+      t('processes.deleteRecipe'),
+      t('processes.deleteRecipeConfirm', { name: r.name }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('detail.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            const res = await apiCall(`/process-template/${r.key}`, { method: 'DELETE' });
+            if (isOk(res.status)) {
+              setRecipes((p) => (p ? { ...p, tpl: p.tpl.filter((x) => x.key !== r.key) } : p));
+            } else {
+              Alert.alert(t('processes.recipeDeleteFailed'));
+            }
+          },
+        },
+      ],
+    );
+
   const submit = async () => {
     setShowProblems(true);
     if (blockers.length) return;
@@ -409,6 +653,108 @@ export default function ProcessCreateScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <ThemedText style={styles.note}>{t('processes.createNote')}</ThemedText>
+
+            {/* collapsed by default and fetching nothing until opened: production has
+                zero saved recipes today, so a mount-time list would tax every open of
+                this screen to serve a minority and still show an empty box */}
+            <TouchableOpacity
+              style={styles.startRow}
+              onPress={() => {
+                const next = !openStart;
+                setOpenStart(next);
+                if (next && !recipes && !loadingRecipes) loadRecipes();
+              }}
+              testID="proc-start-from"
+            >
+              <ThemedText style={styles.startText}>{t('processes.startFrom')}</ThemedText>
+              <ThemedText style={styles.startChevron}>{openStart ? '⌃' : '⌄'}</ThemedText>
+            </TouchableOpacity>
+
+            {openStart && (
+              <View style={styles.startPanel}>
+                {loadingRecipes ? (
+                  <ThemedText style={styles.hint}>{t('processes.loadingRecipes')}</ThemedText>
+                ) : !recipes || (!recipes.tpl.length && !recipes.runs.length) ? (
+                  <ThemedText style={styles.hint}>{t('processes.noRecipes')}</ThemedText>
+                ) : (
+                  <>
+                    {!!recipes.tpl.length && (
+                      <>
+                        <ThemedText style={styles.startHead}>
+                          {t('processes.savedRecipes')}
+                        </ThemedText>
+                        {recipes.tpl.map((r) => (
+                          <View key={r.key} style={styles.recipeRow}>
+                            <TouchableOpacity
+                              style={styles.recipeMain}
+                              onPress={() => applyRecipe(r)}
+                              testID={`proc-recipe-${r.key}`}
+                            >
+                              <ThemedText style={styles.recipeName} numberOfLines={1}>
+                                {r.name || tef(r.type)}
+                              </ThemedText>
+                              <ThemedText style={styles.recipeMeta}>
+                                {`${tef(r.type)} · ${t('processes.recipeSummary', {
+                                  inputs: String(r.inputs.length),
+                                  outputs: String(r.outputs.length),
+                                })}`}
+                              </ThemedText>
+                            </TouchableOpacity>
+                            {/* delete lives on the row, not behind applying it first —
+                                DELETE is the only cleanup this API has, since there is
+                                no update and no get-by-uuid */}
+                            {canDeleteTpl && (
+                              <TouchableOpacity
+                                onPress={() => deleteRecipe(r)}
+                                hitSlop={10}
+                                testID={`proc-recipe-del-${r.key}`}
+                              >
+                                <ThemedText style={styles.remove}>✕</ThemedText>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        ))}
+                      </>
+                    )}
+                    {!!recipes.runs.length && (
+                      <>
+                        <ThemedText style={styles.startHead}>
+                          {t('processes.recentRuns')}
+                        </ThemedText>
+                        {recipes.runs.map((r) => (
+                          <TouchableOpacity
+                            key={r.key}
+                            style={styles.recipeMain}
+                            onPress={() => applyRecipe(r)}
+                            testID={`proc-run-${r.key}`}
+                          >
+                            <ThemedText style={styles.recipeName} numberOfLines={1}>
+                              {tef(r.type)}
+                            </ThemedText>
+                            <ThemedText style={styles.recipeMeta}>
+                              {t('processes.recipeSummary', {
+                                inputs: String(r.inputs.length),
+                                outputs: String(r.outputs.length),
+                              })}
+                            </ThemedText>
+                          </TouchableOpacity>
+                        ))}
+                      </>
+                    )}
+                  </>
+                )}
+              </View>
+            )}
+
+            {!!applied.length && (
+              <View style={styles.appliedBox} testID="proc-applied">
+                {applied.map((line, i) => (
+                  <ThemedText key={i} style={styles.appliedLine}>
+                    {line}
+                  </ThemedText>
+                ))}
+              </View>
+            )}
 
             <ThemedText style={styles.label}>{t('processes.type')} *</ThemedText>
             <ScrollingChipRow>
@@ -607,6 +953,33 @@ export default function ProcessCreateScreen() {
               testID="proc-notes"
             />
 
+            {canWriteTpl && (
+              <View style={styles.saveTpl}>
+                <ThemedText style={styles.label}>{t('processes.saveAsTemplate')}</ThemedText>
+                <View style={styles.qtyRow}>
+                  <TextInput
+                    style={styles.input}
+                    value={recipeName}
+                    onChangeText={setRecipeName}
+                    placeholder={t('processes.recipeNamePlaceholder')}
+                    placeholderTextColor="#9ca3af"
+                    maxLength={255}
+                    testID="proc-recipe-name"
+                  />
+                  <TouchableOpacity
+                    style={styles.saveTplBtn}
+                    onPress={saveRecipe}
+                    disabled={savingRecipe}
+                    testID="proc-save-recipe"
+                  >
+                    <ThemedText style={styles.saveTplText}>
+                      {t('processes.saveAsTemplate')}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             {/* if the button is disabled, the reason is on screen — the web's create
                 button silently does nothing on an invalid row */}
             {showProblems && blockers.length > 0 && (
@@ -713,4 +1086,56 @@ const styles = StyleSheet.create({
   submitOff: { opacity: 0.5 },
   submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   savingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  startRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+    marginBottom: 12,
+  },
+  startText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#374151' },
+  startChevron: { fontSize: 14, color: '#6B7280' },
+  startPanel: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+    padding: 10,
+    marginBottom: 12,
+  },
+  startHead: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  recipeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  recipeMain: { flex: 1, paddingVertical: 8 },
+  recipeName: { fontSize: 14, fontWeight: '600', color: '#1f2937' },
+  recipeMeta: { fontSize: 11, color: '#6B7280', marginTop: 1 },
+  appliedBox: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    gap: 2,
+  },
+  appliedLine: { fontSize: 12, color: '#065F46', lineHeight: 17 },
+  saveTpl: { marginTop: 22, gap: 6 },
+  saveTplBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  saveTplText: { fontSize: 13, fontWeight: '700', color: '#4338CA' },
 });
