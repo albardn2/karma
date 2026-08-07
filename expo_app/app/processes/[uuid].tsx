@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { Alert, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
 import { ThemedText } from '@/components/ThemedText';
-import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
+import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { apiCall, isOk } from '@/utils/api';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
+import { round6 } from '@/utils/fifo';
 
 interface Line {
   material_uuid?: string | null;
@@ -23,6 +26,7 @@ interface Process {
   workflow_execution_uuid?: string | null;
   data?: {
     cost_currency?: string | null;
+    output_warehouse_uuid?: string | null;
     inputs?: Line[];
     outputs?: Line[];
   } | null;
@@ -53,13 +57,28 @@ const qty = (n?: number | null) =>
  * the rows are shown as stored rather than re-merged per material — merging them would
  * hide that two lots had different costs.
  *
- * No actions. Deleting a process unwinds stock, and even the notes-only PUT rewrites the
- * stored cost blob, so neither belongs behind a one-handed tap in a van.
+ * DELETING A RUN PUTS THE STOCK BACK, EXACTLY. Verified against the live API with a
+ * full before/after diff of every lot: the produced lot is soft-deleted and each drawn
+ * lot returns to its previous quantity, because current_quantity is a sum over
+ * non-deleted events and delete soft-deletes this run's events. So delete is a genuine
+ * undo — which is why it is offered.
+ *
+ * But the undo EXPIRES. Once anything downstream consumes the produced lot, delete
+ * answers 404 and the whole operation rolls back, leaving the run alive and nothing
+ * undone. The confirm therefore states what will be returned and to which lot, and the
+ * failure path says the produced stock has already been used rather than showing a bare
+ * not-found.
  */
 export default function ProcessDetailScreen() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
+  const router = useRouter();
   const { t, tef } = useLanguage();
   const [materials, setMaterials] = useState<Record<string, Material>>({});
+  const [warehouse, setWarehouse] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const canUpdate = useHasEndpoint('process', 'update');
+  const canDelete = useHasEndpoint('process', 'delete');
 
   const loadMaterials = useCallback(async () => {
     const res = await apiCall<{ materials: Material[] }>(`/material/?per_page=${PER_PAGE}`);
@@ -73,9 +92,96 @@ export default function ProcessDetailScreen() {
     loadMaterials();
   }, [loadMaterials]);
 
+  // one request, and only when there is a warehouse to name
+  const loadWarehouse = useCallback(async (id?: string | null) => {
+    if (!id) return;
+    const res = await apiCall<{ name?: string }>(`/warehouse/${id}`);
+    if (isOk(res.status)) setWarehouse(res.data?.name ?? null);
+  }, []);
+
+  /**
+   * The confirm names the lots and the amounts, in the direction the delete runs.
+   *
+   * Built from the STORED inputs, which are already lot-level — the server rewrote them
+   * that way on create — so this is the actual ledger that will be reversed rather than
+   * a reconstruction of what was typed.
+   */
+  const deleteConfirm = (p: Process) => {
+    const back = (p.data?.inputs ?? []).map((l) =>
+      t('processes.deleteReturns', {
+        qty: String(round6(Number(l.quantity ?? 0))),
+        unit: unitOf(l.material_uuid),
+        lot: String(l.inventory_uuid ?? '').slice(0, 8),
+      }),
+    );
+    const gone = (p.data?.outputs ?? []).map((l) =>
+      t('processes.deleteRemoves', {
+        qty: String(round6(Number(l.quantity ?? 0))),
+        unit: unitOf(l.material_uuid),
+        material: nameOf(l.material_uuid),
+      }),
+    );
+    return [...back, ...gone].join('\n');
+  };
+
+  const remove = async () => {
+    const res = await apiCall(`/process/${uuid}`, { method: 'DELETE' });
+    if (isOk(res.status)) {
+      router.back();
+      return;
+    }
+    const raw = String(res.error ?? '').slice(0, 300);
+    Alert.alert(
+      t('processes.deleteTitle'),
+      // a 404 here almost always means the produced lot has already been drawn from,
+      // which is a real explanation rather than "not found"
+      res.status === 404 && /inventory events/i.test(raw)
+        ? t('processes.deleteUsed')
+        : raw || t('processes.deleteFailed'),
+    );
+  };
+
+  const actions: DetailAction<Process>[] = [
+    {
+      label: t('detail.edit'),
+      testID: 'process-edit',
+      visible: () => canUpdate,
+      onPress: (p) => {
+        setReloadKey((k) => k + 1);
+        router.push({
+          pathname: '/processes/edit',
+          params: { uuid: p.uuid, notes: p.notes ?? '' },
+        });
+      },
+    },
+    {
+      label: t('processes.uuid'),
+      testID: 'process-copy',
+      onPress: async (p) => {
+        await Clipboard.setStringAsync(p.uuid);
+        Alert.alert(t('processes.copied'));
+      },
+    },
+    {
+      label: t('detail.delete'),
+      destructive: true,
+      testID: 'process-delete',
+      visible: () => canDelete,
+      confirmText: (p) => `${deleteConfirm(p)}\n\n${t('processes.undoNote')}`,
+      onPress: remove,
+    },
+  ];
+
   const nameOf = (u?: string | null) =>
     (u && materials[u]?.name) || t('inventory.unknownMaterial');
   const unitOf = (u?: string | null) => (u && materials[u]?.measure_unit) || '';
+
+  const warehouseRow = (p: Process) => {
+    const id = p.data?.output_warehouse_uuid;
+    if (!id) return '—';
+    if (warehouse === null) loadWarehouse(id);
+    return warehouse ?? String(id).slice(0, 8);
+  };
 
   const lines = (rows: Line[] | undefined, currency?: string | null, costKey: 'cost_per_unit' | 'total_cost' = 'cost_per_unit') => (
     <>
@@ -111,10 +217,13 @@ export default function ProcessDetailScreen() {
           t('processes.source'),
           p.workflow_execution_uuid ? t('processes.fromWorkflow') : t('processes.manual'),
         ],
-        [t('processes.when'), p.created_at ? formatNumericDate(new Date(p.created_at)) : '—'],
+        [t('processes.when'), p.created_at ? formatNumericDate(parseTs(p.created_at)) : '—'],
         [t('processes.costCurrency'), p.data?.cost_currency || '—'],
+        [t('processes.warehouse'), warehouseRow(p)],
         [t('processes.notes'), p.notes || '—'],
       ]}
+      actions={actions}
+      reloadKey={reloadKey}
       sections={[
         {
           title: t('processes.inputs'),
