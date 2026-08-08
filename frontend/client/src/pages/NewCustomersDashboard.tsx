@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { DashboardShell } from "@/components/DashboardShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -38,7 +38,7 @@ const NEW = "#16a34a";
  * purchasing side. One series, so the bars are unstacked and there is no
  * currency involved.
  */
-export default function NewCustomersDashboard({ mine = false }: { mine?: boolean }) {
+export default function NewCustomersDashboard({ mine = false, embedded = false }: { mine?: boolean; embedded?: boolean }) {
   const { t } = useLanguage();
   const [gran, setGran] = useState<Gran>("month");
 
@@ -64,8 +64,7 @@ export default function NewCustomersDashboard({ mine = false }: { mine?: boolean
   ];
 
   return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
+    <DashboardShell embedded={embedded}>
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
@@ -170,7 +169,6 @@ export default function NewCustomersDashboard({ mine = false }: { mine?: boolean
             )}
           </>
         )}
-      </div>
-    </AppLayout>
+    </DashboardShell>
   );
 }

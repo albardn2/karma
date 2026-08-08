@@ -11,7 +11,7 @@ import {
   Legend,
   ReferenceLine,
 } from "recharts";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { DashboardShell } from "@/components/DashboardShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -93,7 +93,7 @@ function PillGroup({
  * unknown cost are left out of cost of goods rather than counted as free, and until
  * employee payouts exist net is "before salaries".
  */
-export default function ProfitabilityDashboard() {
+export default function ProfitabilityDashboard({ embedded = false }: { embedded?: boolean }) {
   const { t, te } = useLanguage();
   const [gran, setGran] = useState<Gran>("month");
   const [ccy, setCcy] = useState<Ccy>("USD");
@@ -122,8 +122,7 @@ export default function ProfitabilityDashboard() {
   ];
 
   return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
+    <DashboardShell embedded={embedded}>
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{t("dashboards.profitability")}</h2>
@@ -268,7 +267,6 @@ export default function ProfitabilityDashboard() {
             )}
           </>
         )}
-      </div>
-    </AppLayout>
+    </DashboardShell>
   );
 }

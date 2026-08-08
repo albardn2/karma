@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { DashboardShell } from "@/components/DashboardShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -44,7 +44,7 @@ const REPEAT = "#5469D4";
  * while a yearly chart counts their whole first year as new. Counts, not money, so
  * there is no currency here.
  */
-export default function CustomerOrdersDashboard() {
+export default function CustomerOrdersDashboard({ embedded = false }: { embedded?: boolean }) {
   const { t } = useLanguage();
   const [gran, setGran] = useState<Gran>("month");
 
@@ -74,8 +74,7 @@ export default function CustomerOrdersDashboard() {
     key === "newOrders" ? t("dashboards.newCustomers") : t("dashboards.repeatCustomers");
 
   return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
+    <DashboardShell embedded={embedded}>
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{t("dashboards.customerOrders")}</h2>
@@ -189,7 +188,6 @@ export default function CustomerOrdersDashboard() {
             )}
           </>
         )}
-      </div>
-    </AppLayout>
+    </DashboardShell>
   );
 }

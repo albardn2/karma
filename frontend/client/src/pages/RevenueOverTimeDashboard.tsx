@@ -12,7 +12,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { DashboardShell } from "@/components/DashboardShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -97,7 +97,7 @@ function PillGroup({
  * stacked bar's two segments always add up to the bar. A currency switch converts
  * each order at its own date rather than dropping the other currency.
  */
-export default function RevenueOverTimeDashboard({ mine = false }: { mine?: boolean }) {
+export default function RevenueOverTimeDashboard({ mine = false, embedded = false }: { mine?: boolean; embedded?: boolean }) {
   const { t, te } = useLanguage();
   const [mode, setMode] = useState<Mode>("cumulative");
   const [gran, setGran] = useState<Gran>("month");
@@ -146,8 +146,7 @@ export default function RevenueOverTimeDashboard({ mine = false }: { mine?: bool
   };
 
   return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
+    <DashboardShell embedded={embedded}>
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
@@ -321,7 +320,6 @@ export default function RevenueOverTimeDashboard({ mine = false }: { mine?: bool
             )}
           </>
         )}
-      </div>
-    </AppLayout>
+    </DashboardShell>
   );
 }

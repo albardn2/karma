@@ -139,6 +139,19 @@ MODULES = [
 ]
 
 RESOURCE_SET = set(RESOURCES)
+
+# Dashboard endpoints that return only the CALLER's own records (their orders,
+# their customers, their assigned stops). Self-scoped by construction, so the
+# per-user resource ACL does not apply to them — a sales rep or driver without
+# the `dashboard` resource grant may still read their own numbers. The account
+# gates (verification, tenant feature cap) still bind; this only skips the
+# per-user check. Flask endpoint names: blueprint.function.
+SELF_SCOPED_DASHBOARD_ENDPOINTS = {
+    "dashboard.my_revenue_over_time",
+    "dashboard.my_materials_sold",
+    "dashboard.my_new_customers",
+    "dashboard.my_trip_stops",
+}
 MODULE_SET = set(MODULES)
 ACTION_SET = set(ACTIONS)
 

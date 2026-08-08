@@ -10,6 +10,7 @@ import Landing from "@/pages/Landing";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
+import Home from "@/pages/Home";
 import Dashboards from "@/pages/Dashboards";
 import ProfitabilityDashboard from "@/pages/ProfitabilityDashboard";
 import RevenueOverTimeDashboard from "@/pages/RevenueOverTimeDashboard";
@@ -95,13 +96,13 @@ import Signup from "@/pages/Signup";
 import SuperAdmin from "@/pages/SuperAdmin";
 
 function HomeRoute() {
-  // "/" is the public landing page for visitors and the dashboard for
-  // signed-in users
+  // "/" is the public landing page for visitors and, for signed-in users,
+  // Home: their role's dashboards stacked in one feed
   const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) return <div className="min-h-screen brand-gradient" />;
   return isAuthenticated ? (
     <ProtectedRoute>
-      <Dashboard />
+      <Home />
     </ProtectedRoute>
   ) : (
     <Landing />
@@ -116,6 +117,7 @@ function Router() {
       <Route path="/signup" component={Signup} />
       <Route path="/" component={HomeRoute} />
       <Route path="/dashboards" component={() => <ProtectedRoute><Dashboards /></ProtectedRoute>} />
+      <Route path="/dashboards/business-overview" component={() => <ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/dashboards/profitability" component={() => <ProtectedRoute><ProfitabilityDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/revenue-over-time" component={() => <ProtectedRoute><RevenueOverTimeDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/spend" component={() => <ProtectedRoute><SpendDashboard /></ProtectedRoute>} />

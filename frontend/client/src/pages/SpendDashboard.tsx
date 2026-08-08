@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { DashboardShell } from "@/components/DashboardShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -93,7 +93,7 @@ function PillGroup({
  * breakdown converted to the chosen currency, so the client just stacks what it is
  * given and a currency switch converts rather than drops the other currency.
  */
-export default function SpendDashboard() {
+export default function SpendDashboard({ embedded = false }: { embedded?: boolean }) {
   const { t, te } = useLanguage();
   const [gran, setGran] = useState<Gran>("month");
   const [ccy, setCcy] = useState<Ccy>("USD");
@@ -125,8 +125,7 @@ export default function SpendDashboard() {
   ];
 
   return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
+    <DashboardShell embedded={embedded}>
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{t("dashboards.spend")}</h2>
@@ -248,7 +247,6 @@ export default function SpendDashboard() {
             )}
           </>
         )}
-      </div>
-    </AppLayout>
+    </DashboardShell>
   );
 }

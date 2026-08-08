@@ -41,7 +41,9 @@ interface SidebarProps {
 }
 
 const navigation = [
-  { key: "nav.dashboard", href: "/", icon: LayoutDashboard },
+  // "/" is Home: the signed-in user's role dashboards, stacked. Still gated on
+  // the backend's `dashboard` module (derived from the href below).
+  { key: "nav.home", href: "/", icon: LayoutDashboard },
   // The dashboards hub. `module` is set explicitly because the id checked against the
   // ACL is derived from href.slice(1) below, which would be "dashboards" (plural, not
   // a backend module) — so without this the entry would gate on a module nobody holds.
