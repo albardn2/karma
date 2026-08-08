@@ -5,6 +5,7 @@ import {
   Receipt,
   ClipboardList,
   Package,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 
@@ -54,6 +55,13 @@ export const IMPLEMENTED_DASHBOARDS: DashboardEntry[] = [
     icon: ClipboardList,
     titleKey: "dashboards.customerOrders",
     descKey: "dashboards.customerOrdersDesc",
+  },
+  {
+    id: "new-customers",
+    href: "/dashboards/new-customers",
+    icon: UserPlus,
+    titleKey: "dashboards.newCustomers",
+    descKey: "dashboards.newCustomersDesc",
   },
   {
     id: "materials-sold",

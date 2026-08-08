@@ -53,6 +53,13 @@ const IMPLEMENTED: Entry[] = [
     descKey: 'dashboards.customerOrdersDesc',
   },
   {
+    id: 'new-customers',
+    route: '/dashboards/new-customers',
+    icon: '🧑‍🤝‍🧑',
+    titleKey: 'dashboards.newCustomers',
+    descKey: 'dashboards.newCustomersDesc',
+  },
+  {
     id: 'materials-sold',
     route: '/dashboards/materials-sold',
     icon: '📦',
