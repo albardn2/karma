@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from flask import request, jsonify
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import func
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
@@ -527,16 +527,11 @@ def profitability():
 _REVENUE_CAPS = {"year": 6, "quarter": 8, "month": 12, "week": 12}
 
 
-@dashboard_blueprint.route("/revenue-over-time", methods=["GET"])
-@jwt_required()
-@scopes_required(
-    PermissionScope.ADMIN.value,
-    PermissionScope.SUPER_ADMIN.value,
-    PermissionScope.OPERATION_MANAGER.value,
-    PermissionScope.ACCOUNTANT.value,
-)
-def revenue_over_time():
+def _revenue_over_time_result(created_by_uuid=None):
     """Revenue over time, per period and cumulative, in one currency.
+
+    With `created_by_uuid`, only orders that user created are counted — the
+    personal ("my revenue") variant; the maths is otherwise identical.
 
       revenue  = Σ customer-order total_adjusted_amount (by order created_at)
       debt     = Σ customer-order net_amount_due (current outstanding)
@@ -583,15 +578,14 @@ def revenue_over_time():
             k = _period_key(dt, gran)
             return k if k in starts else None
 
-        for o in (
-            s.query(CustomerOrderModel)
-            .filter(
-                CustomerOrderModel.is_deleted.is_(False),
-                CustomerOrderModel.created_at >= start,
-                CustomerOrderModel.account_uuid == uow.account_uuid,
-            )
-            .all()
-        ):
+        q = s.query(CustomerOrderModel).filter(
+            CustomerOrderModel.is_deleted.is_(False),
+            CustomerOrderModel.created_at >= start,
+            CustomerOrderModel.account_uuid == uow.account_uuid,
+        )
+        if created_by_uuid:
+            q = q.filter(CustomerOrderModel.created_by_uuid == created_by_uuid)
+        for o in q.all():
             k = bucket(o.created_at)
             if not k:
                 continue
@@ -633,17 +627,40 @@ def revenue_over_time():
             }
         )
 
-    return jsonify(
-        {
-            "target_currency": target.value,
-            "granularity": gran,
-            "groups": groups,
-            "disclosure": {
-                "unconverted_amount": round(unconv_amt, 2),
-                "unconverted_count": unconv_count,
-            },
-        }
-    ), 200
+    return {
+        "target_currency": target.value,
+        "granularity": gran,
+        "groups": groups,
+        "disclosure": {
+            "unconverted_amount": round(unconv_amt, 2),
+            "unconverted_count": unconv_count,
+        },
+    }
+
+
+@dashboard_blueprint.route("/revenue-over-time", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def revenue_over_time():
+    """Business-wide revenue over time — the management view."""
+    return jsonify(_revenue_over_time_result()), 200
+
+
+@dashboard_blueprint.route("/my-revenue-over-time", methods=["GET"])
+@jwt_required()
+def my_revenue_over_time():
+    """The caller's own revenue: only orders they created.
+
+    Deliberately no scope gate — the response is already restricted to the
+    caller's own records, so it is safe for any authenticated user (a sales rep
+    seeing their own numbers), unlike the business-wide variant above.
+    """
+    return jsonify(_revenue_over_time_result(created_by_uuid=get_jwt_identity())), 200
 
 
 # ---------------------------------------------------------------------------
@@ -1069,6 +1086,106 @@ def trip_stops():
     ), 200
 
 
+@dashboard_blueprint.route("/my-trip-stops", methods=["GET"])
+@jwt_required()
+def my_trip_stops():
+    """The caller's own trip stops per period, split completed vs not.
+
+    Same stop universe and bucketing as /trip-stops, filtered to trips ASSIGNED
+    to the caller (the start_trip task result, which stores uuid-or-username, so
+    both are matched). With a single user the per-user split is meaningless, so
+    the stack becomes stop status instead: completed vs everything else
+    (planned / in_progress / skipped) — "of my assigned stops, how many are
+    done". Self-scoped, so no role gate — a driver may see their own numbers.
+    """
+    from models.common import (
+        Task as TaskModel,
+        TaskExecution as TaskExecutionModel,
+        TripStop as TripStopModel,
+        User as UserModel,
+    )
+
+    gran = (request.args.get("granularity") or "month").strip().lower()
+    if gran not in _ORDERS_CAPS:
+        gran = "month"
+    cap = _ORDERS_CAPS[gran]
+    try:
+        periods = max(1, min(cap, int(request.args.get("periods", cap))))
+    except ValueError:
+        periods = cap
+
+    now = datetime.utcnow()
+    period_starts = [_step_back(now, gran, periods - 1 - i) for i in range(periods)]
+    start = period_starts[0]
+    key_order = [_period_key(ps, gran) for ps in period_starts]
+    starts = {_period_key(ps, gran): ps for ps in period_starts}
+
+    me = get_jwt_identity()
+    completed: dict = defaultdict(int)
+    not_completed: dict = defaultdict(int)
+
+    with SqlAlchemyUnitOfWork() as uow:
+        s = uow.session
+        row = (
+            s.query(UserModel.username)
+            .filter(UserModel.uuid == me, UserModel.account_uuid == uow.account_uuid)
+            .first()
+        )
+        my_names = {me} | ({row[0]} if row else set())
+
+        # executions whose start_trip task is assigned to me (uuid or username)
+        my_wfes = {
+            w
+            for (w,) in (
+                s.query(TaskExecutionModel.workflow_execution_uuid)
+                .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
+                .filter(
+                    TaskExecutionModel.account_uuid == uow.account_uuid,
+                    TaskModel.operator == "start_trip_operator",
+                    TaskExecutionModel.result["assigned_user_uuid"].astext.in_(
+                        my_names
+                    ),
+                )
+                .all()
+            )
+        }
+
+        if my_wfes:
+            for created, status in (
+                s.query(TripStopModel.created_at, TripStopModel.status)
+                .join(TripModel, TripStopModel.trip_uuid == TripModel.uuid)
+                .filter(
+                    TripModel.is_deleted.is_(False),
+                    TripModel.workflow_execution_uuid.in_(my_wfes),
+                    TripStopModel.created_at >= start,
+                    TripStopModel.account_uuid == uow.account_uuid,
+                )
+                .all()
+            ):
+                k = _period_key(created, gran)
+                if k not in starts:
+                    continue
+                if (status or "").lower() == "completed":
+                    completed[k] += 1
+                else:
+                    not_completed[k] += 1
+
+    groups = []
+    for k in key_order:
+        ps = starts[k]
+        groups.append(
+            {
+                "period_label": ps.strftime("%m-%d") if gran == "day" else k,
+                "period_start": ps.strftime("%Y-%m-%d"),
+                "total": completed[k] + not_completed[k],
+                "completed": completed[k],
+                "not_completed": not_completed[k],
+            }
+        )
+
+    return jsonify({"granularity": gran, "groups": groups}), 200
+
+
 # ---------------------------------------------------------------------------
 # Materials sold — for ONE period (this month, last week, ...), a stacked bar
 # per MATERIAL: quantity sold via customer-order items, split into fulfilled vs
@@ -1084,16 +1201,11 @@ _MATERIALS_TOP_N = 12
 _MATERIALS_MAX_OFFSET = 120
 
 
-@dashboard_blueprint.route("/materials-sold", methods=["GET"])
-@jwt_required()
-@scopes_required(
-    PermissionScope.ADMIN.value,
-    PermissionScope.SUPER_ADMIN.value,
-    PermissionScope.OPERATION_MANAGER.value,
-    PermissionScope.ACCOUNTANT.value,
-)
-def materials_sold():
+def _materials_sold_result(created_by_uuid=None):
     """Quantities of materials sold in one period, fulfilled vs unfulfilled.
+
+    With `created_by_uuid`, only items of orders that user created are counted —
+    the personal ("my materials") variant; everything else is identical.
 
     Sold = customer-order items, bucketed by their ORDER's created_at (the same
     convention as revenue: the sale happens when the order is placed), with the
@@ -1129,7 +1241,7 @@ def materials_sold():
             Material as MaterialModel,
         )
 
-        rows = (
+        q = (
             s.query(
                 ItemModel.material_uuid,
                 ItemModel.unit,
@@ -1151,8 +1263,12 @@ def materials_sold():
                 CustomerOrderModel.created_at < end,
                 ItemModel.account_uuid == uow.account_uuid,
             )
-            .all()
         )
+        if created_by_uuid:
+            # the personal variant filters on the ORDER's creator ("as per the
+            # customer orders created by the user"), not the item's
+            q = q.filter(CustomerOrderModel.created_by_uuid == created_by_uuid)
+        rows = q.all()
         for mat_uuid, unit, qty, fulfilled_at, name in rows:
             key = (mat_uuid, unit or "")
             if key not in agg:
@@ -1174,19 +1290,38 @@ def materials_sold():
         key=lambda m: -m["total"],
     )
 
-    return jsonify(
-        {
-            "granularity": gran,
-            "offset": offset,
-            "period_label": _period_key(start, gran),
-            "period_start": start.strftime("%Y-%m-%d"),
-            "materials": ranked[:_MATERIALS_TOP_N],
-            "disclosure": {
-                # bars beyond the top N by quantity — reported, never silent
-                "materials_omitted": max(0, len(ranked) - _MATERIALS_TOP_N),
-            },
-        }
-    ), 200
+    return {
+        "granularity": gran,
+        "offset": offset,
+        "period_label": _period_key(start, gran),
+        "period_start": start.strftime("%Y-%m-%d"),
+        "materials": ranked[:_MATERIALS_TOP_N],
+        "disclosure": {
+            # bars beyond the top N by quantity — reported, never silent
+            "materials_omitted": max(0, len(ranked) - _MATERIALS_TOP_N),
+        },
+    }
+
+
+@dashboard_blueprint.route("/materials-sold", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def materials_sold():
+    """Business-wide materials sold — the management view."""
+    return jsonify(_materials_sold_result()), 200
+
+
+@dashboard_blueprint.route("/my-materials-sold", methods=["GET"])
+@jwt_required()
+def my_materials_sold():
+    """The caller's own materials: items of orders they created. Self-scoped,
+    so no role gate — same reasoning as /my-revenue-over-time."""
+    return jsonify(_materials_sold_result(created_by_uuid=get_jwt_identity())), 200
 
 
 # ---------------------------------------------------------------------------
@@ -1197,16 +1332,11 @@ def materials_sold():
 # ---------------------------------------------------------------------------
 
 
-@dashboard_blueprint.route("/new-customers", methods=["GET"])
-@jwt_required()
-@scopes_required(
-    PermissionScope.ADMIN.value,
-    PermissionScope.SUPER_ADMIN.value,
-    PermissionScope.OPERATION_MANAGER.value,
-    PermissionScope.ACCOUNTANT.value,
-)
-def new_customers():
+def _new_customers_result(created_by_uuid=None):
     """Newly created customers per period.
+
+    With `created_by_uuid`, only customers that user created are counted — the
+    personal ("my new customers") variant.
 
     Created = Customer.created_at, soft-deletes excluded — the same definition
     the overview's new_customers series uses, here with the full granularity
@@ -1231,15 +1361,14 @@ def new_customers():
     counts: dict = defaultdict(int)
     with SqlAlchemyUnitOfWork() as uow:
         s = uow.session
-        for (created,) in (
-            s.query(CustomerModel.created_at)
-            .filter(
-                CustomerModel.is_deleted.is_(False),
-                CustomerModel.created_at >= start,
-                CustomerModel.account_uuid == uow.account_uuid,
-            )
-            .all()
-        ):
+        q = s.query(CustomerModel.created_at).filter(
+            CustomerModel.is_deleted.is_(False),
+            CustomerModel.created_at >= start,
+            CustomerModel.account_uuid == uow.account_uuid,
+        )
+        if created_by_uuid:
+            q = q.filter(CustomerModel.created_by_uuid == created_by_uuid)
+        for (created,) in q.all():
             k = _period_key(created, gran)
             if k in starts:
                 counts[k] += 1
@@ -1255,4 +1384,25 @@ def new_customers():
             }
         )
 
-    return jsonify({"granularity": gran, "groups": groups}), 200
+    return {"granularity": gran, "groups": groups}
+
+
+@dashboard_blueprint.route("/new-customers", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def new_customers():
+    """Business-wide new customers — the management view."""
+    return jsonify(_new_customers_result()), 200
+
+
+@dashboard_blueprint.route("/my-new-customers", methods=["GET"])
+@jwt_required()
+def my_new_customers():
+    """Customers the caller created. Self-scoped, so no role gate — same
+    reasoning as /my-revenue-over-time."""
+    return jsonify(_new_customers_result(created_by_uuid=get_jwt_identity())), 200

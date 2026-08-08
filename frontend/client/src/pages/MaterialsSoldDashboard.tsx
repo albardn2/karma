@@ -52,7 +52,7 @@ const short = (s: string, n = 12) => (s.length > n ? `${s.slice(0, n - 1)}…` :
  * by (material, unit) and never sums across materials, so the bars are honest even
  * though the y-axis mixes units.
  */
-export default function MaterialsSoldDashboard() {
+export default function MaterialsSoldDashboard({ mine = false }: { mine?: boolean }) {
   const { t } = useLanguage();
   const [gran, setGranRaw] = useState<Gran>("month");
   const [offset, setOffset] = useState(0);
@@ -64,10 +64,12 @@ export default function MaterialsSoldDashboard() {
     setOffset(0);
   };
 
+  // the personal variant hits the self-scoped endpoint: items of the caller's
+  // own orders only
+  const endpoint = mine ? "/dashboard/my-materials-sold" : "/dashboard/materials-sold";
   const { data, isLoading, error } = useQuery<Payload>({
-    queryKey: ["/dashboard/materials-sold", gran, offset],
-    queryFn: () =>
-      apiRequest(`/dashboard/materials-sold?granularity=${gran}&offset=${offset}`),
+    queryKey: [endpoint, gran, offset],
+    queryFn: () => apiRequest(`${endpoint}?granularity=${gran}&offset=${offset}`),
     retry: false,
   });
 
@@ -97,8 +99,12 @@ export default function MaterialsSoldDashboard() {
       <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{t("dashboards.materialsSold")}</h2>
-            <p className="text-sm text-gray-600">{t("dashboards.materialsSoldDesc")}</p>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {t(mine ? "dashboards.myMaterialsSold" : "dashboards.materialsSold")}
+            </h2>
+            <p className="text-sm text-gray-600">
+              {t(mine ? "dashboards.myMaterialsSoldDesc" : "dashboards.materialsSoldDesc")}
+            </p>
           </div>
           {!forbidden && (
             <div className="flex items-center gap-2 flex-wrap">

@@ -8,6 +8,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
 } from "recharts";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,7 +18,9 @@ import { useLanguage } from "@/contexts/LanguageContext";
 interface Group {
   period_label: string;
   period_start: string;
-  count: number;
+  total: number;
+  completed: number;
+  not_completed: number;
 }
 interface Payload {
   granularity: string;
@@ -26,34 +29,37 @@ interface Payload {
 
 type Gran = "day" | "week" | "month" | "quarter" | "year";
 
-// the same green the customer-orders dashboard uses for its "new customers"
-// segment — one colour for one concept across the whole dashboard set
-const NEW = "#16a34a";
+// completed reads as green (done), the rest amber (still open, not an error) —
+// the same pair the materials dashboard uses for fulfilled/unfulfilled
+const COMPLETED = "#16a34a";
+const NOT_COMPLETED = "#d97706";
 
 /**
- * Newly created customers per period, as a plain bar chart.
+ * The signed-in user's own trip stops per period: completed vs not.
  *
- * Counts of customer records created (soft-deletes excluded) — who joined the
- * book, not what they bought; the customer-orders dashboard answers the
- * purchasing side. One series, so the bars are unstacked and there is no
- * currency involved.
+ * The server counts stops on trips ASSIGNED to the caller (the trips module's
+ * own "Assigned To" resolution) and splits them by stop status — with a single
+ * user, the per-user split of the global trip-stops dashboard is meaningless,
+ * so status is the honest breakdown. Self-scoped endpoint, so any authenticated
+ * user (a driver, a rep) may see their own numbers.
  */
-export default function NewCustomersDashboard({ mine = false }: { mine?: boolean }) {
+export default function MyTripStopsDashboard() {
   const { t } = useLanguage();
   const [gran, setGran] = useState<Gran>("month");
 
-  // the personal variant hits the self-scoped endpoint: customers the caller
-  // created only
-  const endpoint = mine ? "/dashboard/my-new-customers" : "/dashboard/new-customers";
   const { data, isLoading, error } = useQuery<Payload>({
-    queryKey: [endpoint, gran],
-    queryFn: () => apiRequest(`${endpoint}?granularity=${gran}`),
+    queryKey: ["/dashboard/my-trip-stops", gran],
+    queryFn: () => apiRequest(`/dashboard/my-trip-stops?granularity=${gran}`),
     retry: false,
   });
 
   const forbidden = error && /^403/.test((error as Error).message || "");
-  const rows = (data?.groups ?? []).map((g) => ({ name: g.period_label, count: g.count }));
-  const hasAny = rows.some((r) => r.count !== 0);
+  const rows = (data?.groups ?? []).map((g) => ({
+    name: g.period_label,
+    completed: g.completed,
+    notCompleted: g.not_completed,
+  }));
+  const hasAny = (data?.groups ?? []).some((g) => g.total !== 0);
 
   const GRANS: { key: Gran; label: string }[] = [
     { key: "day", label: t("dashboards.gDay") },
@@ -63,17 +69,16 @@ export default function NewCustomersDashboard({ mine = false }: { mine?: boolean
     { key: "year", label: t("dashboards.gYear") },
   ];
 
+  const segLabel = (key: string) =>
+    key === "completed" ? t("dashboards.completed") : t("dashboards.notCompleted");
+
   return (
     <AppLayout>
       <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {t(mine ? "dashboards.myNewCustomers" : "dashboards.newCustomers")}
-            </h2>
-            <p className="text-sm text-gray-600">
-              {t(mine ? "dashboards.myNewCustomersDesc" : "dashboards.newCustomersDesc")}
-            </p>
+            <h2 className="text-2xl font-bold text-gray-900">{t("dashboards.myTripStops")}</h2>
+            <p className="text-sm text-gray-600">{t("dashboards.myTripStopsDesc")}</p>
           </div>
           {!forbidden && (
             <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-gray-100 border border-gray-200">
@@ -81,7 +86,7 @@ export default function NewCustomersDashboard({ mine = false }: { mine?: boolean
                 <button
                   key={g.key}
                   onClick={() => setGran(g.key)}
-                  data-testid={`nc-gran-${g.key}`}
+                  data-testid={`mts-gran-${g.key}`}
                   className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                     gran === g.key
                       ? "bg-white text-gray-900 shadow-sm"
@@ -125,11 +130,19 @@ export default function NewCustomersDashboard({ mine = false }: { mine?: boolean
                           axisLine={false}
                         />
                         <Tooltip
-                          formatter={(v: number) => [v.toLocaleString(), t("dashboards.newCustomers")]}
+                          formatter={(v: number, key: string) => [v.toLocaleString(), segLabel(key)]}
+                        />
+                        <Legend formatter={segLabel} wrapperStyle={{ fontSize: 12 }} />
+                        <Bar
+                          dataKey="completed"
+                          stackId="stops"
+                          fill={COMPLETED}
+                          isAnimationActive={false}
                         />
                         <Bar
-                          dataKey="count"
-                          fill={NEW}
+                          dataKey="notCompleted"
+                          stackId="stops"
+                          fill={NOT_COMPLETED}
                           radius={[2, 2, 0, 0]}
                           isAnimationActive={false}
                         />
@@ -147,19 +160,25 @@ export default function NewCustomersDashboard({ mine = false }: { mine?: boolean
                     <thead>
                       <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
                         <th className="pb-2 pe-4" />
-                        <th className="pb-2 text-end">{t("dashboards.newCustomers")}</th>
+                        <th className="pb-2 pe-4 text-end">{t("dashboards.total")}</th>
+                        <th className="pb-2 pe-4 text-end">{t("dashboards.completed")}</th>
+                        <th className="pb-2 text-end">{t("dashboards.notCompleted")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {[...(data?.groups ?? [])].reverse().map((g) => (
                         <tr key={g.period_start} className="border-t border-gray-100">
                           <td className="py-2 pe-4 font-semibold text-gray-900">{g.period_label}</td>
+                          <td className="py-2 pe-4 text-end tabular-nums font-medium">{g.total}</td>
+                          <td className="py-2 pe-4 text-end tabular-nums text-green-700">
+                            {g.completed}
+                          </td>
                           <td
                             className={`py-2 text-end tabular-nums ${
-                              g.count > 0 ? "text-green-700 font-medium" : "text-gray-500"
+                              g.not_completed > 0 ? "text-amber-700" : "text-gray-600"
                             }`}
                           >
-                            {g.count.toLocaleString()}
+                            {g.not_completed}
                           </td>
                         </tr>
                       ))}

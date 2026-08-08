@@ -18,6 +18,7 @@ import CustomerOrdersDashboard from "@/pages/CustomerOrdersDashboard";
 import MaterialsSoldDashboard from "@/pages/MaterialsSoldDashboard";
 import NewCustomersDashboard from "@/pages/NewCustomersDashboard";
 import TripStopsDashboard from "@/pages/TripStopsDashboard";
+import MyTripStopsDashboard from "@/pages/MyTripStopsDashboard";
 import Customers from "@/pages/Customers";
 import CustomerDetail from "@/pages/CustomerDetail";
 import Vendors from "@/pages/Vendors";
@@ -122,6 +123,10 @@ function Router() {
       <Route path="/dashboards/materials-sold" component={() => <ProtectedRoute><MaterialsSoldDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/new-customers" component={() => <ProtectedRoute><NewCustomersDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/trip-stops" component={() => <ProtectedRoute><TripStopsDashboard /></ProtectedRoute>} />
+      <Route path="/dashboards/my-revenue" component={() => <ProtectedRoute><RevenueOverTimeDashboard mine /></ProtectedRoute>} />
+      <Route path="/dashboards/my-materials-sold" component={() => <ProtectedRoute><MaterialsSoldDashboard mine /></ProtectedRoute>} />
+      <Route path="/dashboards/my-new-customers" component={() => <ProtectedRoute><NewCustomersDashboard mine /></ProtectedRoute>} />
+      <Route path="/dashboards/my-trip-stops" component={() => <ProtectedRoute><MyTripStopsDashboard /></ProtectedRoute>} />
       <Route path="/customers" component={() => <ProtectedRoute><Customers /></ProtectedRoute>} />
       <Route path="/customers/:uuid" component={() => <ProtectedRoute><CustomerDetail /></ProtectedRoute>} />
       <Route path="/vendors" component={() => <ProtectedRoute><Vendors /></ProtectedRoute>} />

@@ -169,10 +169,16 @@ DASHBOARD_CATALOG = [
     {"id": "new-customers", "title_key": "dashboards.newCustomers", "order": 5},
     {"id": "materials-sold", "title_key": "dashboards.materialsSold", "order": 6},
     {"id": "trip-stops", "title_key": "dashboards.tripStops", "order": 7},
-    {"id": "sales-performance", "title_key": "dashboards.salesPerformance", "order": 8},
-    {"id": "field-ops", "title_key": "dashboards.fieldOps", "order": 9},
-    {"id": "spend", "title_key": "dashboards.spend", "order": 10},
-    {"id": "inventory-health", "title_key": "dashboards.inventoryHealth", "order": 11},
+    # the personal set: the same charts filtered to the signed-in user's own
+    # records, backed by self-scoped endpoints any authenticated user may call
+    {"id": "my-revenue", "title_key": "dashboards.myRevenue", "order": 8},
+    {"id": "my-materials-sold", "title_key": "dashboards.myMaterialsSold", "order": 9},
+    {"id": "my-new-customers", "title_key": "dashboards.myNewCustomers", "order": 10},
+    {"id": "my-trip-stops", "title_key": "dashboards.myTripStops", "order": 11},
+    {"id": "sales-performance", "title_key": "dashboards.salesPerformance", "order": 12},
+    {"id": "field-ops", "title_key": "dashboards.fieldOps", "order": 13},
+    {"id": "spend", "title_key": "dashboards.spend", "order": 14},
+    {"id": "inventory-health", "title_key": "dashboards.inventoryHealth", "order": 15},
 ]
 DASHBOARD_IDS = {d["id"] for d in DASHBOARD_CATALOG}
 _DASHBOARD_ORDER = {d["id"]: d["order"] for d in DASHBOARD_CATALOG}
@@ -185,12 +191,12 @@ _DASHBOARD_ORDER = {d["id"]: d["order"] for d in DASHBOARD_CATALOG}
 DASHBOARD_DEFAULTS = {
     "operation_manager": ["business-overview", "profitability", "revenue-over-time", "customer-orders", "new-customers", "materials-sold", "trip-stops", "sales-performance", "field-ops", "spend", "inventory-health"],
     "accountant": ["business-overview", "profitability", "revenue-over-time", "customer-orders", "new-customers", "materials-sold", "spend"],
-    "sales_manager": ["business-overview", "revenue-over-time", "customer-orders", "new-customers", "materials-sold", "trip-stops", "sales-performance", "field-ops"],
-    "sales": ["sales-performance", "field-ops"],
-    "sales_associate": ["sales-performance", "field-ops"],
+    "sales_manager": ["business-overview", "revenue-over-time", "customer-orders", "new-customers", "materials-sold", "trip-stops", "my-revenue", "my-materials-sold", "my-new-customers", "my-trip-stops", "sales-performance", "field-ops"],
+    "sales": ["my-revenue", "my-materials-sold", "my-new-customers", "my-trip-stops", "sales-performance", "field-ops"],
+    "sales_associate": ["my-revenue", "my-materials-sold", "my-new-customers", "my-trip-stops", "sales-performance", "field-ops"],
     "warehouse_keeper": ["inventory-health"],
     "operator": [],
-    "driver": [],
+    "driver": ["my-trip-stops"],
 }
 
 # Platform-owner overrides live in platform_setting under this key, as
