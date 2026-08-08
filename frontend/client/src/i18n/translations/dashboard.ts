@@ -31,7 +31,10 @@ export const en: Record<string, string> = {
   'dashboards.revenueOverTimeDesc': 'Revenue, received and debt per period, and cumulative.',
   'dashboards.salesPerformance': 'Sales Performance',
   'dashboards.fieldOps': 'Field Operations',
-  'dashboards.spend': 'Spend',
+  'dashboards.spend': 'Expenses & Salaries',
+  'dashboards.spendDesc': 'Expense categories and salaries per period.',
+  'dashboards.salaries': 'Salaries',
+  'dashboards.total': 'Total',
   'dashboards.inventoryHealth': 'Inventory Health',
   'dashboards.comingSoon': 'Coming soon',
 
@@ -91,7 +94,10 @@ export const ar: Record<string, string> = {
   'dashboards.revenueOverTimeDesc': 'الإيرادات والمحصَّل والدين لكل فترة، وتراكمياً.',
   'dashboards.salesPerformance': 'أداء المبيعات',
   'dashboards.fieldOps': 'العمليات الميدانية',
-  'dashboards.spend': 'المصروفات',
+  'dashboards.spend': 'المصروفات والرواتب',
+  'dashboards.spendDesc': 'فئات المصروفات والرواتب لكل فترة.',
+  'dashboards.salaries': 'الرواتب',
+  'dashboards.total': 'الإجمالي',
   'dashboards.inventoryHealth': 'صحة المخزون',
   'dashboards.comingSoon': 'قريباً',
 

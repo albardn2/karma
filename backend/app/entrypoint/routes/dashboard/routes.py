@@ -638,3 +638,157 @@ def revenue_over_time():
             },
         }
     ), 200
+
+
+# ---------------------------------------------------------------------------
+# Expenses & salaries — a stacked bar per period, one segment per expense
+# category plus a salaries segment, over week / month / quarter / year, in one
+# reporting currency.
+# ---------------------------------------------------------------------------
+
+# The distinct thing here: salaries are NOT an expense category (the enum has no
+# such value) — they are payouts made to an employee, the same definition
+# profitability uses, kept separate so the two clients agree on what "salaries"
+# means. Its key is a reserved segment id that cannot collide with a category.
+_SALARIES_KEY = "salaries"
+
+
+@dashboard_blueprint.route("/expenses-breakdown", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def expenses_breakdown():
+    """Spend per period, broken down into a colour-coded stack.
+
+    Each period's bar is the sum of its expense categories (Expense.category) plus a
+    salaries segment (payouts made to an employee — Payout.employee_uuid, the same
+    source profitability uses; salaries are deliberately not one of the expense
+    categories, since the schema has no salary category). Every amount is converted
+    to the target currency at its own date and summed — the same convert-then-sum
+    rule as the rest of the dashboards.
+
+    `categories` is the ordered list of segment keys that actually have spend in the
+    window (salaries first, then expense categories in their enum order), so the
+    client stacks and colours them consistently and never draws an empty segment.
+    """
+    from app.dto.expense import ExpenseCategory
+
+    gran = (request.args.get("granularity") or "month").strip().lower()
+    if gran not in _REVENUE_CAPS:
+        gran = "month"
+    cap = _REVENUE_CAPS[gran]
+    try:
+        periods = max(1, min(cap, int(request.args.get("periods", cap))))
+    except ValueError:
+        periods = cap
+    target = _target_currency()
+
+    now = datetime.utcnow()
+    period_starts = [_step_back(now, gran, periods - 1 - i) for i in range(periods)]
+    start = period_starts[0]
+    key_order = [_period_key(ps, gran) for ps in period_starts]
+    starts = {_period_key(ps, gran): ps for ps in period_starts}
+
+    # per period -> per segment total, converted
+    by_period: dict = defaultdict(lambda: defaultdict(float))
+    seg_totals: dict = defaultdict(float)
+    unconv_amt = 0.0
+    unconv_count = 0
+    salaries_backed = False
+
+    with SqlAlchemyUnitOfWork() as uow:
+        s = uow.session
+        conv = CurrencyConverter(uow, target)
+
+        def bucket(dt):
+            k = _period_key(dt, gran)
+            return k if k in starts else None
+
+        # ---- expenses, one segment per category ----
+        for x in (
+            s.query(ExpenseModel)
+            .filter(
+                ExpenseModel.is_deleted.is_(False),
+                ExpenseModel.created_at >= start,
+                ExpenseModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        ):
+            k = bucket(x.created_at)
+            if not k:
+                continue
+            seg = (x.category or "other")
+            # a stored value outside the enum still gets a segment rather than
+            # vanishing — it sorts after the known ones below
+            c = conv.convert(x.amount or 0, x.currency, x.created_at)
+            if c is None:
+                if x.amount:
+                    unconv_amt += x.amount or 0
+                    unconv_count += 1
+                continue
+            by_period[k][seg] += c
+            seg_totals[seg] += c
+
+        # ---- salaries: payouts made to an employee ----
+        for p in (
+            s.query(PayoutModel)
+            .filter(
+                PayoutModel.is_deleted.is_(False),
+                PayoutModel.employee_uuid.isnot(None),
+                PayoutModel.created_at >= start,
+                PayoutModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        ):
+            k = bucket(p.created_at)
+            if not k:
+                continue
+            salaries_backed = True
+            c = conv.convert(p.amount or 0, p.currency, p.created_at)
+            if c is None:
+                if p.amount:
+                    unconv_amt += p.amount or 0
+                    unconv_count += 1
+                continue
+            by_period[k][_SALARIES_KEY] += c
+            seg_totals[_SALARIES_KEY] += c
+
+    # segment order: salaries first, then expense categories in their enum order,
+    # then any stray stored value — but only segments that actually have spend
+    canonical = [_SALARIES_KEY] + [c.value for c in ExpenseCategory]
+    present = {k for k, v in seg_totals.items() if round(v, 2) != 0}
+    categories = [k for k in canonical if k in present]
+    categories += sorted(k for k in present if k not in canonical)
+
+    groups = []
+    for k in key_order:
+        row = by_period[k]
+        breakdown = {seg: round(row.get(seg, 0.0), 2) for seg in categories}
+        groups.append(
+            {
+                "period_label": k,
+                "period_start": starts[k].strftime("%Y-%m-%d"),
+                "total": round(sum(row.get(seg, 0.0) for seg in categories), 2),
+                "breakdown": breakdown,
+            }
+        )
+
+    return jsonify(
+        {
+            "target_currency": target.value,
+            "granularity": gran,
+            "categories": categories,
+            "groups": groups,
+            "disclosure": {
+                "unconverted_amount": round(unconv_amt, 2),
+                "unconverted_count": unconv_count,
+                # false until an employee payout exists; lets a client note that
+                # salaries are not tracked rather than imply a real zero
+                "salaries_backed": salaries_backed,
+            },
+        }
+    ), 200
