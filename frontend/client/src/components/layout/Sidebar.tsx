@@ -179,7 +179,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <aside className={cn(
         "fixed inset-y-0 start-0 z-50 w-64 bg-white border-e border-gray-200 shadow-sm transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
         isOpen ? "translate-x-0" : "max-lg:-translate-x-full max-lg:rtl:translate-x-full",
-        "flex flex-col h-screen touch-none"
+        // h-screen only for the mobile fixed overlay; on desktop the aside sits
+        // inside the viewport-pinned row, so it fills THAT (h-full) — h-screen
+        // there would overflow by the impersonation banner's height
+        "flex flex-col h-screen lg:h-full touch-none"
       )}
         onTouchMove={(e) => {
           // Prevent touch events from bubbling to the main page when sidebar is open on mobile
