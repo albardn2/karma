@@ -30,7 +30,7 @@ interface MenuItem {
 }
 
 const ALL_MENU_ITEMS: MenuItem[] = [
-  { id: 17, titleKey: 'menu.dashboard', icon: '📊', section: 'dashboard', color: '#334155', module: 'dashboard' },
+  { id: 17, titleKey: 'menu.dashboards', icon: '📊', section: 'dashboards', color: '#334155', module: 'dashboard' },
   { id: 1, titleKey: 'menu.customers', icon: '👥', section: 'customers', color: '#5469D4', module: 'customers' },
   { id: 2, titleKey: 'menu.customerOrders', icon: '📋', section: 'customer_orders', color: '#e74c3c', module: 'customer-orders' },
   { id: 3, titleKey: 'menu.distribution', icon: '🚚', section: 'distribution', color: '#16a34a', module: 'workflow-execution' },

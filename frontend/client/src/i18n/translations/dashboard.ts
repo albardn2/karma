@@ -17,6 +17,37 @@ export const en: Record<string, string> = {
   'dashboard.cumulativeRevenue': 'Cumulative revenue',
   'dashboard.analyticsRestricted':
     'Business analytics are visible to admins, operation managers and accountants.',
+
+  // Dashboards hub + the pre-defined dashboard set (shared ids with the app and the
+  // backend catalog — title keys match DASHBOARD_CATALOG's title_key exactly).
+  'dashboards.hubTitle': 'Dashboards',
+  'dashboards.hubSubtitle': 'The reports assigned to your role.',
+  'dashboards.none': 'No dashboards are assigned to your role yet.',
+  'dashboards.businessOverview': 'Business Overview',
+  'dashboards.businessOverviewDesc': 'Revenue, collections and activity over a window.',
+  'dashboards.profitability': 'Profitability',
+  'dashboards.profitabilityDesc': 'Revenue, gross and net per period.',
+  'dashboards.salesPerformance': 'Sales Performance',
+  'dashboards.fieldOps': 'Field Operations',
+  'dashboards.spend': 'Spend',
+  'dashboards.inventoryHealth': 'Inventory Health',
+  'dashboards.comingSoon': 'Coming soon',
+
+  // Profitability dashboard (grouped three-bar chart)
+  'dashboards.revenue': 'Revenue',
+  'dashboards.gross': 'Gross',
+  'dashboards.net': 'Net',
+  'dashboards.grossFull': 'Gross = revenue − cost of goods',
+  'dashboards.netFull': 'Net = gross − expenses − salaries',
+  'dashboards.gYear': 'Yearly',
+  'dashboards.gQuarter': 'Quarterly',
+  'dashboards.gMonth': 'Monthly',
+  'dashboards.uncosted':
+    '{qty} unit(s) sold from stock of unknown cost are left out of cost of goods.',
+  'dashboards.beforeSalaries': 'Net is before salaries — no employee payouts are recorded yet.',
+  'dashboards.unconverted':
+    '{amount} could not be converted (no exchange rate near that date) and is excluded.',
+  'dashboards.noData': 'No data for this range.',
 };
 
 export const ar: Record<string, string> = {
@@ -36,4 +67,34 @@ export const ar: Record<string, string> = {
   'dashboard.cumulativeRevenue': 'الإيرادات التراكمية',
   'dashboard.analyticsRestricted':
     'تحليلات الأعمال متاحة لمديري النظام ومديري العمليات والمحاسبين.',
+
+  // لوحات المعلومات + المجموعة المعرَّفة مسبقاً
+  'dashboards.hubTitle': 'لوحات المعلومات',
+  'dashboards.hubSubtitle': 'التقارير المخصصة لدورك.',
+  'dashboards.none': 'لا توجد لوحات معلومات مخصصة لدورك بعد.',
+  'dashboards.businessOverview': 'نظرة عامة على العمل',
+  'dashboards.businessOverviewDesc': 'الإيرادات والتحصيل والنشاط خلال فترة.',
+  'dashboards.profitability': 'الربحية',
+  'dashboards.profitabilityDesc': 'الإيرادات والربح الإجمالي والصافي لكل فترة.',
+  'dashboards.salesPerformance': 'أداء المبيعات',
+  'dashboards.fieldOps': 'العمليات الميدانية',
+  'dashboards.spend': 'المصروفات',
+  'dashboards.inventoryHealth': 'صحة المخزون',
+  'dashboards.comingSoon': 'قريباً',
+
+  // لوحة الربحية (مخطط ثلاثي الأعمدة)
+  'dashboards.revenue': 'الإيرادات',
+  'dashboards.gross': 'الإجمالي',
+  'dashboards.net': 'الصافي',
+  'dashboards.grossFull': 'الإجمالي = الإيرادات − كلفة البضاعة',
+  'dashboards.netFull': 'الصافي = الإجمالي − المصروفات − الرواتب',
+  'dashboards.gYear': 'سنوي',
+  'dashboards.gQuarter': 'ربع سنوي',
+  'dashboards.gMonth': 'شهري',
+  'dashboards.uncosted':
+    'يُستبعد {qty} وحدة مباعة من مخزون مجهول الكلفة من حساب كلفة البضاعة.',
+  'dashboards.beforeSalaries': 'الصافي قبل الرواتب — لم تُسجَّل أي مدفوعات رواتب بعد.',
+  'dashboards.unconverted':
+    'تعذَّر تحويل {amount} (لا يوجد سعر صرف قريب من ذلك التاريخ) وتم استبعاده.',
+  'dashboards.noData': 'لا توجد بيانات لهذه الفترة.',
 };
