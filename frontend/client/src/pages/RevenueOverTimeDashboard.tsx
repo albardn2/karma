@@ -97,16 +97,18 @@ function PillGroup({
  * stacked bar's two segments always add up to the bar. A currency switch converts
  * each order at its own date rather than dropping the other currency.
  */
-export default function RevenueOverTimeDashboard() {
+export default function RevenueOverTimeDashboard({ mine = false }: { mine?: boolean }) {
   const { t, te } = useLanguage();
   const [mode, setMode] = useState<Mode>("cumulative");
   const [gran, setGran] = useState<Gran>("month");
   const [ccy, setCcy] = useState<Ccy>("USD");
 
+  // the personal variant hits the self-scoped endpoint: same maths, only the
+  // caller's own orders
+  const endpoint = mine ? "/dashboard/my-revenue-over-time" : "/dashboard/revenue-over-time";
   const { data, isLoading, error } = useQuery<Payload>({
-    queryKey: ["/dashboard/revenue-over-time", gran, ccy],
-    queryFn: () =>
-      apiRequest(`/dashboard/revenue-over-time?granularity=${gran}&target_currency=${ccy}`),
+    queryKey: [endpoint, gran, ccy],
+    queryFn: () => apiRequest(`${endpoint}?granularity=${gran}&target_currency=${ccy}`),
     retry: false,
   });
 
@@ -148,8 +150,12 @@ export default function RevenueOverTimeDashboard() {
       <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{t("dashboards.revenueOverTime")}</h2>
-            <p className="text-sm text-gray-600">{t("dashboards.revenueOverTimeDesc")}</p>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {t(mine ? "dashboards.myRevenue" : "dashboards.revenueOverTime")}
+            </h2>
+            <p className="text-sm text-gray-600">
+              {t(mine ? "dashboards.myRevenueDesc" : "dashboards.revenueOverTimeDesc")}
+            </p>
           </div>
           {!forbidden && (
             <div className="flex items-center gap-2 flex-wrap">

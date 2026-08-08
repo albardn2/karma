@@ -78,6 +78,36 @@ export const IMPLEMENTED_DASHBOARDS: DashboardEntry[] = [
     titleKey: "dashboards.tripStops",
     descKey: "dashboards.tripStopsDesc",
   },
+  // the personal set — the same charts filtered to the signed-in user's own
+  // records, backed by self-scoped endpoints
+  {
+    id: "my-revenue",
+    href: "/dashboards/my-revenue",
+    icon: TrendingUp,
+    titleKey: "dashboards.myRevenue",
+    descKey: "dashboards.myRevenueDesc",
+  },
+  {
+    id: "my-materials-sold",
+    href: "/dashboards/my-materials-sold",
+    icon: Package,
+    titleKey: "dashboards.myMaterialsSold",
+    descKey: "dashboards.myMaterialsSoldDesc",
+  },
+  {
+    id: "my-new-customers",
+    href: "/dashboards/my-new-customers",
+    icon: UserPlus,
+    titleKey: "dashboards.myNewCustomers",
+    descKey: "dashboards.myNewCustomersDesc",
+  },
+  {
+    id: "my-trip-stops",
+    href: "/dashboards/my-trip-stops",
+    icon: MapPin,
+    titleKey: "dashboards.myTripStops",
+    descKey: "dashboards.myTripStopsDesc",
+  },
   {
     id: "spend",
     href: "/dashboards/spend",

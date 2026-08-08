@@ -53,7 +53,7 @@ const short = (s: string, n = 7) => (s.length > n ? `${s.slice(0, n - 1)}…` : 
  * the server groups by (material, unit) and never sums across materials. Bar labels
  * are truncated for phone width — the table below carries the full names.
  */
-export default function MaterialsSoldScreen() {
+export function MaterialsSoldScreenImpl({ mine = false }: { mine?: boolean }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -73,19 +73,22 @@ export default function MaterialsSoldScreen() {
     setOffset(0);
   };
 
+  // the personal variant hits the self-scoped endpoint: items of the caller's
+  // own orders only
+  const endpoint = mine ? '/dashboard/my-materials-sold' : '/dashboard/materials-sold';
   const load = useCallback(
     async (isRefresh = false) => {
       if (!isRefresh) setLoading(true);
       setFailed(false);
       const res = await apiCall<Payload>(
-        `/dashboard/materials-sold?granularity=${gran}&offset=${offset}`,
+        `${endpoint}?granularity=${gran}&offset=${offset}`,
       );
       if (isOk(res.status) && res.data) setData(res.data);
       else setFailed(true);
       setLoading(false);
       setRefreshing(false);
     },
-    [gran, offset],
+    [gran, offset, endpoint],
   );
 
   useEffect(() => {
@@ -114,7 +117,9 @@ export default function MaterialsSoldScreen() {
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="ms-back">
             <ThemedText style={styles.back}>‹</ThemedText>
           </TouchableOpacity>
-          <ThemedText style={styles.topTitle}>{t('dashboards.materialsSold')}</ThemedText>
+          <ThemedText style={styles.topTitle}>
+            {t(mine ? 'dashboards.myMaterialsSold' : 'dashboards.materialsSold')}
+          </ThemedText>
           <View style={styles.backSpacer} />
         </View>
 
@@ -231,6 +236,10 @@ export default function MaterialsSoldScreen() {
       </ThemedView>
     </ModuleGuard>
   );
+}
+
+export default function MaterialsSoldScreen() {
+  return <MaterialsSoldScreenImpl />;
 }
 
 const styles = StyleSheet.create({

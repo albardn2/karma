@@ -73,6 +73,36 @@ const IMPLEMENTED: Entry[] = [
     titleKey: 'dashboards.tripStops',
     descKey: 'dashboards.tripStopsDesc',
   },
+  // the personal set — the same charts filtered to the signed-in user's own
+  // records, backed by self-scoped endpoints
+  {
+    id: 'my-revenue',
+    route: '/dashboards/my-revenue',
+    icon: '🧑‍💼',
+    titleKey: 'dashboards.myRevenue',
+    descKey: 'dashboards.myRevenueDesc',
+  },
+  {
+    id: 'my-materials-sold',
+    route: '/dashboards/my-materials-sold',
+    icon: '🛒',
+    titleKey: 'dashboards.myMaterialsSold',
+    descKey: 'dashboards.myMaterialsSoldDesc',
+  },
+  {
+    id: 'my-new-customers',
+    route: '/dashboards/my-new-customers',
+    icon: '🤝',
+    titleKey: 'dashboards.myNewCustomers',
+    descKey: 'dashboards.myNewCustomersDesc',
+  },
+  {
+    id: 'my-trip-stops',
+    route: '/dashboards/my-trip-stops',
+    icon: '🚩',
+    titleKey: 'dashboards.myTripStops',
+    descKey: 'dashboards.myTripStopsDesc',
+  },
   {
     id: 'spend',
     route: '/dashboards/spend',

@@ -58,7 +58,7 @@ const REVENUE = '#5469D4';
  * equals that period's revenue, so the stacked bar's two segments always add up to
  * the bar — the client only draws what it is given and never does money maths.
  */
-export default function RevenueOverTimeScreen() {
+export function RevenueOverTimeScreenImpl({ mine = false }: { mine?: boolean }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -72,19 +72,22 @@ export default function RevenueOverTimeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [failed, setFailed] = useState(false);
 
+  // the personal variant hits the self-scoped endpoint: same maths, only the
+  // caller's own orders
+  const endpoint = mine ? '/dashboard/my-revenue-over-time' : '/dashboard/revenue-over-time';
   const load = useCallback(
     async (isRefresh = false) => {
       if (!isRefresh) setLoading(true);
       setFailed(false);
       const res = await apiCall<Payload>(
-        `/dashboard/revenue-over-time?granularity=${gran}&target_currency=${ccy}`,
+        `${endpoint}?granularity=${gran}&target_currency=${ccy}`,
       );
       if (isOk(res.status) && res.data) setData(res.data);
       else setFailed(true);
       setLoading(false);
       setRefreshing(false);
     },
-    [gran, ccy],
+    [gran, ccy, endpoint],
   );
 
   useEffect(() => {
@@ -117,7 +120,9 @@ export default function RevenueOverTimeScreen() {
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="rot-back">
             <ThemedText style={styles.back}>‹</ThemedText>
           </TouchableOpacity>
-          <ThemedText style={styles.topTitle}>{t('dashboards.revenueOverTime')}</ThemedText>
+          <ThemedText style={styles.topTitle}>
+            {t(mine ? 'dashboards.myRevenue' : 'dashboards.revenueOverTime')}
+          </ThemedText>
           <View style={styles.backSpacer} />
         </View>
 
@@ -245,6 +250,10 @@ export default function RevenueOverTimeScreen() {
       </ThemedView>
     </ModuleGuard>
   );
+}
+
+export default function RevenueOverTimeScreen() {
+  return <RevenueOverTimeScreenImpl />;
 }
 
 const styles = StyleSheet.create({
