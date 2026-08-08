@@ -4,6 +4,7 @@ import {
   TrendingUp,
   Receipt,
   ClipboardList,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,6 +54,13 @@ export const IMPLEMENTED_DASHBOARDS: DashboardEntry[] = [
     icon: ClipboardList,
     titleKey: "dashboards.customerOrders",
     descKey: "dashboards.customerOrdersDesc",
+  },
+  {
+    id: "materials-sold",
+    href: "/dashboards/materials-sold",
+    icon: Package,
+    titleKey: "dashboards.materialsSold",
+    descKey: "dashboards.materialsSoldDesc",
   },
   {
     id: "spend",

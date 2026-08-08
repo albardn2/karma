@@ -31,6 +31,8 @@ export const en: Record<string, string> = {
   'dashboards.revenueOverTimeDesc': 'Revenue, received and debt per period, and cumulative.',
   'dashboards.customerOrders': 'Customer Orders',
   'dashboards.customerOrdersDesc': 'Order counts per period, new vs returning customers.',
+  'dashboards.materialsSold': 'Materials Sold',
+  'dashboards.materialsSoldDesc': 'Quantities sold per material, fulfilled vs unfulfilled.',
   'dashboards.salesPerformance': 'Sales Performance',
   'dashboards.fieldOps': 'Field Operations',
   'dashboards.spend': 'Expenses & Salaries',
@@ -53,6 +55,13 @@ export const en: Record<string, string> = {
   'dashboards.gDay': 'Daily',
   'dashboards.newCustomers': 'New customers',
   'dashboards.repeatCustomers': 'Returning customers',
+  'dashboards.fulfilled': 'Fulfilled',
+  'dashboards.unfulfilled': 'Unfulfilled',
+  'dashboards.unit': 'Unit',
+  'dashboards.materialsOmitted':
+    '{count} more material(s) not shown — the chart carries the top 12 by quantity.',
+  'dashboards.materialUnitsNote':
+    'Quantities are in each material’s own unit; every bar is one material, so different units are never summed. Fulfilled counts what has been delivered by now, out of what was ordered in this period.',
   'dashboards.newRepeatNote':
     'An order counts as “new” when it falls in the period of the customer’s first-ever order — repeat purchases inside that same period still count as new; later periods count as returning.',
   'dashboards.modeCumulative': 'Cumulative',
@@ -101,6 +110,8 @@ export const ar: Record<string, string> = {
   'dashboards.revenueOverTimeDesc': 'الإيرادات والمحصَّل والدين لكل فترة، وتراكمياً.',
   'dashboards.customerOrders': 'طلبات العملاء',
   'dashboards.customerOrdersDesc': 'عدد الطلبات لكل فترة، عملاء جدد مقابل عائدين.',
+  'dashboards.materialsSold': 'المواد المباعة',
+  'dashboards.materialsSoldDesc': 'الكميات المباعة لكل مادة، منفَّذ مقابل غير منفَّذ.',
   'dashboards.salesPerformance': 'أداء المبيعات',
   'dashboards.fieldOps': 'العمليات الميدانية',
   'dashboards.spend': 'المصروفات والرواتب',
@@ -123,6 +134,13 @@ export const ar: Record<string, string> = {
   'dashboards.gDay': 'يومي',
   'dashboards.newCustomers': 'عملاء جدد',
   'dashboards.repeatCustomers': 'عملاء عائدون',
+  'dashboards.fulfilled': 'منفَّذ',
+  'dashboards.unfulfilled': 'غير منفَّذ',
+  'dashboards.unit': 'الوحدة',
+  'dashboards.materialsOmitted':
+    'لم تُعرض {count} مادة إضافية — يعرض المخطط أعلى 12 مادة من حيث الكمية.',
+  'dashboards.materialUnitsNote':
+    'الكميات بوحدة كل مادة؛ كل عمود يمثل مادة واحدة، فلا تُجمع وحدات مختلفة. يُحتسب "منفَّذ" ما سُلِّم حتى الآن مما طُلب في هذه الفترة.',
   'dashboards.newRepeatNote':
     'يُحتسب الطلب "جديداً" إذا وقع في الفترة التي تضم أول طلب للعميل على الإطلاق — وتُحتسب مشترياته المتكررة ضمن الفترة نفسها جديدة أيضاً؛ أما الفترات اللاحقة فتُحتسب كعميل عائد.',
   'dashboards.modeCumulative': 'تراكمي',

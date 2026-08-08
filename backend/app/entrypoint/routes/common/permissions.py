@@ -166,10 +166,11 @@ DASHBOARD_CATALOG = [
     {"id": "profitability", "title_key": "dashboards.profitability", "order": 2},
     {"id": "revenue-over-time", "title_key": "dashboards.revenueOverTime", "order": 3},
     {"id": "customer-orders", "title_key": "dashboards.customerOrders", "order": 4},
-    {"id": "sales-performance", "title_key": "dashboards.salesPerformance", "order": 5},
-    {"id": "field-ops", "title_key": "dashboards.fieldOps", "order": 6},
-    {"id": "spend", "title_key": "dashboards.spend", "order": 7},
-    {"id": "inventory-health", "title_key": "dashboards.inventoryHealth", "order": 8},
+    {"id": "materials-sold", "title_key": "dashboards.materialsSold", "order": 5},
+    {"id": "sales-performance", "title_key": "dashboards.salesPerformance", "order": 6},
+    {"id": "field-ops", "title_key": "dashboards.fieldOps", "order": 7},
+    {"id": "spend", "title_key": "dashboards.spend", "order": 8},
+    {"id": "inventory-health", "title_key": "dashboards.inventoryHealth", "order": 9},
 ]
 DASHBOARD_IDS = {d["id"] for d in DASHBOARD_CATALOG}
 _DASHBOARD_ORDER = {d["id"]: d["order"] for d in DASHBOARD_CATALOG}
@@ -180,9 +181,9 @@ _DASHBOARD_ORDER = {d["id"]: d["order"] for d in DASHBOARD_CATALOG}
 # today that is accountant + operation_manager; granting a dashboard to another
 # role presupposes granting it the module too.
 DASHBOARD_DEFAULTS = {
-    "operation_manager": ["business-overview", "profitability", "revenue-over-time", "customer-orders", "sales-performance", "field-ops", "spend", "inventory-health"],
-    "accountant": ["business-overview", "profitability", "revenue-over-time", "customer-orders", "spend"],
-    "sales_manager": ["business-overview", "revenue-over-time", "customer-orders", "sales-performance", "field-ops"],
+    "operation_manager": ["business-overview", "profitability", "revenue-over-time", "customer-orders", "materials-sold", "sales-performance", "field-ops", "spend", "inventory-health"],
+    "accountant": ["business-overview", "profitability", "revenue-over-time", "customer-orders", "materials-sold", "spend"],
+    "sales_manager": ["business-overview", "revenue-over-time", "customer-orders", "materials-sold", "sales-performance", "field-ops"],
     "sales": ["sales-performance", "field-ops"],
     "sales_associate": ["sales-performance", "field-ops"],
     "warehouse_keeper": ["inventory-health"],
