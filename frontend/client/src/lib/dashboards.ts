@@ -1,4 +1,11 @@
-import { LayoutDashboard, BarChart3, TrendingUp, Receipt, type LucideIcon } from "lucide-react";
+import {
+  LayoutDashboard,
+  BarChart3,
+  TrendingUp,
+  Receipt,
+  ClipboardList,
+  type LucideIcon,
+} from "lucide-react";
 
 export interface DashboardEntry {
   /** shared id — matches permissions.py DASHBOARD_CATALOG and the app registry */
@@ -39,6 +46,13 @@ export const IMPLEMENTED_DASHBOARDS: DashboardEntry[] = [
     icon: TrendingUp,
     titleKey: "dashboards.revenueOverTime",
     descKey: "dashboards.revenueOverTimeDesc",
+  },
+  {
+    id: "customer-orders",
+    href: "/dashboards/customer-orders",
+    icon: ClipboardList,
+    titleKey: "dashboards.customerOrders",
+    descKey: "dashboards.customerOrdersDesc",
   },
   {
     id: "spend",

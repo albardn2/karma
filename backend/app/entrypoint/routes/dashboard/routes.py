@@ -284,6 +284,8 @@ def _period_key(dt, gran: str) -> str:
         # Monday (which is what the bucket starts are keyed by)
         iso = dt.isocalendar()
         return f"{iso[0]}-W{iso[1]:02d}"
+    if gran == "day":
+        return dt.strftime("%Y-%m-%d")
     return dt.strftime("%Y-%m")
 
 
@@ -296,6 +298,8 @@ def _period_start(dt, gran: str):
     if gran == "week":
         # Monday of dt's week — weekday() is 0 for Monday
         return d - timedelta(days=d.weekday())
+    if gran == "day":
+        return d
     return d.replace(day=1)
 
 
@@ -306,6 +310,8 @@ def _step_back(dt, gran: str, n: int):
         return start.replace(year=start.year - n)
     if gran == "week":
         return start - timedelta(weeks=n)
+    if gran == "day":
+        return start - timedelta(days=n)
     months = n * (3 if gran == "quarter" else 1)
     y = start.year + (start.month - 1 - months) // 12
     m = (start.month - 1 - months) % 12 + 1
@@ -792,3 +798,116 @@ def expenses_breakdown():
             },
         }
     ), 200
+
+
+# ---------------------------------------------------------------------------
+# Customer orders count — a stacked bar per period: orders by NEW customers vs
+# orders by RETURNING customers, over day / week / month / quarter / year.
+# Counts of orders, not money, so no currency is involved.
+# ---------------------------------------------------------------------------
+
+# Daily is offered here (nothing money-based needs it) for the short-horizon
+# pulse; 14 single stacked bars still read fine at phone width.
+_ORDERS_CAPS = {"year": 6, "quarter": 8, "month": 12, "week": 12, "day": 14}
+
+
+@dashboard_blueprint.route("/customer-orders", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def customer_orders_count():
+    """Order counts per period, split into new vs returning customers.
+
+    An order counts as NEW when it falls in the period containing its customer's
+    first-ever order, at the chart's own granularity. That single rule produces
+    exactly the requested semantics:
+
+      * "no previous purchases at the time of the order" — a customer's first
+        period is the one holding their first order;
+      * a repeat purchase INSIDE that same period still counts as new (the
+        became-returning flip only shows from the next period on);
+      * the same customer reads as new in July and returning in August on a
+        monthly chart — and the whole of 2026 as new on a yearly one, because
+        the comparison is between period KEYS at the current granularity.
+
+    The first-order date is taken over ALL orders (not just the window), so a
+    customer acquired before the window correctly reads as returning, and
+    new + returning always equals the period's total.
+    """
+    gran = (request.args.get("granularity") or "month").strip().lower()
+    if gran not in _ORDERS_CAPS:
+        gran = "month"
+    cap = _ORDERS_CAPS[gran]
+    try:
+        periods = max(1, min(cap, int(request.args.get("periods", cap))))
+    except ValueError:
+        periods = cap
+
+    now = datetime.utcnow()
+    period_starts = [_step_back(now, gran, periods - 1 - i) for i in range(periods)]
+    start = period_starts[0]
+    key_order = [_period_key(ps, gran) for ps in period_starts]
+    starts = {_period_key(ps, gran): ps for ps in period_starts}
+
+    new_orders: dict = defaultdict(int)
+    repeat_orders: dict = defaultdict(int)
+
+    with SqlAlchemyUnitOfWork() as uow:
+        s = uow.session
+
+        # each customer's first-ever order date — one aggregate over the whole
+        # account, deliberately unwindowed: history before the window is exactly
+        # what makes a customer "returning" inside it
+        first_by_customer = dict(
+            s.query(
+                CustomerOrderModel.customer_uuid,
+                func.min(CustomerOrderModel.created_at),
+            )
+            .filter(
+                CustomerOrderModel.is_deleted.is_(False),
+                CustomerOrderModel.account_uuid == uow.account_uuid,
+            )
+            .group_by(CustomerOrderModel.customer_uuid)
+            .all()
+        )
+
+        for cust, created in (
+            s.query(CustomerOrderModel.customer_uuid, CustomerOrderModel.created_at)
+            .filter(
+                CustomerOrderModel.is_deleted.is_(False),
+                CustomerOrderModel.created_at >= start,
+                CustomerOrderModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        ):
+            k = _period_key(created, gran)
+            if k not in starts:
+                continue
+            first = first_by_customer.get(cust)
+            # a window order always has a first (it is itself a candidate); the
+            # get() only guards a pathological read skew
+            if first is not None and _period_key(first, gran) == k:
+                new_orders[k] += 1
+            else:
+                repeat_orders[k] += 1
+
+    groups = []
+    for k in key_order:
+        ps = starts[k]
+        groups.append(
+            {
+                # daily keys are long; a short md label keeps 14 bars readable.
+                # the full date stays available in period_start.
+                "period_label": ps.strftime("%m-%d") if gran == "day" else k,
+                "period_start": ps.strftime("%Y-%m-%d"),
+                "total": new_orders[k] + repeat_orders[k],
+                "new_customer_orders": new_orders[k],
+                "repeat_customer_orders": repeat_orders[k],
+            }
+        )
+
+    return jsonify({"granularity": gran, "groups": groups}), 200
