@@ -914,6 +914,162 @@ def customer_orders_count():
 
 
 # ---------------------------------------------------------------------------
+# Trip stops — a stacked bar per period: how many trip stops each user worked,
+# over day / week / month / quarter / year buckets. Counts, so no currency.
+# ---------------------------------------------------------------------------
+
+# Legends stop being legible past this many users; the rest aggregate into a
+# reserved "__others__" segment so every period's bar still shows its true total.
+_TRIP_STOP_TOP_USERS = 8
+# Reserved segment keys, dunder-fenced so a real username can never collide.
+_OTHERS_KEY = "__others__"
+_UNASSIGNED_KEY = "__unassigned__"
+
+
+@dashboard_blueprint.route("/trip-stops", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def trip_stops():
+    """Trip-stop counts per period, split per assigned user.
+
+    A stop is counted at its own created_at (for planned stops that is the
+    planning moment, for manual field stops the visit itself — in this data the
+    two almost always share the trip's day) and attributed to its TRIP's
+    assignee: the user on the start_trip task result, the same resolution the
+    trips screens use for "Assigned To", stored as uuid-or-username and mapped
+    to a username here. Stops of unassigned trips land in a reserved
+    "__unassigned__" segment rather than vanishing; beyond the top N users by
+    total the rest aggregate into "__others__" so each bar keeps its true
+    height. Stops have no soft-delete of their own; their trip's is respected.
+    """
+    from models.common import (
+        Task as TaskModel,
+        TaskExecution as TaskExecutionModel,
+        TripStop as TripStopModel,
+        User as UserModel,
+    )
+
+    gran = (request.args.get("granularity") or "month").strip().lower()
+    if gran not in _ORDERS_CAPS:
+        gran = "month"
+    cap = _ORDERS_CAPS[gran]
+    try:
+        periods = max(1, min(cap, int(request.args.get("periods", cap))))
+    except ValueError:
+        periods = cap
+
+    now = datetime.utcnow()
+    period_starts = [_step_back(now, gran, periods - 1 - i) for i in range(periods)]
+    start = period_starts[0]
+    key_order = [_period_key(ps, gran) for ps in period_starts]
+    starts = {_period_key(ps, gran): ps for ps in period_starts}
+
+    by_period: dict = defaultdict(lambda: defaultdict(int))
+    seg_totals: dict = defaultdict(int)
+
+    with SqlAlchemyUnitOfWork() as uow:
+        s = uow.session
+
+        rows = (
+            s.query(TripStopModel.created_at, TripModel.workflow_execution_uuid)
+            .join(TripModel, TripStopModel.trip_uuid == TripModel.uuid)
+            .filter(
+                TripModel.is_deleted.is_(False),
+                TripStopModel.created_at >= start,
+                TripStopModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        )
+
+        # batched assignee resolution, one query for every execution in the
+        # window — the same start_trip-task source the trip list route reads
+        wfes = {w for _, w in rows if w}
+        assigned_by_wfe: dict = {}
+        if wfes:
+            for wfe_uuid, v in (
+                s.query(
+                    TaskExecutionModel.workflow_execution_uuid,
+                    TaskExecutionModel.result["assigned_user_uuid"].astext,
+                )
+                .join(TaskModel, TaskModel.uuid == TaskExecutionModel.task_uuid)
+                .filter(
+                    TaskExecutionModel.workflow_execution_uuid.in_(wfes),
+                    TaskExecutionModel.account_uuid == uow.account_uuid,
+                    TaskModel.operator == "start_trip_operator",
+                )
+                .all()
+            ):
+                if v:
+                    assigned_by_wfe[wfe_uuid] = v
+        # the stored value is uuid-or-username; map uuids to usernames and pass
+        # usernames through — mirroring the trip list route's resolution
+        uuid_to_name = dict(
+            s.query(UserModel.uuid, UserModel.username)
+            .filter(UserModel.account_uuid == uow.account_uuid)
+            .all()
+        )
+
+        for created, wfe in rows:
+            k = _period_key(created, gran)
+            if k not in starts:
+                continue
+            v = assigned_by_wfe.get(wfe)
+            seg = uuid_to_name.get(v, v) if v else _UNASSIGNED_KEY
+            by_period[k][seg] += 1
+            seg_totals[seg] += 1
+
+    # rank real users by total; beyond the top N they fold into __others__, and
+    # __unassigned__ always sits last so it reads as the residue it is
+    real = sorted(
+        (k for k in seg_totals if k != _UNASSIGNED_KEY),
+        key=lambda k: -seg_totals[k],
+    )
+    top, rest = real[:_TRIP_STOP_TOP_USERS], real[_TRIP_STOP_TOP_USERS:]
+    users = list(top)
+    if rest:
+        users.append(_OTHERS_KEY)
+    if seg_totals.get(_UNASSIGNED_KEY):
+        users.append(_UNASSIGNED_KEY)
+
+    groups = []
+    for k in key_order:
+        row = by_period[k]
+        breakdown = {u: row.get(u, 0) for u in top}
+        if rest:
+            breakdown[_OTHERS_KEY] = sum(row.get(u, 0) for u in rest)
+        if seg_totals.get(_UNASSIGNED_KEY):
+            breakdown[_UNASSIGNED_KEY] = row.get(_UNASSIGNED_KEY, 0)
+        ps = starts[k]
+        groups.append(
+            {
+                "period_label": ps.strftime("%m-%d") if gran == "day" else k,
+                "period_start": ps.strftime("%Y-%m-%d"),
+                "total": sum(row.values()),
+                "breakdown": breakdown,
+            }
+        )
+
+    return jsonify(
+        {
+            "granularity": gran,
+            # ordered segment keys: usernames, then __others__/__unassigned__ —
+            # both reserved keys are dunder-fenced so no username collides
+            "users": users,
+            "groups": groups,
+            "disclosure": {
+                # how many real users were folded into __others__
+                "users_grouped": len(rest),
+            },
+        }
+    ), 200
+
+
+# ---------------------------------------------------------------------------
 # Materials sold — for ONE period (this month, last week, ...), a stacked bar
 # per MATERIAL: quantity sold via customer-order items, split into fulfilled vs
 # unfulfilled. Quantities are in each material's own unit and are never summed
