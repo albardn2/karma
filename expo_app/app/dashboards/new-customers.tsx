@@ -42,7 +42,7 @@ const NEW = '#16a34a';
  * purchasing side. One series, so this uses the plain BarChart rather than a
  * stack, and there is no currency involved.
  */
-export function NewCustomersScreenImpl({ mine = false }: { mine?: boolean }) {
+export function NewCustomersScreenImpl({ mine = false, embedded = false }: { mine?: boolean; embedded?: boolean }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -86,32 +86,8 @@ export function NewCustomersScreenImpl({ mine = false }: { mine?: boolean }) {
     ['year', t('dashboards.gYear')],
   ];
 
-  return (
-    <ModuleGuard module="dashboard">
-      <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="nc-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
-          </TouchableOpacity>
-          <ThemedText style={styles.topTitle}>
-            {t(mine ? 'dashboards.myNewCustomers' : 'dashboards.newCustomers')}
-          </ThemedText>
-          <View style={styles.backSpacer} />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                load(true);
-              }}
-            />
-          }
-        >
+  const inner = (
+    <>
           <View style={styles.controls}>
             <ScrollingChipRow>
               {GRANS.map(([g, label]) => (
@@ -158,6 +134,47 @@ export function NewCustomersScreenImpl({ mine = false }: { mine?: boolean }) {
               </View>
             </>
           )}
+    </>
+  );
+
+  // Home stacks this panel inside its own scroller: section title in place
+  // of the top bar, and no ScrollView / guard of its own
+  if (embedded) {
+    return (
+      <View style={styles.embeddedSection}>
+        <ThemedText style={styles.embeddedTitle}>{t(mine ? 'dashboards.myNewCustomers' : 'dashboards.newCustomers')}</ThemedText>
+        {inner}
+      </View>
+    );
+  }
+
+  return (
+    <ModuleGuard module="dashboard">
+      <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="nc-back">
+            <ThemedText style={styles.back}>‹</ThemedText>
+          </TouchableOpacity>
+          <ThemedText style={styles.topTitle}>
+            {t(mine ? 'dashboards.myNewCustomers' : 'dashboards.newCustomers')}
+          </ThemedText>
+          <View style={styles.backSpacer} />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load(true);
+              }}
+            />
+          }
+        >
+          {inner}
         </ScrollView>
       </ThemedView>
     </ModuleGuard>
@@ -169,6 +186,8 @@ export default function NewCustomersScreen() {
 }
 
 const styles = StyleSheet.create({
+  embeddedSection: { paddingHorizontal: 20 },
+  embeddedTitle: { fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 12, textAlign: 'left' },
   container: { flex: 1, backgroundColor: '#f1f5f9' },
   topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 },
   back: { fontSize: 30, lineHeight: 34, color: '#5469D4', fontWeight: '700' },

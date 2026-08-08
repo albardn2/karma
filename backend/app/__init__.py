@@ -77,6 +77,7 @@ def _load_request_identity():
     from flask_jwt_extended import verify_jwt_in_request, get_jwt
     from app.entrypoint.routes.common.permissions import (
         RESOURCE_SET,
+        SELF_SCOPED_DASHBOARD_ENDPOINTS,
         endpoint_allowed,
         effective_permissions,
         dashboards_for_scope,
@@ -213,10 +214,13 @@ def _load_request_identity():
             return jsonify(
                 {"msg": "Forbidden — feature not enabled for this account"}
             ), 403
-        # per-user fine-grained grant (admins bypass)
+        # per-user fine-grained grant (admins bypass; self-scoped dashboard
+        # endpoints too — they only ever return the caller's own records, so
+        # the per-user resource ACL is not the right gate for them)
         if (
             not g.is_admin
             and g.user_acl is not None
+            and request.endpoint not in SELF_SCOPED_DASHBOARD_ENDPOINTS
             and not endpoint_allowed(g.user_acl, request.blueprint, request.method)
         ):
             return jsonify({"msg": "Forbidden — missing endpoint permission"}), 403

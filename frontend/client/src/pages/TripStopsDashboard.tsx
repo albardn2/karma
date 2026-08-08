@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { DashboardShell } from "@/components/DashboardShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -49,7 +49,7 @@ const OTHERS = "__others__";
  * unassigned trips into "__unassigned__" (drawn gray). Counts, not money — no
  * currency toggle.
  */
-export default function TripStopsDashboard() {
+export default function TripStopsDashboard({ embedded = false }: { embedded?: boolean }) {
   const { t } = useLanguage();
   const [gran, setGran] = useState<Gran>("month");
 
@@ -85,8 +85,7 @@ export default function TripStopsDashboard() {
   ];
 
   return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
+    <DashboardShell embedded={embedded}>
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{t("dashboards.tripStops")}</h2>
@@ -197,7 +196,6 @@ export default function TripStopsDashboard() {
             )}
           </>
         )}
-      </div>
-    </AppLayout>
+    </DashboardShell>
   );
 }

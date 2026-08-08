@@ -30,8 +30,9 @@ export interface DashboardEntry {
  */
 export const IMPLEMENTED_DASHBOARDS: DashboardEntry[] = [
   {
+    // "/" is now Home (the stacked feed); the overview keeps its own page here
     id: "business-overview",
-    href: "/",
+    href: "/dashboards/business-overview",
     icon: LayoutDashboard,
     titleKey: "dashboards.businessOverview",
     descKey: "dashboards.businessOverviewDesc",

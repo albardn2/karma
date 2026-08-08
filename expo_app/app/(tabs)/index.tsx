@@ -4,7 +4,7 @@ import { StyleSheet, ScrollView, TouchableOpacity, View, Alert } from 'react-nat
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { WelcomeContent } from '@/components/WelcomeContent';
+import { HomeDashboards } from '@/components/HomeDashboards';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -178,7 +178,9 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {activeTab === 'home' ? (
-          <WelcomeContent />
+          // Home: the role's dashboards stacked (falls back to the old welcome
+          // screen when the role has none) — the app twin of the web "/" feed
+          <HomeDashboards />
         ) : (
           <View style={styles.menuContainer}>
             <View style={styles.menuSection}>

@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { DashboardShell } from "@/components/DashboardShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -43,7 +43,7 @@ const NOT_COMPLETED = "#d97706";
  * so status is the honest breakdown. Self-scoped endpoint, so any authenticated
  * user (a driver, a rep) may see their own numbers.
  */
-export default function MyTripStopsDashboard() {
+export default function MyTripStopsDashboard({ embedded = false }: { embedded?: boolean }) {
   const { t } = useLanguage();
   const [gran, setGran] = useState<Gran>("month");
 
@@ -73,8 +73,7 @@ export default function MyTripStopsDashboard() {
     key === "completed" ? t("dashboards.completed") : t("dashboards.notCompleted");
 
   return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
+    <DashboardShell embedded={embedded}>
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{t("dashboards.myTripStops")}</h2>
@@ -189,7 +188,6 @@ export default function MyTripStopsDashboard() {
             )}
           </>
         )}
-      </div>
-    </AppLayout>
+    </DashboardShell>
   );
 }

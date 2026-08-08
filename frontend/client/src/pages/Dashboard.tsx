@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { DashboardShell } from "@/components/DashboardShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -154,7 +154,7 @@ function StatCard({
   );
 }
 
-export default function Dashboard() {
+export default function Dashboard({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const { t, te } = useLanguage();
   const [days, setDays] = useState(30);
@@ -188,15 +188,19 @@ export default function Dashboard() {
   const forbidden = error && /^403/.test((error as Error).message || "");
 
   return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
+    <DashboardShell embedded={embedded}>
         {/* header */}
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{t("dashboard.title")}</h2>
-            <p className="text-sm text-gray-600">
-              {t("dashboard.welcome", { name: firstName ? `, ${firstName}` : "" })}
-            </p>
+            {/* titled by its dashboard name, so the Home stack reads uniformly */}
+            <h2 className="text-2xl font-bold text-gray-900">
+              {t("dashboards.businessOverview")}
+            </h2>
+            {!embedded && (
+              <p className="text-sm text-gray-600">
+                {t("dashboard.welcome", { name: firstName ? `, ${firstName}` : "" })}
+              </p>
+            )}
           </div>
           {!forbidden && (
             <div className="flex items-center gap-2 flex-wrap">
@@ -400,7 +404,6 @@ export default function Dashboard() {
             </div>
           </>
         )}
-      </div>
-    </AppLayout>
+    </DashboardShell>
   );
 }

@@ -2,6 +2,7 @@
 
 export const en: Record<string, string> = {
   'nav.dashboard': 'Dashboard',
+  'nav.home': 'Home',
   'nav.dashboards': 'Dashboards',
   'nav.accounts': 'Accounts',
   'nav.customers': 'Customers',
@@ -39,6 +40,7 @@ export const en: Record<string, string> = {
 
 export const ar: Record<string, string> = {
   'nav.dashboard': 'لوحة التحكم',
+  'nav.home': 'الرئيسية',
   'nav.dashboards': 'لوحات المعلومات',
   'nav.accounts': 'حسابات الشركات',
   'nav.customers': 'العملاء',
