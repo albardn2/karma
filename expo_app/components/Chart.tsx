@@ -36,6 +36,98 @@ const short = (n: number) => {
   return String(Math.round(n * 100) / 100);
 };
 
+interface GroupedBarChartProps {
+  /** one entry per x-axis group (period); each carries N series values */
+  groups: Array<{ label: string; values: number[] }>;
+  /** series names, same length/order as each group's values — drives the legend */
+  series: string[];
+  width: number;
+}
+
+/**
+ * Several bars per x group — revenue / gross / net per period, say.
+ *
+ * A signed axis, unlike the single BarChart: gross and especially net can go
+ * negative (a loss-making month), so the zero line floats and bars grow up or
+ * down from it. niceMax/short/SERIES_COLOURS are shared so it matches every other
+ * chart. Kept deliberately small; the caller caps the group count (5 years / 8
+ * quarters / 6 months) so N×groups bars never turn into a smear at 375pt.
+ */
+export function GroupedBarChart({ groups, series, width }: GroupedBarChartProps) {
+  if (!groups.length || !series.length) return null;
+  const all = groups.flatMap((g) => g.values);
+  const rawMax = Math.max(...all, 0);
+  const rawMin = Math.min(...all, 0);
+  const max = niceMax(rawMax);
+  const min = rawMin < 0 ? -niceMax(Math.abs(rawMin)) : 0;
+  const span = max - min || 1;
+  const plotW = width - PAD_L - 8;
+  const plotH = CHART_H - PAD_T - PAD_B;
+  const y0 = PAD_T + plotH * (max / span); // pixel row of value 0
+  const slot = plotW / groups.length;
+  const n = series.length;
+  const barW = Math.max(3, Math.min(22, (slot * 0.7) / n));
+  const groupW = barW * n;
+
+  const gridlines = min < 0 ? [min, 0, max] : [0, max / 2, max];
+
+  return (
+    <Svg width={width} height={CHART_H}>
+      {gridlines.map((v) => {
+        const y = PAD_T + plotH * ((max - v) / span);
+        return (
+          <G key={v}>
+            <Line
+              x1={PAD_L}
+              y1={y}
+              x2={width - 8}
+              y2={y}
+              stroke={v === 0 ? '#9ca3af' : '#e5e7eb'}
+              strokeWidth={1}
+            />
+            <SvgText x={PAD_L - 6} y={y + 4} fontSize={9} fill="#9ca3af" textAnchor="end">
+              {short(v)}
+            </SvgText>
+          </G>
+        );
+      })}
+      {groups.map((g, gi) => {
+        const gx = PAD_L + slot * gi + (slot - groupW) / 2;
+        return (
+          <G key={`${g.label}-${gi}`}>
+            {g.values.map((v, si) => {
+              const h = (Math.abs(v) / span) * plotH;
+              const x = gx + si * barW;
+              // grow up from zero for positive, down for negative
+              const y = v >= 0 ? y0 - h : y0;
+              return (
+                <Rect
+                  key={si}
+                  x={x}
+                  y={y}
+                  width={Math.max(barW - 1.5, 2)}
+                  height={Math.max(h, 1)}
+                  rx={2}
+                  fill={SERIES_COLOURS[si % SERIES_COLOURS.length]}
+                />
+              );
+            })}
+            <SvgText
+              x={gx + groupW / 2}
+              y={CHART_H - 6}
+              fontSize={9}
+              fill="#6b7280"
+              textAnchor="middle"
+            >
+              {g.label}
+            </SvgText>
+          </G>
+        );
+      })}
+    </Svg>
+  );
+}
+
 interface BarChartProps {
   data: Array<{ label: string; value: number }>;
   width: number;

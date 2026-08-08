@@ -10,6 +10,8 @@ import Landing from "@/pages/Landing";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
+import Dashboards from "@/pages/Dashboards";
+import ProfitabilityDashboard from "@/pages/ProfitabilityDashboard";
 import Customers from "@/pages/Customers";
 import CustomerDetail from "@/pages/CustomerDetail";
 import Vendors from "@/pages/Vendors";
@@ -106,6 +108,8 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
       <Route path="/" component={HomeRoute} />
+      <Route path="/dashboards" component={() => <ProtectedRoute><Dashboards /></ProtectedRoute>} />
+      <Route path="/dashboards/profitability" component={() => <ProtectedRoute><ProfitabilityDashboard /></ProtectedRoute>} />
       <Route path="/customers" component={() => <ProtectedRoute><Customers /></ProtectedRoute>} />
       <Route path="/customers/:uuid" component={() => <ProtectedRoute><CustomerDetail /></ProtectedRoute>} />
       <Route path="/vendors" component={() => <ProtectedRoute><Vendors /></ProtectedRoute>} />

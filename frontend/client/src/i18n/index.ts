@@ -6,6 +6,7 @@
 
 import * as accountSettings from './translations/accountSettings';
 import * as rolePresets from './translations/rolePresets';
+import * as roleDashboards from './translations/roleDashboards';
 import * as common from './translations/common';
 import * as nav from './translations/nav';
 import * as dashboard from './translations/dashboard';
@@ -45,6 +46,7 @@ export const LANGUAGE_LABELS: Record<Lang, string> = {
 const modules = [
   accountSettings,
   rolePresets,
+  roleDashboards,
   common,
   nav,
   dashboard,

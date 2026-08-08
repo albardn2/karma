@@ -13,6 +13,12 @@ interface User {
   permission_scope?: string;
   phoneNumber?: string;
   language?: string;
+  /**
+   * Dashboard ids this user's role may see, resolved server-side. `null` (or
+   * absent) means every dashboard — admins and the platform owner are unrestricted,
+   * exactly like the module/endpoint null cases. A list means precisely those ids.
+   */
+  dashboards?: string[] | null;
 }
 
 interface SignupData {

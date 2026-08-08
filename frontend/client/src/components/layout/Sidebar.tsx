@@ -42,6 +42,10 @@ interface SidebarProps {
 
 const navigation = [
   { key: "nav.dashboard", href: "/", icon: LayoutDashboard },
+  // The dashboards hub. `module` is set explicitly because the id checked against the
+  // ACL is derived from href.slice(1) below, which would be "dashboards" (plural, not
+  // a backend module) — so without this the entry would gate on a module nobody holds.
+  { key: "nav.dashboards", href: "/dashboards", icon: BarChart3, module: "dashboard" },
   // superOnly: platform-owner console, visible to superusers only
   { key: "nav.superAdmin", href: "/super-admin", icon: Landmark, superOnly: true },
   { key: "nav.customers", href: "/customers", icon: Users },
@@ -117,7 +121,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     // everyone in that account.
     if (item.alwaysVisible) return true;
     if (grantedModules) {
-      const moduleId = item.href === '/' ? 'dashboard' : item.href.slice(1);
+      const moduleId = item.module ?? (item.href === '/' ? 'dashboard' : item.href.slice(1));
       return grantedModules.includes(moduleId);
     }
     return true;
