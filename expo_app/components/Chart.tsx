@@ -128,6 +128,85 @@ export function GroupedBarChart({ groups, series, width }: GroupedBarChartProps)
   );
 }
 
+interface StackedBarChartProps {
+  /** one entry per x-axis group; each carries the stack's segment values (>= 0) */
+  data: Array<{ label: string; segments: number[] }>;
+  /** segment names, same length/order as each entry's segments — drives the legend */
+  series: string[];
+  width: number;
+  /** segment colours, same order as series; falls back to SERIES_COLOURS */
+  colours?: string[];
+}
+
+/**
+ * One bar per period, each split into stacked segments — received + debt, say.
+ *
+ * The segments sum to the bar (the caller guarantees received + debt = revenue),
+ * so the bar's height reads as the period total and the split reads as its make-up.
+ * Segments are assumed non-negative (a debt or a receipt cannot be less than zero);
+ * that is why this is a plain upward stack, not the signed axis GroupedBarChart
+ * needs. Shares niceMax/short so the axis matches every other chart.
+ */
+export function StackedBarChart({ data, series, width, colours }: StackedBarChartProps) {
+  if (!data.length || !series.length) return null;
+  const palette = colours ?? SERIES_COLOURS;
+  const totals = data.map((d) => d.segments.reduce((s, v) => s + Math.max(v, 0), 0));
+  const max = niceMax(Math.max(...totals, 0));
+  const plotW = width - PAD_L - 8;
+  const plotH = CHART_H - PAD_T - PAD_B;
+  const slot = plotW / data.length;
+  const barW = Math.max(4, Math.min(28, slot * 0.6));
+
+  return (
+    <Svg width={width} height={CHART_H}>
+      {[0, 0.5, 1].map((f) => {
+        const y = PAD_T + plotH * (1 - f);
+        return (
+          <G key={f}>
+            <Line x1={PAD_L} y1={y} x2={width - 8} y2={y} stroke="#e5e7eb" strokeWidth={1} />
+            <SvgText x={PAD_L - 6} y={y + 4} fontSize={9} fill="#9ca3af" textAnchor="end">
+              {short(max * f)}
+            </SvgText>
+          </G>
+        );
+      })}
+      {data.map((d, i) => {
+        const x = PAD_L + slot * i + (slot - barW) / 2;
+        let top = PAD_T + plotH; // stack grows up from the baseline
+        return (
+          <G key={`${d.label}-${i}`}>
+            {d.segments.map((v, si) => {
+              const h = max > 0 ? (Math.max(v, 0) / max) * plotH : 0;
+              top -= h;
+              return (
+                <Rect
+                  key={si}
+                  x={x}
+                  y={top}
+                  width={barW}
+                  height={Math.max(h, 0)}
+                  fill={palette[si % palette.length]}
+                />
+              );
+            })}
+            {(data.length <= 8 || i % 2 === 0) && (
+              <SvgText
+                x={x + barW / 2}
+                y={CHART_H - 6}
+                fontSize={9}
+                fill="#6b7280"
+                textAnchor="middle"
+              >
+                {d.label}
+              </SvgText>
+            )}
+          </G>
+        );
+      })}
+    </Svg>
+  );
+}
+
 interface BarChartProps {
   data: Array<{ label: string; value: number }>;
   width: number;
@@ -190,9 +269,12 @@ interface LineChartProps {
   width: number;
   /** step lines, for a running stock level that changes at discrete events */
   step?: boolean;
+  /** line colours, same order as series; falls back to SERIES_COLOURS */
+  colours?: string[];
 }
 
-export function LineChart({ series, width, step }: LineChartProps) {
+export function LineChart({ series, width, step, colours }: LineChartProps) {
+  const palette = colours ?? SERIES_COLOURS;
   const withPoints = series.filter((s) => s.points.length);
   if (!withPoints.length) return null;
 
@@ -227,7 +309,7 @@ export function LineChart({ series, width, step }: LineChartProps) {
       )}
 
       {withPoints.map((s, si) => {
-        const colour = SERIES_COLOURS[si % SERIES_COLOURS.length];
+        const colour = palette[si % palette.length];
         let d = '';
         s.points.forEach((p, i) => {
           const px = x(i);
@@ -262,15 +344,14 @@ export function LineChart({ series, width, step }: LineChartProps) {
   );
 }
 
-export function ChartLegend({ names }: { names: string[] }) {
+export function ChartLegend({ names, colours }: { names: string[]; colours?: string[] }) {
   if (names.length < 2) return null;
+  const palette = colours ?? SERIES_COLOURS;
   return (
     <View style={styles.legend}>
       {names.map((n, i) => (
         <View key={n} style={styles.legendItem}>
-          <View
-            style={[styles.swatch, { backgroundColor: SERIES_COLOURS[i % SERIES_COLOURS.length] }]}
-          />
+          <View style={[styles.swatch, { backgroundColor: palette[i % palette.length] }]} />
           <ThemedText style={styles.legendText} numberOfLines={1}>
             {n}
           </ThemedText>

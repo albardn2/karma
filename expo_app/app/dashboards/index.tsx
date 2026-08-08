@@ -38,6 +38,13 @@ const IMPLEMENTED: Entry[] = [
     titleKey: 'dashboards.profitability',
     descKey: 'dashboards.profitabilityDesc',
   },
+  {
+    id: 'revenue-over-time',
+    route: '/dashboards/revenue-over-time',
+    icon: '💹',
+    titleKey: 'dashboards.revenueOverTime',
+    descKey: 'dashboards.revenueOverTimeDesc',
+  },
 ];
 
 /**
