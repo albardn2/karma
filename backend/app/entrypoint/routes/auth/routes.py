@@ -345,6 +345,12 @@ def me():
             account = uow.account_repository.find_one(uuid=imp_account)
             dto["impersonating_account_uuid"] = imp_account
             dto["impersonating_company"] = account.company_name if account else None
+        # the dashboards this user's role may see, resolved server-side. None
+        # means all (admin/superuser); a list means exactly these ids, ordered.
+        # Both clients render `catalog ∩ this ∩ screens-this-build-ships`, so an
+        # id a client does not recognise is simply not drawn. Read from `g` (set
+        # at the chokepoint) so it and perms_version agree.
+        dto["dashboards"] = getattr(g, "user_dashboards", None)
         # The baseline a client compares later responses against. Read from `g`
         # rather than recomputed here so the body and the X-Perms-Version header
         # can never disagree — computing it twice from two code paths is how a
