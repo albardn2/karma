@@ -279,6 +279,11 @@ def _period_key(dt, gran: str) -> str:
         return dt.strftime("%Y")
     if gran == "quarter":
         return f"{dt.year}-Q{(dt.month - 1) // 3 + 1}"
+    if gran == "week":
+        # ISO year-week, so the label of any day matches the label of its week's
+        # Monday (which is what the bucket starts are keyed by)
+        iso = dt.isocalendar()
+        return f"{iso[0]}-W{iso[1]:02d}"
     return dt.strftime("%Y-%m")
 
 
@@ -288,6 +293,9 @@ def _period_start(dt, gran: str):
         return d.replace(month=1, day=1)
     if gran == "quarter":
         return d.replace(month=((d.month - 1) // 3) * 3 + 1, day=1)
+    if gran == "week":
+        # Monday of dt's week — weekday() is 0 for Monday
+        return d - timedelta(days=d.weekday())
     return d.replace(day=1)
 
 
@@ -296,6 +304,8 @@ def _step_back(dt, gran: str, n: int):
     start = _period_start(dt, gran)
     if gran == "year":
         return start.replace(year=start.year - n)
+    if gran == "week":
+        return start - timedelta(weeks=n)
     months = n * (3 if gran == "quarter" else 1)
     y = start.year + (start.month - 1 - months) // 12
     m = (start.month - 1 - months) % 12 + 1
@@ -493,6 +503,138 @@ def profitability():
                 # false until at least one employee payout exists in the window;
                 # lets the client label net as "before salaries (not tracked)"
                 "salaries_backed": salaries_backed,
+            },
+        }
+    ), 200
+
+
+# ---------------------------------------------------------------------------
+# Revenue over time — one dataset, two views the client toggles between:
+#   * per period: revenue split into received + debt (a stacked bar)
+#   * cumulative: running revenue and running debt (two curves)
+# over week / month / quarter / year buckets, in one reporting currency.
+# ---------------------------------------------------------------------------
+
+# A single bar per period stacks more densely than profitability's three, and a
+# cumulative line wants more points, so these run longer than _PERIOD_CAPS. Week is
+# offered here (profitability has no weekly view) for the finer revenue trend.
+_REVENUE_CAPS = {"year": 6, "quarter": 8, "month": 12, "week": 12}
+
+
+@dashboard_blueprint.route("/revenue-over-time", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def revenue_over_time():
+    """Revenue over time, per period and cumulative, in one currency.
+
+      revenue  = Σ customer-order total_adjusted_amount (by order created_at)
+      debt     = Σ customer-order net_amount_due (current outstanding)
+      received = revenue − debt   (the portion already paid down)
+
+    `received` is the paid-down portion of each period's OWN orders, not payments
+    banked in the period — that is deliberately what makes received + debt equal
+    that period's revenue exactly, so the two segments of a stacked bar always add
+    up to the bar. (Cash collected in a period is a different question, answered by
+    the overview's `collected`.) The cumulative curves are the running sums of the
+    per-period revenue and debt across the shown window, from zero at its start.
+
+    Every amount is converted to the target currency at its own order date and then
+    summed — the same convert-then-sum rule as the rest of the dashboards, never a
+    cross-currency mix. total and its due convert at the same day's rate, so the
+    split stays exact in the reporting currency too.
+    """
+    gran = (request.args.get("granularity") or "month").strip().lower()
+    if gran not in _REVENUE_CAPS:
+        gran = "month"
+    cap = _REVENUE_CAPS[gran]
+    try:
+        periods = max(1, min(cap, int(request.args.get("periods", cap))))
+    except ValueError:
+        periods = cap
+    target = _target_currency()
+
+    now = datetime.utcnow()
+    period_starts = [_step_back(now, gran, periods - 1 - i) for i in range(periods)]
+    start = period_starts[0]
+    key_order = [_period_key(ps, gran) for ps in period_starts]
+    starts = {_period_key(ps, gran): ps for ps in period_starts}
+
+    revenue: dict = defaultdict(float)
+    debt: dict = defaultdict(float)
+    unconv_amt = 0.0
+    unconv_count = 0
+
+    with SqlAlchemyUnitOfWork() as uow:
+        s = uow.session
+        conv = CurrencyConverter(uow, target)
+
+        def bucket(dt):
+            k = _period_key(dt, gran)
+            return k if k in starts else None
+
+        for o in (
+            s.query(CustomerOrderModel)
+            .filter(
+                CustomerOrderModel.is_deleted.is_(False),
+                CustomerOrderModel.created_at >= start,
+                CustomerOrderModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        ):
+            k = bucket(o.created_at)
+            if not k:
+                continue
+            total = o.total_adjusted_amount or 0
+            due = o.net_amount_due or 0
+            rc = conv.convert(total, o.currency, o.created_at)
+            if rc is None:
+                # no rate for this order's day — bank it for disclosure rather
+                # than count a partial (converting only the due side would break
+                # received + debt = revenue)
+                if total:
+                    unconv_amt += total
+                    unconv_count += 1
+                continue
+            # same currency and day as total, so this resolves whenever rc did
+            dc = conv.convert(due, o.currency, o.created_at) or 0.0
+            revenue[k] += rc
+            debt[k] += dc
+
+    groups = []
+    cum_rev = 0.0
+    cum_debt = 0.0
+    for k in key_order:
+        rev = revenue[k]
+        d = debt[k]
+        cum_rev += rev
+        cum_debt += d
+        groups.append(
+            {
+                "period_label": k,
+                "period_start": starts[k].strftime("%Y-%m-%d"),
+                "revenue": round(rev, 2),
+                # received + debt == revenue (before rounding); the client can
+                # stack them without a residual
+                "received": round(rev - d, 2),
+                "debt": round(d, 2),
+                "cumulative_revenue": round(cum_rev, 2),
+                "cumulative_debt": round(cum_debt, 2),
+            }
+        )
+
+    return jsonify(
+        {
+            "target_currency": target.value,
+            "granularity": gran,
+            "groups": groups,
+            "disclosure": {
+                "unconverted_amount": round(unconv_amt, 2),
+                "unconverted_count": unconv_count,
             },
         }
     ), 200
