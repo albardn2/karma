@@ -16,6 +16,7 @@ import RevenueOverTimeDashboard from "@/pages/RevenueOverTimeDashboard";
 import SpendDashboard from "@/pages/SpendDashboard";
 import CustomerOrdersDashboard from "@/pages/CustomerOrdersDashboard";
 import MaterialsSoldDashboard from "@/pages/MaterialsSoldDashboard";
+import NewCustomersDashboard from "@/pages/NewCustomersDashboard";
 import Customers from "@/pages/Customers";
 import CustomerDetail from "@/pages/CustomerDetail";
 import Vendors from "@/pages/Vendors";
@@ -118,6 +119,7 @@ function Router() {
       <Route path="/dashboards/spend" component={() => <ProtectedRoute><SpendDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/customer-orders" component={() => <ProtectedRoute><CustomerOrdersDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/materials-sold" component={() => <ProtectedRoute><MaterialsSoldDashboard /></ProtectedRoute>} />
+      <Route path="/dashboards/new-customers" component={() => <ProtectedRoute><NewCustomersDashboard /></ProtectedRoute>} />
       <Route path="/customers" component={() => <ProtectedRoute><Customers /></ProtectedRoute>} />
       <Route path="/customers/:uuid" component={() => <ProtectedRoute><CustomerDetail /></ProtectedRoute>} />
       <Route path="/vendors" component={() => <ProtectedRoute><Vendors /></ProtectedRoute>} />

@@ -1031,3 +1031,72 @@ def materials_sold():
             },
         }
     ), 200
+
+
+# ---------------------------------------------------------------------------
+# New customers — a plain bar per period: how many customers were CREATED in
+# it, over day / week / month / quarter / year buckets. A count of people
+# joining the book, not of their purchases — the customer-orders dashboard's
+# "new" segment answers the purchasing side.
+# ---------------------------------------------------------------------------
+
+
+@dashboard_blueprint.route("/new-customers", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def new_customers():
+    """Newly created customers per period.
+
+    Created = Customer.created_at, soft-deletes excluded — the same definition
+    the overview's new_customers series uses, here with the full granularity
+    range instead of a fixed daily window. One series, so the client draws a
+    plain (unstacked) bar chart.
+    """
+    gran = (request.args.get("granularity") or "month").strip().lower()
+    if gran not in _ORDERS_CAPS:
+        gran = "month"
+    cap = _ORDERS_CAPS[gran]
+    try:
+        periods = max(1, min(cap, int(request.args.get("periods", cap))))
+    except ValueError:
+        periods = cap
+
+    now = datetime.utcnow()
+    period_starts = [_step_back(now, gran, periods - 1 - i) for i in range(periods)]
+    start = period_starts[0]
+    key_order = [_period_key(ps, gran) for ps in period_starts]
+    starts = {_period_key(ps, gran): ps for ps in period_starts}
+
+    counts: dict = defaultdict(int)
+    with SqlAlchemyUnitOfWork() as uow:
+        s = uow.session
+        for (created,) in (
+            s.query(CustomerModel.created_at)
+            .filter(
+                CustomerModel.is_deleted.is_(False),
+                CustomerModel.created_at >= start,
+                CustomerModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        ):
+            k = _period_key(created, gran)
+            if k in starts:
+                counts[k] += 1
+
+    groups = []
+    for k in key_order:
+        ps = starts[k]
+        groups.append(
+            {
+                "period_label": ps.strftime("%m-%d") if gran == "day" else k,
+                "period_start": ps.strftime("%Y-%m-%d"),
+                "count": counts[k],
+            }
+        )
+
+    return jsonify({"granularity": gran, "groups": groups}), 200
