@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Package,
   UserPlus,
+  MapPin,
   type LucideIcon,
 } from "lucide-react";
 
@@ -69,6 +70,13 @@ export const IMPLEMENTED_DASHBOARDS: DashboardEntry[] = [
     icon: Package,
     titleKey: "dashboards.materialsSold",
     descKey: "dashboards.materialsSoldDesc",
+  },
+  {
+    id: "trip-stops",
+    href: "/dashboards/trip-stops",
+    icon: MapPin,
+    titleKey: "dashboards.tripStops",
+    descKey: "dashboards.tripStopsDesc",
   },
   {
     id: "spend",

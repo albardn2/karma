@@ -67,6 +67,13 @@ const IMPLEMENTED: Entry[] = [
     descKey: 'dashboards.materialsSoldDesc',
   },
   {
+    id: 'trip-stops',
+    route: '/dashboards/trip-stops',
+    icon: '📍',
+    titleKey: 'dashboards.tripStops',
+    descKey: 'dashboards.tripStopsDesc',
+  },
+  {
     id: 'spend',
     route: '/dashboards/spend',
     icon: '🧾',
