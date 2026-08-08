@@ -46,6 +46,13 @@ const IMPLEMENTED: Entry[] = [
     descKey: 'dashboards.revenueOverTimeDesc',
   },
   {
+    id: 'customer-orders',
+    route: '/dashboards/customer-orders',
+    icon: '📋',
+    titleKey: 'dashboards.customerOrders',
+    descKey: 'dashboards.customerOrdersDesc',
+  },
+  {
     id: 'spend',
     route: '/dashboards/spend',
     icon: '🧾',
