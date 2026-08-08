@@ -14,8 +14,11 @@ from app.entrypoint.routes.dashboard import dashboard_blueprint
 from models.common import (
     Customer as CustomerModel,
     CustomerOrder as CustomerOrderModel,
+    Expense as ExpenseModel,
     Invoice as InvoiceModel,
+    InventoryEvent as InventoryEventModel,
     Payment as PaymentModel,
+    Payout as PayoutModel,
     Trip as TripModel,
 )
 
@@ -258,3 +261,238 @@ def overview():
             },
         }
     return jsonify(result), 200
+
+
+# ---------------------------------------------------------------------------
+# Profitability — a grouped three-bar chart per period:
+#   revenue | gross (revenue − COGS) | net (gross − expenses − salaries)
+# converted to one reporting currency, over year / quarter / month buckets.
+# ---------------------------------------------------------------------------
+
+# Group caps per granularity — a phone bar chart of three-bars-times-N gets
+# unreadable fast (36 bars at ~7pt). Matches the screenshot's ~3-group density.
+_PERIOD_CAPS = {"year": 5, "quarter": 8, "month": 6}
+
+
+def _period_key(dt, gran: str) -> str:
+    if gran == "year":
+        return dt.strftime("%Y")
+    if gran == "quarter":
+        return f"{dt.year}-Q{(dt.month - 1) // 3 + 1}"
+    return dt.strftime("%Y-%m")
+
+
+def _period_start(dt, gran: str):
+    d = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    if gran == "year":
+        return d.replace(month=1, day=1)
+    if gran == "quarter":
+        return d.replace(month=((d.month - 1) // 3) * 3 + 1, day=1)
+    return d.replace(day=1)
+
+
+def _step_back(dt, gran: str, n: int):
+    """The period-start `n` periods before the one containing dt."""
+    start = _period_start(dt, gran)
+    if gran == "year":
+        return start.replace(year=start.year - n)
+    months = n * (3 if gran == "quarter" else 1)
+    y = start.year + (start.month - 1 - months) // 12
+    m = (start.month - 1 - months) % 12 + 1
+    return start.replace(year=y, month=m)
+
+
+@dashboard_blueprint.route("/profitability", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def profitability():
+    """Revenue, gross profit and net profit per period, in one currency.
+
+      revenue = Σ customer-order total_adjusted_amount (by order created_at)
+      gross   = revenue − COGS
+      net     = gross − expenses − salaries
+
+    COGS is not stored: it is the cost basis of the stock each sale consumed,
+    summed over 'sale' inventory events at their lot's weighted-average cost
+    (reusing the inventory costing engine). A sale drawn from a lot whose cost is
+    unknown is NOT counted as free — its quantity goes to an `uncosted` bucket and
+    gross/net are reported as excluding it, never quietly overstated.
+
+    Salaries have no first-class home in this schema; the only path is a payout
+    made to an employee (payout.employee_uuid). Until such payouts exist the term
+    is 0 and `salaries_backed` is false, so a client can say "before salaries"
+    rather than imply a real subtraction.
+
+    Every figure is converted to the target currency at its own date and summed —
+    the same convert-then-sum rule as the overview, never a cross-currency mix.
+    """
+    from app.domains.inventory.domain import InventoryDomain
+
+    gran = (request.args.get("granularity") or "month").strip().lower()
+    if gran not in _PERIOD_CAPS:
+        gran = "month"
+    cap = _PERIOD_CAPS[gran]
+    try:
+        periods = max(1, min(cap, int(request.args.get("periods", cap))))
+    except ValueError:
+        periods = cap
+    target = _target_currency()
+
+    now = datetime.utcnow()
+    # the period-start of each of the last `periods` buckets, oldest first, so the
+    # client draws left to right. start is the oldest bucket's start.
+    period_starts = [_step_back(now, gran, periods - 1 - i) for i in range(periods)]
+    start = period_starts[0]
+    key_order = [_period_key(ps, gran) for ps in period_starts]
+    starts = {_period_key(ps, gran): ps for ps in period_starts}
+
+    revenue: dict = defaultdict(float)
+    cogs: dict = defaultdict(float)
+    expenses: dict = defaultdict(float)
+    salaries: dict = defaultdict(float)
+    uncosted_qty = 0.0
+    unconv_amt = 0.0
+    unconv_count = 0
+    salaries_backed = False
+
+    with SqlAlchemyUnitOfWork() as uow:
+        s = uow.session
+        conv = CurrencyConverter(uow, target)
+        # one cost context for every lot this request touches: caches each lot's
+        # cost and each rate day once, and holds the single backfill latch
+        cost_ctx = InventoryDomain.new_cost_context(currency=target)
+
+        def bucket(dt):
+            k = _period_key(dt, gran)
+            return k if k in starts else None
+
+        # ---- revenue: order total at order created_at ----
+        for o in (
+            s.query(CustomerOrderModel)
+            .filter(
+                CustomerOrderModel.is_deleted.is_(False),
+                CustomerOrderModel.created_at >= start,
+                CustomerOrderModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        ):
+            k = bucket(o.created_at)
+            if not k:
+                continue
+            amt = o.total_adjusted_amount or 0
+            c = conv.convert(amt, o.currency, o.created_at)
+            if c is None:
+                if amt:
+                    unconv_amt += amt
+                    unconv_count += 1
+                continue
+            revenue[k] += c
+
+        # ---- COGS: cost basis of stock consumed by 'sale' events ----
+        for e in (
+            s.query(InventoryEventModel)
+            .filter(
+                InventoryEventModel.is_deleted.is_(False),
+                InventoryEventModel.event_type == "sale",
+                InventoryEventModel.created_at >= start,
+                InventoryEventModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        ):
+            k = bucket(e.created_at)
+            if not k:
+                continue
+            qty = abs(e.quantity or 0)
+            if not qty:
+                continue
+            # lot cost already in target currency (converted at receipt date
+            # inside the costing engine); None = unknowable, so bank the quantity
+            lot_cost, _orig = InventoryDomain._lot_cost_and_quantity(
+                uow=uow, inventory_uuid=e.inventory_uuid, ctx=cost_ctx
+            )
+            if lot_cost is None:
+                uncosted_qty += qty
+                continue
+            cogs[k] += qty * lot_cost
+
+        # ---- expenses: Expense.amount at created_at ----
+        for x in (
+            s.query(ExpenseModel)
+            .filter(
+                ExpenseModel.is_deleted.is_(False),
+                ExpenseModel.created_at >= start,
+                ExpenseModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        ):
+            k = bucket(x.created_at)
+            if not k:
+                continue
+            c = conv.convert(x.amount or 0, x.currency, x.created_at)
+            if c is None:
+                if x.amount:
+                    unconv_amt += x.amount or 0
+                    unconv_count += 1
+                continue
+            expenses[k] += c
+
+        # ---- salaries: payouts made to an employee ----
+        for p in (
+            s.query(PayoutModel)
+            .filter(
+                PayoutModel.is_deleted.is_(False),
+                PayoutModel.employee_uuid.isnot(None),
+                PayoutModel.created_at >= start,
+                PayoutModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        ):
+            k = bucket(p.created_at)
+            if not k:
+                continue
+            salaries_backed = True
+            c = conv.convert(p.amount or 0, p.currency, p.created_at)
+            if c is None:
+                if p.amount:
+                    unconv_amt += p.amount or 0
+                    unconv_count += 1
+                continue
+            salaries[k] += c
+
+    groups = []
+    for k in key_order:
+        rev = round(revenue[k], 2)
+        gross = round(revenue[k] - cogs[k], 2)
+        net = round(revenue[k] - cogs[k] - expenses[k] - salaries[k], 2)
+        groups.append(
+            {
+                "period_label": k,
+                "period_start": starts[k].strftime("%Y-%m-%d"),
+                "revenue": rev,
+                "gross": gross,
+                "net": net,
+            }
+        )
+
+    return jsonify(
+        {
+            "target_currency": target.value,
+            "granularity": gran,
+            "groups": groups,
+            "disclosure": {
+                # sold units whose lot cost is unknown — gross/net exclude these
+                "uncosted_quantity": round(uncosted_qty, 2),
+                # money that had no rate to convert (never folded into a figure)
+                "unconverted_amount": round(unconv_amt, 2),
+                "unconverted_count": unconv_count,
+                # false until at least one employee payout exists in the window;
+                # lets the client label net as "before salaries (not tracked)"
+                "salaries_backed": salaries_backed,
+            },
+        }
+    ), 200
