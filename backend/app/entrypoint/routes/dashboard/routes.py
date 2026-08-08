@@ -911,3 +911,123 @@ def customer_orders_count():
         )
 
     return jsonify({"granularity": gran, "groups": groups}), 200
+
+
+# ---------------------------------------------------------------------------
+# Materials sold — for ONE period (this month, last week, ...), a stacked bar
+# per MATERIAL: quantity sold via customer-order items, split into fulfilled vs
+# unfulfilled. Quantities are in each material's own unit and are never summed
+# across materials — which is why the x-axis is materials, not time.
+# ---------------------------------------------------------------------------
+
+# Bars are materials, so the time dimension collapses to one window; `offset`
+# steps that window back (0 = the current period). More material bars than this
+# turn into a smear at phone width, so the chart carries the top N by quantity
+# and reports how many it left out.
+_MATERIALS_TOP_N = 12
+_MATERIALS_MAX_OFFSET = 120
+
+
+@dashboard_blueprint.route("/materials-sold", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def materials_sold():
+    """Quantities of materials sold in one period, fulfilled vs unfulfilled.
+
+    Sold = customer-order items, bucketed by their ORDER's created_at (the same
+    convention as revenue: the sale happens when the order is placed), with the
+    order's and the item's soft-deletes both respected. Fulfilled means the item
+    is marked fulfilled (fulfilled_at set — the model's own convention, and
+    is_fulfilled tracks it 1:1), regardless of WHEN that happened: this answers
+    "of what was ordered in this period, how much has been delivered by now".
+
+    Grouping is by (material, item unit): materials are never summed with each
+    other — quantities only mean anything in their own unit — and the unit is
+    carried per bar so a client can label it. A material sold in two units would
+    become two bars rather than one dishonest sum.
+    """
+    gran = (request.args.get("granularity") or "month").strip().lower()
+    if gran not in _ORDERS_CAPS:
+        gran = "month"
+    try:
+        offset = max(0, min(_MATERIALS_MAX_OFFSET, int(request.args.get("offset", 0))))
+    except ValueError:
+        offset = 0
+
+    now = datetime.utcnow()
+    start = _step_back(now, gran, offset)
+    end = _step_back(now, gran, offset - 1)  # next period's start
+
+    # (material_uuid, unit) -> [fulfilled_qty, unfulfilled_qty, name]
+    agg: dict = {}
+
+    with SqlAlchemyUnitOfWork() as uow:
+        s = uow.session
+        from models.common import (
+            CustomerOrderItem as ItemModel,
+            Material as MaterialModel,
+        )
+
+        rows = (
+            s.query(
+                ItemModel.material_uuid,
+                ItemModel.unit,
+                ItemModel.quantity,
+                ItemModel.fulfilled_at,
+                MaterialModel.name,
+            )
+            .join(
+                CustomerOrderModel,
+                ItemModel.customer_order_uuid == CustomerOrderModel.uuid,
+            )
+            # no is_deleted filter on Material: a retired material's history is
+            # still history, and its name is still the honest label
+            .join(MaterialModel, ItemModel.material_uuid == MaterialModel.uuid)
+            .filter(
+                ItemModel.is_deleted.is_(False),
+                CustomerOrderModel.is_deleted.is_(False),
+                CustomerOrderModel.created_at >= start,
+                CustomerOrderModel.created_at < end,
+                ItemModel.account_uuid == uow.account_uuid,
+            )
+            .all()
+        )
+        for mat_uuid, unit, qty, fulfilled_at, name in rows:
+            key = (mat_uuid, unit or "")
+            if key not in agg:
+                agg[key] = [0, 0, name]
+            agg[key][0 if fulfilled_at is not None else 1] += qty or 0
+
+    ranked = sorted(
+        (
+            {
+                "material_uuid": mu,
+                "name": rec[2],
+                "unit": unit,
+                "total": rec[0] + rec[1],
+                "fulfilled": rec[0],
+                "unfulfilled": rec[1],
+            }
+            for (mu, unit), rec in agg.items()
+        ),
+        key=lambda m: -m["total"],
+    )
+
+    return jsonify(
+        {
+            "granularity": gran,
+            "offset": offset,
+            "period_label": _period_key(start, gran),
+            "period_start": start.strftime("%Y-%m-%d"),
+            "materials": ranked[:_MATERIALS_TOP_N],
+            "disclosure": {
+                # bars beyond the top N by quantity — reported, never silent
+                "materials_omitted": max(0, len(ranked) - _MATERIALS_TOP_N),
+            },
+        }
+    ), 200

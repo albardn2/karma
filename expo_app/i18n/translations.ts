@@ -351,6 +351,14 @@ export const translations: Record<Lang, Record<string, string>> = {
   'dashboards.newCustomers': 'New customers',
   'dashboards.repeatCustomers': 'Returning customers',
   'dashboards.gDay': 'Day',
+  'dashboards.materialsSold': 'Materials Sold',
+  'dashboards.materialsSoldDesc': 'Quantities sold per material, fulfilled vs unfulfilled.',
+  'dashboards.fulfilled': 'Fulfilled',
+  'dashboards.unfulfilled': 'Unfulfilled',
+  'dashboards.unit': 'Unit',
+  'dashboards.materialsOmitted': '{count} more material(s) not shown — top 12 by quantity are charted.',
+  'dashboards.materialUnitsNote':
+    'Quantities are in each material’s own unit; every bar is one material, so different units are never summed. Fulfilled counts what has been delivered by now, out of what was ordered in this period.',
   'dashboards.newRepeatNote':
     'An order counts as “new” when it falls in the period of the customer’s first-ever order — repeat purchases inside that same period still count as new; later periods count as returning.',
   'dashboards.modeCumulative': 'Cumulative',
@@ -1556,6 +1564,14 @@ export const translations: Record<Lang, Record<string, string>> = {
   'dashboards.newCustomers': 'عملاء جدد',
   'dashboards.repeatCustomers': 'عملاء عائدون',
   'dashboards.gDay': 'يوم',
+  'dashboards.materialsSold': 'المواد المباعة',
+  'dashboards.materialsSoldDesc': 'الكميات المباعة لكل مادة، منفَّذ مقابل غير منفَّذ.',
+  'dashboards.fulfilled': 'منفَّذ',
+  'dashboards.unfulfilled': 'غير منفَّذ',
+  'dashboards.unit': 'الوحدة',
+  'dashboards.materialsOmitted': 'لم تُعرض {count} مادة إضافية — يعرض المخطط أعلى 12 مادة كمّيةً.',
+  'dashboards.materialUnitsNote':
+    'الكميات بوحدة كل مادة؛ كل عمود يمثل مادة واحدة، فلا تُجمع وحدات مختلفة. يُحتسب "منفَّذ" ما سُلِّم حتى الآن مما طُلب في هذه الفترة.',
   'dashboards.newRepeatNote':
     'يُحتسب الطلب "جديداً" إذا وقع في الفترة التي تضم أول طلب للعميل على الإطلاق — وتُحتسب مشترياته المتكررة ضمن الفترة نفسها جديدة أيضاً؛ أما الفترات اللاحقة فتُحتسب كعميل عائد.',
   'dashboards.modeCumulative': 'تراكمي',
