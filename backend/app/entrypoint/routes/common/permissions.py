@@ -143,6 +143,129 @@ MODULE_SET = set(MODULES)
 ACTION_SET = set(ACTIONS)
 
 
+# ---------------------------------------------------------------------------
+# DASHBOARDS — which of the pre-defined dashboards each role may see.
+#
+# A separate concern from `modules`/`endpoints`, deliberately. The `dashboard`
+# module answers "can this user reach the Dashboards section at all"; this map
+# answers "which dashboards render inside it". Keeping it out of the module
+# namespace means a dashboard never shows up as a toggle in the per-user CRUD
+# checklist, and — because it resolves from the ROLE directly rather than from a
+# user's frozen permissions column — a platform-owner change to a role's
+# dashboards reaches every user of that role, including ones who carry a
+# customised per-user ACL. Platform-wide, like ROLE_PRESETS: one config for all
+# tenants, written only by the platform owner.
+#
+# THE CATALOG is the single place a dashboard is declared. A client renders
+# whichever of these it actually ships a screen for; an id it does not recognise
+# is silently ignored (never a crash), so a new dashboard added here stays
+# invisible until a build ships its screen. Adding a dashboard = one entry here
+# + one screen per client + its translation keys.
+DASHBOARD_CATALOG = [
+    {"id": "business-overview", "title_key": "dashboards.businessOverview", "order": 1},
+    {"id": "sales-performance", "title_key": "dashboards.salesPerformance", "order": 2},
+    {"id": "field-ops", "title_key": "dashboards.fieldOps", "order": 3},
+    {"id": "spend", "title_key": "dashboards.spend", "order": 4},
+    {"id": "inventory-health", "title_key": "dashboards.inventoryHealth", "order": 5},
+]
+DASHBOARD_IDS = {d["id"] for d in DASHBOARD_CATALOG}
+_DASHBOARD_ORDER = {d["id"]: d["order"] for d in DASHBOARD_CATALOG}
+
+# Baseline role -> dashboard ids. An absent role sees none. admin/superuser see
+# every dashboard (resolved to None below) and are never stored here. A role only
+# actually reaches these if it ALSO holds the `dashboard` module (role_presets) —
+# today that is accountant + operation_manager; granting a dashboard to another
+# role presupposes granting it the module too.
+DASHBOARD_DEFAULTS = {
+    "operation_manager": ["business-overview", "sales-performance", "field-ops", "spend", "inventory-health"],
+    "accountant": ["business-overview", "spend"],
+    "sales_manager": ["business-overview", "sales-performance", "field-ops"],
+    "sales": ["sales-performance", "field-ops"],
+    "sales_associate": ["sales-performance", "field-ops"],
+    "warehouse_keeper": ["inventory-health"],
+    "operator": [],
+    "driver": [],
+}
+
+# Platform-owner overrides live in platform_setting under this key, as
+# {role: [dashboard_id, ...]} for OVERRIDDEN roles only — absent means "use the
+# DASHBOARD_DEFAULTS baseline for that role".
+ROLE_DASHBOARDS_SETTING_KEY = "role_dashboards"
+_dash_override_cache: dict = {"at": None, "value": {}}
+
+
+def invalidate_role_dashboards() -> None:
+    """Drop the cached dashboard overrides so the next read hits the database."""
+    _dash_override_cache["at"] = None
+
+
+def role_dashboard_overrides() -> dict:
+    """Platform-owner overrides for role dashboards, cached with the same short
+    TTL and the same authorization-path safety as role_overrides()."""
+    import time
+
+    now = time.monotonic()
+    at = _dash_override_cache["at"]
+    if at is not None and (now - at) < _ROLE_OVERRIDE_TTL_SECONDS:
+        return _dash_override_cache["value"]
+
+    try:
+        from app.adapters.unit_of_work.sqlalchemy_unit_of_work import (
+            SqlAlchemyUnitOfWork,
+        )
+        from models.common import PlatformSetting
+
+        with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+            row = (
+                uow.session.query(PlatformSetting)
+                .filter_by(key=ROLE_DASHBOARDS_SETTING_KEY)
+                .one_or_none()
+            )
+            value = dict(row.value) if row and row.value else {}
+    except Exception:
+        # same rule as role_overrides: this sits on the auth path, so a
+        # transient DB problem serves the last known value rather than 500ing
+        return _dash_override_cache["value"]
+
+    _dash_override_cache["at"] = now
+    _dash_override_cache["value"] = value
+    return value
+
+
+def resolved_role_dashboards() -> dict:
+    """Every configurable role's dashboard ids: the override where one exists,
+    else the baseline. Only ids still in the catalog survive, so retiring a
+    dashboard cannot leave a dangling grant."""
+    overrides = role_dashboard_overrides()
+    out = {}
+    for role in DASHBOARD_DEFAULTS:
+        ids = overrides[role] if role in overrides else DASHBOARD_DEFAULTS[role]
+        out[role] = [i for i in (ids or []) if i in DASHBOARD_IDS]
+    return out
+
+
+def dashboards_for_scope(permission_scope):
+    """Ordered dashboard ids a scope may see, or None for admin/superuser (all).
+
+    Mirrors effective_permissions' admin bypass: None means "every dashboard",
+    a list means exactly these. Deduped across a comma-joined scope and ordered
+    by the catalog so both clients render the same sequence.
+    """
+    scopes = set((permission_scope or "").split(","))
+    if scopes & _ADMIN_SCOPES:
+        return None
+    resolved = resolved_role_dashboards()
+    seen: set = set()
+    out: list = []
+    for s in scopes:
+        for did in resolved.get(s, []):
+            if did not in seen:
+                seen.add(did)
+                out.append(did)
+    out.sort(key=lambda i: _DASHBOARD_ORDER.get(i, 999))
+    return out
+
+
 _ADMIN_SCOPES = {"admin", "superuser"}
 
 
@@ -193,7 +316,7 @@ def endpoint_allowed(permissions: dict, blueprint: str, method: str) -> bool:
     return action in allowed
 
 
-def perms_version(scopes, user_acl, account_perms, account_verified) -> str:
+def perms_version(scopes, user_acl, account_perms, account_verified, dashboards="__unset__") -> str:
     """A short fingerprint of everything that governs what a client may see.
 
     The server revokes access on the caller's very next request, because the
@@ -218,15 +341,21 @@ def perms_version(scopes, user_acl, account_perms, account_verified) -> str:
     """
     import hashlib
 
+    governing = {
+        "scopes": sorted(s for s in (scopes or []) if s),
+        "acl": user_acl,
+        "account": account_perms,
+        "verified": bool(account_verified),
+    }
+    # The set of dashboards a role sees governs visibility too, so an edit to it
+    # must move the fingerprint and tell open clients to re-read. Only folded in
+    # when the caller passes it (sentinel default), so a caller that predates this
+    # — a test, say — keeps its old fingerprint rather than forcing a spurious
+    # refresh; the one caller that matters (the request chokepoint) passes it.
+    if dashboards != "__unset__":
+        governing["dashboards"] = dashboards
+
     payload = json.dumps(
-        {
-            "scopes": sorted(s for s in (scopes or []) if s),
-            "acl": user_acl,
-            "account": account_perms,
-            "verified": bool(account_verified),
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str,
+        governing, sort_keys=True, separators=(",", ":"), default=str
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]

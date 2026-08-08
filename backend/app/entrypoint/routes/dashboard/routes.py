@@ -18,6 +18,21 @@ from models.common import (
 )
 
 
+@dashboard_blueprint.route("/catalog", methods=["GET"])
+@jwt_required()
+def catalog():
+    """The pre-defined set of dashboards, declared once server-side.
+
+    The single source of truth that the super-admin assignment matrix, both
+    clients' labels/ordering, and the assignment validator all read, so a new
+    dashboard is declared in exactly one place. Open to any authenticated user:
+    it is a static menu of ids and label keys, not data.
+    """
+    from app.entrypoint.routes.common.permissions import DASHBOARD_CATALOG
+
+    return jsonify(DASHBOARD_CATALOG), 200
+
+
 def _day(dt) -> str:
     return dt.strftime("%Y-%m-%d") if dt else ""
 

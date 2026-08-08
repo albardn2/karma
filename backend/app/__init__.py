@@ -79,6 +79,7 @@ def _load_request_identity():
         RESOURCE_SET,
         endpoint_allowed,
         effective_permissions,
+        dashboards_for_scope,
         perms_version,
     )
     try:
@@ -166,11 +167,16 @@ def _load_request_identity():
         g.user_scopes = set((user.permission_scope or "").split(","))
         # effective perms: explicit checklist or role preset (None = admin)
         g.user_acl = effective_permissions(user)
+        # which dashboards this role may see (None = admin, all). Resolved from
+        # the ROLE, not the ACL, so it reaches users with a custom per-user
+        # checklist too.
+        g.user_dashboards = dashboards_for_scope(user.permission_scope)
         # Fingerprint of what governs this caller, emitted on every response by
         # _emit_perms_version below. Computed here because this is the one place
-        # that has all four inputs already resolved and DB-fresh.
+        # that has all the inputs already resolved and DB-fresh.
         g.perms_version = perms_version(
-            g.user_scopes, g.user_acl, g.account_perms, g.account_verified
+            g.user_scopes, g.user_acl, g.account_perms, g.account_verified,
+            g.user_dashboards,
         )
 
     if request.blueprint in RESOURCE_SET:

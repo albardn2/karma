@@ -514,3 +514,149 @@ def impersonate(account_uuid: str):
             "company_name": account.company_name,
         }
     return jsonify(result), 200
+
+
+# ---------------------------------------------------------------------------
+# Role -> dashboards: which of the pre-defined dashboards each role sees.
+# Platform-wide, like role-presets: one config for every tenant, written only by
+# the platform owner. A separate concern from role permissions, so it lives in
+# its own PlatformSetting key and never appears in the CRUD permission checklist.
+# ---------------------------------------------------------------------------
+
+
+def _role_dashboards_payload(uow):
+    """Every configurable role's dashboard ids, plus what the matrix needs to act
+    safely: the baseline (so it can offer reset + show what an override changed),
+    whether each role is overridden, and how many users follow the role."""
+    from app.entrypoint.routes.common.permissions import (
+        DASHBOARD_CATALOG,
+        DASHBOARD_DEFAULTS,
+        resolved_role_dashboards,
+        role_dashboard_overrides,
+    )
+    from models.common import User as UserModel
+
+    overrides = role_dashboard_overrides()
+    resolved = resolved_role_dashboards()
+    counts = dict(
+        uow.session.query(UserModel.permission_scope, func.count(UserModel.uuid))
+        .filter(UserModel.is_deleted.is_(False), UserModel.permissions.is_(None))
+        .group_by(UserModel.permission_scope)
+        .all()
+    )
+    return {
+        "catalog": DASHBOARD_CATALOG,
+        "roles": {
+            role: {
+                "dashboards": resolved[role],
+                "baseline": DASHBOARD_DEFAULTS[role],
+                "is_overridden": role in overrides,
+                "following_count": counts.get(role, 0),
+            }
+            for role in DASHBOARD_DEFAULTS
+        },
+    }
+
+
+@super_admin_blueprint.route("/settings/role-dashboards", methods=["GET"])
+@scopes_required(SUPER)
+def get_role_dashboards():
+    """Per-role dashboard assignment for the super-admin matrix."""
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        result = _role_dashboards_payload(uow)
+    return jsonify(result), 200
+
+
+@super_admin_blueprint.route("/settings/role-dashboards/<string:role>", methods=["PUT"])
+@scopes_required(SUPER)
+def set_role_dashboards(role: str):
+    """Set which dashboards one role sees, platform-wide.
+
+    Takes effect without a deploy: the perms-version fingerprint folds the
+    dashboard set in, so every open client of a user following this role re-reads
+    /auth/me on its next request and re-renders its dashboard strip.
+    """
+    from pydantic import BaseModel, ConfigDict, field_validator
+    from app.entrypoint.routes.common.permissions import (
+        DASHBOARD_DEFAULTS,
+        DASHBOARD_IDS,
+        ROLE_DASHBOARDS_SETTING_KEY,
+        invalidate_role_dashboards,
+    )
+    from models.common import PlatformSetting
+
+    # admin/superuser are excluded: they see every dashboard by construction, so
+    # an entry for them would be stored, shown, and silently ignored.
+    if role not in DASHBOARD_DEFAULTS:
+        raise BadRequestError(
+            f"unknown role {role!r} — must be one of {sorted(DASHBOARD_DEFAULTS)}"
+        )
+
+    class _Body(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        dashboards: list[str]
+
+        @field_validator("dashboards")
+        @classmethod
+        def _known_ids(cls, v):
+            # reject unknown ids rather than store a dangling grant no client can
+            # ever render; dedupe while preserving order
+            seen, out = set(), []
+            for i in v:
+                if i not in DASHBOARD_IDS:
+                    raise ValueError(
+                        f"unknown dashboard {i!r} — must be one of {sorted(DASHBOARD_IDS)}"
+                    )
+                if i not in seen:
+                    seen.add(i)
+                    out.append(i)
+            return out
+
+    payload = _Body(**request.json)
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        row = uow.session.query(PlatformSetting).filter_by(
+            key=ROLE_DASHBOARDS_SETTING_KEY).one_or_none()
+        # rebuilt, not mutated: MutableDict tracks top-level assignment only
+        value = dict(row.value) if row and row.value else {}
+        value[role] = payload.dashboards
+        if row:
+            row.value = value
+        else:
+            uow.session.add(
+                PlatformSetting(key=ROLE_DASHBOARDS_SETTING_KEY, value=value)
+            )
+        # commit, THEN invalidate — same ordering rule as the role presets: the
+        # override read goes through its own session and cannot see an uncommitted
+        # write, so invalidating first would re-cache the stale value with a fresh
+        # timestamp and serve it for the whole TTL.
+        uow.commit()
+        invalidate_role_dashboards()
+        result = _role_dashboards_payload(uow)
+    return jsonify(result), 200
+
+
+@super_admin_blueprint.route("/settings/role-dashboards/<string:role>", methods=["DELETE"])
+@scopes_required(SUPER)
+def reset_role_dashboards(role: str):
+    """Drop the override and return this role to the baseline dashboard set."""
+    from app.entrypoint.routes.common.permissions import (
+        DASHBOARD_DEFAULTS,
+        ROLE_DASHBOARDS_SETTING_KEY,
+        invalidate_role_dashboards,
+    )
+    from models.common import PlatformSetting
+
+    if role not in DASHBOARD_DEFAULTS:
+        raise BadRequestError(f"unknown role {role!r}")
+
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        row = uow.session.query(PlatformSetting).filter_by(
+            key=ROLE_DASHBOARDS_SETTING_KEY).one_or_none()
+        if row and row.value and role in row.value:
+            value = dict(row.value)
+            value.pop(role, None)
+            row.value = value
+        uow.commit()
+        invalidate_role_dashboards()
+        result = _role_dashboards_payload(uow)
+    return jsonify(result), 200
