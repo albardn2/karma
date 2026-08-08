@@ -45,6 +45,13 @@ const IMPLEMENTED: Entry[] = [
     titleKey: 'dashboards.revenueOverTime',
     descKey: 'dashboards.revenueOverTimeDesc',
   },
+  {
+    id: 'spend',
+    route: '/dashboards/spend',
+    icon: '🧾',
+    titleKey: 'dashboards.spend',
+    descKey: 'dashboards.spendDesc',
+  },
 ];
 
 /**
