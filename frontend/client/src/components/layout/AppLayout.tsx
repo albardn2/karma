@@ -29,7 +29,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    // h-screen + overflow-hidden pin the shell to the viewport: the DOCUMENT
+    // never scrolls, so the sidebar stays put while <main> below scrolls its
+    // own content (and the sidebar's nav keeps its own independent scroll)
+    <div className="h-screen overflow-hidden flex flex-col">
       {impersonatingCompany && (
         <div
           data-testid="impersonation-banner"
@@ -45,12 +48,18 @@ export function AppLayout({ children }: AppLayoutProps) {
           </button>
         </div>
       )}
-      <div className="flex-1 flex flex-col lg:flex-row">
+      {/* min-h-0 lets this row shrink to the leftover viewport height instead
+          of growing with its content — without it flexbox sizes the row to the
+          tallest child and the document scrolls again */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
         <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
 
         <MobileHeader onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
 
-        <main className="flex-1 flex flex-col overflow-hidden pb-16 lg:pb-0">
+        {/* overflow-y-auto (not hidden): pages that bring their own scroll
+            container keep it; pages that don't now scroll here instead of
+            scrolling the document out from under the sidebar */}
+        <main className="flex-1 min-h-0 flex flex-col overflow-y-auto pb-16 lg:pb-0">
           {children}
         </main>
 
