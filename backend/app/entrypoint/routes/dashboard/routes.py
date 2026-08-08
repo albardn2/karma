@@ -6,7 +6,9 @@ from flask_jwt_extended import jwt_required
 from sqlalchemy import func
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+from app.domains.exchange_rate.converter import CurrencyConverter
 from app.dto.auth import PermissionScope
+from app.dto.common_enums import Currency
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.dashboard import dashboard_blueprint
 from models.common import (
@@ -16,6 +18,21 @@ from models.common import (
     Payment as PaymentModel,
     Trip as TripModel,
 )
+
+# When the caller names no reporting currency, USD is the reference unit: it is
+# stable against SYP volatility and the redenomination, so a converted total is
+# comparable across the whole window. A tenant can still ask for SYP explicitly.
+DEFAULT_TARGET_CURRENCY = Currency.USD
+
+
+def _target_currency() -> Currency:
+    raw = (request.args.get("target_currency") or "").strip().upper()
+    try:
+        return Currency(raw) if raw else DEFAULT_TARGET_CURRENCY
+    except ValueError:
+        # an unknown target is a client mistake, not a reason to 500 a landing
+        # page; fall back to the default rather than reject
+        return DEFAULT_TARGET_CURRENCY
 
 
 def _day(dt) -> str:
@@ -42,6 +59,8 @@ def overview():
     except ValueError:
         days_window = 30
 
+    target = _target_currency()
+
     now = datetime.utcnow()
     start = (now - timedelta(days=days_window - 1)).replace(
         hour=0, minute=0, second=0, microsecond=0
@@ -51,13 +70,44 @@ def overview():
     with SqlAlchemyUnitOfWork() as uow:
         s = uow.session
 
+        # One converter per request: it caches each day's rate and pulls at most
+        # once, so restating a whole window of orders costs one rate lookup per
+        # distinct day. Every amount is converted at ITS OWN day's rate before it
+        # is summed — the only honest way to combine SYP and USD into one number.
+        conv = CurrencyConverter(uow, target)
+
+        # An amount that cannot be converted (a currency with no rate anywhere)
+        # is never zeroed into the total; it is counted here and reported raw, so
+        # a converted headline can always say "plus N records not converted".
+        # With USD<->SYP the only pair and a full year of rates, this stays empty
+        # in practice, but the contract must be able to admit a gap.
+        unconv_count: dict = defaultdict(int)
+        unconv_raw: dict = defaultdict(float)
+
+        def _add(bucket_total, bucket_by_day, cur, day, amount, when):
+            """Sum the raw per-currency figure AND the converted one, or bank the
+            unconvertible amount for honest disclosure."""
+            bucket_total[cur] += amount
+            bucket_by_day[cur][day] += amount
+            c = conv.convert(amount, cur if cur != "?" else None, when)
+            if c is None:
+                if amount:
+                    unconv_count[cur] += 1
+                    unconv_raw[cur] += amount
+                return None
+            return c
+
         # ---- money metrics from orders created in the window ----
-        # totals/series keyed by currency; amount_due needs the hybrid props,
-        # so iterate the window's orders (dashboard windows are bounded)
+        # per-currency maps kept as-is (existing consumers read them); converted
+        # totals/series added alongside. amount_due needs the hybrid props, so
+        # iterate the window's orders (dashboard windows are bounded).
         revenue_total: dict = defaultdict(float)
         debt_total: dict = defaultdict(float)
         revenue_by_day: dict = defaultdict(lambda: defaultdict(float))
         orders_by_day: dict = defaultdict(int)
+        revenue_conv_total = 0.0
+        debt_conv_total = 0.0
+        revenue_conv_by_day: dict = defaultdict(float)
         orders_count = 0
         window_orders = (
             s.query(CustomerOrderModel)
@@ -72,15 +122,26 @@ def overview():
             cur = o.currency or "?"
             day = _day(o.created_at)
             total = o.total_adjusted_amount or 0
-            revenue_total[cur] += total
-            revenue_by_day[cur][day] += total
-            debt_total[cur] += o.net_amount_due or 0
+            rc = _add(revenue_total, revenue_by_day, cur, day, total, o.created_at)
+            if rc is not None:
+                revenue_conv_total += rc
+                revenue_conv_by_day[day] += rc
+            due = o.net_amount_due or 0
+            debt_total[cur] += due
+            dc = conv.convert(due, cur if cur != "?" else None, o.created_at)
+            if dc is not None:
+                debt_conv_total += dc
+            elif due:
+                unconv_count[cur] += 1
+                unconv_raw[cur] += due
             orders_by_day[day] += 1
             orders_count += 1
 
         # ---- collected: payments in the window (skip deleted/voided chains) ----
         collected_total: dict = defaultdict(float)
         collected_by_day: dict = defaultdict(lambda: defaultdict(float))
+        collected_conv_total = 0.0
+        collected_conv_by_day: dict = defaultdict(float)
         payments = (
             s.query(PaymentModel)
             .outerjoin(InvoiceModel, PaymentModel.invoice_uuid == InvoiceModel.uuid)
@@ -95,8 +156,11 @@ def overview():
         for p in payments:
             cur = p.currency or "?"
             day = _day(p.created_at)
-            collected_total[cur] += p.amount or 0
-            collected_by_day[cur][day] += p.amount or 0
+            amount = p.amount or 0
+            cc = _add(collected_total, collected_by_day, cur, day, amount, p.created_at)
+            if cc is not None:
+                collected_conv_total += cc
+                collected_conv_by_day[day] += cc
 
         # ---- counts: new customers + trips per day ----
         new_customers_rows = (
@@ -137,6 +201,9 @@ def overview():
             "to": now.isoformat(),
             "days": days_window,
             "currencies": currencies,
+            # what the converted figures below are denominated in, echoed back so
+            # a client that fell back to the default knows which currency it got
+            "target_currency": target.value,
             "totals": {
                 "revenue": dict(revenue_total),
                 "collected": dict(collected_total),
@@ -144,6 +211,20 @@ def overview():
                 "new_customers": sum(customers_by_day.values()),
                 "orders": orders_count,
                 "trips": sum(trips_by_day.values()),
+            },
+            # single-currency figures: every amount restated at its own day's
+            # rate and summed. These are what the revamped dashboards read; the
+            # per-currency maps above stay for the existing consumers.
+            "totals_converted": {
+                "revenue": round(revenue_conv_total, 2),
+                "collected": round(collected_conv_total, 2),
+                "window_debt": round(debt_conv_total, 2),
+            },
+            # non-empty only when some amount had no rate to convert by; never
+            # folded into the totals above
+            "unconverted": {
+                "count": sum(unconv_count.values()),
+                "by_currency": {k: round(v, 2) for k, v in unconv_raw.items()},
             },
             "series": {
                 "revenue": {
@@ -155,6 +236,10 @@ def overview():
                 "new_customers": _series(day_keys, customers_by_day),
                 "orders": _series(day_keys, orders_by_day),
                 "trips": _series(day_keys, trips_by_day),
+            },
+            "series_converted": {
+                "revenue": _series(day_keys, revenue_conv_by_day),
+                "collected": _series(day_keys, collected_conv_by_day),
             },
         }
     return jsonify(result), 200
