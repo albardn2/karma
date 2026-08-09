@@ -176,7 +176,25 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build Android (internal distribution)
-        run: eas build --platform android --profile preview --non-interactive
+        run: |
+          # pipefail so tee cannot mask a failed build
+          set -o pipefail
+          eas build --platform android --profile preview --non-interactive 2>&1 | tee build.log
+
+      - name: Publish install link
+        if: always()
+        run: |
+          # An internal-distribution APK is only useful if you can find it. EAS
+          # prints the build page URL; lift it into the job summary rather than
+          # making someone dig through the raw log for the one line that matters.
+          URL=$(grep -oE 'https://expo\.dev/accounts/[^[:space:]]+/builds/[a-f0-9-]+' build.log | tail -1 || true)
+          if [ -n "$URL" ]; then
+            {
+              echo "### Android APK ready"
+              echo ""
+              echo "Open on the device to install: $URL"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   build-android-google-play:
     name: Android store build → Play internal track
@@ -209,12 +227,47 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build Android (store)
-        run: eas build --platform android --profile production --non-interactive
+        run: |
+          # pipefail so tee cannot mask a failed build
+          set -o pipefail
+          eas build --platform android --profile production --non-interactive 2>&1 | tee build.log
+
+      - name: Publish build link
+        if: always()
+        run: |
+          URL=$(grep -oE 'https://expo\.dev/accounts/[^[:space:]]+/builds/[a-f0-9-]+' build.log | tail -1 || true)
+          if [ -n "$URL" ]; then
+            {
+              echo "### Android AAB built"
+              echo ""
+              echo "$URL"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Submit Android to Google Play (internal track)
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64 }}
         run: |
+          # The signed AAB above is the deliverable; uploading it is a separate,
+          # optional step needing Play credentials this repo may not hold yet.
+          # Skipping LOUDLY beats failing: without this guard an unset secret
+          # decodes to an empty file and `eas submit` dies on unparseable JSON,
+          # which reads as "Android CI is broken" when the build was fine.
+          if [ -z "$GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64" ]; then
+            {
+              echo "### Play submission skipped — no service-account key"
+              echo ""
+              echo "The signed **AAB built successfully** (link above); only the upload was skipped."
+              echo ""
+              echo "To turn on automatic upload to the Play **internal** track:"
+              echo "1. Play Console → *Users and permissions* → invite a Google Cloud service account with **Release to testing tracks** rights."
+              echo "2. Download its JSON key and encode it: \`base64 -i key.json | pbcopy\`"
+              echo "3. Add it as the repo secret **\`GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64\`**."
+              echo "4. Upload **one AAB by hand** in the Play Console first — Google rejects API uploads until the package has an existing release."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64 is not set — built the AAB, skipped Play submission."
+            exit 0
+          fi
           echo "$GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64" | base64 --decode > google-service-account-key.json
           eas submit --platform android --profile preview --non-interactive --latest
 
