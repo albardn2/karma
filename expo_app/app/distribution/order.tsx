@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -68,6 +69,46 @@ export default function OrderActionsScreen() {
     ? (data?.invoices || []).find((i: any) => i.uuid === invoiceUuid) ?? data?.invoices?.[0]
     : data?.invoices?.[0];
   const items = (order?.customer_order_items || []).filter((i: any) => !i.is_deleted);
+
+  // payment-aware price editing, same rule the order detail screen follows:
+  // the server decides ("unpaid" | "single_payment" | "locked"). Prices live
+  // on the INVOICE lines, so map each order item to its invoice line here.
+  const priceEditState: string | undefined = data?.price_edit_state;
+  const canEditPrice = priceEditState === 'unpaid' || priceEditState === 'single_payment';
+  const invoiceItemFor = (orderItemUuid: string) => {
+    for (const inv of data?.invoices || []) {
+      if (inv.is_deleted) continue;
+      const hit = (inv.invoice_items || []).find(
+        (li: any) => !li.is_deleted && li.customer_order_item_uuid === orderItemUuid,
+      );
+      if (hit) return hit;
+    }
+    return null;
+  };
+  const [priceItem, setPriceItem] = useState<any>(null);
+  const [priceDraft, setPriceDraft] = useState('');
+  const [priceSaving, setPriceSaving] = useState(false);
+
+  const savePrice = async () => {
+    if (!priceItem) return;
+    const price = parseFloat(priceDraft);
+    if (isNaN(price) || price < 0) return;
+    setPriceSaving(true);
+    const res = await apiCall(`/invoice-item/${priceItem.uuid}/price`, {
+      method: 'PUT',
+      body: JSON.stringify({ price_per_unit: price }),
+    });
+    setPriceSaving(false);
+    if (res.status === 200) {
+      setPriceItem(null);
+      load();
+    } else {
+      Alert.alert(
+        t('customerOrders.editPrice'),
+        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+      );
+    }
+  };
   const unfulfilled = items.filter((i: any) => !i.is_fulfilled);
   const amountDue = invoice?.net_amount_due ?? order?.net_amount_due ?? 0;
   const currency = order?.currency || '';
@@ -201,38 +242,66 @@ export default function OrderActionsScreen() {
 
           {/* items */}
           <View style={styles.itemsBox}>
-            {items.map((i: any) =>
-              i.is_fulfilled ? (
-                <View key={i.uuid} style={styles.itemRow}>
-                  <ThemedText style={styles.itemName}>{i.material_name} × {i.quantity} {i.unit || ''}</ThemedText>
-                  <ThemedText style={[styles.itemTag, styles.tagGreen]}>
-                    {t('order.itemFulfilled')}
+            {priceEditState === 'single_payment' && (
+              <ThemedText style={styles.priceNote}>
+                {t('customerOrders.priceEditPaymentNote')}
+              </ThemedText>
+            )}
+            {items.map((i: any) => {
+              // the price lives on the matching INVOICE line; editable only
+              // when the order's payment state allows (server-decided)
+              const li = invoiceItemFor(i.uuid);
+              const priceRow = canEditPrice && li && (
+                <TouchableOpacity
+                  style={styles.editPriceRow}
+                  onPress={() => {
+                    setPriceDraft(String(li.price_per_unit ?? ''));
+                    setPriceItem(li);
+                  }}
+                  hitSlop={8}
+                  testID={`edit-price-${li.uuid}`}
+                >
+                  <ThemedText style={styles.editPriceText}>
+                    {round2(li.price_per_unit ?? 0)} {te(currency)} · {t('customerOrders.editPrice')}
                   </ThemedText>
+                </TouchableOpacity>
+              );
+              return i.is_fulfilled ? (
+                <View key={i.uuid}>
+                  <View style={styles.itemRow}>
+                    <ThemedText style={styles.itemName}>{i.material_name} × {i.quantity} {i.unit || ''}</ThemedText>
+                    <ThemedText style={[styles.itemTag, styles.tagGreen]}>
+                      {t('order.itemFulfilled')}
+                    </ThemedText>
+                  </View>
+                  {priceRow}
                 </View>
               ) : (
                 // tappable: untick a line to leave it undelivered this time. All
                 // lines start ticked, so tapping nothing keeps the old behaviour.
-                <TouchableOpacity
-                  key={i.uuid}
-                  style={styles.itemRow}
-                  onPress={() =>
-                    setPicked((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(i.uuid)) next.delete(i.uuid);
-                      else next.add(i.uuid);
-                      return next;
-                    })
-                  }
-                  testID={`pick-item-${i.uuid}`}
-                >
-                  <ThemedText style={styles.check}>{picked.has(i.uuid) ? '☑' : '☐'}</ThemedText>
-                  <ThemedText style={styles.itemName}>{i.material_name} × {i.quantity} {i.unit || ''}</ThemedText>
-                  <ThemedText style={[styles.itemTag, styles.tagGray]}>
-                    {t('order.itemPending')}
-                  </ThemedText>
-                </TouchableOpacity>
-              )
-            )}
+                <View key={i.uuid}>
+                  <TouchableOpacity
+                    style={styles.itemRow}
+                    onPress={() =>
+                      setPicked((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(i.uuid)) next.delete(i.uuid);
+                        else next.add(i.uuid);
+                        return next;
+                      })
+                    }
+                    testID={`pick-item-${i.uuid}`}
+                  >
+                    <ThemedText style={styles.check}>{picked.has(i.uuid) ? '☑' : '☐'}</ThemedText>
+                    <ThemedText style={styles.itemName}>{i.material_name} × {i.quantity} {i.unit || ''}</ThemedText>
+                    <ThemedText style={[styles.itemTag, styles.tagGray]}>
+                      {t('order.itemPending')}
+                    </ThemedText>
+                  </TouchableOpacity>
+                  {priceRow}
+                </View>
+              );
+            })}
           </View>
 
           {savedBanner && (
@@ -314,6 +383,51 @@ export default function OrderActionsScreen() {
           )}
         </ScrollView>
       )}
+
+      <Modal
+        visible={!!priceItem}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPriceItem(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <ThemedText style={styles.modalTitle}>
+              {t('customerOrders.editPrice')}
+              {priceItem?.material_name ? ` — ${priceItem.material_name}` : ''}
+            </ThemedText>
+            <TextInput
+              style={styles.priceInput}
+              value={priceDraft}
+              onChangeText={setPriceDraft}
+              keyboardType="decimal-pad"
+              placeholder={t('customerOrders.newPricePerUnit')}
+              placeholderTextColor="#9ca3af"
+              autoFocus
+              testID="order-price-input"
+            />
+            <View style={styles.modalRow}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setPriceItem(null)}
+                disabled={priceSaving}
+              >
+                <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSave, priceSaving && styles.modalSaveOff]}
+                onPress={savePrice}
+                disabled={priceSaving}
+                testID="order-price-save"
+              >
+                <ThemedText style={styles.modalSaveText}>
+                  {priceSaving ? t('custdetail.saving') : t('form.save')}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -342,6 +456,33 @@ const styles = StyleSheet.create({
   itemTag: { fontSize: 11, fontWeight: '600', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
   tagGreen: { backgroundColor: '#D1FAE5', color: '#047857' },
   tagGray: { backgroundColor: '#E5E7EB', color: '#4B5563' },
+  priceNote: {
+    fontSize: 11, color: '#B45309', lineHeight: 15,
+    paddingHorizontal: 12, paddingTop: 8,
+  },
+  editPriceRow: {
+    paddingHorizontal: 12, paddingBottom: 8, marginTop: -4,
+    alignSelf: 'flex-start',
+  },
+  editPriceText: { fontSize: 12, fontWeight: '700', color: '#5469D4' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
+  modalSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
+    padding: 16, paddingBottom: 32,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
+  priceInput: {
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 8,
+    backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 10,
+    fontSize: 16, color: '#111827',
+  },
+  modalRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 12 },
+  modalCancel: { paddingHorizontal: 14, paddingVertical: 10 },
+  modalCancelText: { color: '#6b7280', fontWeight: '600' },
+  modalSave: { backgroundColor: '#5469D4', borderRadius: 10, paddingHorizontal: 18, paddingVertical: 10 },
+  modalSaveOff: { opacity: 0.6 },
+  modalSaveText: { color: '#fff', fontWeight: '700' },
   // same green as the stop screen's completed banner, so success reads the same
   // way everywhere in the app
   savedBanner: { backgroundColor: '#D1FAE5', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 14 },
