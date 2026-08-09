@@ -66,12 +66,17 @@ def create_customer_order_checkout():
                     PermissionScope.ACCOUNTANT.value
                  )
 def get_customer_order_with_items_and_invoice(uuid: str):
+    from app.entrypoint.routes.invoice_item.routes import order_price_edit_state
+
     with SqlAlchemyUnitOfWork() as uow:
         cus_order = uow.customer_order_repository.find_one(uuid=uuid, is_deleted=False)
         if not cus_order:
             raise NotFoundError("CustomerOrder not found")
 
         dto=CustomerOrderWithItemsAndInvoiceRead.from_customer_order_model(cus_order)
+        # both clients decide whether to offer the price editor from this one
+        # server-computed flag, so the payment-state rule cannot drift
+        dto.price_edit_state, _ = order_price_edit_state(cus_order)
         result = dto.model_dump(mode="json")
     return jsonify(result), 201
 

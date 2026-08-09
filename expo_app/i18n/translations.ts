@@ -1174,6 +1174,10 @@ export const translations: Record<Lang, Record<string, string>> = {
   'customerOrders.notes': 'Notes',
   'customerOrders.notesPlaceholder': 'Order notes…',
   'customerOrders.editNotes': 'Edit notes',
+  'customerOrders.editPrice': 'Edit price',
+  'customerOrders.newPricePerUnit': 'New price per unit',
+  'customerOrders.priceEditPaymentNote':
+    'This order is settled by a single payment — changing a price also adjusts that payment by the same amount.',
   'customerOrders.void': 'Void order (admin)',
   'customerOrders.voidConfirm': 'Voids this order and reverses everything it did: line items, the invoice, ALL RECORDED PAYMENTS, and stock movements. This works even on paid and fulfilled orders. This cannot be undone from the app.',
   'customerOrders.unfulfil': 'Unfulfil',
@@ -2399,6 +2403,10 @@ export const translations: Record<Lang, Record<string, string>> = {
   'customerOrders.notes': 'ملاحظات',
   'customerOrders.notesPlaceholder': 'ملاحظات الطلب…',
   'customerOrders.editNotes': 'تعديل الملاحظات',
+  'customerOrders.editPrice': 'تعديل السعر',
+  'customerOrders.newPricePerUnit': 'السعر الجديد للوحدة',
+  'customerOrders.priceEditPaymentNote':
+    'هذا الطلب مسدَّد بدفعة واحدة — تغيير السعر سيعدِّل تلك الدفعة بالمقدار نفسه.',
   'customerOrders.void': 'إلغاء الطلب (مسؤول)',
   'customerOrders.voidConfirm': 'سيؤدي إلغاء هذا الطلب إلى عكس كل ما نتج عنه: البنود والفاتورة وجميع الدفعات المسجلة وحركات المخزون، حتى لو كان الطلب مدفوعاً ومنفذاً. لا يمكن التراجع عن هذا من التطبيق.',
   'customerOrders.unfulfil': 'إلغاء التنفيذ',

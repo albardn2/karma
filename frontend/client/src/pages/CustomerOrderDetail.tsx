@@ -133,6 +133,42 @@ export default function CustomerOrderDetail() {
   const customerOrder = orderData?.customer_order;
   const customerOrderItems = customerOrder?.customer_order_items || [];
   const invoices = orderData?.invoices || [];
+  // payment-aware price editing, decided SERVER-side from the order's payment
+  // state: "unpaid" (free), "single_payment" (allowed; the one payment absorbs
+  // the delta) or "locked" (partial / several payments / notes)
+  const priceEditState: string | undefined = orderData?.price_edit_state;
+  const canEditPrice = priceEditState === "unpaid" || priceEditState === "single_payment";
+  const [priceEditUuid, setPriceEditUuid] = useState<string | null>(null);
+  const [priceDraft, setPriceDraft] = useState("");
+
+  const priceMutation = useMutation({
+    mutationFn: ({ uuid, price }: { uuid: string; price: number }) =>
+      apiRequest(`/invoice-item/${uuid}/price`, {
+        method: "PUT",
+        body: { price_per_unit: price },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/customer-order/with-items-and-invoice", params?.id] });
+      setPriceEditUuid(null);
+      toast({
+        title: t('common.success'),
+        description: t('customerOrders.priceUpdated'),
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('common.error'),
+        description: error.message || t('customerOrders.updateFailed'),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const savePrice = (uuid: string) => {
+    const price = parseFloat(priceDraft);
+    if (isNaN(price) || price < 0) return;
+    priceMutation.mutate({ uuid, price });
+  };
 
   const updateMutation = useMutation({
     mutationFn: (data: { notes?: string }) =>
@@ -764,19 +800,73 @@ export default function CustomerOrderDetail() {
                       </div>
                     </div>
 
-                    {/* Invoice Items */}
+                    {/* Invoice Items — price per unit editable when the order's
+                        payment state allows (server-decided) */}
                     {invoice.invoice_items && invoice.invoice_items.length > 0 && (
                       <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                         <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('customerOrders.invoiceItems')}</h5>
+                        {priceEditState === "single_payment" && (
+                          <p className="text-xs text-amber-700 mb-2" data-testid="price-edit-payment-note">
+                            {t('customerOrders.priceEditPaymentNote')}
+                          </p>
+                        )}
                         <div className="space-y-2">
                           {invoice.invoice_items.map((item: InvoiceItem) => (
-                            <div key={item.uuid} className="flex items-center justify-between text-sm">
+                            <div key={item.uuid} className="flex items-center justify-between gap-3 text-sm">
                               <span className="text-gray-600 dark:text-gray-400">
-                                {item.material_name} ({item.quantity} {item.unit})
+                                {item.material_name} ({item.quantity} {item.unit} × {formatCurrency(item.price_per_unit, item.currency)})
                               </span>
-                              <span className="font-medium text-gray-900 dark:text-gray-100">
-                                {formatCurrency(item.total_price, item.currency)}
-                              </span>
+                              {priceEditUuid === item.uuid ? (
+                                <span className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={priceDraft}
+                                    onChange={(e) => setPriceDraft(e.target.value)}
+                                    className="h-7 w-28 text-sm"
+                                    data-testid={`price-input-${item.uuid}`}
+                                    autoFocus
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 w-7 p-0"
+                                    onClick={() => savePrice(item.uuid)}
+                                    disabled={priceMutation.isPending}
+                                    data-testid={`price-save-${item.uuid}`}
+                                  >
+                                    <Save className="h-4 w-4 text-green-700" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 w-7 p-0"
+                                    onClick={() => setPriceEditUuid(null)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 font-medium text-gray-900 dark:text-gray-100">
+                                  {formatCurrency(item.total_price, item.currency)}
+                                  {canEditPrice && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0"
+                                      title={t('customerOrders.editPrice')}
+                                      onClick={() => {
+                                        setPriceEditUuid(item.uuid);
+                                        setPriceDraft(String(item.price_per_unit));
+                                      }}
+                                      data-testid={`price-edit-${item.uuid}`}
+                                    >
+                                      <Edit3 className="h-3.5 w-3.5 text-gray-400" />
+                                    </Button>
+                                  )}
+                                </span>
+                              )}
                             </div>
                           ))}
                         </div>

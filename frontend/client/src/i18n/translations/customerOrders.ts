@@ -168,6 +168,10 @@ export const en: Record<string, string> = {
   'customerOrders.createdOn': 'Created {date}',
   'customerOrders.dueDatePrefix': 'Due {date}',
   'customerOrders.invoiceItems': 'Invoice Items',
+  'customerOrders.editPrice': 'Edit price',
+  'customerOrders.priceUpdated': 'Price updated',
+  'customerOrders.priceEditPaymentNote':
+    'This order is settled by a single payment — changing a price also adjusts that payment by the same amount.',
   'customerOrders.orderItemDetails': 'Order Item Details',
   'customerOrders.fulfilledOn': 'Fulfilled {date}',
   'customerOrders.itemUuid': 'Item UUID',
@@ -356,6 +360,10 @@ export const ar: Record<string, string> = {
   'customerOrders.createdOn': 'أُنشئ في {date}',
   'customerOrders.dueDatePrefix': 'الاستحقاق {date}',
   'customerOrders.invoiceItems': 'أصناف الفاتورة',
+  'customerOrders.editPrice': 'تعديل السعر',
+  'customerOrders.priceUpdated': 'تم تحديث السعر',
+  'customerOrders.priceEditPaymentNote':
+    'هذا الطلب مسدَّد بدفعة واحدة — تغيير السعر سيعدِّل تلك الدفعة بالمقدار نفسه.',
   'customerOrders.orderItemDetails': 'تفاصيل صنف الطلب',
   'customerOrders.fulfilledOn': 'سُلّم في {date}',
   'customerOrders.itemUuid': 'معرّف الصنف',

@@ -65,3 +65,11 @@ class InvoiceItemPage(BaseModel):
     page: int
     per_page: int
     pages: int
+class InvoiceItemPriceUpdate(BaseModel):
+    """Change one line's price per unit — the payment-aware edit.
+
+    Deliberately the ONLY editable field: quantity changes stock and
+    fulfilment, price is the thing that gets corrected after the fact.
+    """
+    model_config = ConfigDict(extra="forbid")
+    price_per_unit: float = Field(ge=0)
