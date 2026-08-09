@@ -138,6 +138,11 @@ class CustomerOrderWithItemsAndInvoiceRead(BaseModel):
     model_config = ConfigDict(extra="forbid")
     customer_order: CustomerOrderRead
     invoices: list[InvoiceRead]
+    # whether line prices may be edited, decided by the ORDER's payment state:
+    # "unpaid" (free), "single_payment" (allowed; the one payment absorbs the
+    # delta) or "locked". Set by the detail route — both clients read it here
+    # so the rule lives server-side only.
+    price_edit_state: Optional[str] = None
 
     @classmethod
     def from_customer_order_model(cls, customer_order:CustomerOrder):

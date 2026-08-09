@@ -69,6 +69,8 @@ interface Order {
 interface OrderPayload {
   customer_order: Order;
   invoices?: Invoice[] | null;
+  /** server-decided price editability: "unpaid" | "single_payment" | "locked" */
+  price_edit_state?: string | null;
 }
 
 /**
@@ -89,10 +91,12 @@ interface OrderPayload {
  * recorded payments, stock movements — even on settled orders. Its confirm spells
  * that out, because the web version hides the same power behind a bare confirm().
  *
- * Items are IMMUTABLE after creation, and that is the billing contract, not a gap:
- * the bulk item endpoint rejects prices and creates no invoice line, so an item added
- * later would be unpriced and invisible to the invoice totals. Fixing a wrong order
- * is void-and-recreate, never editing lines in place.
+ * Items are mostly immutable after creation — quantities and materials stay the
+ * billing contract, fixed by void-and-recreate. The ONE in-place edit is price per
+ * unit, and only when the server says the order's payment state allows it
+ * (price_edit_state): freely while nothing is paid, or on a fully-paid order
+ * settled by a single payment — in which case that payment absorbs the delta so
+ * the order stays exactly paid. Everything else is locked server-side.
  */
 export default function CustomerOrderDetailScreen() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
@@ -105,6 +109,32 @@ export default function CustomerOrderDetailScreen() {
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
+
+  // price editor state — one invoice line at a time, seeded with its current price
+  const [priceItem, setPriceItem] = useState<InvoiceItem | null>(null);
+  const [priceDraft, setPriceDraft] = useState('');
+  const [priceSaving, setPriceSaving] = useState(false);
+
+  const savePrice = async () => {
+    if (!priceItem) return;
+    const price = parseFloat(priceDraft);
+    if (isNaN(price) || price < 0) return;
+    setPriceSaving(true);
+    const res = await apiCall(`/invoice-item/${priceItem.uuid}/price`, {
+      method: 'PUT',
+      body: JSON.stringify({ price_per_unit: price }),
+    });
+    setPriceSaving(false);
+    if (isOk(res.status)) {
+      setPriceItem(null);
+      setReloadKey((k) => k + 1);
+    } else {
+      Alert.alert(
+        t('customerOrders.editPrice'),
+        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+      );
+    }
+  };
 
   const liveItems = (o: Order) =>
     (o.customer_order_items ?? []).filter((i) => !i.is_deleted);
@@ -284,6 +314,11 @@ export default function CustomerOrderDetailScreen() {
                         {t('customerOrders.paidAmount')} {money(inv.net_amount_paid, inv.currency)}
                         {inv.due_date ? ` · ${formatNumericDate(new Date(inv.due_date))}` : ''}
                       </ThemedText>
+                      {d.price_edit_state === 'single_payment' && (
+                        <ThemedText style={styles.priceNote}>
+                          {t('customerOrders.priceEditPaymentNote')}
+                        </ThemedText>
+                      )}
                       {(inv.invoice_items ?? [])
                         .filter((li) => !li.is_deleted)
                         .map((li) => (
@@ -295,6 +330,23 @@ export default function CustomerOrderDetailScreen() {
                               {li.quantity ?? '—'} × {money(li.price_per_unit, null)} ={' '}
                               {money(li.total_price, inv.currency)}
                             </ThemedText>
+                            {/* price is the one editable line field, and only when
+                                the ORDER's payment state allows (server-decided) */}
+                            {(d.price_edit_state === 'unpaid' ||
+                              d.price_edit_state === 'single_payment') && (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setPriceDraft(String(li.price_per_unit ?? ''));
+                                  setPriceItem(li);
+                                }}
+                                hitSlop={8}
+                                testID={`edit-price-${li.uuid}`}
+                              >
+                                <ThemedText style={styles.editPrice}>
+                                  {t('customerOrders.editPrice')}
+                                </ThemedText>
+                              </TouchableOpacity>
+                            )}
                           </View>
                         ))}
                       {/* per-invoice, so a second invoice on the order is payable
@@ -406,6 +458,51 @@ export default function CustomerOrderDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={!!priceItem}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPriceItem(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <ThemedText style={styles.modalTitle}>
+              {t('customerOrders.editPrice')}
+              {priceItem?.material_name ? ` — ${priceItem.material_name}` : ''}
+            </ThemedText>
+            <TextInput
+              style={styles.priceInput}
+              value={priceDraft}
+              onChangeText={setPriceDraft}
+              keyboardType="decimal-pad"
+              placeholder={t('customerOrders.newPricePerUnit')}
+              placeholderTextColor="#9ca3af"
+              autoFocus
+              testID="order-price-input"
+            />
+            <View style={styles.modalRow}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setPriceItem(null)}
+                disabled={priceSaving}
+              >
+                <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSave, priceSaving && styles.modalSaveOff]}
+                onPress={savePrice}
+                disabled={priceSaving}
+                testID="order-price-save"
+              >
+                <ThemedText style={styles.modalSaveText}>
+                  {priceSaving ? t('custdetail.saving') : t('form.save')}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -445,6 +542,18 @@ const styles = StyleSheet.create({
   },
   invoiceLineName: { flex: 1, fontSize: 12, opacity: 0.75 },
   invoiceLineFigures: { fontSize: 12, opacity: 0.6 },
+  editPrice: { fontSize: 12, fontWeight: '700', color: '#5469D4' },
+  priceNote: { fontSize: 11, color: '#B45309', lineHeight: 15, marginTop: 6 },
+  priceInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: '#111827',
+  },
   payBtn: {
     alignSelf: 'flex-start',
     marginTop: 8,
