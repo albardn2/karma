@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { API_BASE_URL } from '../lib/config';
-import { notePermsVersion, resetPermsVersion, setOnPermsChanged } from '../lib/queryClient';
+import { notePermsVersion, resetPermsVersion, setOnPermsChanged, queryClient } from '../lib/queryClient';
 
 interface User {
   uuid: string;
@@ -167,7 +167,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (data.access_token) {
           localStorage.setItem('auth_token', data.access_token);
-          
+
+          // The query cache belongs to whoever was signed in before. A 401
+          // wipes it via full page reload, but login is an SPA transition —
+          // without this, dashboards render the previous tenant's cached
+          // numbers (staleTime keeps them for minutes) after switching
+          // accounts in the same browser session.
+          queryClient.clear();
+
           // Fetch user data after successful login
           const userResponse = await fetch(`${API_BASE_URL}/auth/me`, {
             headers: {
@@ -217,6 +224,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (result.access_token) {
           localStorage.setItem('auth_token', result.access_token);
 
+          // same reason as login: the cache still holds the previous
+          // account's data, and a brand-new tenant must start from nothing
+          queryClient.clear();
+
           // Fetch user data after successful signup (same flow as login)
           const userResponse = await fetch(`${API_BASE_URL}/auth/me`, {
             headers: {
@@ -264,6 +275,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // so the next user on this browser is not compared against this one's
     // fingerprint and refreshed for no reason
     resetPermsVersion();
+    // and is not served this one's cached data
+    queryClient.clear();
   };
 
   const scopes = (user?.permission_scope ?? '')
