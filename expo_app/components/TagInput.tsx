@@ -5,8 +5,10 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
 
 // Mirror of the server rule (backend/app/dto/customer.py normalize_tags): one
-// optional colon, both sides non-empty, no comma, <= 64. Keep in lockstep.
+// optional colon, both sides non-empty, no comma, <= 64, at most MAX_TAGS per
+// customer. Keep in lockstep.
 const MAX_TAG_LENGTH = 64;
+const MAX_TAGS = 25;
 
 export function normalizeTag(raw: string): string | null {
   const tag = raw.trim();
@@ -52,7 +54,10 @@ export function TagInput({
       .slice(0, 8);
   }, [known, value, draft]);
 
+  const atCap = value.length >= MAX_TAGS;
+
   const add = (raw: string) => {
+    if (atCap) return;
     const tag = normalizeTag(raw);
     if (!tag) return;
     if (!value.includes(tag)) onChange([...value, tag]);
@@ -76,29 +81,31 @@ export function TagInput({
         </View>
       )}
 
-      <View style={styles.row}>
-        <TextInput
-          style={styles.input}
-          value={draft}
-          onChangeText={setDraft}
-          onSubmitEditing={() => add(draft)}
-          blurOnSubmit={false}
-          placeholder={t('custcreate.tagsPlaceholder')}
-          placeholderTextColor="#9ca3af"
-          autoCapitalize="none"
-          testID="tag-input"
-        />
-        <TouchableOpacity
-          style={[styles.addButton, !normalizeTag(draft) && styles.addButtonDisabled]}
-          onPress={() => add(draft)}
-          disabled={!normalizeTag(draft)}
-          testID="tag-add"
-        >
-          <ThemedText style={styles.addButtonText}>{t('custcreate.tagsAdd')}</ThemedText>
-        </TouchableOpacity>
-      </View>
+      {!atCap && (
+        <View style={styles.row}>
+          <TextInput
+            style={styles.input}
+            value={draft}
+            onChangeText={setDraft}
+            onSubmitEditing={() => add(draft)}
+            blurOnSubmit={false}
+            placeholder={t('custcreate.tagsPlaceholder')}
+            placeholderTextColor="#9ca3af"
+            autoCapitalize="none"
+            testID="tag-input"
+          />
+          <TouchableOpacity
+            style={[styles.addButton, !normalizeTag(draft) && styles.addButtonDisabled]}
+            onPress={() => add(draft)}
+            disabled={!normalizeTag(draft)}
+            testID="tag-add"
+          >
+            <ThemedText style={styles.addButtonText}>{t('custcreate.tagsAdd')}</ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
 
-      {suggestions.length > 0 && (
+      {!atCap && suggestions.length > 0 && (
         <View style={styles.suggestWrap}>
           {suggestions.map((tag) => (
             <TouchableOpacity

@@ -164,8 +164,14 @@ def list_customers():
         # validator forbids commas inside a tag; LIKE wildcards in the query
         # are escaped so "100%" is a literal tag, not a pattern.
         from sqlalchemy import or_
+        from app.dto.customer import MAX_TAGS
         joined = func.array_to_string(CustomerModel.tags, ",")
-        for tag in [t.strip() for t in params.tags.split(",") if t.strip()]:
+        tag_list = [t.strip() for t in params.tags.split(",") if t.strip()]
+        # each bare key adds two non-indexable array_to_string LIKEs per row;
+        # cap the count so a filter can't turn every list call into a heavy scan
+        if len(tag_list) > MAX_TAGS:
+            raise BadRequestError(f"at most {MAX_TAGS} tags in a filter")
+        for tag in tag_list:
             conds = [CustomerModel.tags.contains([tag])]
             if ":" not in tag:
                 esc = tag.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

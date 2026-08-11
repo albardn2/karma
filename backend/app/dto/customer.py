@@ -37,7 +37,14 @@ def normalize_tags(v):
     """
     if v is None:
         return v
+    # Bound the INPUT length before walking it. The dedup below is a membership
+    # scan, so an unbounded list is O(n²) — a ~100k-element body pins a worker
+    # for tens of seconds. The final list can never exceed MAX_TAGS anyway, so
+    # rejecting a longer input up front costs nothing real and closes the DoS.
+    if len(v) > MAX_TAGS:
+        raise ValueError(f"at most {MAX_TAGS} tags per customer")
     out: list[str] = []
+    seen: set[str] = set()
     for raw in v:
         tag = str(raw).strip()
         if not tag:
@@ -53,10 +60,9 @@ def normalize_tags(v):
             if not key or not value:
                 raise ValueError(f"key and value must both be non-empty: {tag}")
             tag = f"{key}:{value}"
-        if tag not in out:
+        if tag not in seen:
+            seen.add(tag)
             out.append(tag)
-    if len(out) > MAX_TAGS:
-        raise ValueError(f"at most {MAX_TAGS} tags per customer")
     return out
 
 

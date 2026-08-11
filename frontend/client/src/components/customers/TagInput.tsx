@@ -8,8 +8,10 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 // Mirror of the server rule (backend/app/dto/customer.py normalize_tags), so a
 // bad tag is caught before submit instead of coming back a 422. Kept in lockstep
-// with that function: one optional colon, both sides non-empty, no comma, <=64.
+// with that function: one optional colon, both sides non-empty, no comma, <=64,
+// and at most MAX_TAGS per customer.
 const MAX_TAG_LENGTH = 64;
+const MAX_TAGS = 25;
 
 function normalizeTag(raw: string): string | null {
   const tag = raw.trim();
@@ -58,7 +60,10 @@ export function TagInput({
       .slice(0, 8);
   }, [data, value, draft]);
 
+  const atCap = value.length >= MAX_TAGS;
+
   const add = (raw: string) => {
+    if (atCap) return;
     const tag = normalizeTag(raw);
     if (!tag) return;
     if (!value.includes(tag)) onChange([...value, tag]);
@@ -104,16 +109,22 @@ export function TagInput({
         <Input
           ref={inputRef}
           value={draft}
-          disabled={disabled}
+          disabled={disabled || atCap}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           onBlur={() => draft.trim() && add(draft)}
-          placeholder={value.length === 0 ? t("customers.tagsPlaceholder") : ""}
+          placeholder={
+            atCap
+              ? t("customers.tagsAtCap")
+              : value.length === 0
+                ? t("customers.tagsPlaceholder")
+                : ""
+          }
           className="flex-1 min-w-[8rem] border-0 p-0 h-6 shadow-none focus-visible:ring-0"
           data-testid="tag-input"
         />
       </div>
-      {suggestions.length > 0 && (
+      {!atCap && suggestions.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {suggestions.map((tag) => (
             <button
