@@ -10,6 +10,7 @@ export interface Customer {
   notes?: string;
   business_cards?: string;
   coordinates?: string;
+  tags: string[];
   created_at: string;
   is_deleted: boolean;
   balance_per_currency: Record<string, number>;
@@ -24,6 +25,7 @@ export interface CustomerFormData {
   category: string;
   notes?: string | null;
   coordinates?: string | null;
+  tags?: string[];
 }
 
 export interface CustomerPage {

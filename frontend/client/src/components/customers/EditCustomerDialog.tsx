@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { Customer, CustomerFormData } from "@/lib/types";
+import { TagInput } from "./TagInput";
 
 interface EditCustomerDialogProps {
   customer: Customer;
@@ -46,6 +47,7 @@ export function EditCustomerDialog({
     category: customer.category,
     notes: customer.notes || "",
     coordinates: customer.coordinates || "",
+    tags: customer.tags ?? [],
   });
 
   const { toast } = useToast();
@@ -62,6 +64,7 @@ export function EditCustomerDialog({
       category: customer.category,
       notes: customer.notes || null,
       coordinates: customer.coordinates || null,
+      tags: customer.tags ?? [],
     });
   }, [customer]);
 
@@ -111,6 +114,7 @@ export function EditCustomerDialog({
       email_address: formData.email_address?.trim() || null,
       notes: formData.notes?.trim() || null,
       coordinates: formData.coordinates?.trim() || null,
+      tags: formData.tags ?? [],
     };
 
     updateCustomerMutation.mutate(cleanedData);
@@ -220,6 +224,14 @@ export function EditCustomerDialog({
               onChange={(e) => handleInputChange("notes", e.target.value)}
               placeholder={t('customers.editNotesPlaceholder')}
               rows={3}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t('customers.tags')}</Label>
+            <TagInput
+              value={formData.tags ?? []}
+              onChange={(tags) => setFormData((prev) => ({ ...prev, tags }))}
             />
           </div>
 

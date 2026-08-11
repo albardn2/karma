@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { CustomerFormData } from "@/lib/types";
+import { TagInput } from "./TagInput";
 
 interface AddCustomerDialogProps {
   categories: string[];
@@ -42,6 +43,7 @@ export function AddCustomerDialog({ categories }: AddCustomerDialogProps) {
     category: "",
     notes: "",
     coordinates: "",
+    tags: [],
   });
 
   const { toast } = useToast();
@@ -122,6 +124,9 @@ export function AddCustomerDialog({ categories }: AddCustomerDialogProps) {
     }
     if (formData.coordinates && formData.coordinates.trim()) {
       payload.coordinates = formData.coordinates.trim();
+    }
+    if (formData.tags && formData.tags.length) {
+      payload.tags = formData.tags;
     }
 
     createCustomerMutation.mutate(payload as CustomerFormData);
@@ -239,6 +244,14 @@ export function AddCustomerDialog({ categories }: AddCustomerDialogProps) {
               onChange={(e) => handleInputChange("notes", e.target.value)}
               placeholder={t('customers.notesPlaceholder')}
               rows={3}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t('customers.tags')}</Label>
+            <TagInput
+              value={formData.tags ?? []}
+              onChange={(tags) => setFormData((prev) => ({ ...prev, tags }))}
             />
           </div>
 

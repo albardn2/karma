@@ -28,6 +28,7 @@ export interface CustomerFilters {
   full_name?: string;
   phone_number?: string;
   within_polygon?: string;
+  tags?: string;
   page?: number;
   per_page?: number;
 }
@@ -153,6 +154,19 @@ export function CustomerFiltersComponent({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Tags */}
+          <div className="space-y-2">
+            <Label htmlFor="tags">{t('customers.tags')}</Label>
+            <Input
+              id="tags"
+              placeholder={t('customers.filterByTags')}
+              value={localFilters.tags || ""}
+              onChange={(e) => updateFilter("tags", e.target.value)}
+              data-testid="filter-tags"
+            />
+            <p className="text-xs text-gray-500">{t('customers.filterByTagsHint')}</p>
           </div>
 
           {/* Customer UUID */}

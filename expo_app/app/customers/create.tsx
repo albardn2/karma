@@ -10,6 +10,7 @@ import { NativeHeader } from '@/components/layout/NativeHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { TagInput } from '@/components/TagInput';
 
 interface CustomerForm {
   full_name: string;
@@ -21,6 +22,7 @@ interface CustomerForm {
   business_cards: string;
   notes: string;
   coordinates: string;
+  tags: string[];
 }
 
 export default function CreateCustomerScreen() {
@@ -36,6 +38,7 @@ export default function CreateCustomerScreen() {
     business_cards: '',
     notes: '',
     coordinates: '',
+    tags: [],
   });
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<string[]>(['restaurant', 'roastery', 'minimarket', 'supermarket', 'distributer', 'school', 'university', 'hospital']);
@@ -129,6 +132,7 @@ export default function CreateCustomerScreen() {
       if (form.business_cards.trim()) payload.business_cards  = form.business_cards.trim();
       if (form.notes.trim())          payload.notes           = form.notes.trim();
       if (form.coordinates.trim())    payload.coordinates     = form.coordinates.trim();
+      if (form.tags.length)           payload.tags            = form.tags;
 
       console.log('Submitting payload:', payload);
       const response = await apiCall('/customer/', {
@@ -374,6 +378,12 @@ export default function CreateCustomerScreen() {
               placeholder={t('custcreate.notesPlaceholder')}
               multiline numberOfLines={4}
               placeholderTextColor="#9ca3af" />
+          </View>
+
+          {/* Tags */}
+          <View style={styles.fieldContainer}>
+            <ThemedText style={styles.label}>{t('custcreate.tagsLabel')}</ThemedText>
+            <TagInput value={form.tags} onChange={(tags) => setForm((prev) => ({ ...prev, tags }))} />
           </View>
 
           {/* Action Buttons */}

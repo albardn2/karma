@@ -22,6 +22,44 @@ class CustomerCategory(str, Enum):
 
 
 
+MAX_TAG_LENGTH = 64
+MAX_TAGS = 25
+
+
+def normalize_tags(v):
+    """Validate and canonicalise a tag list.
+
+    A tag is "key" or "key:value" — one optional colon, both sides non-empty
+    after trimming. Commas are forbidden because the list-filter query param is
+    CSV and array_to_string(tags, ',') backs the key-prefix filter; embedded
+    whitespace is allowed for multi-word (e.g. Arabic) values. None passes
+    through: on update it means "clear", handled at the route.
+    """
+    if v is None:
+        return v
+    out: list[str] = []
+    for raw in v:
+        tag = str(raw).strip()
+        if not tag:
+            raise ValueError("empty tag")
+        if len(tag) > MAX_TAG_LENGTH:
+            raise ValueError(f"tag longer than {MAX_TAG_LENGTH} characters: {tag[:20]}…")
+        if "," in tag:
+            raise ValueError(f"tag may not contain a comma: {tag}")
+        if tag.count(":") > 1:
+            raise ValueError(f"tag may have at most one ':' (key or key:value): {tag}")
+        if ":" in tag:
+            key, value = (part.strip() for part in tag.split(":"))
+            if not key or not value:
+                raise ValueError(f"key and value must both be non-empty: {tag}")
+            tag = f"{key}:{value}"
+        if tag not in out:
+            out.append(tag)
+    if len(out) > MAX_TAGS:
+        raise ValueError(f"at most {MAX_TAGS} tags per customer")
+    return out
+
+
 class CustomerBase(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
@@ -35,6 +73,12 @@ class CustomerBase(BaseModel):
     category: CustomerCategory
     coordinates: Optional[str] = None
     created_by_uuid : Optional[str] = None
+    # "key" or "key:value" labels; [] when the customer has none
+    tags: Optional[List[str]] = None
+
+    @field_validator("tags")
+    def _tags_format(cls, v):
+        return normalize_tags(v)
 
 class CustomerCreate(CustomerBase):
     """What’s required when creating a new customer."""
@@ -64,6 +108,12 @@ class CustomerUpdate(BaseModel):
     notes: Optional[str] = None
     category: Optional[CustomerCategory] = None
     coordinates: Optional[str] = None
+    # omitted = untouched (exclude_unset); [] or null = clear
+    tags: Optional[List[str]] = None
+
+    @field_validator("tags")
+    def _tags_format(cls, v):
+        return normalize_tags(v)
 
     @field_validator("coordinates", mode="before")
     def parse_latlon_to_wkt(cls, v: str) -> str:
@@ -124,6 +174,10 @@ class CustomerListParams(BaseModel):
     # When set, results are ordered nearest-first and customers without a
     # saved location are excluded.
     near: Optional[str] = None
+    # CSV of tags; a customer matches when it carries EVERY listed tag.
+    # A bare key also matches any key:value of that key ("region" finds
+    # "region:malki"), so keys work as families the way outcome prefixes do.
+    tags: Optional[str] = None
 
     page: int = Field(1, gt=0, description="Page number, starting from 1")
     per_page: int = Field(20, gt=0, le=1000, description="Items per page, max 100")

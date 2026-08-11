@@ -45,7 +45,12 @@ def create_customer():
         if payload.email_address and uow.customer_repository.find_one(email_address=payload.email_address):
             raise BadRequestError(f"Customer with email {payload.email_address} already exists")
 
-        cust = CustomerModel(**payload.model_dump())
+        data = payload.model_dump()
+        # the column is NOT NULL; an omitted tags field must become the empty
+        # list here because passing tags=None would override the model default
+        if data.get("tags") is None:
+            data["tags"] = []
+        cust = CustomerModel(**data)
         uow.customer_repository.save(model=cust, commit=True)
         customer_data = CustomerRead.from_orm(cust).model_dump(mode='json')
 
@@ -83,6 +88,10 @@ def update_customer(uuid: str):
         if payload.email_address and payload.email_address != customer.email_address:
             if uow.customer_repository.find_one(email_address=payload.email_address):
                 raise BadRequestError(f"Customer with email {payload.email_address} already exists")
+        # tags is NOT NULL: an explicit null in the body means "clear",
+        # which the column spells [] (omitted stays excluded by exclude_unset)
+        if "tags" in data and data["tags"] is None:
+            data["tags"] = []
         # Update customer fields
         for key, value in data.items():
             if hasattr(customer, key):
@@ -147,6 +156,22 @@ def list_customers():
         filters.append(CustomerModel.full_name.ilike(f"%{params.full_name}%"))
     if params.phone_number:
         filters.append(CustomerModel.phone_number.ilike(f"%{params.phone_number}%"))
+    if params.tags:
+        # every requested tag must be present (AND). A bare key also matches
+        # any key:value of that key, so "region" finds "region:malki" — same
+        # family semantics as outcome prefixes elsewhere. The prefix test runs
+        # on array_to_string(tags, ','), which is sound because the tag
+        # validator forbids commas inside a tag; LIKE wildcards in the query
+        # are escaped so "100%" is a literal tag, not a pattern.
+        from sqlalchemy import or_
+        joined = func.array_to_string(CustomerModel.tags, ",")
+        for tag in [t.strip() for t in params.tags.split(",") if t.strip()]:
+            conds = [CustomerModel.tags.contains([tag])]
+            if ":" not in tag:
+                esc = tag.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                conds.append(joined.like(f"{esc}:%", escape="\\"))
+                conds.append(joined.like(f"%,{esc}:%", escape="\\"))
+            filters.append(or_(*conds))
     if params.within_polygon:
         try:
             # Wrap your WKT string in a WKTElement (with the correct SRID)
@@ -206,6 +231,34 @@ def list_customers():
         ).model_dump(mode='json')
 
     return jsonify(result), 200
+
+
+@customer_blueprint.route('/tags', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.ACCOUNTANT.value)
+def list_customer_tags():
+    """Every distinct tag in use on this tenant's live customers, sorted —
+    what the clients offer as suggestions so spellings converge instead of
+    drifting ("vip" vs "VIP" vs "v.i.p")."""
+    with SqlAlchemyUnitOfWork() as uow:
+        # raw unnest — the repository chokepoint can't express it, so the
+        # tenant filter is spelled out per the multi-tenancy rule
+        tag_col = func.unnest(CustomerModel.tags).label("tag")
+        rows = (
+            uow.session.query(tag_col)
+            .filter(
+                CustomerModel.account_uuid == uow.account_uuid,
+                CustomerModel.is_deleted.is_(False),
+            )
+            .distinct()
+            .order_by(tag_col.asc())
+            .all()
+        )
+    return jsonify({"tags": [r[0] for r in rows]}), 200
 
 
 @customer_blueprint.route('/categories', methods=['GET'])
