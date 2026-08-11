@@ -932,6 +932,11 @@ export const translations: Record<Lang, Record<string, string>> = {
     'stopdetail.unfulfilled': 'Unfulfilled',
     'stopdetail.unpaid': 'Unpaid',
     'stopdetail.stopCompleted': '✓ Stop completed',
+    'stopdetail.previousVisits': 'Previous results & comments',
+    'stopdetail.historyDate': 'Date',
+    'stopdetail.historyResult': 'Result',
+    'stopdetail.historyComment': 'Comment',
+    'stopdetail.historyPage': '{page} / {pages}',
     // createorder
     'createorder.addItem': '+ Add item',
     'createorder.createError': 'Could not create the order',
@@ -2161,6 +2166,11 @@ export const translations: Record<Lang, Record<string, string>> = {
     'stopdetail.unfulfilled': 'غير مُسلَّم',
     'stopdetail.unpaid': 'غير مدفوع',
     'stopdetail.stopCompleted': '✓ اكتملت المحطة',
+    'stopdetail.previousVisits': 'النتائج والتعليقات السابقة',
+    'stopdetail.historyDate': 'التاريخ',
+    'stopdetail.historyResult': 'النتيجة',
+    'stopdetail.historyComment': 'التعليق',
+    'stopdetail.historyPage': '{page} / {pages}',
     // createorder
     'createorder.addItem': '+ إضافة صنف',
     'createorder.createError': 'تعذر إنشاء الطلب',

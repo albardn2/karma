@@ -162,3 +162,37 @@ class TripStopPage(BaseModel):
     page: int
     per_page: int
     pages: int
+
+
+class TripStopHistoryParams(BaseModel):
+    """A customer's past visit results, newest first (stop screen history table)."""
+    model_config = ConfigDict(extra="forbid")
+
+    customer_uuid: str
+    # the stop being worked on right now — its own (possibly submitted) result
+    # is already on screen above the table, so listing it again is noise
+    exclude_uuid: Optional[str] = None
+
+    page: int = Field(1, gt=0, description="Page number, starting at 1")
+    per_page: int = Field(5, gt=0, le=100, description="Items per page, max 100")
+
+
+class TripStopHistoryItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    uuid: str
+    # when the result was recorded (task-execution end time), falling back to
+    # the stop's creation time for rows completed before end times were kept
+    date: datetime
+    outcome: str
+    notes: Optional[str] = None
+
+
+class TripStopHistoryPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: List[TripStopHistoryItem]
+    total_count: int
+    page: int
+    per_page: int
+    pages: int

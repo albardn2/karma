@@ -13,6 +13,9 @@ from app.dto.trip_stop import (
     TripStopUpdate,
     TripStopListParams,
     TripStopPage,
+    TripStopHistoryParams,
+    TripStopHistoryItem,
+    TripStopHistoryPage,
 )
 from datetime import timedelta
 
@@ -208,6 +211,81 @@ def list_trip_stops():
             page=page.page,
             per_page=page.per_page,
             pages=page.pages,
+        ).model_dump(mode="json")
+    return jsonify(result), 200
+
+
+@trip_stop_blueprint.route("/customer-history", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATOR.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.DRIVER.value,
+    PermissionScope.SALES.value,
+)
+def customer_history():
+    """A customer's past visit results (outcome + notes), newest first.
+
+    Feeds the history table on the stop screen, so a driver standing at the
+    door can see how earlier visits went. Only stops with a recorded outcome
+    count — a planned stop nobody has completed yet has no result to show.
+    Ordered by when the result was actually recorded (task-execution end
+    time), not the stop's created_at: every stop of a trip is created in one
+    burst when the trip starts, so creation order says nothing about visit
+    order within a day.
+    """
+    params = TripStopHistoryParams(**request.args)
+    with SqlAlchemyUnitOfWork() as uow:
+        from models.common import (
+            TaskExecution as TaskExecutionModel,
+            Trip as TripModel,
+        )
+
+        recorded_at = func.coalesce(
+            TaskExecutionModel.end_time, TripStopModel.created_at
+        )
+        # raw query (outerjoin + coalesce ordering) — the repository paginator
+        # can't express it, so the tenant filter is spelled out per the
+        # multi-tenancy rule for raw queries
+        q = (
+            uow.session.query(TripStopModel, recorded_at.label("recorded_at"))
+            .outerjoin(
+                TaskExecutionModel,
+                TaskExecutionModel.uuid == TripStopModel.task_execution_uuid,
+            )
+            .filter(
+                TripStopModel.account_uuid == uow.account_uuid,
+                TripStopModel.customer_uuid == params.customer_uuid,
+                TripStopModel.outcome.isnot(None),
+                TripStopModel.trip.has(TripModel.is_deleted.is_(False)),
+            )
+        )
+        if params.exclude_uuid:
+            q = q.filter(TripStopModel.uuid != params.exclude_uuid)
+
+        total = q.count()
+        rows = (
+            q.order_by(recorded_at.desc())
+            .offset((params.page - 1) * params.per_page)
+            .limit(params.per_page)
+            .all()
+        )
+        result = TripStopHistoryPage(
+            items=[
+                TripStopHistoryItem(
+                    uuid=stop.uuid,
+                    date=recorded,
+                    outcome=stop.outcome,
+                    notes=stop.notes,
+                )
+                for stop, recorded in rows
+            ],
+            total_count=total,
+            page=params.page,
+            per_page=params.per_page,
+            pages=(total + params.per_page - 1) // params.per_page,
         ).model_dump(mode="json")
     return jsonify(result), 200
 

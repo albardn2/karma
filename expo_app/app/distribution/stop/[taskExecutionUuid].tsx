@@ -28,6 +28,21 @@ interface Field {
   placeholder?: string | null;
 }
 
+interface HistoryItem {
+  uuid: string;
+  date: string;
+  outcome: string;
+  notes?: string | null;
+}
+interface HistoryPage {
+  items: HistoryItem[];
+  total_count: number;
+  page: number;
+  pages: number;
+}
+
+const HISTORY_PER_PAGE = 5;
+
 const toDate = (s?: string | null) => {
   if (!s) return null;
   const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z');
@@ -61,8 +76,24 @@ export default function StopDetailScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [pickerField, setPickerField] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [history, setHistory] = useState<HistoryPage | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
 
   useFocusEffect(React.useCallback(() => { setRefreshKey((k) => k + 1); }, []));
+
+  // How earlier visits to this customer went, newest first. The current stop
+  // is excluded — its result is the form right above the table.
+  useEffect(() => {
+    if (!customerUuid) return;
+    (async () => {
+      const qs =
+        `customer_uuid=${customerUuid}&page=${historyPage}&per_page=${HISTORY_PER_PAGE}` +
+        (tripStopUuid ? `&exclude_uuid=${tripStopUuid}` : '');
+      const res = await apiCall<HistoryPage>(`/trip-stop/customer-history?${qs}`);
+      if (res.status === 200 && res.data) setHistory(res.data);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerUuid, historyPage, refreshKey]);
 
   useEffect(() => {
     (async () => {
@@ -335,6 +366,50 @@ export default function StopDetailScreen() {
               {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.completeText}>{t('stopdetail.completeStop')}</ThemedText>}
             </TouchableOpacity>
           )}
+
+          {/* previous visits: how earlier stops at this customer ended */}
+          {history && history.total_count > 0 && (
+            <View style={styles.historyBox} testID="history-table">
+              <ThemedText style={styles.recentTitle}>{t('stopdetail.previousVisits')}</ThemedText>
+              <View style={styles.historyHead}>
+                <ThemedText style={[styles.historyHeadText, styles.historyDate]}>{t('stopdetail.historyDate')}</ThemedText>
+                <ThemedText style={[styles.historyHeadText, styles.historyResult]}>{t('stopdetail.historyResult')}</ThemedText>
+                <ThemedText style={[styles.historyHeadText, styles.historyComment]}>{t('stopdetail.historyComment')}</ThemedText>
+              </View>
+              {history.items.map((h) => (
+                <View key={h.uuid} style={styles.historyRow} testID={`history-row-${h.uuid}`}>
+                  <ThemedText style={[styles.historyCell, styles.historyDate]}>{fmt(h.date)}</ThemedText>
+                  <ThemedText style={[styles.historyCell, styles.historyResult]}>{te(h.outcome)}</ThemedText>
+                  <ThemedText style={[styles.historyCell, styles.historyComment, !h.notes && styles.historyEmpty]}>
+                    {h.notes || '—'}
+                  </ThemedText>
+                </View>
+              ))}
+              {history.pages > 1 && (
+                <View style={styles.historyPager}>
+                  <TouchableOpacity
+                    onPress={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                    disabled={historyPage <= 1}
+                    hitSlop={10}
+                    testID="history-prev"
+                  >
+                    <ThemedText style={[styles.pagerArrow, historyPage <= 1 && styles.pagerDisabled]}>‹</ThemedText>
+                  </TouchableOpacity>
+                  <ThemedText style={styles.pagerLabel}>
+                    {t('stopdetail.historyPage', { page: history.page, pages: history.pages })}
+                  </ThemedText>
+                  <TouchableOpacity
+                    onPress={() => setHistoryPage((p) => Math.min(history.pages, p + 1))}
+                    disabled={historyPage >= history.pages}
+                    hitSlop={10}
+                    testID="history-next"
+                  >
+                    <ThemedText style={[styles.pagerArrow, historyPage >= history.pages && styles.pagerDisabled]}>›</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -403,6 +478,20 @@ const styles = StyleSheet.create({
   completeText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   completedBanner: { marginTop: 8, backgroundColor: '#D1FAE5', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   completedBannerText: { color: '#047857', fontSize: 16, fontWeight: '700' },
+  historyBox: { marginTop: 24 },
+  historyHead: { flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.12)' },
+  historyHeadText: { fontSize: 11, fontWeight: '700', opacity: 0.55, textTransform: 'uppercase', letterSpacing: 0.4 },
+  historyRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.08)' },
+  historyCell: { fontSize: 13 },
+  // column widths: date and result get fixed shares, the comment takes the rest
+  historyDate: { flex: 1.1, paddingEnd: 6 },
+  historyResult: { flex: 1.2, paddingEnd: 6 },
+  historyComment: { flex: 1.4 },
+  historyEmpty: { opacity: 0.35 },
+  historyPager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 14, paddingTop: 10 },
+  pagerArrow: { fontSize: 26, lineHeight: 28, color: '#5469D4', paddingHorizontal: 6 },
+  pagerDisabled: { color: '#c7cbd4' },
+  pagerLabel: { fontSize: 13, opacity: 0.6 },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '70%', paddingBottom: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.1)' },
