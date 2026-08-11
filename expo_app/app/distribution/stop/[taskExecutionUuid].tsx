@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  I18nManager,
   Modal,
   RefreshControl,
   ScrollView,
@@ -85,13 +86,23 @@ export default function StopDetailScreen() {
   // is excluded — its result is the form right above the table.
   useEffect(() => {
     if (!customerUuid) return;
+    // an arrow tap supersedes the in-flight request; without this the slower
+    // response can land last and show a page the pager no longer points at
+    let cancelled = false;
     (async () => {
       const qs =
         `customer_uuid=${customerUuid}&page=${historyPage}&per_page=${HISTORY_PER_PAGE}` +
         (tripStopUuid ? `&exclude_uuid=${tripStopUuid}` : '');
       const res = await apiCall<HistoryPage>(`/trip-stop/customer-history?${qs}`);
-      if (res.status === 200 && res.data) setHistory(res.data);
+      if (cancelled || res.status !== 200 || !res.data) return;
+      setHistory(res.data);
+      // the dataset can shrink between fetches (a trip soft-deleted elsewhere);
+      // a page past the new end comes back with zero rows — snap to the last
+      // real page instead of stranding the user on an empty table
+      if (res.data.pages > 0 && historyPage > res.data.pages) setHistoryPage(res.data.pages);
+      else if (res.data.total_count === 0 && historyPage !== 1) setHistoryPage(1);
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerUuid, historyPage, refreshKey]);
 
@@ -387,24 +398,32 @@ export default function StopDetailScreen() {
               ))}
               {history.pages > 1 && (
                 <View style={styles.historyPager}>
+                  {/* arrows run on the SERVER's page, not the request counter:
+                      after a failed or superseded fetch the two can differ, and
+                      stepping from what is actually on screen means a retap
+                      retries the missing page instead of skipping past it */}
                   <TouchableOpacity
-                    onPress={() => setHistoryPage((p) => Math.max(1, p - 1))}
-                    disabled={historyPage <= 1}
+                    onPress={() => setHistoryPage(Math.max(1, history.page - 1))}
+                    disabled={history.page <= 1}
                     hitSlop={10}
                     testID="history-prev"
                   >
-                    <ThemedText style={[styles.pagerArrow, historyPage <= 1 && styles.pagerDisabled]}>‹</ThemedText>
+                    <ThemedText style={[styles.pagerArrow, history.page <= 1 && styles.pagerDisabled]}>
+                      {I18nManager.isRTL ? '›' : '‹'}
+                    </ThemedText>
                   </TouchableOpacity>
                   <ThemedText style={styles.pagerLabel}>
                     {t('stopdetail.historyPage', { page: history.page, pages: history.pages })}
                   </ThemedText>
                   <TouchableOpacity
-                    onPress={() => setHistoryPage((p) => Math.min(history.pages, p + 1))}
-                    disabled={historyPage >= history.pages}
+                    onPress={() => setHistoryPage(Math.min(history.pages, history.page + 1))}
+                    disabled={history.page >= history.pages}
                     hitSlop={10}
                     testID="history-next"
                   >
-                    <ThemedText style={[styles.pagerArrow, historyPage >= history.pages && styles.pagerDisabled]}>›</ThemedText>
+                    <ThemedText style={[styles.pagerArrow, history.page >= history.pages && styles.pagerDisabled]}>
+                      {I18nManager.isRTL ? '‹' : '›'}
+                    </ThemedText>
                   </TouchableOpacity>
                 </View>
               )}

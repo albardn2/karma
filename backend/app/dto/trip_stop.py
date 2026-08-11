@@ -173,7 +173,9 @@ class TripStopHistoryParams(BaseModel):
     # is already on screen above the table, so listing it again is noise
     exclude_uuid: Optional[str] = None
 
-    page: int = Field(1, gt=0, description="Page number, starting at 1")
+    # upper bound because (page-1)*per_page becomes a Postgres OFFSET bind:
+    # an absurd page must 422 here, not overflow bigint into a 500
+    page: int = Field(1, gt=0, le=1_000_000, description="Page number, starting at 1")
     per_page: int = Field(5, gt=0, le=100, description="Items per page, max 100")
 
 
