@@ -258,7 +258,10 @@ def customer_history():
             .filter(
                 TripStopModel.account_uuid == uow.account_uuid,
                 TripStopModel.customer_uuid == params.customer_uuid,
+                # some legacy completions wrote '' rather than leaving NULL;
+                # either way there is no result to show
                 TripStopModel.outcome.isnot(None),
+                TripStopModel.outcome != "",
                 TripStopModel.trip.has(TripModel.is_deleted.is_(False)),
             )
         )

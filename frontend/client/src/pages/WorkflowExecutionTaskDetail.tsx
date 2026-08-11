@@ -50,6 +50,7 @@ import { CreateOrderDialog } from "@/components/customer-orders/CreateOrderDialo
 import { AddStopDialog } from "@/components/trips/AddStopDialog";
 import { CreateTripExpenseDialog } from "@/components/expenses/CreateTripExpenseDialog";
 import { CustomerRecentOrders } from "@/components/customer-orders/CustomerRecentOrders";
+import { TripStopVisitHistory } from "@/components/trips/TripStopVisitHistory";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { findSaleOption, hasRevenueOrderAtStop } from "@/lib/tripStopOutcome";
 import { useToast } from "@/hooks/use-toast";
@@ -1436,6 +1437,15 @@ export default function WorkflowExecutionTaskDetail() {
                         </Button>
                       </form>
                     </Form>
+
+                    {/* below the result/notes form: how earlier visits to this
+                        customer ended, paginated (mirrors the app's stop screen) */}
+                    {orderContext && (
+                      <TripStopVisitHistory
+                        customerUuid={orderContext.customerUuid}
+                        excludeTripStopUuid={orderContext.tripStopUuid}
+                      />
+                    )}
                   </CardContent>
                 </Card>
               )}
