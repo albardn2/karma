@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime
 from app.dto.common_enums import Currency
@@ -26,13 +26,26 @@ MAX_TAG_LENGTH = 64
 MAX_TAGS = 25
 
 
+def split_tag(tag: str) -> tuple[str, str]:
+    """(key, value) for a normalized tag. A bare key has value '' — the tag
+    validator forbids an empty value on a key:value tag, so '' can only mean
+    "bare key present" and never collides with a real value."""
+    if ":" in tag:
+        key, value = tag.split(":", 1)
+        return key, value
+    return tag, ""
+
+
 def normalize_tags(v):
     """Validate and canonicalise a tag list.
 
     A tag is "key" or "key:value" — one optional colon, both sides non-empty
     after trimming. Commas are forbidden because the list-filter query param is
     CSV and array_to_string(tags, ',') backs the key-prefix filter; embedded
-    whitespace is allowed for multi-word (e.g. Arabic) values. None passes
+    whitespace is allowed for multi-word (e.g. Arabic) values. Tags are
+    SINGLE-VALUED per key: a customer may not carry both "interest:interested"
+    and "interest:not_interested", so a key's value is a well-defined thing that
+    can transition — which is what the tag-change analytics count. None passes
     through: on update it means "clear", handled at the route.
     """
     if v is None:
@@ -45,6 +58,7 @@ def normalize_tags(v):
         raise ValueError(f"at most {MAX_TAGS} tags per customer")
     out: list[str] = []
     seen: set[str] = set()
+    keys: set[str] = set()
     for raw in v:
         tag = str(raw).strip()
         if not tag:
@@ -60,9 +74,17 @@ def normalize_tags(v):
             if not key or not value:
                 raise ValueError(f"key and value must both be non-empty: {tag}")
             tag = f"{key}:{value}"
-        if tag not in seen:
-            seen.add(tag)
-            out.append(tag)
+        if tag in seen:
+            continue
+        key = split_tag(tag)[0]
+        # one value per key: "interest:interested" and "interest:not_interested"
+        # cannot coexist. The clients replace same-key values in the editor, so a
+        # well-behaved client never trips this; it is the API safety net.
+        if key in keys:
+            raise ValueError(f"at most one value per key: '{key}'")
+        keys.add(key)
+        seen.add(tag)
+        out.append(tag)
     return out
 
 
@@ -271,3 +293,203 @@ class CustomerMapClusterPage(BaseModel):
     # (and so this is debuggable from a response body alone).
     cell_size_degrees: float
     max_points: int = MAX_MAP_POINTS
+
+
+# --------------------------- TAG CHANGE HISTORY ---------------------------
+
+
+class _TransitionSideFilters(BaseModel):
+    """The from/to selectors shared by the rollup and the drill-down.
+
+    Each side of a transition can be pinned three ways:
+      * a value string ("interested"; "" matches a bare key present),
+      * ABSENT (the key wasn't there) via from_absent / to_absent = true,
+      * or left unset to mean "any".
+    Absent is its own flag because a query param can't carry SQL NULL, and for a
+    bare flag like "blacklist" absent<->present IS the whole story: who got it
+    added is `from_absent=true`, who got it removed is `to_absent=true`.
+    """
+
+    from_value: Optional[str] = None
+    to_value: Optional[str] = None
+    from_absent: bool = False
+    to_absent: bool = False
+
+    @model_validator(mode="after")
+    def _one_selector_per_side(self):
+        if self.from_absent and self.from_value is not None:
+            raise ValueError("pass at most one of from_value / from_absent")
+        if self.to_absent and self.to_value is not None:
+            raise ValueError("pass at most one of to_value / to_absent")
+        return self
+
+
+class TagTransitionParams(_TransitionSideFilters):
+    """Which key's transitions to roll up, over which window."""
+    model_config = ConfigDict(extra="forbid")
+
+    # the tag key, e.g. "interest" — the family whose value changes we count
+    key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
+    # inclusive ISO datetimes bounding when the change was recorded; both
+    # optional (omit for all-time)
+    date_from: Optional[datetime] = None
+    date_to: Optional[datetime] = None
+
+
+class TagTransition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # None = key absent (a set / a clear); "" = bare key present; else the value
+    from_value: Optional[str] = None
+    to_value: Optional[str] = None
+    # DISTINCT customers who made this transition in the window ("how many
+    # customers", not how many times)
+    customers: int
+
+
+class TagTransitionsResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    transitions: List[TagTransition]
+
+
+class CustomerTagHistoryParams(BaseModel):
+    """A single customer's tag changes, newest first."""
+    model_config = ConfigDict(extra="forbid")
+
+    page: int = Field(1, gt=0, le=1_000_000)
+    per_page: int = Field(20, gt=0, le=100)
+
+
+class CustomerTagHistoryItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    uuid: str
+    created_at: datetime
+    created_by_uuid: Optional[str] = None
+    change_group_uuid: str
+    key: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+
+
+class CustomerTagHistoryPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: List[CustomerTagHistoryItem]
+    total_count: int
+    page: int
+    per_page: int
+    pages: int
+
+
+class TagTransitionCustomersParams(_TransitionSideFilters):
+    """Which customers made one specific transition (key + from/to) — the
+    drill-down behind a transition count. Same from/to selectors as the rollup
+    (value, from_absent/to_absent, or unset = any)."""
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
+    date_from: Optional[datetime] = None
+    date_to: Optional[datetime] = None
+    page: int = Field(1, gt=0, le=1_000_000)
+    per_page: int = Field(20, gt=0, le=100)
+
+
+class TagTransitionCustomer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_uuid: str
+    company_name: str
+    full_name: str
+    # when this customer last made the transition in the window (a customer who
+    # flip-flopped shows their most recent crossing)
+    changed_at: datetime
+
+
+class TagTransitionCustomersPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    from_value: Optional[str] = None
+    to_value: Optional[str] = None
+    customers: List[TagTransitionCustomer]
+    total_count: int
+    page: int
+    per_page: int
+    pages: int
+
+
+# --------------------------- TAG NET DELTA (point-in-time) ---------------------------
+#
+# Transitions count MOVEMENTS (who went X -> Y). This instead compares the SET of
+# customers HOLDING a tag at two instants — "blacklist held 40 on Aug 1 and 55 on
+# Aug 31, +15, and here are the net-new ones". State at an instant is reconstructed
+# by replaying the event log up to that moment (the value at T is the new_value of
+# the latest event on that key at or before T). Forward-only: a tag set before the
+# event log existed has no event to replay, so it reads as absent — negligible on a
+# tenant whose tags all postdate the log, but real, hence documented.
+
+
+class TagDeltaParams(BaseModel):
+    """Holder-set delta for one tag between two instants."""
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
+    # which value's holders to track: a value ("" = bare key present) or omit to
+    # mean "holds the key in ANY form" (present with any value)
+    value: Optional[str] = None
+    # the two instants to compare state at. as_of_start omitted = before all
+    # history (nobody held it); as_of_end omitted = now.
+    as_of_start: Optional[datetime] = None
+    as_of_end: Optional[datetime] = None
+
+
+class TagDeltaResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    value: Optional[str] = None
+    as_of_start: Optional[datetime] = None
+    as_of_end: datetime
+    count_start: int
+    count_end: int
+    net_delta: int           # count_end - count_start (== added_count - removed_count)
+    added_count: int         # held at end, not at start (net-new)
+    removed_count: int       # held at start, not at end
+
+
+class TagDeltaCustomersParams(BaseModel):
+    """The net-new or net-gone customers behind a delta."""
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
+    value: Optional[str] = None
+    as_of_start: Optional[datetime] = None
+    as_of_end: Optional[datetime] = None
+    # which side of the delta to list
+    direction: str = Field(..., pattern="^(added|removed)$")
+    page: int = Field(1, gt=0, le=1_000_000)
+    per_page: int = Field(20, gt=0, le=100)
+
+
+class TagDeltaCustomer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_uuid: str
+    company_name: str
+    full_name: str
+
+
+class TagDeltaCustomersPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    value: Optional[str] = None
+    direction: str
+    customers: List[TagDeltaCustomer]
+    total_count: int
+    page: int
+    per_page: int
+    pages: int

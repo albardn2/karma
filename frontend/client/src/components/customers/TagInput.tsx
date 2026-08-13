@@ -25,6 +25,9 @@ function normalizeTag(raw: string): string | null {
   return tag;
 }
 
+// the key part of a normalized tag ("interest" for "interest:x", "vip" for "vip")
+const tagKey = (tag: string) => (tag.includes(":") ? tag.slice(0, tag.indexOf(":")) : tag);
+
 /**
  * Chip editor for a customer's tags. Type a "key" or "key:value" and press
  * Enter/comma to commit; Backspace on an empty box removes the last chip.
@@ -63,10 +66,15 @@ export function TagInput({
   const atCap = value.length >= MAX_TAGS;
 
   const add = (raw: string) => {
-    if (atCap) return;
     const tag = normalizeTag(raw);
     if (!tag) return;
-    if (!value.includes(tag)) onChange([...value, tag]);
+    // one value per key: adding "interest:not_interested" replaces any existing
+    // "interest:*" rather than stacking a second value the server would reject
+    const key = tagKey(tag);
+    const withoutSameKey = value.filter((existing) => tagKey(existing) !== key);
+    // cap on the RESULT, so swapping a same-key value is never blocked at the cap
+    if (withoutSameKey.length >= MAX_TAGS) return;
+    if (!withoutSameKey.includes(tag)) onChange([...withoutSameKey, tag]);
     setDraft("");
   };
 
