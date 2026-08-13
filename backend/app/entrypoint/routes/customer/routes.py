@@ -40,6 +40,24 @@ from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.auth import add_logged_user_to_payload
 
 
+def _apply_transition_side_filters(query, EventModel, params):
+    """Apply the from/to selectors to a CustomerTagEvent query.
+
+    Each side: from_absent/to_absent -> IS NULL (the key was/ is absent);
+    else a value ('' matches a bare key present); else no constraint. `is not
+    None` is deliberate — '' is a real value, only an omitted param means "any".
+    Shared by the rollup and the drill-down so their filtering can't drift.
+    """
+    if params.from_absent:
+        query = query.filter(EventModel.old_value.is_(None))
+    elif params.from_value is not None:
+        query = query.filter(EventModel.old_value == params.from_value)
+    if params.to_absent:
+        query = query.filter(EventModel.new_value.is_(None))
+    elif params.to_value is not None:
+        query = query.filter(EventModel.new_value == params.to_value)
+    return query
+
 
 @customer_blueprint.route('/', methods=['POST'])
 @jwt_required()
@@ -318,8 +336,10 @@ def customer_tag_transitions():
     from interest:interested to interest:not_interested".
 
     old_value/new_value semantics: NULL = the key was absent (a set or a clear),
-    "" = a bare key present, otherwise the value. Passing from_value/to_value
-    narrows to one transition ("" matches bare-present; omit for all).
+    "" = a bare key present, otherwise the value. Narrow to one transition with
+    from_value/to_value (a value; "" matches bare-present) or from_absent/
+    to_absent=true (the key was / is absent). For a bare flag like "blacklist",
+    who got it ADDED is from_absent=true, REMOVED is to_absent=true.
     """
     from sqlalchemy import distinct
     from models.common import CustomerTagEvent as EventModel
@@ -342,12 +362,7 @@ def customer_tag_transitions():
             q = q.filter(EventModel.created_at >= params.date_from)
         if params.date_to is not None:
             q = q.filter(EventModel.created_at <= params.date_to)
-        # `is not None` on purpose: "" is a meaningful value (bare key present),
-        # only an omitted param means "don't filter this side"
-        if params.from_value is not None:
-            q = q.filter(EventModel.old_value == params.from_value)
-        if params.to_value is not None:
-            q = q.filter(EventModel.new_value == params.to_value)
+        q = _apply_transition_side_filters(q, EventModel, params)
         rows = q.group_by(EventModel.old_value, EventModel.new_value).all()
 
         transitions = [
@@ -373,10 +388,12 @@ def customer_tag_transitions():
                  PermissionScope.DRIVER.value)
 def customer_tag_transition_customers():
     """WHICH customers made one transition — the drill-down behind a count on
-    /tag-transitions. Same filters (key, window, from_value/to_value with '' =
-    bare-present, omit = any); returns the DISTINCT customers who made it,
-    newest crossing first, paginated. Counts match the rollup because both
-    count distinct customers over the same event filter.
+    /tag-transitions. Same filters (key, window, and the from/to selectors:
+    from_value/to_value, or from_absent/to_absent for the "key was/is absent"
+    side — e.g. who got the bare flag "blacklist" added is from_absent=true).
+    Returns the DISTINCT customers who made it, newest crossing first,
+    paginated. Counts match the rollup because both count distinct customers
+    over the same event filter.
     """
     from models.common import CustomerTagEvent as EventModel
 
@@ -398,10 +415,7 @@ def customer_tag_transition_customers():
             grouped = grouped.filter(EventModel.created_at >= params.date_from)
         if params.date_to is not None:
             grouped = grouped.filter(EventModel.created_at <= params.date_to)
-        if params.from_value is not None:
-            grouped = grouped.filter(EventModel.old_value == params.from_value)
-        if params.to_value is not None:
-            grouped = grouped.filter(EventModel.new_value == params.to_value)
+        grouped = _apply_transition_side_filters(grouped, EventModel, params)
         grouped = grouped.group_by(EventModel.customer_uuid).subquery()
 
         total = uow.session.query(func.count()).select_from(grouped).scalar() or 0

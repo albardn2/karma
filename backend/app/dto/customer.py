@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime
 from app.dto.common_enums import Currency
@@ -298,7 +298,33 @@ class CustomerMapClusterPage(BaseModel):
 # --------------------------- TAG CHANGE HISTORY ---------------------------
 
 
-class TagTransitionParams(BaseModel):
+class _TransitionSideFilters(BaseModel):
+    """The from/to selectors shared by the rollup and the drill-down.
+
+    Each side of a transition can be pinned three ways:
+      * a value string ("interested"; "" matches a bare key present),
+      * ABSENT (the key wasn't there) via from_absent / to_absent = true,
+      * or left unset to mean "any".
+    Absent is its own flag because a query param can't carry SQL NULL, and for a
+    bare flag like "blacklist" absent<->present IS the whole story: who got it
+    added is `from_absent=true`, who got it removed is `to_absent=true`.
+    """
+
+    from_value: Optional[str] = None
+    to_value: Optional[str] = None
+    from_absent: bool = False
+    to_absent: bool = False
+
+    @model_validator(mode="after")
+    def _one_selector_per_side(self):
+        if self.from_absent and self.from_value is not None:
+            raise ValueError("pass at most one of from_value / from_absent")
+        if self.to_absent and self.to_value is not None:
+            raise ValueError("pass at most one of to_value / to_absent")
+        return self
+
+
+class TagTransitionParams(_TransitionSideFilters):
     """Which key's transitions to roll up, over which window."""
     model_config = ConfigDict(extra="forbid")
 
@@ -308,10 +334,6 @@ class TagTransitionParams(BaseModel):
     # optional (omit for all-time)
     date_from: Optional[datetime] = None
     date_to: Optional[datetime] = None
-    # narrow to a single transition when set — the direct answer to "how many
-    # customers moved from X to Y". "" matches a bare key present; omit for all.
-    from_value: Optional[str] = None
-    to_value: Optional[str] = None
 
 
 class TagTransition(BaseModel):
@@ -362,17 +384,15 @@ class CustomerTagHistoryPage(BaseModel):
     pages: int
 
 
-class TagTransitionCustomersParams(BaseModel):
+class TagTransitionCustomersParams(_TransitionSideFilters):
     """Which customers made one specific transition (key + from/to) — the
-    drill-down behind a transition count."""
+    drill-down behind a transition count. Same from/to selectors as the rollup
+    (value, from_absent/to_absent, or unset = any)."""
     model_config = ConfigDict(extra="forbid")
 
     key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
     date_from: Optional[datetime] = None
     date_to: Optional[datetime] = None
-    # same semantics as the rollup: "" matches bare-present, omit for any
-    from_value: Optional[str] = None
-    to_value: Optional[str] = None
     page: int = Field(1, gt=0, le=1_000_000)
     per_page: int = Field(20, gt=0, le=100)
 
