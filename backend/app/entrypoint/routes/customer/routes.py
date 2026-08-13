@@ -25,6 +25,11 @@ from app.dto.customer import (
     TagTransitionCustomersParams,
     TagTransitionCustomer,
     TagTransitionCustomersPage,
+    TagDeltaParams,
+    TagDeltaResult,
+    TagDeltaCustomersParams,
+    TagDeltaCustomer,
+    TagDeltaCustomersPage,
     CustomerTagHistoryParams,
     CustomerTagHistoryItem,
     CustomerTagHistoryPage,
@@ -38,6 +43,38 @@ from app.dto.trip_stop import TripStopStatus
 from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.auth import add_logged_user_to_payload
+
+
+def _holders_as_of(uow, EventModel, account_uuid, key, value, value_provided, as_of):
+    """Set of customer uuids HOLDING (key[, value]) at instant `as_of`.
+
+    State at an instant = the new_value of the latest event on that key at or
+    before as_of (DISTINCT ON customer, newest first). value_provided True means
+    the holder must equal `value` ("" = bare present); False means "present in
+    any form" (state IS NOT NULL). Pure log replay — see TagDeltaParams for the
+    forward-only caveat. Tenant filter spelled out per the multi-tenancy rule.
+    """
+    latest = (
+        uow.session.query(
+            EventModel.customer_uuid.label("cu"),
+            EventModel.new_value.label("state"),
+        )
+        .filter(
+            EventModel.account_uuid == account_uuid,
+            EventModel.key == key,
+            EventModel.created_at <= as_of,
+        )
+        # one row per customer: their most recent event at or before as_of
+        .distinct(EventModel.customer_uuid)
+        .order_by(
+            EventModel.customer_uuid,
+            EventModel.created_at.desc(),
+            EventModel.uuid.desc(),
+        )
+        .subquery()
+    )
+    holder = (latest.c.state == value) if value_provided else latest.c.state.isnot(None)
+    return {r[0] for r in uow.session.query(latest.c.cu).filter(holder).all()}
 
 
 def _apply_transition_side_filters(query, EventModel, params):
@@ -451,6 +488,111 @@ def customer_tag_transition_customers():
                     changed_at=ca,
                 )
                 for (u, cn, fn, ca) in rows
+            ],
+            total_count=total,
+            page=params.page,
+            per_page=params.per_page,
+            pages=(total + params.per_page - 1) // params.per_page,
+        ).model_dump(mode="json")
+    return jsonify(result), 200
+
+
+@customer_blueprint.route('/tag-delta', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value)
+def customer_tag_delta():
+    """NET change in the set of customers holding a tag between two instants.
+
+    Not movements (that's /tag-transitions) — the point-in-time holder counts:
+    "blacklist held 40 on Aug 1 and 55 on Aug 31, +15". `value` picks which
+    value's holders ("" = bare present; omit = holds the key in any form);
+    as_of_start/as_of_end bound the two instants (start omitted = before all
+    history so count_start 0; end omitted = now). net_delta == count_end -
+    count_start == added_count - removed_count.
+    """
+    from models.common import CustomerTagEvent as EventModel
+
+    params = TagDeltaParams(**request.args)
+    value_provided = params.value is not None
+    end_at = params.as_of_end or datetime.utcnow()
+    with SqlAlchemyUnitOfWork() as uow:
+        # start omitted -> before any history -> nobody held it
+        start = (
+            _holders_as_of(uow, EventModel, uow.account_uuid, params.key,
+                           params.value, value_provided, params.as_of_start)
+            if params.as_of_start is not None else set()
+        )
+        end = _holders_as_of(uow, EventModel, uow.account_uuid, params.key,
+                             params.value, value_provided, end_at)
+        result = TagDeltaResult(
+            key=params.key,
+            value=params.value,
+            as_of_start=params.as_of_start,
+            as_of_end=end_at,
+            count_start=len(start),
+            count_end=len(end),
+            net_delta=len(end) - len(start),
+            added_count=len(end - start),
+            removed_count=len(start - end),
+        ).model_dump(mode="json")
+    return jsonify(result), 200
+
+
+@customer_blueprint.route('/tag-delta/customers', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value)
+def customer_tag_delta_customers():
+    """The net-new (direction=added) or net-gone (direction=removed) customers
+    behind a /tag-delta — those holding the tag at one instant but not the
+    other. Same key/value/as_of params; company + contact name, paginated."""
+    from models.common import CustomerTagEvent as EventModel
+
+    params = TagDeltaCustomersParams(**request.args)
+    value_provided = params.value is not None
+    end_at = params.as_of_end or datetime.utcnow()
+    with SqlAlchemyUnitOfWork() as uow:
+        start = (
+            _holders_as_of(uow, EventModel, uow.account_uuid, params.key,
+                           params.value, value_provided, params.as_of_start)
+            if params.as_of_start is not None else set()
+        )
+        end = _holders_as_of(uow, EventModel, uow.account_uuid, params.key,
+                             params.value, value_provided, end_at)
+        target = (end - start) if params.direction == "added" else (start - end)
+
+        total = len(target)
+        # fetch names for the target set (tenant-scoped), order by company_name
+        # for a stable, readable page; the set is bounded by tenant size
+        rows = []
+        if target:
+            rows = (
+                uow.session.query(
+                    CustomerModel.uuid,
+                    CustomerModel.company_name,
+                    CustomerModel.full_name,
+                )
+                .filter(
+                    CustomerModel.uuid.in_(target),
+                    CustomerModel.account_uuid == uow.account_uuid,
+                )
+                .order_by(CustomerModel.company_name.asc(), CustomerModel.uuid.asc())
+                .offset((params.page - 1) * params.per_page)
+                .limit(params.per_page)
+                .all()
+            )
+        result = TagDeltaCustomersPage(
+            key=params.key,
+            value=params.value,
+            direction=params.direction,
+            customers=[
+                TagDeltaCustomer(customer_uuid=u, company_name=cn, full_name=fn)
+                for (u, cn, fn) in rows
             ],
             total_count=total,
             page=params.page,

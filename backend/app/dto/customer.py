@@ -419,3 +419,77 @@ class TagTransitionCustomersPage(BaseModel):
     page: int
     per_page: int
     pages: int
+
+
+# --------------------------- TAG NET DELTA (point-in-time) ---------------------------
+#
+# Transitions count MOVEMENTS (who went X -> Y). This instead compares the SET of
+# customers HOLDING a tag at two instants — "blacklist held 40 on Aug 1 and 55 on
+# Aug 31, +15, and here are the net-new ones". State at an instant is reconstructed
+# by replaying the event log up to that moment (the value at T is the new_value of
+# the latest event on that key at or before T). Forward-only: a tag set before the
+# event log existed has no event to replay, so it reads as absent — negligible on a
+# tenant whose tags all postdate the log, but real, hence documented.
+
+
+class TagDeltaParams(BaseModel):
+    """Holder-set delta for one tag between two instants."""
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
+    # which value's holders to track: a value ("" = bare key present) or omit to
+    # mean "holds the key in ANY form" (present with any value)
+    value: Optional[str] = None
+    # the two instants to compare state at. as_of_start omitted = before all
+    # history (nobody held it); as_of_end omitted = now.
+    as_of_start: Optional[datetime] = None
+    as_of_end: Optional[datetime] = None
+
+
+class TagDeltaResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    value: Optional[str] = None
+    as_of_start: Optional[datetime] = None
+    as_of_end: datetime
+    count_start: int
+    count_end: int
+    net_delta: int           # count_end - count_start (== added_count - removed_count)
+    added_count: int         # held at end, not at start (net-new)
+    removed_count: int       # held at start, not at end
+
+
+class TagDeltaCustomersParams(BaseModel):
+    """The net-new or net-gone customers behind a delta."""
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
+    value: Optional[str] = None
+    as_of_start: Optional[datetime] = None
+    as_of_end: Optional[datetime] = None
+    # which side of the delta to list
+    direction: str = Field(..., pattern="^(added|removed)$")
+    page: int = Field(1, gt=0, le=1_000_000)
+    per_page: int = Field(20, gt=0, le=100)
+
+
+class TagDeltaCustomer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_uuid: str
+    company_name: str
+    full_name: str
+
+
+class TagDeltaCustomersPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    value: Optional[str] = None
+    direction: str
+    customers: List[TagDeltaCustomer]
+    total_count: int
+    page: int
+    per_page: int
+    pages: int
