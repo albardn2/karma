@@ -310,8 +310,7 @@ def list_customer_tags():
 @scopes_required(PermissionScope.ADMIN.value,
                  PermissionScope.SUPER_ADMIN.value,
                  PermissionScope.SALES.value,
-                 PermissionScope.ACCOUNTANT.value,
-                 PermissionScope.OPERATION_MANAGER.value)
+                 PermissionScope.DRIVER.value)
 def customer_tag_transitions():
     """How this tenant's customers moved between values of one tag key over a
     window: for every observed old_value -> new_value, the count of DISTINCT
@@ -355,8 +354,11 @@ def customer_tag_transitions():
             TagTransition(from_value=ov, to_value=nv, customers=c)
             for ov, nv, c in rows
         ]
-        # biggest movements first — a stable, useful default ordering
-        transitions.sort(key=lambda tr: tr.customers, reverse=True)
+        # biggest movements first; (from, to) as a deterministic tiebreaker so
+        # equal-count rows come back in a stable order across calls
+        transitions.sort(
+            key=lambda tr: (-tr.customers, tr.from_value or "", tr.to_value or "")
+        )
         result = TagTransitionsResult(
             key=params.key, transitions=transitions
         ).model_dump(mode="json")
@@ -368,8 +370,7 @@ def customer_tag_transitions():
 @scopes_required(PermissionScope.ADMIN.value,
                  PermissionScope.SUPER_ADMIN.value,
                  PermissionScope.SALES.value,
-                 PermissionScope.ACCOUNTANT.value,
-                 PermissionScope.OPERATION_MANAGER.value)
+                 PermissionScope.DRIVER.value)
 def customer_tag_transition_customers():
     """WHICH customers made one transition — the drill-down behind a count on
     /tag-transitions. Same filters (key, window, from_value/to_value with '' =
@@ -417,7 +418,9 @@ def customer_tag_transition_customers():
             # defence in depth, though events already scope to this tenant.
             .join(grouped, grouped.c.customer_uuid == CustomerModel.uuid)
             .filter(CustomerModel.account_uuid == uow.account_uuid)
-            .order_by(grouped.c.changed_at.desc())
+            # customer uuid breaks changed_at ties so paging can't duplicate or
+            # skip a customer whose crossing time equals another's
+            .order_by(grouped.c.changed_at.desc(), CustomerModel.uuid.desc())
             .offset((params.page - 1) * params.per_page)
             .limit(params.per_page)
             .all()
@@ -456,6 +459,11 @@ def customer_tag_history(uuid: str):
 
     params = CustomerTagHistoryParams(**request.args)
     with SqlAlchemyUnitOfWork() as uow:
+        # 404 a bogus / other-tenant uuid like get_customer does, so an empty
+        # page unambiguously means "no changes yet", not "not your customer".
+        # NOT filtered on is_deleted: a soft-deleted customer keeps its history.
+        if not uow.customer_repository.find_one(uuid=uuid):
+            raise NotFoundError("Customer not found")
         base = (
             uow.session.query(EventModel)
             .filter(
@@ -465,7 +473,9 @@ def customer_tag_history(uuid: str):
         )
         total = base.count()
         rows = (
-            base.order_by(EventModel.created_at.desc())
+            # uuid breaks created_at ties (a single save stamps up to MAX_TAGS
+            # events with one timestamp) so paging is stable across calls
+            base.order_by(EventModel.created_at.desc(), EventModel.uuid.desc())
             .offset((params.page - 1) * params.per_page)
             .limit(params.per_page)
             .all()

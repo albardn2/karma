@@ -203,17 +203,25 @@ class CustomerTagEvent(Base):
     the historical record the transition analytics count over.
     """
     __tablename__ = "customer_tag_event"
+    # Composite indexes matching the two read paths, declared here (not as
+    # per-column index=True) so the model agrees with migration e5b1c9a743d2 —
+    # otherwise `alembic revision --autogenerate` would try to drop these and add
+    # single-column ones, degrading both queries to seq scans.
+    __table_args__ = (
+        Index('ix_customer_tag_event_account_key_created', 'account_uuid', 'key', 'created_at'),
+        Index('ix_customer_tag_event_customer_created', 'customer_uuid', 'created_at'),
+    )
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
-    customer_uuid = Column(String(36), ForeignKey('customer.uuid'), nullable=False, index=True)
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False)
+    customer_uuid = Column(String(36), ForeignKey('customer.uuid'), nullable=False)
     # who made the change (the JWT identity); nullable for system/backfill paths
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     # correlates every key that changed in ONE save, so a per-customer timeline
     # can group "these three keys changed together"
     change_group_uuid = Column(String(36), nullable=False)
-    key = Column(String(64), nullable=False, index=True)
+    key = Column(String(64), nullable=False)
     old_value = Column(String(64), nullable=True)
     new_value = Column(String(64), nullable=True)
 
