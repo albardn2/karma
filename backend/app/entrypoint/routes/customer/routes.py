@@ -22,6 +22,9 @@ from app.dto.customer import (
     TagTransitionParams,
     TagTransition,
     TagTransitionsResult,
+    TagTransitionCustomersParams,
+    TagTransitionCustomer,
+    TagTransitionCustomersPage,
     CustomerTagHistoryParams,
     CustomerTagHistoryItem,
     CustomerTagHistoryPage,
@@ -356,6 +359,86 @@ def customer_tag_transitions():
         transitions.sort(key=lambda tr: tr.customers, reverse=True)
         result = TagTransitionsResult(
             key=params.key, transitions=transitions
+        ).model_dump(mode="json")
+    return jsonify(result), 200
+
+
+@customer_blueprint.route('/tag-transitions/customers', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.OPERATION_MANAGER.value)
+def customer_tag_transition_customers():
+    """WHICH customers made one transition — the drill-down behind a count on
+    /tag-transitions. Same filters (key, window, from_value/to_value with '' =
+    bare-present, omit = any); returns the DISTINCT customers who made it,
+    newest crossing first, paginated. Counts match the rollup because both
+    count distinct customers over the same event filter.
+    """
+    from models.common import CustomerTagEvent as EventModel
+
+    params = TagTransitionCustomersParams(**request.args)
+    with SqlAlchemyUnitOfWork() as uow:
+        # one row per matching customer, with their most recent crossing time.
+        # raw aggregate — tenant filter spelled out per the multi-tenancy rule
+        grouped = (
+            uow.session.query(
+                EventModel.customer_uuid.label("customer_uuid"),
+                func.max(EventModel.created_at).label("changed_at"),
+            )
+            .filter(
+                EventModel.account_uuid == uow.account_uuid,
+                EventModel.key == params.key,
+            )
+        )
+        if params.date_from is not None:
+            grouped = grouped.filter(EventModel.created_at >= params.date_from)
+        if params.date_to is not None:
+            grouped = grouped.filter(EventModel.created_at <= params.date_to)
+        if params.from_value is not None:
+            grouped = grouped.filter(EventModel.old_value == params.from_value)
+        if params.to_value is not None:
+            grouped = grouped.filter(EventModel.new_value == params.to_value)
+        grouped = grouped.group_by(EventModel.customer_uuid).subquery()
+
+        total = uow.session.query(func.count()).select_from(grouped).scalar() or 0
+        rows = (
+            uow.session.query(
+                CustomerModel.uuid,
+                CustomerModel.company_name,
+                CustomerModel.full_name,
+                grouped.c.changed_at,
+            )
+            # inner join: soft-deleted customers keep their row, so a customer
+            # who transitioned then was deleted still appears (and the count
+            # stays equal to the rollup). Account re-checked on the customer as
+            # defence in depth, though events already scope to this tenant.
+            .join(grouped, grouped.c.customer_uuid == CustomerModel.uuid)
+            .filter(CustomerModel.account_uuid == uow.account_uuid)
+            .order_by(grouped.c.changed_at.desc())
+            .offset((params.page - 1) * params.per_page)
+            .limit(params.per_page)
+            .all()
+        )
+        result = TagTransitionCustomersPage(
+            key=params.key,
+            from_value=params.from_value,
+            to_value=params.to_value,
+            customers=[
+                TagTransitionCustomer(
+                    customer_uuid=u,
+                    company_name=cn,
+                    full_name=fn,
+                    changed_at=ca,
+                )
+                for (u, cn, fn, ca) in rows
+            ],
+            total_count=total,
+            page=params.page,
+            per_page=params.per_page,
+            pages=(total + params.per_page - 1) // params.per_page,
         ).model_dump(mode="json")
     return jsonify(result), 200
 

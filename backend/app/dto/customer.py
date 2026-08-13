@@ -360,3 +360,42 @@ class CustomerTagHistoryPage(BaseModel):
     page: int
     per_page: int
     pages: int
+
+
+class TagTransitionCustomersParams(BaseModel):
+    """Which customers made one specific transition (key + from/to) — the
+    drill-down behind a transition count."""
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
+    date_from: Optional[datetime] = None
+    date_to: Optional[datetime] = None
+    # same semantics as the rollup: "" matches bare-present, omit for any
+    from_value: Optional[str] = None
+    to_value: Optional[str] = None
+    page: int = Field(1, gt=0, le=1_000_000)
+    per_page: int = Field(20, gt=0, le=100)
+
+
+class TagTransitionCustomer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_uuid: str
+    company_name: str
+    full_name: str
+    # when this customer last made the transition in the window (a customer who
+    # flip-flopped shows their most recent crossing)
+    changed_at: datetime
+
+
+class TagTransitionCustomersPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    from_value: Optional[str] = None
+    to_value: Optional[str] = None
+    customers: List[TagTransitionCustomer]
+    total_count: int
+    page: int
+    per_page: int
+    pages: int
