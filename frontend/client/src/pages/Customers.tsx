@@ -359,6 +359,16 @@ export default function Customers() {
                       <p className="text-sm text-gray-700 line-clamp-2">{customer.notes}</p>
                     </div>
                   )}
+
+                  {customer.tags && customer.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {customer.tags.map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-xs font-normal">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}

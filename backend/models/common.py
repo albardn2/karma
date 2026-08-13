@@ -200,6 +200,9 @@ class Customer(Base):
     business_cards = Column(Text, nullable=True)  # URL(s) or file path(s)
     notes = Column(Text, nullable=True)
     category = Column(String(120), nullable=False)  # e.g., roastery, cafe, etc.
+    # free-form labels, each "key" or "key:value" (validated at the DTO);
+    # plain strings so "vip" and "region:malki" filter with the same operators
+    tags = Column(ARRAY(String), nullable=False, default=list, server_default='{}')
     coordinates = Column(Geometry("POINT", srid=4326), nullable=True)
     is_deleted = Column(Boolean, default=False)
 

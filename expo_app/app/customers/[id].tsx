@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime, formatNumericDate } from '@/utils/date';
+import { TagInput } from '@/components/TagInput';
 
 interface Customer {
   uuid: string;
@@ -45,6 +46,7 @@ interface Customer {
     | "university"
     | "hospital";
   coordinates: string | null;
+  tags: string[];
   created_at: string;
   is_deleted: boolean;
   balance_per_currency: Record<string, number>;
@@ -381,6 +383,14 @@ export default function CustomerDetailScreen() {
       }
       if (editedCustomer.coordinates !== customer.coordinates) {
         updateData.coordinates = editedCustomer.coordinates;
+      }
+      // arrays compare by identity; diff by content so an unchanged tag list
+      // isn't sent (and a reorder/edit is)
+      const tagsChanged =
+        (editedCustomer.tags || []).length !== (customer.tags || []).length ||
+        (editedCustomer.tags || []).some((t, i) => t !== (customer.tags || [])[i]);
+      if (tagsChanged) {
+        updateData.tags = editedCustomer.tags || [];
       }
 
       // If no changes, just exit edit mode
@@ -988,6 +998,29 @@ export default function CustomerDetailScreen() {
                 locationLoading={locationLoading}
                 onGetLocation={getLocation}
               />
+              {/* Tags: chip editor while editing, badges otherwise. Hidden when
+                  a non-editing customer has none, so the row isn't dead space */}
+              {(isEditing || (customer.tags && customer.tags.length > 0)) && (
+                <View style={styles.infoRow}>
+                  <ThemedText style={styles.infoLabel}>{t('custdetail.tags')}</ThemedText>
+                  {isEditing && editedCustomer ? (
+                    <TagInput
+                      value={editedCustomer.tags || []}
+                      onChange={(tags) =>
+                        setEditedCustomer((prev) => (prev ? { ...prev, tags } : prev))
+                      }
+                    />
+                  ) : (
+                    <View style={styles.tagBadgeWrap} testID="customer-tags">
+                      {(customer.tags || []).map((tag) => (
+                        <View key={tag} style={styles.tagBadge} testID={`customer-tag-${tag}`}>
+                          <ThemedText style={styles.tagBadgeText}>{tag}</ThemedText>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
               <InfoRow
                 label={t('custdetail.uuid')}
                 value={customer.uuid}
@@ -1431,6 +1464,14 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     flex: 1,
   },
+  tagBadgeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tagBadge: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 14,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  tagBadgeText: { fontSize: 13, color: '#3730A3' },
   infoInput: {
     borderWidth: 1,
     borderColor: "#d1d5db",

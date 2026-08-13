@@ -303,6 +303,24 @@ export default function CustomerDetail() {
               </CardContent>
             </Card>
 
+            {/* Tags */}
+            {customer.tags && customer.tags.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('customers.tags')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-1.5" data-testid="customer-tags">
+                    {customer.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="font-normal" data-testid={`customer-tag-${tag}`}>
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Notes */}
             {customer.notes && (
               <Card>
