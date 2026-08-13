@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  I18nManager,
   Modal,
   RefreshControl,
   ScrollView,
@@ -27,6 +28,21 @@ interface Field {
   options?: string[] | null;
   placeholder?: string | null;
 }
+
+interface HistoryItem {
+  uuid: string;
+  date: string;
+  outcome: string;
+  notes?: string | null;
+}
+interface HistoryPage {
+  items: HistoryItem[];
+  total_count: number;
+  page: number;
+  pages: number;
+}
+
+const HISTORY_PER_PAGE = 5;
 
 const toDate = (s?: string | null) => {
   if (!s) return null;
@@ -61,8 +77,34 @@ export default function StopDetailScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [pickerField, setPickerField] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [history, setHistory] = useState<HistoryPage | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
 
   useFocusEffect(React.useCallback(() => { setRefreshKey((k) => k + 1); }, []));
+
+  // How earlier visits to this customer went, newest first. The current stop
+  // is excluded — its result is the form right above the table.
+  useEffect(() => {
+    if (!customerUuid) return;
+    // an arrow tap supersedes the in-flight request; without this the slower
+    // response can land last and show a page the pager no longer points at
+    let cancelled = false;
+    (async () => {
+      const qs =
+        `customer_uuid=${customerUuid}&page=${historyPage}&per_page=${HISTORY_PER_PAGE}` +
+        (tripStopUuid ? `&exclude_uuid=${tripStopUuid}` : '');
+      const res = await apiCall<HistoryPage>(`/trip-stop/customer-history?${qs}`);
+      if (cancelled || res.status !== 200 || !res.data) return;
+      setHistory(res.data);
+      // the dataset can shrink between fetches (a trip soft-deleted elsewhere);
+      // a page past the new end comes back with zero rows — snap to the last
+      // real page instead of stranding the user on an empty table
+      if (res.data.pages > 0 && historyPage > res.data.pages) setHistoryPage(res.data.pages);
+      else if (res.data.total_count === 0 && historyPage !== 1) setHistoryPage(1);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerUuid, historyPage, refreshKey]);
 
   useEffect(() => {
     (async () => {
@@ -335,6 +377,58 @@ export default function StopDetailScreen() {
               {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.completeText}>{t('stopdetail.completeStop')}</ThemedText>}
             </TouchableOpacity>
           )}
+
+          {/* previous visits: how earlier stops at this customer ended */}
+          {history && history.total_count > 0 && (
+            <View style={styles.historyBox} testID="history-table">
+              <ThemedText style={styles.recentTitle}>{t('stopdetail.previousVisits')}</ThemedText>
+              <View style={styles.historyHead}>
+                <ThemedText style={[styles.historyHeadText, styles.historyDate]}>{t('stopdetail.historyDate')}</ThemedText>
+                <ThemedText style={[styles.historyHeadText, styles.historyResult]}>{t('stopdetail.historyResult')}</ThemedText>
+                <ThemedText style={[styles.historyHeadText, styles.historyComment]}>{t('stopdetail.historyComment')}</ThemedText>
+              </View>
+              {history.items.map((h) => (
+                <View key={h.uuid} style={styles.historyRow} testID={`history-row-${h.uuid}`}>
+                  <ThemedText style={[styles.historyCell, styles.historyDate]}>{fmt(h.date)}</ThemedText>
+                  <ThemedText style={[styles.historyCell, styles.historyResult]}>{te(h.outcome)}</ThemedText>
+                  <ThemedText style={[styles.historyCell, styles.historyComment, !h.notes && styles.historyEmpty]}>
+                    {h.notes || '—'}
+                  </ThemedText>
+                </View>
+              ))}
+              {history.pages > 1 && (
+                <View style={styles.historyPager}>
+                  {/* arrows run on the SERVER's page, not the request counter:
+                      after a failed or superseded fetch the two can differ, and
+                      stepping from what is actually on screen means a retap
+                      retries the missing page instead of skipping past it */}
+                  <TouchableOpacity
+                    onPress={() => setHistoryPage(Math.max(1, history.page - 1))}
+                    disabled={history.page <= 1}
+                    hitSlop={10}
+                    testID="history-prev"
+                  >
+                    <ThemedText style={[styles.pagerArrow, history.page <= 1 && styles.pagerDisabled]}>
+                      {I18nManager.isRTL ? '›' : '‹'}
+                    </ThemedText>
+                  </TouchableOpacity>
+                  <ThemedText style={styles.pagerLabel}>
+                    {t('stopdetail.historyPage', { page: history.page, pages: history.pages })}
+                  </ThemedText>
+                  <TouchableOpacity
+                    onPress={() => setHistoryPage(Math.min(history.pages, history.page + 1))}
+                    disabled={history.page >= history.pages}
+                    hitSlop={10}
+                    testID="history-next"
+                  >
+                    <ThemedText style={[styles.pagerArrow, history.page >= history.pages && styles.pagerDisabled]}>
+                      {I18nManager.isRTL ? '‹' : '›'}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -403,6 +497,20 @@ const styles = StyleSheet.create({
   completeText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   completedBanner: { marginTop: 8, backgroundColor: '#D1FAE5', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   completedBannerText: { color: '#047857', fontSize: 16, fontWeight: '700' },
+  historyBox: { marginTop: 24 },
+  historyHead: { flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.12)' },
+  historyHeadText: { fontSize: 11, fontWeight: '700', opacity: 0.55, textTransform: 'uppercase', letterSpacing: 0.4 },
+  historyRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.08)' },
+  historyCell: { fontSize: 13 },
+  // column widths: date and result get fixed shares, the comment takes the rest
+  historyDate: { flex: 1.1, paddingEnd: 6 },
+  historyResult: { flex: 1.2, paddingEnd: 6 },
+  historyComment: { flex: 1.4 },
+  historyEmpty: { opacity: 0.35 },
+  historyPager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 14, paddingTop: 10 },
+  pagerArrow: { fontSize: 26, lineHeight: 28, color: '#5469D4', paddingHorizontal: 6 },
+  pagerDisabled: { color: '#c7cbd4' },
+  pagerLabel: { fontSize: 13, opacity: 0.6 },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '70%', paddingBottom: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.1)' },
