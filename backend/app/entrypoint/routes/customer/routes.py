@@ -19,7 +19,14 @@ from app.dto.customer import (
     CustomerMapCluster,
     CustomerMapClusterPage,
     CustomerMapClusterParams,
+    TagTransitionParams,
+    TagTransition,
+    TagTransitionsResult,
+    CustomerTagHistoryParams,
+    CustomerTagHistoryItem,
+    CustomerTagHistoryPage,
 )
+from app.domains.customer.tag_history import record_tag_changes
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.entrypoint.routes.common.errors import NotFoundError
 
@@ -51,7 +58,19 @@ def create_customer():
         if data.get("tags") is None:
             data["tags"] = []
         cust = CustomerModel(**data)
-        uow.customer_repository.save(model=cust, commit=True)
+        uow.customer_repository.save(model=cust, commit=False)
+        # flush so cust.uuid exists for the event FK, then log the initial tags
+        # as changes from nothing (None -> value), in the SAME transaction
+        uow.session.flush()
+        record_tag_changes(
+            uow,
+            customer_uuid=cust.uuid,
+            account_uuid=uow.account_uuid,
+            created_by_uuid=current_uuid,
+            old_tags=[],
+            new_tags=cust.tags,
+        )
+        uow.commit()
         customer_data = CustomerRead.from_orm(cust).model_dump(mode='json')
 
     return jsonify(customer_data), 201
@@ -78,6 +97,7 @@ def get_customer(uuid: str):
 @scopes_required(PermissionScope.ADMIN.value,
                  PermissionScope.SUPER_ADMIN.value)
 def update_customer(uuid: str):
+    current_uuid = get_jwt_identity()
     payload = CustomerUpdate(**request.json)
     data = payload.model_dump(exclude_unset=True)
     with SqlAlchemyUnitOfWork() as uow:
@@ -92,11 +112,26 @@ def update_customer(uuid: str):
         # which the column spells [] (omitted stays excluded by exclude_unset)
         if "tags" in data and data["tags"] is None:
             data["tags"] = []
+        # snapshot BEFORE mutating, so the diff is against what was stored
+        tags_touched = "tags" in data
+        old_tags = list(customer.tags or [])
         # Update customer fields
         for key, value in data.items():
             if hasattr(customer, key):
                 setattr(customer, key, value)
-        uow.customer_repository.save(model=customer, commit=True)
+        uow.customer_repository.save(model=customer, commit=False)
+        # log the per-key changes in the same transaction as the write, only
+        # when tags were part of this update
+        if tags_touched:
+            record_tag_changes(
+                uow,
+                customer_uuid=customer.uuid,
+                account_uuid=uow.account_uuid,
+                created_by_uuid=current_uuid,
+                old_tags=old_tags,
+                new_tags=customer.tags,
+            )
+        uow.commit()
         customer_data = CustomerRead.from_orm(customer).model_dump(mode='json')
 
     return jsonify(customer_data), 200
@@ -265,6 +300,112 @@ def list_customer_tags():
             .all()
         )
     return jsonify({"tags": [r[0] for r in rows]}), 200
+
+
+@customer_blueprint.route('/tag-transitions', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.OPERATION_MANAGER.value)
+def customer_tag_transitions():
+    """How this tenant's customers moved between values of one tag key over a
+    window: for every observed old_value -> new_value, the count of DISTINCT
+    customers who made it. The direct answer to "how many customers changed
+    from interest:interested to interest:not_interested".
+
+    old_value/new_value semantics: NULL = the key was absent (a set or a clear),
+    "" = a bare key present, otherwise the value. Passing from_value/to_value
+    narrows to one transition ("" matches bare-present; omit for all).
+    """
+    from sqlalchemy import distinct
+    from models.common import CustomerTagEvent as EventModel
+
+    params = TagTransitionParams(**request.args)
+    with SqlAlchemyUnitOfWork() as uow:
+        # raw aggregate — tenant filter spelled out per the multi-tenancy rule
+        q = (
+            uow.session.query(
+                EventModel.old_value,
+                EventModel.new_value,
+                func.count(distinct(EventModel.customer_uuid)),
+            )
+            .filter(
+                EventModel.account_uuid == uow.account_uuid,
+                EventModel.key == params.key,
+            )
+        )
+        if params.date_from is not None:
+            q = q.filter(EventModel.created_at >= params.date_from)
+        if params.date_to is not None:
+            q = q.filter(EventModel.created_at <= params.date_to)
+        # `is not None` on purpose: "" is a meaningful value (bare key present),
+        # only an omitted param means "don't filter this side"
+        if params.from_value is not None:
+            q = q.filter(EventModel.old_value == params.from_value)
+        if params.to_value is not None:
+            q = q.filter(EventModel.new_value == params.to_value)
+        rows = q.group_by(EventModel.old_value, EventModel.new_value).all()
+
+        transitions = [
+            TagTransition(from_value=ov, to_value=nv, customers=c)
+            for ov, nv, c in rows
+        ]
+        # biggest movements first — a stable, useful default ordering
+        transitions.sort(key=lambda tr: tr.customers, reverse=True)
+        result = TagTransitionsResult(
+            key=params.key, transitions=transitions
+        ).model_dump(mode="json")
+    return jsonify(result), 200
+
+
+@customer_blueprint.route('/<string:uuid>/tag-history', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.ACCOUNTANT.value)
+def customer_tag_history(uuid: str):
+    """One customer's tag changes, newest first — the per-customer timeline."""
+    from models.common import CustomerTagEvent as EventModel
+
+    params = CustomerTagHistoryParams(**request.args)
+    with SqlAlchemyUnitOfWork() as uow:
+        base = (
+            uow.session.query(EventModel)
+            .filter(
+                EventModel.account_uuid == uow.account_uuid,
+                EventModel.customer_uuid == uuid,
+            )
+        )
+        total = base.count()
+        rows = (
+            base.order_by(EventModel.created_at.desc())
+            .offset((params.page - 1) * params.per_page)
+            .limit(params.per_page)
+            .all()
+        )
+        result = CustomerTagHistoryPage(
+            items=[
+                CustomerTagHistoryItem(
+                    uuid=r.uuid,
+                    created_at=r.created_at,
+                    created_by_uuid=r.created_by_uuid,
+                    change_group_uuid=r.change_group_uuid,
+                    key=r.key,
+                    old_value=r.old_value,
+                    new_value=r.new_value,
+                )
+                for r in rows
+            ],
+            total_count=total,
+            page=params.page,
+            per_page=params.per_page,
+            pages=(total + params.per_page - 1) // params.per_page,
+        ).model_dump(mode="json")
+    return jsonify(result), 200
 
 
 @customer_blueprint.route('/categories', methods=['GET'])

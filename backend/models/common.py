@@ -185,6 +185,39 @@ class User(Base):
         return "superuser" in (self.permission_scope or "").split(",")
 
 
+class CustomerTagEvent(Base):
+    """Append-only log of a customer's tag changes, one row per (key) that
+    changed in a single save.
+
+    Tags are single-valued per key (the DTO enforces it), so a change to key
+    `interest` is fully described by old_value -> new_value. NULL on either side
+    is meaningful and distinct from a bare key present with no value:
+      * old_value NULL, new_value 'interested'      -> the key was ADDED
+      * old_value 'interested', new_value 'not_..'  -> the value CHANGED
+      * old_value 'interested', new_value NULL       -> the key was REMOVED
+    A bare key (no colon, e.g. 'vip') present is recorded with value '' — the
+    tag validator forbids an empty value on a key:value tag, so '' can only
+    ever mean "bare key present", never collides with a real value.
+
+    Never mutated or deleted (not even when the customer is soft-deleted): it is
+    the historical record the transition analytics count over.
+    """
+    __tablename__ = "customer_tag_event"
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
+    customer_uuid = Column(String(36), ForeignKey('customer.uuid'), nullable=False, index=True)
+    # who made the change (the JWT identity); nullable for system/backfill paths
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    # correlates every key that changed in ONE save, so a per-customer timeline
+    # can group "these three keys changed together"
+    change_group_uuid = Column(String(36), nullable=False)
+    key = Column(String(64), nullable=False, index=True)
+    old_value = Column(String(64), nullable=True)
+    new_value = Column(String(64), nullable=True)
+
+
 class Customer(Base):
     __tablename__ = "customer"
 

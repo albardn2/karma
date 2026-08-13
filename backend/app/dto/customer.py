@@ -26,13 +26,26 @@ MAX_TAG_LENGTH = 64
 MAX_TAGS = 25
 
 
+def split_tag(tag: str) -> tuple[str, str]:
+    """(key, value) for a normalized tag. A bare key has value '' — the tag
+    validator forbids an empty value on a key:value tag, so '' can only mean
+    "bare key present" and never collides with a real value."""
+    if ":" in tag:
+        key, value = tag.split(":", 1)
+        return key, value
+    return tag, ""
+
+
 def normalize_tags(v):
     """Validate and canonicalise a tag list.
 
     A tag is "key" or "key:value" — one optional colon, both sides non-empty
     after trimming. Commas are forbidden because the list-filter query param is
     CSV and array_to_string(tags, ',') backs the key-prefix filter; embedded
-    whitespace is allowed for multi-word (e.g. Arabic) values. None passes
+    whitespace is allowed for multi-word (e.g. Arabic) values. Tags are
+    SINGLE-VALUED per key: a customer may not carry both "interest:interested"
+    and "interest:not_interested", so a key's value is a well-defined thing that
+    can transition — which is what the tag-change analytics count. None passes
     through: on update it means "clear", handled at the route.
     """
     if v is None:
@@ -45,6 +58,7 @@ def normalize_tags(v):
         raise ValueError(f"at most {MAX_TAGS} tags per customer")
     out: list[str] = []
     seen: set[str] = set()
+    keys: set[str] = set()
     for raw in v:
         tag = str(raw).strip()
         if not tag:
@@ -60,9 +74,17 @@ def normalize_tags(v):
             if not key or not value:
                 raise ValueError(f"key and value must both be non-empty: {tag}")
             tag = f"{key}:{value}"
-        if tag not in seen:
-            seen.add(tag)
-            out.append(tag)
+        if tag in seen:
+            continue
+        key = split_tag(tag)[0]
+        # one value per key: "interest:interested" and "interest:not_interested"
+        # cannot coexist. The clients replace same-key values in the editor, so a
+        # well-behaved client never trips this; it is the API safety net.
+        if key in keys:
+            raise ValueError(f"at most one value per key: '{key}'")
+        keys.add(key)
+        seen.add(tag)
+        out.append(tag)
     return out
 
 
@@ -271,3 +293,70 @@ class CustomerMapClusterPage(BaseModel):
     # (and so this is debuggable from a response body alone).
     cell_size_degrees: float
     max_points: int = MAX_MAP_POINTS
+
+
+# --------------------------- TAG CHANGE HISTORY ---------------------------
+
+
+class TagTransitionParams(BaseModel):
+    """Which key's transitions to roll up, over which window."""
+    model_config = ConfigDict(extra="forbid")
+
+    # the tag key, e.g. "interest" — the family whose value changes we count
+    key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
+    # inclusive ISO datetimes bounding when the change was recorded; both
+    # optional (omit for all-time)
+    date_from: Optional[datetime] = None
+    date_to: Optional[datetime] = None
+    # narrow to a single transition when set — the direct answer to "how many
+    # customers moved from X to Y". "" matches a bare key present; omit for all.
+    from_value: Optional[str] = None
+    to_value: Optional[str] = None
+
+
+class TagTransition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # None = key absent (a set / a clear); "" = bare key present; else the value
+    from_value: Optional[str] = None
+    to_value: Optional[str] = None
+    # DISTINCT customers who made this transition in the window ("how many
+    # customers", not how many times)
+    customers: int
+
+
+class TagTransitionsResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    transitions: List[TagTransition]
+
+
+class CustomerTagHistoryParams(BaseModel):
+    """A single customer's tag changes, newest first."""
+    model_config = ConfigDict(extra="forbid")
+
+    page: int = Field(1, gt=0, le=1_000_000)
+    per_page: int = Field(20, gt=0, le=100)
+
+
+class CustomerTagHistoryItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    uuid: str
+    created_at: datetime
+    created_by_uuid: Optional[str] = None
+    change_group_uuid: str
+    key: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+
+
+class CustomerTagHistoryPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: List[CustomerTagHistoryItem]
+    total_count: int
+    page: int
+    per_page: int
+    pages: int
