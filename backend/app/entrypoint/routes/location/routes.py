@@ -109,11 +109,18 @@ def client_config():
         # the caller's own account, so the namespace cannot be chosen by the client
         broker = _broker_config(uow.account_uuid)
         # cadence is global now: the per-user switch says WHETHER to track,
-        # the account config says HOW OFTEN to publish
-        config = _get_config(uow)
+        # the account config says HOW OFTEN to publish. Read-only lookup with a
+        # default — NOT _get_config, which lazily INSERTs: this endpoint is hit
+        # by every app at startup, so creating the row here would let concurrent
+        # first-calls on a never-configured account race into duplicate rows.
+        config = (
+            uow.session.query(LocationTrackingConfigModel)
+            .filter(LocationTrackingConfigModel.account_uuid == uow.account_uuid)
+            .first()
+        )
         result = {
             "track_location": bool(user.track_location),
-            "ping_seconds": int(config.live_ping_seconds or 15),
+            "ping_seconds": int((config.live_ping_seconds if config else 15) or 15),
             "broker_ws_url": broker["ws_url"],
             "topic": f"{broker['topic_prefix']}/{user.uuid}",
             # the live-map view subscribes to `{topic_prefix}/+`
