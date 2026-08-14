@@ -146,7 +146,7 @@ jobs:
         run: rm -f asc-api-key.p8
 
   build-android-preview:
-    name: Android APK (internal install)
+    name: Android APK (internal install, prod API)
     needs: check-trigger
     if: needs.check-trigger.outputs.build_preview == 'true' && needs.check-trigger.outputs.android == 'true'
     runs-on: ubuntu-latest
@@ -179,7 +179,10 @@ jobs:
         run: |
           # pipefail so tee cannot mask a failed build
           set -o pipefail
-          eas build --platform android --profile preview --non-interactive 2>&1 | tee build.log
+          # production-apk = the production profile (prod API) as an installable
+          # internal APK. The iOS ad-hoc job still uses `preview` (dev); only the
+          # Android sideload build is moved to prod, which is what gets installed.
+          eas build --platform android --profile production-apk --non-interactive 2>&1 | tee build.log
 
       - name: Publish install link
         if: always()

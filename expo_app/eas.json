@@ -22,6 +22,11 @@
       "distribution": "store",
       "autoIncrement": true,
       "env": { "API_BASE_URL": "https://api-prod.karma-grp.com" }
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
     }
   },
   "submit": {
