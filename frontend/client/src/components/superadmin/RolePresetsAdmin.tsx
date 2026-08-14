@@ -3,6 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PermissionsEditor } from "@/components/users/PermissionsEditor";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
@@ -68,6 +75,23 @@ export function RolePresetsAdmin() {
     }
     setDraft(r.permissions);
     setEditing(r.role);
+  };
+
+  /**
+   * Load another role's permissions into the OPEN role's draft, so you can base
+   * one role on another instead of re-ticking a full checklist. Deep-cloned so
+   * editing the draft never mutates the source role's cached object. This only
+   * stages the copy — nothing is saved until Save, and the "affects N users"
+   * warning still shows before it applies.
+   */
+  const copyFrom = (target: string, sourceRole: string) => {
+    const src = roles.find((r) => r.role === sourceRole);
+    if (!src) return;
+    setDraft(structuredClone(src.permissions));
+    toast({
+      title: t("common.success"),
+      description: t("rolePresets.copiedFrom", { role: te(sourceRole), target: te(target) }),
+    });
   };
 
   const afterWrite = (label: string) => {
@@ -176,7 +200,7 @@ export function RolePresetsAdmin() {
           {editing === r.role && (
             <CardContent className="space-y-4">
               <PermissionsEditor key={r.role} value={draft} onChange={setDraft} />
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   onClick={() => saveMutation.mutate(r.role)}
                   disabled={saveMutation.isPending}
@@ -187,6 +211,26 @@ export function RolePresetsAdmin() {
                 <Button variant="ghost" onClick={() => setDraft(r.baseline)}>
                   {t("rolePresets.loadBaseline")}
                 </Button>
+                {/* base this role on another: pick a source, its permissions
+                    fill the draft for review before Save. Reset each open via
+                    key so it always shows the placeholder, never a stale pick. */}
+                <Select key={r.role} onValueChange={(src) => copyFrom(r.role, src)}>
+                  <SelectTrigger
+                    className="h-9 w-auto min-w-[10rem]"
+                    data-testid={`role-copyfrom-${r.role}`}
+                  >
+                    <SelectValue placeholder={t("rolePresets.copyFrom")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles
+                      .filter((o) => o.role !== r.role)
+                      .map((o) => (
+                        <SelectItem key={o.role} value={o.role} data-testid={`role-copyfrom-opt-${o.role}`}>
+                          {te(o.role)}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
               {r.following > 0 && (
                 <p className="text-xs text-amber-700" data-testid={`role-warn-${r.role}`}>

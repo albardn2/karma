@@ -17,6 +17,9 @@ export const en: Record<string, string> = {
   'rolePresets.summary': '{modules} menu module(s), {resources} resource(s) granted',
   'rolePresets.resetToDefault': 'Reset to default',
   'rolePresets.loadBaseline': 'Load generated default',
+  'rolePresets.copyFrom': 'Copy from…',
+  'rolePresets.copiedFrom':
+    "Copied {role}'s permissions — review, then Save to apply to {target}.",
   'rolePresets.affectsWarning':
     'Saving changes what {count} user(s) can do, on their next request.',
 };
@@ -35,6 +38,9 @@ export const ar: Record<string, string> = {
   'rolePresets.summary': '{modules} وحدة قائمة، {resources} مورد مسموح',
   'rolePresets.resetToDefault': 'إعادة إلى الأصل',
   'rolePresets.loadBaseline': 'تحميل الإعداد الأصلي',
+  'rolePresets.copyFrom': 'نسخ من…',
+  'rolePresets.copiedFrom':
+    'تم نسخ صلاحيات {role} — راجعها ثم احفظ لتطبيقها على {target}.',
   'rolePresets.affectsWarning':
     'الحفظ سيغيّر ما يمكن لـ {count} مستخدم فعله، عند طلبهم التالي.',
 };
