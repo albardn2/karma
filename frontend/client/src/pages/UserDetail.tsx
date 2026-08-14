@@ -39,7 +39,6 @@ import {
   Copy,
   Trash2,
   MapPin,
-  Timer,
   History
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -63,15 +62,6 @@ const makeUserUpdateSchema = (t: (key: string) => string) =>
     permission_scope: z.string().optional(),
     is_active: z.boolean().optional(),
     track_location: z.boolean().optional(),
-    location_ping_seconds: z.preprocess(
-      (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
-      z
-        .number({ invalid_type_error: t("users.mustBeNumber") })
-        .int(t("users.mustBeWholeNumber"))
-        .min(1, t("users.pingMinSeconds"))
-        .max(3600, t("users.pingMaxSeconds"))
-        .optional()
-    ),
   });
 
 type UserUpdateFormValues = z.infer<ReturnType<typeof makeUserUpdateSchema>>;
@@ -153,7 +143,6 @@ export default function UserDetail() {
       permission_scope: "",
       is_active: undefined,
       track_location: undefined,
-      location_ping_seconds: undefined,
     },
   });
 
@@ -173,7 +162,6 @@ export default function UserDetail() {
         permission_scope: user.permission_scope || "",
         is_active: user.is_active,
         track_location: user.track_location,
-        location_ping_seconds: user.location_ping_seconds,
       });
       // seed the checklist from what actually governs the user: their
       // explicit override, else their role preset
@@ -699,30 +687,6 @@ export default function UserDetail() {
                           )}
                         />
 
-                        <FormField
-                          control={form.control}
-                          name="location_ping_seconds"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>{t("users.pingCadenceLabel")}</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  max={3600}
-                                  placeholder={t("users.enterPingCadence")}
-                                  {...field}
-                                  value={field.value ?? ""}
-                                />
-                              </FormControl>
-                              <FormDescription>
-                                {t("users.pingCadenceDesc")}
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
                       </div>
                     </div>
                   </Form>
@@ -862,18 +826,6 @@ export default function UserDetail() {
                         <Badge variant={user.track_location ? "default" : "secondary"}>
                           {user.track_location ? t("users.enabled") : t("users.disabled")}
                         </Badge>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <Timer className="h-4 w-4" />
-                          <span>{t("users.pingCadence")}</span>
-                        </div>
-                        <p className="font-medium">
-                          {user.location_ping_seconds != null
-                            ? t("users.seconds", { count: user.location_ping_seconds })
-                            : t("users.notSet")}
-                        </p>
                       </div>
                     </div>
                   </div>

@@ -44,8 +44,13 @@ export const en: Record<string, string> = {
   'location.settingsSubtitle':
     'Global configuration for how user location data is stored and retained.',
   'location.settingsNote':
-    "These settings apply to all users. The live publish cadence (how often the mobile app sends location updates for a specific user) is configured per user on the user's page.",
+    'These settings apply to all users. Tracking is turned on per user on their own page; how often the app publishes while tracking is the live ping cadence below.',
   'location.storageConfig': 'Storage Configuration',
+  'location.livePingCadence': 'Live ping cadence (seconds)',
+  'location.livePingCadencePlaceholder': 'Enter live ping cadence in seconds',
+  'location.livePingCadenceDesc':
+    'How often the app publishes a live position while a user is tracked',
+  'location.errMaxPing': 'Must be at most 3600 seconds',
   'location.tripCadence': 'Trip cadence (seconds)',
   'location.tripCadencePlaceholder': 'Enter trip cadence in seconds',
   'location.tripCadenceDesc': 'Spacing of stored points during a trip',
@@ -151,8 +156,12 @@ export const ar: Record<string, string> = {
   'location.settingsSubtitle':
     'الإعدادات العامة لكيفية تخزين بيانات مواقع المستخدمين والاحتفاظ بها.',
   'location.settingsNote':
-    'تنطبق هذه الإعدادات على جميع المستخدمين. أما وتيرة النشر المباشر (كم مرة يرسل تطبيق الجوال تحديثات الموقع لمستخدم محدد) فتُضبط لكل مستخدم على صفحته.',
+    'تنطبق هذه الإعدادات على جميع المستخدمين. يُفعَّل التتبع لكل مستخدم من صفحته، ووتيرة النشر أثناء التتبع هي وتيرة الإرسال المباشر أدناه.',
   'location.storageConfig': 'إعدادات التخزين',
+  'location.livePingCadence': 'وتيرة الإرسال المباشر (بالثواني)',
+  'location.livePingCadencePlaceholder': 'أدخل وتيرة الإرسال المباشر بالثواني',
+  'location.livePingCadenceDesc': 'كم مرة يرسل التطبيق الموقع المباشر أثناء تتبّع المستخدم',
+  'location.errMaxPing': 'يجب ألا تتجاوز 3600 ثانية',
   'location.tripCadence': 'وتيرة الرحلة (بالثواني)',
   'location.tripCadencePlaceholder': 'أدخل وتيرة الرحلة بالثواني',
   'location.tripCadenceDesc': 'المسافة الزمنية بين النقاط المخزنة أثناء الرحلة',

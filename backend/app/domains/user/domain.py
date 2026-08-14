@@ -135,7 +135,7 @@ class UserDomain:
         updates = payload.model_dump(exclude_unset=True)
         # these columns are NOT NULL; an explicit null in the payload means
         # "leave unchanged" (email/phone may still be cleared via null)
-        for key in ("track_location", "location_ping_seconds", "is_active"):
+        for key in ("track_location", "is_active"):
             if updates.get(key) is None:
                 updates.pop(key, None)
         # The password NEVER goes through the generic setattr loop below. It used to,

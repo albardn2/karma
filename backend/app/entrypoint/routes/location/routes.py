@@ -108,9 +108,12 @@ def client_config():
             raise NotFoundError("User not found")
         # the caller's own account, so the namespace cannot be chosen by the client
         broker = _broker_config(uow.account_uuid)
+        # cadence is global now: the per-user switch says WHETHER to track,
+        # the account config says HOW OFTEN to publish
+        config = _get_config(uow)
         result = {
             "track_location": bool(user.track_location),
-            "ping_seconds": int(user.location_ping_seconds or 15),
+            "ping_seconds": int(config.live_ping_seconds or 15),
             "broker_ws_url": broker["ws_url"],
             "topic": f"{broker['topic_prefix']}/{user.uuid}",
             # the live-map view subscribes to `{topic_prefix}/+`
