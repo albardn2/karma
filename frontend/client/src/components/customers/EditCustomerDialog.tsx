@@ -109,13 +109,28 @@ export function EditCustomerDialog({
     }
 
     // Convert empty strings to null for optional fields
-    const cleanedData = {
+    const cleanedData: CustomerFormData = {
       ...formData,
       email_address: formData.email_address?.trim() || null,
       notes: formData.notes?.trim() || null,
       coordinates: formData.coordinates?.trim() || null,
-      tags: formData.tags ?? [],
     };
+
+    // Send tags ONLY if this form actually changed them. Some tags are derived
+    // server-side from orders and trip-stop outcomes, so this snapshot goes
+    // stale whenever a rep works in the app — and the PUT replaces the whole
+    // array. Sending an untouched stale list would delete a derivation the
+    // server made minutes ago and write a reverse row into the tag history.
+    // Omitted keys are left alone by the route (model_dump(exclude_unset=True)).
+    const before = customer.tags ?? [];
+    const after = formData.tags ?? [];
+    const tagsChanged =
+      before.length !== after.length || after.some((tag, i) => tag !== before[i]);
+    if (tagsChanged) {
+      cleanedData.tags = after;
+    } else {
+      delete cleanedData.tags;
+    }
 
     updateCustomerMutation.mutate(cleanedData);
   };

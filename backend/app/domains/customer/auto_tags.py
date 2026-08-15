@@ -97,6 +97,36 @@ def tags_for_outcome(outcome) -> list[str]:
     return tags
 
 
+# the sale key is a LADDER, and it only ever climbs
+_SALE_RANK = {SALE_NONE: 0, SALE_ONE_TIME: 1, SALE_REPEATED: 2}
+
+
+def sale_tag_for_order(customer, *, bought_before: bool) -> list[str]:
+    """The customer_sale value an order implies — unless the customer already
+    carries a stronger one.
+
+    An order proves "has bought at least once". That is weaker than "buys
+    repeatedly", so it must not overwrite it: a customer onboarded as a known
+    repeat buyer (which create deliberately preserves, see with_default_sale_tag)
+    would otherwise be demoted to one-time by their first order in this system,
+    then promoted again by their second. The funnel analytics would show one
+    customer converting twice, in opposite directions, neither of which
+    happened. An unrecognised value is treated as no rank and gets replaced.
+
+    This is the one derived key where automatic does NOT simply win: elsewhere
+    the derivation is better evidence than what it replaces, but here it is
+    strictly less informed.
+    """
+    tag = SALE_REPEATED if bought_before else SALE_ONE_TIME
+    current = next(
+        (t for t in (customer.tags or []) if split_tag(t)[0].lower() == SALE_KEY),
+        None,
+    )
+    if current is not None and _SALE_RANK.get(current, -1) >= _SALE_RANK[tag]:
+        return []
+    return [tag]
+
+
 # the families that mean a rep actually reached the customer and formed a view
 _VERDICT_FAMILIES = ("sale", "interested", "not_interested", "blacklist")
 

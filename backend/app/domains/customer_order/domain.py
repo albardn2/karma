@@ -179,7 +179,7 @@ class CustomerOrderDomain:
         app/domains/customer/auto_tags.py for the skip rules.
         """
         from app.domains.customer.auto_tags import (
-            INTEREST_YES, SALE_ONE_TIME, SALE_REPEATED, apply_auto_tags,
+            INTEREST_YES, apply_auto_tags, sale_tag_for_order,
         )
 
         customer = uow.customer_repository.find_one(uuid=order.customer_uuid, is_deleted=False)
@@ -196,7 +196,9 @@ class CustomerOrderDomain:
         apply_auto_tags(
             uow,
             customer=customer,
-            tags=[SALE_REPEATED if bought_before else SALE_ONE_TIME, INTEREST_YES],
+            # the sale tag only climbs — an order says "has bought", which must
+            # not demote a customer already marked as a repeat buyer
+            tags=sale_tag_for_order(customer, bought_before=bought_before) + [INTEREST_YES],
             actor_uuid=order.created_by_uuid,
         )
 

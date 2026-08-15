@@ -41,6 +41,7 @@ from app.domains.customer.auto_tags import (
     SALE_REPEATED,
     apply_auto_tags,
     outcome_machine_key,
+    sale_tag_for_order,
     tags_cleared_by_outcome,
     tags_for_outcome,
     with_default_sale_tag,
@@ -308,6 +309,43 @@ def test_an_explicit_sale_state_at_create_is_respected():
 def test_default_sale_tag_never_overflows_the_cap():
     full = [f"t{i}" for i in range(MAX_TAGS)]
     assert with_default_sale_tag(full) == full
+
+
+# --- the sale ladder only climbs -------------------------------------------
+#
+# An order proves "has bought at least once", which is WEAKER than "buys
+# repeatedly". This is the one derived key where the derivation can be less
+# informed than what it would replace, so it is the one place automatic does
+# not simply win.
+
+def test_first_order_promotes_a_new_customer():
+    assert sale_tag_for_order(_Customer(SALE_NONE), bought_before=False) == [SALE_ONE_TIME]
+
+
+def test_a_later_order_promotes_to_repeated():
+    assert sale_tag_for_order(_Customer(SALE_ONE_TIME), bought_before=True) == [SALE_REPEATED]
+
+
+def test_a_first_in_system_order_does_not_demote_a_known_repeat_buyer():
+    """A customer onboarded as an existing buyer keeps that standing. Demoting
+    them would also make the funnel show one customer converting twice in
+    opposite directions — down now, up again on their next order."""
+    assert sale_tag_for_order(_Customer(SALE_REPEATED), bought_before=False) == []
+
+
+def test_an_unchanged_rung_is_not_rewritten():
+    assert sale_tag_for_order(_Customer(SALE_ONE_TIME), bought_before=False) == []
+    assert sale_tag_for_order(_Customer(SALE_REPEATED), bought_before=True) == []
+
+
+def test_an_untagged_customer_still_gets_a_sale_tag():
+    assert sale_tag_for_order(_Customer("vip"), bought_before=False) == [SALE_ONE_TIME]
+
+
+def test_an_unrecognised_sale_value_is_replaced():
+    """A hand-typed customer_sale:whatever has no rung, so the derivation wins
+    rather than being blocked forever by a value nothing understands."""
+    assert sale_tag_for_order(_Customer("customer_sale:maybe"), bought_before=False) == [SALE_ONE_TIME]
 
 
 def test_applying_replaces_the_previous_value_of_the_same_key():
