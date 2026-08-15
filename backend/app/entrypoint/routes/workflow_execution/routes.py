@@ -193,6 +193,8 @@ def add_manual_stop(uuid: str):
     from app.dto.trip import TripStatus
     from app.dto.task_execution import OperatorType
     from app.dto.customer import CustomerCreate, CustomerRead
+    from app.domains.customer.auto_tags import with_default_sale_tag
+    from app.domains.customer.tag_history import record_tag_changes
     from models.common import Customer as CustomerModel
     from app.utils.geom_utils import lat_lon_to_wkt
     from app.domains.task_execution.workflow_operators.create_trip_operator import create_trip_stop_with_task
@@ -212,6 +214,7 @@ def add_manual_stop(uuid: str):
             raise BadRequestError(f"Trip is not in progress (status: {trip.status})")
 
         # resolve or create the customer
+        created_customer = None
         if payload.customer_uuid:
             customer = uow.customer_repository.find_one(uuid=payload.customer_uuid, is_deleted=False)
             if not customer:
@@ -249,8 +252,19 @@ def add_manual_stop(uuid: str):
             customer_create.created_by_uuid = current_uuid
             if customer_create.email_address and uow.customer_repository.find_one(email_address=customer_create.email_address):
                 raise BadRequestError(f"Customer with email {customer_create.email_address} already exists")
-            customer = CustomerModel(**customer_create.model_dump())
+            data = customer_create.model_dump()
+            if data.get("tags") is None:
+                data["tags"] = []
+            # a customer added at the door is created here rather than through
+            # POST /customer, so seed the same starting sale state — otherwise
+            # exactly the cohort about to be sold to would start with no
+            # customer_sale key, and their first order would register as
+            # (absent -> one_time_sale) in a different bucket from everyone
+            # else's (no_sale -> one_time_sale)
+            data["tags"] = with_default_sale_tag(data["tags"])
+            customer = CustomerModel(**data)
             uow.customer_repository.save(model=customer, commit=False)
+            created_customer = customer
 
         # the stop needs coordinates; backfill from the request (device location)
         if customer.coordinates is None:
@@ -263,6 +277,19 @@ def add_manual_stop(uuid: str):
         # (downstream code calls to_shape() on it)
         uow.session.flush()
         uow.session.refresh(customer)
+
+        # now that the PK exists, log the starting tags the same way POST
+        # /customer does, so a customer added at the door has the same opening
+        # entry in their tag history as one added from the office
+        if created_customer is not None:
+            record_tag_changes(
+                uow,
+                customer_uuid=created_customer.uuid,
+                account_uuid=created_customer.account_uuid,
+                created_by_uuid=current_uuid,
+                old_tags=[],
+                new_tags=created_customer.tags,
+            )
 
         existing_indexes = [s.index for s in trip.stops if s.index is not None]
         next_index = (max(existing_indexes) + 1) if existing_indexes else 0

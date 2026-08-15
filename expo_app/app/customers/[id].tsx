@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { useRouter, useLocalSearchParams, Stack } from "expo-router";
+import { useRouter, useLocalSearchParams, Stack, useFocusEffect } from "expo-router";
 import { apiCall } from "@/utils/api";
 import { LinearGradient } from "expo-linear-gradient";
 import { CustomerLocationMap } from "@/components/CustomerLocationMap";
@@ -216,11 +216,21 @@ export default function CustomerDetailScreen() {
     return () => subscription?.remove();
   }, []);
 
-  useEffect(() => {
-    if (id) {
-      fetchCustomer();
-    }
-  }, [id]);
+  // Re-read on every focus, not just on mount. The sale and interest tags are
+  // derived server-side from orders and trip-stop outcomes, so this screen goes
+  // stale the moment the rep creates an order from somewhere else in the app —
+  // and stale here is worse than it looks: saving any field PUTs the whole tag
+  // array, so an edit made from a pre-order snapshot would write the old tags
+  // back and undo the derivation (logging reverse events into the tag history
+  // on the way). Never refetch mid-edit, which would discard what is being
+  // typed. Same pattern as the stop screen's refresh-on-focus.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (id && !isEditing) {
+        fetchCustomer();
+      }
+    }, [id, isEditing]),
+  );
 
   const showBanner = (type: "success" | "error", message: string) => {
     setBanner({ type, message });

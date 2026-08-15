@@ -35,6 +35,7 @@ from app.dto.customer import (
     CustomerTagHistoryPage,
 )
 from app.domains.customer.tag_history import record_tag_changes
+from app.domains.customer.auto_tags import with_default_sale_tag
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.entrypoint.routes.common.errors import NotFoundError
 
@@ -115,6 +116,9 @@ def create_customer():
         # list here because passing tags=None would override the model default
         if data.get("tags") is None:
             data["tags"] = []
+        # every customer starts life as a non-buyer, so the sale funnel has a
+        # baseline to move away from when their first order lands
+        data["tags"] = with_default_sale_tag(data["tags"])
         cust = CustomerModel(**data)
         uow.customer_repository.save(model=cust, commit=False)
         # flush so cust.uuid exists for the event FK, then log the initial tags

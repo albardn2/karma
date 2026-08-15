@@ -63,6 +63,9 @@ class TripStopOperator(OperatorInterface):
         trip_stop.sales_outcome = sales_outcome
         trip_stop.notes = operator_schema.notes
         uow.trip_stop_repository.save(trip_stop, commit=False)
+        self.tag_customer_from_outcome(uow=uow, trip_stop=trip_stop,
+                                       outcome=operator_schema.outcome,
+                                       actor_uuid=payload.completed_by_uuid)
         task_exe.result = operator_schema.model_dump(mode="json")
         task_exe.status = WorkflowStatus.COMPLETED.value
         task_exe.end_time = datetime.now()
@@ -70,6 +73,29 @@ class TripStopOperator(OperatorInterface):
 
         # Save the task execution with the result
         uow.task_execution_repository.save(task_exe, commit=False)
+
+    def tag_customer_from_outcome(self, uow: SqlAlchemyUnitOfWork, trip_stop,
+                                  outcome: str, actor_uuid=None) -> None:
+        """Turn what the rep reported into tags on the customer.
+
+        The outcome the rep already picks is the cheapest interest signal the
+        business has, so the customer_interest tag follows it rather than asking
+        anyone to maintain the same fact twice. blacklist and
+        interested:prioritize_next_visit additionally raise their own flags.
+
+        A manual stop has no customer (trip_stop.customer_uuid is nullable) and
+        simply tags nothing. Re-completing a stop with a corrected outcome moves
+        the tags again, which is the intended behaviour: the latest verdict wins.
+        """
+        from app.domains.customer.auto_tags import apply_auto_tags, tags_for_outcome
+
+        if not trip_stop.customer_uuid:
+            return
+        tags = tags_for_outcome(outcome)
+        if not tags:
+            return
+        customer = uow.customer_repository.find_one(uuid=trip_stop.customer_uuid, is_deleted=False)
+        apply_auto_tags(uow, customer=customer, tags=tags, actor_uuid=actor_uuid)
 
     def validate(self):
         raise NotImplementedError("The validate method must be implemented by subclasses.")

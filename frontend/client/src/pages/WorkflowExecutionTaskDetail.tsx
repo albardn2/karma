@@ -335,6 +335,12 @@ export default function WorkflowExecutionTaskDetail() {
       // Invalidate and refetch queries - wait for fresh data
       await queryClient.invalidateQueries({ queryKey: ["/task-execution/"] });
       await queryClient.refetchQueries({ queryKey: ["/workflow-execution/", executionUuid] });
+      // completing a trip stop derives the customer's interest tag (and the
+      // blacklist / prioritize flags) from the outcome, so every customer view
+      // has to re-read — this is the web path that fires that rule
+      queryClient.invalidateQueries({
+        predicate: (query) => String(query.queryKey[0]).includes("/customer"),
+      });
       
       // Find the next task in the DAG based on dependencies (using fresh data)
       const updatedExecution = queryClient.getQueryData<WorkflowExecution>(["/workflow-execution/", executionUuid]);

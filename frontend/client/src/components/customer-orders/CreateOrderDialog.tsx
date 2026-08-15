@@ -107,7 +107,14 @@ export function CreateOrderDialog({
     onSuccess: () => {
       toast({ title: t('customerOrders.orderCreated'), description: t('customerOrders.orderCreatedDesc') });
       queryClient.invalidateQueries({ queryKey: ["/customer-order/"] });
-      queryClient.invalidateQueries({ queryKey: ["/customer/"] }); // refresh customer balance
+      // an order moves the customer's balance AND their derived sale/interest
+      // tags, so every customer view has to re-read. Matching by substring
+      // rather than by the ["/customer/"] prefix is what makes this work at
+      // all: the detail page keys on ["/customer", uuid] and the list on
+      // ["/customer/list", ...], neither of which that prefix ever matched.
+      queryClient.invalidateQueries({
+        predicate: (query) => String(query.queryKey[0]).includes("/customer"),
+      });
       queryClient.invalidateQueries({ queryKey: ["/trip-stop/"] });
       reset();
       setIsOpen(false);

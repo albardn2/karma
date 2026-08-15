@@ -162,8 +162,43 @@ class CustomerOrderDomain:
     def create_customer_order(uow: SqlAlchemyUnitOfWork,payload:CustomerOrderCreate) -> CustomerOrderRead:
         order = CustomerOrderModel(**payload.model_dump(mode="json"))
         uow.customer_order_repository.save(model=order, commit=False)
+        # every order-creating route funnels through here — the bare POST, the
+        # with-items-and-invoice build, and the app's one-shot checkout (which
+        # calls the builder) — so the customer's sale/interest tags are derived
+        # in exactly one place
+        CustomerOrderDomain._tag_customer_from_order(uow=uow, order=order)
         result = CustomerOrderRead.from_orm(order)
         return result
+
+    @staticmethod
+    def _tag_customer_from_order(uow: SqlAlchemyUnitOfWork, order: CustomerOrderModel) -> None:
+        """An order is the strongest evidence there is: this customer buys, and
+        is interested. Derive both tags from it.
+
+        Never raises — a tag must not be able to fail an order. See
+        app/domains/customer/auto_tags.py for the skip rules.
+        """
+        from app.domains.customer.auto_tags import (
+            INTEREST_YES, SALE_ONE_TIME, SALE_REPEATED, apply_auto_tags,
+        )
+
+        customer = uow.customer_repository.find_one(uuid=order.customer_uuid, is_deleted=False)
+        if not customer:
+            return
+        # "has bought before?" — fetch two, because the order just saved above is
+        # already in the session and autoflush puts it in range of this query.
+        # Two rows means at least one is NOT the new order; comparing uuids makes
+        # the answer right whether or not the flush has happened yet.
+        recent = uow.customer_order_repository.find_all(
+            limit=2, customer_uuid=order.customer_uuid, is_deleted=False,
+        )
+        bought_before = any(other.uuid != order.uuid for other in recent)
+        apply_auto_tags(
+            uow,
+            customer=customer,
+            tags=[SALE_REPEATED if bought_before else SALE_ONE_TIME, INTEREST_YES],
+            actor_uuid=order.created_by_uuid,
+        )
 
     @staticmethod
     def update_customer_order(uuid:str,uow: SqlAlchemyUnitOfWork,payload: CustomerOrderUpdate) -> CustomerOrderRead:
