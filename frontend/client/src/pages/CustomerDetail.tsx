@@ -25,6 +25,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useTagCatalog } from "@/lib/tagCatalog";
 import { CustomerActivity } from "@/components/customers/CustomerActivity";
 import type { Customer } from "@/lib/types";
 import { EditCustomerDialog } from "@/components/customers/EditCustomerDialog";
@@ -32,6 +33,7 @@ import { CustomerDetailMap } from "@/components/map/CustomerDetailMap";
 
 export default function CustomerDetail() {
   const { t, te } = useLanguage();
+  const { labelFor } = useTagCatalog();
   const { uuid } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -313,7 +315,8 @@ export default function CustomerDetail() {
                   <div className="flex flex-wrap gap-1.5" data-testid="customer-tags">
                     {customer.tags.map((tag) => (
                       <Badge key={tag} variant="secondary" className="font-normal" data-testid={`customer-tag-${tag}`}>
-                        {tag}
+                        {/* predefined tags translate via the catalog; custom stay raw */}
+                        {te(labelFor(tag))}
                       </Badge>
                     ))}
                   </div>

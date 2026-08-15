@@ -3,8 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useTagCatalog } from "@/lib/tagCatalog";
 
 // Mirror of the server rule (backend/app/dto/customer.py normalize_tags), so a
 // bad tag is caught before submit instead of coming back a 422. Kept in lockstep
@@ -43,9 +51,16 @@ export function TagInput({
   onChange: (tags: string[]) => void;
   disabled?: boolean;
 }) {
-  const { t } = useLanguage();
+  const { t, te } = useLanguage();
   const [draft, setDraft] = useState("");
+  // remounts the predefined Select after each pick so it returns to its
+  // placeholder instead of holding the last choice
+  const [pickCount, setPickCount] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // predefined distribution-analytics tags ("<tag> - <arabic>" labels);
+  // labelFor translates a stored tag back for display, custom tags pass raw
+  const { catalog, labelFor } = useTagCatalog();
 
   const { data } = useQuery<{ tags: string[] }>({
     queryKey: ["/customer/tags"],
@@ -97,7 +112,7 @@ export function TagInput({
       >
         {value.map((tag, i) => (
           <Badge key={tag} variant="secondary" className="gap-1 font-normal" data-testid={`tag-chip-${tag}`}>
-            {tag}
+            {te(labelFor(tag))}
             {!disabled && (
               <button
                 type="button"
@@ -132,6 +147,25 @@ export function TagInput({
           data-testid="tag-input"
         />
       </div>
+      {/* predefined distribution-analytics tags: pick from the server catalog,
+          translated per language; the clean tag is what gets stored. Custom
+          tags keep using the free-text input above. */}
+      {!disabled && !atCap && catalog.length > 0 && (
+        <div className="mt-1.5">
+          <Select key={pickCount} onValueChange={(tag) => { add(tag); setPickCount((n) => n + 1); }}>
+            <SelectTrigger className="h-8 w-auto min-w-[12rem] text-xs" data-testid="tag-predefined">
+              <SelectValue placeholder={t("customers.predefinedTags")} />
+            </SelectTrigger>
+            <SelectContent>
+              {catalog.map((entry) => (
+                <SelectItem key={entry.tag} value={entry.tag} data-testid={`tag-predefined-opt-${entry.tag}`}>
+                  {te(entry.label)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {!atCap && suggestions.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {suggestions.map((tag) => (
@@ -142,7 +176,7 @@ export function TagInput({
               className="text-xs px-2 py-0.5 rounded-full border border-dashed border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50"
               data-testid={`tag-suggest-${tag}`}
             >
-              + {tag}
+              + {te(labelFor(tag))}
             </button>
           ))}
         </div>

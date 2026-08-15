@@ -26,6 +26,7 @@ import * as Location from 'expo-location';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime, formatNumericDate } from '@/utils/date';
 import { TagInput } from '@/components/TagInput';
+import { useTagCatalog } from '@/utils/tagCatalog';
 
 interface Customer {
   uuid: string;
@@ -182,7 +183,9 @@ export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { t, tef } = useLanguage();
+  const { t, te, tef } = useLanguage();
+  // translates predefined tags for display; custom tags pass through raw
+  const { labelFor } = useTagCatalog();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [screenData, setScreenData] = useState(Dimensions.get("window"));
@@ -1014,7 +1017,7 @@ export default function CustomerDetailScreen() {
                     <View style={styles.tagBadgeWrap} testID="customer-tags">
                       {(customer.tags || []).map((tag) => (
                         <View key={tag} style={styles.tagBadge} testID={`customer-tag-${tag}`}>
-                          <ThemedText style={styles.tagBadgeText}>{tag}</ThemedText>
+                          <ThemedText style={styles.tagBadgeText}>{te(labelFor(tag))}</ThemedText>
                         </View>
                       ))}
                     </View>

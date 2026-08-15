@@ -360,6 +360,25 @@ def list_customer_tags():
     return jsonify({"tags": [r[0] for r in rows]}), 200
 
 
+@customer_blueprint.route('/tag-catalog', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.ACCOUNTANT.value)
+def customer_tag_catalog():
+    """The predefined distribution-analytics tags, with bilingual labels.
+
+    Static and platform-wide (not tenant data): the clients render a picker
+    from this list — label split on " - " for English/Arabic, the clean `tag`
+    stored — alongside the free-form custom-tag input. Single source of truth
+    so the pickable set can change without touching either client.
+    """
+    from app.dto.customer import PREDEFINED_CUSTOMER_TAGS
+    return jsonify({"tags": PREDEFINED_CUSTOMER_TAGS}), 200
+
+
 @customer_blueprint.route('/tag-transitions', methods=['GET'])
 @jwt_required()
 @scopes_required(PermissionScope.ADMIN.value,

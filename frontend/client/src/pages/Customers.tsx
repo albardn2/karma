@@ -13,10 +13,12 @@ import { CustomerMap } from "@/components/map/CustomerMap";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useTagCatalog } from "@/lib/tagCatalog";
 import type { Customer, CustomerPage } from "@/lib/types";
 
 export default function Customers() {
   const { t, te } = useLanguage();
+  const { labelFor } = useTagCatalog();
   const [, setLocation] = useLocation();
   const [viewMode, setViewMode] = useState<'list' | 'map' | 'analytics'>('list');
   const [filters, setFilters] = useState<CustomerFilters>({
@@ -364,7 +366,8 @@ export default function Customers() {
                     <div className="flex flex-wrap gap-1">
                       {customer.tags.map((tag) => (
                         <Badge key={tag} variant="outline" className="text-xs font-normal">
-                          {tag}
+                          {/* predefined tags translate via the catalog; custom stay raw */}
+                          {te(labelFor(tag))}
                         </Badge>
                       ))}
                     </div>

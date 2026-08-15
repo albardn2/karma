@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
+import { useTagCatalog } from '@/utils/tagCatalog';
 
 // Mirror of the server rule (backend/app/dto/customer.py normalize_tags): one
 // optional colon, both sides non-empty, no comma, <= 64, at most MAX_TAGS per
@@ -38,9 +39,13 @@ export function TagInput({
   value: string[];
   onChange: (tags: string[]) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, te } = useLanguage();
   const [draft, setDraft] = useState('');
   const [known, setKnown] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // predefined distribution-analytics tags ("<tag> - <arabic>" labels);
+  // labelFor translates a stored tag back for display, custom tags pass raw
+  const { catalog, labelFor } = useTagCatalog();
 
   useEffect(() => {
     (async () => {
@@ -80,7 +85,7 @@ export function TagInput({
         <View style={styles.chipWrap}>
           {value.map((tag) => (
             <View key={tag} style={styles.chip} testID={`tag-chip-${tag}`}>
-              <ThemedText style={styles.chipText}>{tag}</ThemedText>
+              <ThemedText style={styles.chipText}>{te(labelFor(tag))}</ThemedText>
               <TouchableOpacity onPress={() => remove(tag)} hitSlop={8} testID={`tag-remove-${tag}`}>
                 <ThemedText style={styles.chipX}>✕</ThemedText>
               </TouchableOpacity>
@@ -113,6 +118,21 @@ export function TagInput({
         </View>
       )}
 
+      {/* predefined distribution-analytics tags: bottom-sheet picker fed by the
+          server catalog, labels translated per language; the clean tag is what
+          gets stored. Custom tags keep using the free-text input above. */}
+      {!atCap && catalog.length > 0 && (
+        <TouchableOpacity
+          style={styles.predefinedButton}
+          onPress={() => setPickerOpen(true)}
+          testID="tag-predefined"
+        >
+          <ThemedText style={styles.predefinedButtonText}>
+            {t('custcreate.predefinedTags')} ▾
+          </ThemedText>
+        </TouchableOpacity>
+      )}
+
       {!atCap && suggestions.length > 0 && (
         <View style={styles.suggestWrap}>
           {suggestions.map((tag) => (
@@ -122,11 +142,43 @@ export function TagInput({
               onPress={() => add(tag)}
               testID={`tag-suggest-${tag}`}
             >
-              <ThemedText style={styles.suggestText}>+ {tag}</ThemedText>
+              <ThemedText style={styles.suggestText}>+ {te(labelFor(tag))}</ThemedText>
             </TouchableOpacity>
           ))}
         </View>
       )}
+
+      <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>{t('custcreate.predefinedTags')}</ThemedText>
+              <TouchableOpacity onPress={() => setPickerOpen(false)} hitSlop={8}>
+                <ThemedText style={styles.modalClose}>✕</ThemedText>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              {catalog.map((entry) => (
+                <TouchableOpacity
+                  key={entry.tag}
+                  style={styles.modalOption}
+                  onPress={() => {
+                    add(entry.tag);
+                    setPickerOpen(false);
+                  }}
+                  testID={`tag-predefined-opt-${entry.tag}`}
+                >
+                  <ThemedText
+                    style={[styles.modalOptionText, value.includes(entry.tag) && styles.modalOptionActive]}
+                  >
+                    {value.includes(entry.tag) ? '✓ ' : ''}{te(entry.label)}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -174,4 +226,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   suggestText: { fontSize: 12, color: '#4b5563' },
+  predefinedButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#5469D4',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+  },
+  predefinedButtonText: { fontSize: 13, color: '#5469D4', fontWeight: '600' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
+  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '70%', paddingBottom: 24 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.1)' },
+  modalTitle: { fontSize: 16, fontWeight: '700' },
+  modalClose: { fontSize: 18, color: '#6b7280' },
+  modalList: { paddingHorizontal: 8 },
+  modalOption: { paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.06)' },
+  modalOptionText: { fontSize: 15, color: '#111827' },
+  modalOptionActive: { fontWeight: '700', color: '#5469D4' },
 });

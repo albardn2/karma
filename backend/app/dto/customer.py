@@ -26,6 +26,29 @@ MAX_TAG_LENGTH = 64
 MAX_TAGS = 25
 
 
+# The standard distribution-analytics tags, offered as a picker in both
+# clients alongside free-form custom tags. Same bilingual-composite pattern as
+# TripStopOutcome: each label is "<tag> - <arabic>", the clients' enumLabel
+# splits on " - " (English before, Arabic after), and the CLEAN `tag` half is
+# what gets stored — so analytics filter/group on machine strings while the
+# UI translates. Single source of truth, served by /customer/tag-catalog;
+# neither client hardcodes this list. Keys with values are single-valued per
+# customer (normalize_tags enforces it), so picking a second value of the
+# same key replaces the first. Values are data: renaming one orphans every
+# customer already tagged with it.
+PREDEFINED_CUSTOMER_TAGS: list[dict] = [
+    {"tag": "customer_sale:no_sale", "label": "customer_sale:no_sale - بيع العميل: لا يوجد بيع"},
+    {"tag": "customer_sale:one_time_sale", "label": "customer_sale:one_time_sale - بيع العميل: بيع لمرة واحدة"},
+    {"tag": "customer_sale:repeated_sale", "label": "customer_sale:repeated_sale - بيع العميل: بيع متكرر"},
+    {"tag": "customer_interest:not_interested", "label": "customer_interest:not_interested - اهتمام العميل: غير مهتم"},
+    {"tag": "customer_interest:interested", "label": "customer_interest:interested - اهتمام العميل: مهتم"},
+    {"tag": "blacklist", "label": "blacklist - القائمة السوداء"},
+    {"tag": "agent", "label": "agent - وكيل"},
+    {"tag": "skip_distribution", "label": "skip_distribution - تخطي التوزيع"},
+    {"tag": "prioritize_next_stop", "label": "prioritize_next_stop - إعطاء الأولوية للمحطة القادمة"},
+]
+
+
 def split_tag(tag: str) -> tuple[str, str]:
     """(key, value) for a normalized tag. A bare key has value '' — the tag
     validator forbids an empty value on a key:value tag, so '' can only mean
