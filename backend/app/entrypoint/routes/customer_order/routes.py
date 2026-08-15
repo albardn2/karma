@@ -87,7 +87,9 @@ def get_customer_order_with_items_and_invoice(uuid: str):
                  PermissionScope.SUPER_ADMIN.value)
 def delete_customer_order_with_items_and_invoice(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
-        dto = CustomerOrderDomain.delete_customer_order_with_items_and_invoice(uuid=uuid, uow=uow)
+        # the voider, not the order's creator, owns the resulting tag change
+        dto = CustomerOrderDomain.delete_customer_order_with_items_and_invoice(
+            uuid=uuid, uow=uow, actor_uuid=get_jwt_identity())
         result = dto.model_dump(mode="json")
         uow.commit()
     return jsonify(result), 201
@@ -146,7 +148,9 @@ def update_customer_order(uuid: str):
                  )
 def delete_customer_order(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
-        customer_order_read = CustomerOrderDomain.delete_customer_order(uuid=uuid, uow=uow)
+        # the voider, not the order's creator, owns the resulting tag change
+        customer_order_read = CustomerOrderDomain.delete_customer_order(
+            uuid=uuid, uow=uow, actor_uuid=get_jwt_identity())
         result = customer_order_read.model_dump(mode="json")
         uow.commit()
     return jsonify(result), 200

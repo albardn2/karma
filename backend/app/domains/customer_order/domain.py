@@ -119,7 +119,8 @@ class CustomerOrderDomain:
         return result
 
     @staticmethod
-    def delete_customer_order_with_items_and_invoice(uuid:str, uow: SqlAlchemyUnitOfWork) -> CustomerOrderRead:
+    def delete_customer_order_with_items_and_invoice(uuid:str, uow: SqlAlchemyUnitOfWork,
+                                                     actor_uuid=None) -> CustomerOrderRead:
         # fetch existing order
         order = uow.customer_order_repository.find_one(uuid=uuid, is_deleted=False)
         if not order:
@@ -152,6 +153,7 @@ class CustomerOrderDomain:
         # delete customer order
         order.is_deleted = True
         uow.customer_order_repository.save(model=order, commit=False)
+        CustomerOrderDomain._retag_customer_after_void(uow=uow, order=order, actor_uuid=actor_uuid)
         result = CustomerOrderWithItemsAndInvoiceRead.from_customer_order_model(order)
         return result
 
@@ -203,6 +205,41 @@ class CustomerOrderDomain:
         )
 
     @staticmethod
+    def _retag_customer_after_void(uow: SqlAlchemyUnitOfWork, order: CustomerOrderModel,
+                                   actor_uuid=None) -> None:
+        """Voiding an order re-evaluates the customer's sale standing against
+        the orders that are still live, so a customer whose only order was
+        voided stops counting as a buyer instead of sitting at repeated_sale on
+        the tag dashboards while absent from the revenue ones.
+
+        customer_interest is deliberately NOT reverted: the customer was
+        interested enough to order, voiding the paperwork does not un-happen
+        that, and the same key may have been set by a trip-stop outcome that has
+        nothing to do with this order.
+
+        Never raises — a tag must not be able to fail a void.
+        """
+        from app.domains.customer.auto_tags import apply_auto_tags, sale_tag_after_void
+
+        customer = uow.customer_repository.find_one(uuid=order.customer_uuid, is_deleted=False)
+        if not customer:
+            return
+        # Three, not two: the voided order may still read as live here depending
+        # on flush timing, so fetching three guarantees that after dropping it
+        # we can still tell "none" from "one" from "two or more" — the only
+        # distinctions the sale ladder makes.
+        live = uow.customer_order_repository.find_all(
+            limit=3, customer_uuid=order.customer_uuid, is_deleted=False,
+        )
+        remaining = len([other for other in live if other.uuid != order.uuid])
+        apply_auto_tags(
+            uow,
+            customer=customer,
+            tags=sale_tag_after_void(customer, live_orders=remaining),
+            actor_uuid=actor_uuid,
+        )
+
+    @staticmethod
     def update_customer_order(uuid:str,uow: SqlAlchemyUnitOfWork,payload: CustomerOrderUpdate) -> CustomerOrderRead:
         # fetch existing order
         order = uow.customer_order_repository.find_one(uuid=uuid, is_deleted=False)
@@ -217,7 +254,8 @@ class CustomerOrderDomain:
         return result
 
     @staticmethod
-    def delete_customer_order(uuid:str, uow: SqlAlchemyUnitOfWork) -> CustomerOrderRead:
+    def delete_customer_order(uuid:str, uow: SqlAlchemyUnitOfWork,
+                              actor_uuid=None) -> CustomerOrderRead:
         """Void an order: soft-delete it together with everything it caused —
         items, invoices, payments, and the inventory/vehicle events its
         fulfillment created (which restores warehouse/vehicle stock, since
@@ -273,6 +311,7 @@ class CustomerOrderDomain:
 
         order.is_deleted = True
         uow.customer_order_repository.save(model=order, commit=False)
+        CustomerOrderDomain._retag_customer_after_void(uow=uow, order=order, actor_uuid=actor_uuid)
         result = CustomerOrderRead.from_orm(order)
         return result
 

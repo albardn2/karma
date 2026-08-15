@@ -127,6 +127,44 @@ def sale_tag_for_order(customer, *, bought_before: bool) -> list[str]:
     return [tag]
 
 
+def sale_tag_for_live_order_count(count: int) -> str:
+    """The rung a customer's LIVE order count justifies."""
+    if count <= 0:
+        return SALE_NONE
+    if count == 1:
+        return SALE_ONE_TIME
+    return SALE_REPEATED
+
+
+def sale_tag_after_void(customer, *, live_orders: int) -> list[str]:
+    """The customer_sale value to write after an order is voided.
+
+    Re-evaluated from the orders that are still live, so a customer whose only
+    order was voided stops counting as a buyer — otherwise they sit at
+    repeated_sale on the tag dashboards while being absent from the revenue
+    ones, which is the whole reason a void has to reach the tags at all.
+
+    This is the one path that may move the sale key DOWN, and it moves it only
+    as far as the orders account for: a rung the orders never granted was put
+    there by a person (create preserves a manual standing, see
+    with_default_sale_tag), and voiding an order is no reason to take it away —
+    that would leave the customer worse off than before the voided order ever
+    existed. So the value is left alone whenever it already outranks what the
+    orders justified a moment ago.
+    """
+    current = next(
+        (t for t in (customer.tags or []) if split_tag(t)[0].lower() == SALE_KEY),
+        None,
+    )
+    # what the orders justified BEFORE this void — the voided order was live
+    # until now, hence +1
+    justified_before = _SALE_RANK[sale_tag_for_live_order_count(live_orders + 1)]
+    if current is not None and _SALE_RANK.get(current, -1) > justified_before:
+        return []
+    tag = sale_tag_for_live_order_count(live_orders)
+    return [] if current == tag else [tag]
+
+
 # the families that mean a rep actually reached the customer and formed a view
 _VERDICT_FAMILIES = ("sale", "interested", "not_interested", "blacklist")
 

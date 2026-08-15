@@ -41,6 +41,8 @@ from app.domains.customer.auto_tags import (
     SALE_REPEATED,
     apply_auto_tags,
     outcome_machine_key,
+    sale_tag_after_void,
+    sale_tag_for_live_order_count,
     sale_tag_for_order,
     tags_cleared_by_outcome,
     tags_for_outcome,
@@ -346,6 +348,84 @@ def test_an_unrecognised_sale_value_is_replaced():
     """A hand-typed customer_sale:whatever has no rung, so the derivation wins
     rather than being blocked forever by a value nothing understands."""
     assert sale_tag_for_order(_Customer("customer_sale:maybe"), bought_before=False) == [SALE_ONE_TIME]
+
+
+# --- voiding an order re-evaluates the rung -------------------------------
+#
+# The one path that may move the sale key DOWN. A voided order has to stop
+# counting, or a customer sits at repeated_sale on the tag dashboards while
+# being absent from the revenue ones.
+
+@pytest.mark.parametrize(
+    "count,expected",
+    [(0, SALE_NONE), (1, SALE_ONE_TIME), (2, SALE_REPEATED), (7, SALE_REPEATED)],
+)
+def test_the_rung_a_live_order_count_justifies(count, expected):
+    assert sale_tag_for_live_order_count(count) == expected
+
+
+def test_voiding_the_only_order_returns_the_customer_to_no_sale():
+    customer = _Customer(SALE_ONE_TIME, INTEREST_YES)
+    assert sale_tag_after_void(customer, live_orders=0) == [SALE_NONE]
+
+
+def test_voiding_one_of_two_orders_drops_to_one_time():
+    customer = _Customer(SALE_REPEATED)
+    assert sale_tag_after_void(customer, live_orders=1) == [SALE_ONE_TIME]
+
+
+def test_voiding_one_of_many_orders_changes_nothing():
+    customer = _Customer(SALE_REPEATED)
+    assert sale_tag_after_void(customer, live_orders=2) == []
+
+
+def test_a_void_does_not_strip_a_standing_the_orders_never_granted():
+    """A customer onboarded as a known repeat buyer, whose single in-system
+    order is then voided, must not come out WORSE than before that order
+    existed. One order could never have justified repeated_sale, so that value
+    came from a person and the void leaves it alone."""
+    customer = _Customer(SALE_REPEATED)
+    assert sale_tag_after_void(customer, live_orders=0) == []
+
+
+def test_a_void_still_corrects_a_standing_the_orders_did_grant():
+    """The mirror case: two orders DID justify repeated_sale, so voiding one is
+    entitled to walk it back."""
+    customer = _Customer(SALE_REPEATED)
+    assert sale_tag_after_void(customer, live_orders=1) == [SALE_ONE_TIME]
+
+
+def test_a_void_that_changes_nothing_writes_nothing():
+    customer = _Customer(SALE_ONE_TIME)
+    assert sale_tag_after_void(customer, live_orders=1) == []
+
+
+def test_a_customer_with_no_sale_tag_gains_one_on_a_void():
+    """Legacy rows predate the derivation; a void is as good a moment as any to
+    give them the baseline."""
+    customer = _Customer("vip")
+    assert sale_tag_after_void(customer, live_orders=0) == [SALE_NONE]
+
+
+def test_a_void_leaves_interest_and_manual_tags_alone():
+    """Voiding paperwork does not un-happen the interest the order showed, and
+    the same key may have come from a trip stop instead."""
+    customer = _Customer(SALE_ONE_TIME, INTEREST_YES, "agent", BLACKLIST_TAG)
+    _apply(customer, tags=sale_tag_after_void(customer, live_orders=0))
+    assert set(customer.tags) == {SALE_NONE, INTEREST_YES, "agent", BLACKLIST_TAG}
+
+
+def test_the_full_void_round_trip_is_recorded():
+    """no_sale -> one_time_sale on the order, and back again on the void, so the
+    funnel analytics see the reversal rather than silently drifting."""
+    customer = _Customer(SALE_NONE)
+    _apply(customer, tags=sale_tag_for_order(customer, bought_before=False))
+    assert customer.tags == [SALE_ONE_TIME]
+    uow, _ = _apply(customer, tags=sale_tag_after_void(customer, live_orders=0))
+    assert customer.tags == [SALE_NONE]
+    assert ("customer_sale", "one_time_sale", "no_sale") in {
+        (e.key, e.old_value, e.new_value) for e in uow.session.added
+    }
 
 
 def test_applying_replaces_the_previous_value_of_the_same_key():
