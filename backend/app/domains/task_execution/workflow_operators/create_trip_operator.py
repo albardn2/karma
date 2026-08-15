@@ -58,6 +58,14 @@ class TripStopOutcome(str, Enum):
     BLACKLIST = "blacklist - القائمة السوداء"
 
 
+def current_outcome_options() -> list[str]:
+    """The live outcome list, in enum order. The options are baked into each
+    trip-stop task at trip creation, so a trip already in flight keeps whatever
+    list existed then; the task read path serves this instead, so web and app
+    always show the current enum rather than a stale snapshot."""
+    return [outcome.value for outcome in TripStopOutcome]
+
+
 
 class CreateTripOperatorSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")

@@ -16,6 +16,28 @@ from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.auth import add_logged_user_to_payload
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.domains.task.domain import TaskDomain
+from app.domains.task_execution.workflow_operators.create_trip_operator import (
+    current_outcome_options,
+)
+
+
+def _serve_live_outcome_options(task_dto: dict) -> dict:
+    """Replace a trip-stop task's baked outcome options with the CURRENT enum.
+
+    The list is snapshotted into task_inputs when the trip is created, so a trip
+    already in flight keeps whatever options existed then. Both clients render
+    these options, so a stale snapshot makes the web and app diverge from the
+    live outcome list whenever the enum changes. Overriding on read keeps them
+    in lockstep with no per-trip migration and no future drift. Mutates and
+    returns the same dict for convenient chaining.
+    """
+    if task_dto.get("operator") != "trip_stop_operator":
+        return task_dto
+    fields = ((task_dto.get("task_inputs") or {}).get("fields")) or []
+    for f in fields:
+        if isinstance(f, dict) and f.get("type") == "select" and f.get("label") == "outcome":
+            f["options"] = current_outcome_options()
+    return task_dto
 
 
 # Route to create a new Task
@@ -50,6 +72,7 @@ def get_task(uuid: str):
         if not task:
             raise NotFoundError(f"Task not found with uuid: {uuid}")
         dto = TaskRead.from_orm_with_enrichment(task,uow).model_dump(mode="json")
+        dto = _serve_live_outcome_options(dto)
     return jsonify(dto), 200
 
 # Route to update a Task
@@ -100,7 +123,9 @@ def list_tasks():
             per_page=params.per_page
         )
         items = [
-            TaskRead.from_orm_with_enrichment(task,uow).model_dump(mode="json")
+            _serve_live_outcome_options(
+                TaskRead.from_orm_with_enrichment(task,uow).model_dump(mode="json")
+            )
             for task in page.items
         ]
         result = TaskPage(
