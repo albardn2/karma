@@ -35,6 +35,7 @@ from app.dto.customer import (
     CustomerTagHistoryPage,
 )
 from app.domains.customer.tag_history import record_tag_changes
+from app.domains.customer.auto_tags import with_default_sale_tag
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.entrypoint.routes.common.errors import NotFoundError
 
@@ -115,6 +116,9 @@ def create_customer():
         # list here because passing tags=None would override the model default
         if data.get("tags") is None:
             data["tags"] = []
+        # every customer starts life as a non-buyer, so the sale funnel has a
+        # baseline to move away from when their first order lands
+        data["tags"] = with_default_sale_tag(data["tags"])
         cust = CustomerModel(**data)
         uow.customer_repository.save(model=cust, commit=False)
         # flush so cust.uuid exists for the event FK, then log the initial tags
@@ -205,13 +209,16 @@ def delete_customer(uuid: str):
         if not customer:
             raise NotFoundError("Customer not found")
 
-        customer_orders = uow.customer_order_repository.find_all(uuid=uuid, is_deleted=False)
+        # each of these is keyed by customer_uuid: `uuid` here is the customer's,
+        # while `uuid` on those models is their own primary key, so filtering on
+        # it can never match and the guard would silently never fire
+        customer_orders = uow.customer_order_repository.find_all(customer_uuid=uuid, is_deleted=False, limit=1)
         if customer_orders:
             raise BadRequestError("Customer has orders and cannot be deleted")
-        debit_note_items = uow.debit_note_item_repository.find_all(uuid=uuid, is_deleted=False)
+        debit_note_items = uow.debit_note_item_repository.find_all(customer_uuid=uuid, is_deleted=False, limit=1)
         if debit_note_items:
             raise BadRequestError("Customer has debit notes and cannot be deleted")
-        credit_note_items = uow.credit_note_item_repository.find_all(uuid=uuid, is_deleted=False)
+        credit_note_items = uow.credit_note_item_repository.find_all(customer_uuid=uuid, is_deleted=False, limit=1)
         if credit_note_items:
             raise BadRequestError("Customer has credit notes and cannot be deleted")
         for k,v in customer.balance_per_currency.items():
@@ -257,9 +264,13 @@ def list_customers():
         # validator forbids commas inside a tag; LIKE wildcards in the query
         # are escaped so "100%" is a literal tag, not a pattern.
         from sqlalchemy import or_
-        from app.dto.customer import MAX_TAGS
+        from app.dto.customer import MAX_TAGS, _PREDEFINED_ALIASES
         joined = func.array_to_string(CustomerModel.tags, ",")
+        # accept the VISIBLE spelling of a predefined tag too: an AR-mode user
+        # only ever sees the Arabic half of the label, so typing it here must
+        # match the stored machine tag rather than silently return nothing
         tag_list = [t.strip() for t in params.tags.split(",") if t.strip()]
+        tag_list = [_PREDEFINED_ALIASES.get(t, t) for t in tag_list]
         # each bare key adds two non-indexable array_to_string LIKEs per row;
         # cap the count so a filter can't turn every list call into a heavy scan
         if len(tag_list) > MAX_TAGS:
@@ -358,6 +369,25 @@ def list_customer_tags():
             .all()
         )
     return jsonify({"tags": [r[0] for r in rows]}), 200
+
+
+@customer_blueprint.route('/tag-catalog', methods=['GET'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.ACCOUNTANT.value)
+def customer_tag_catalog():
+    """The predefined distribution-analytics tags, with bilingual labels.
+
+    Static and platform-wide (not tenant data): the clients render a picker
+    from this list — label split on " - " for English/Arabic, the clean `tag`
+    stored — alongside the free-form custom-tag input. Single source of truth
+    so the pickable set can change without touching either client.
+    """
+    from app.dto.customer import PREDEFINED_CUSTOMER_TAGS
+    return jsonify({"tags": PREDEFINED_CUSTOMER_TAGS}), 200
 
 
 @customer_blueprint.route('/tag-transitions', methods=['GET'])

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Filter, X } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useTagCatalog } from "@/lib/tagCatalog";
 
 export interface CustomerFilters {
   uuid?: string;
@@ -49,6 +50,11 @@ export function CustomerFiltersComponent({
   const { t, te } = useLanguage();
   const [localFilters, setLocalFilters] = useState<CustomerFilters>(filters);
   const [isOpen, setIsOpen] = useState(false);
+  // predefined tags are shown translated everywhere, so an AR user may never
+  // have seen the machine string — this picker appends it to the filter text.
+  // The key remounts the Select back to its placeholder after each pick.
+  const { catalog } = useTagCatalog();
+  const [tagPickCount, setTagPickCount] = useState(0);
 
   const handleApplyFilters = () => {
     onFiltersChange(localFilters);
@@ -64,6 +70,16 @@ export function CustomerFiltersComponent({
 
   const updateFilter = (key: keyof CustomerFilters, value: any) => {
     setLocalFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  // append a predefined machine tag to the comma-separated tags filter (dedup)
+  const appendFilterTag = (tag: string) => {
+    const parts = (localFilters.tags || "")
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (!parts.includes(tag)) parts.push(tag);
+    updateFilter("tags", parts.join(", "));
   };
 
   const hasActiveFilters = Object.keys(filters).some(key => 
@@ -166,6 +182,23 @@ export function CustomerFiltersComponent({
               onChange={(e) => updateFilter("tags", e.target.value)}
               data-testid="filter-tags"
             />
+            {catalog.length > 0 && (
+              <Select
+                key={tagPickCount}
+                onValueChange={(tag) => { appendFilterTag(tag); setTagPickCount((n) => n + 1); }}
+              >
+                <SelectTrigger className="h-8 text-xs" data-testid="filter-tag-predefined">
+                  <SelectValue placeholder={t('customers.filterPredefinedTags')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {catalog.map((entry) => (
+                    <SelectItem key={entry.tag} value={entry.tag} data-testid={`filter-tag-predefined-opt-${entry.tag}`}>
+                      {te(entry.label)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <p className="text-xs text-gray-500">{t('customers.filterByTagsHint')}</p>
           </div>
 

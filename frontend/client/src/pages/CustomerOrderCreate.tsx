@@ -119,6 +119,12 @@ export default function CustomerOrderCreate() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/customer-order/"] });
       queryClient.refetchQueries({ queryKey: ["/customer-order/"] });
+      // the order also moves the customer's derived sale/interest tags; the
+      // detail page keys on ["/customer", uuid] and the list on
+      // ["/customer/list", ...], so only a substring predicate reaches both
+      queryClient.invalidateQueries({
+        predicate: (query) => String(query.queryKey[0]).includes("/customer"),
+      });
       toast({
         title: t('common.success'),
         description: t('customerOrders.createSuccess'),

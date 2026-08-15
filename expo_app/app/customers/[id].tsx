@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { useRouter, useLocalSearchParams, Stack } from "expo-router";
+import { useRouter, useLocalSearchParams, Stack, useFocusEffect } from "expo-router";
 import { apiCall } from "@/utils/api";
 import { LinearGradient } from "expo-linear-gradient";
 import { CustomerLocationMap } from "@/components/CustomerLocationMap";
@@ -26,6 +26,7 @@ import * as Location from 'expo-location';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime, formatNumericDate } from '@/utils/date';
 import { TagInput } from '@/components/TagInput';
+import { useTagCatalog } from '@/utils/tagCatalog';
 
 interface Customer {
   uuid: string;
@@ -182,7 +183,9 @@ export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { t, tef } = useLanguage();
+  const { t, te, tef } = useLanguage();
+  // translates predefined tags for display; custom tags pass through raw
+  const { labelFor } = useTagCatalog();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [screenData, setScreenData] = useState(Dimensions.get("window"));
@@ -213,11 +216,32 @@ export default function CustomerDetailScreen() {
     return () => subscription?.remove();
   }, []);
 
+  // Read isEditing through a ref so the focus callback below keeps a STABLE
+  // identity. expo-router re-runs a focus effect whenever its callback changes
+  // while the screen is focused, so listing isEditing as a dependency would
+  // fire a refetch the moment edit mode ends — blanking the screen to the
+  // full-page spinner over the success banner, and turning a network blip into
+  // the "failed to load" bounce right after a save that actually worked.
+  const isEditingRef = React.useRef(false);
   useEffect(() => {
-    if (id) {
-      fetchCustomer();
-    }
-  }, [id]);
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
+
+  // Re-read on every focus, not just on mount. The sale and interest tags are
+  // derived server-side from orders and trip-stop outcomes, so this screen goes
+  // stale the moment the rep creates an order from somewhere else in the app —
+  // and stale here is worse than it looks: the edit form PUTs the tag array, so
+  // an edit made from a pre-order snapshot would write the old tags back and
+  // undo the derivation (logging reverse events into the tag history on the
+  // way). Never refetch mid-edit, which would discard what is being typed.
+  // Same pattern as the stop screen's refresh-on-focus.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (id && !isEditingRef.current) {
+        fetchCustomer();
+      }
+    }, [id]),
+  );
 
   const showBanner = (type: "success" | "error", message: string) => {
     setBanner({ type, message });
@@ -315,6 +339,15 @@ export default function CustomerDetailScreen() {
   };
 
   const fetchCustomer = async () => {
+    // A failed FIRST load leaves nothing to look at, so it bounces back. A
+    // failed refresh-on-focus must not: the rep is standing in front of the
+    // customer with the screen already populated, and throwing them out over a
+    // dropped signal — right after a save that succeeded — reads as data loss.
+    const failed = () => {
+      if (customer) return;
+      Alert.alert(t('custdetail.error'), t('custdetail.loadCustomerFailed'));
+      router.back();
+    };
     try {
       setLoading(true);
       const response = await apiCall<Customer>(`/customer/${id}`);
@@ -323,13 +356,11 @@ export default function CustomerDetailScreen() {
         setCustomer(response.data);
         setEditedCustomer(response.data);
       } else {
-        Alert.alert(t('custdetail.error'), t('custdetail.loadCustomerFailed'));
-        router.back();
+        failed();
       }
     } catch (error) {
       console.error("Error fetching customer:", error);
-      Alert.alert(t('custdetail.error'), t('custdetail.loadCustomerFailed'));
-      router.back();
+      failed();
     } finally {
       setLoading(false);
     }
@@ -529,7 +560,9 @@ export default function CustomerDetailScreen() {
     hospital: "#5469D4",
   };
 
-  if (loading) {
+  // only the FIRST load takes over the screen; a refresh-on-focus keeps showing
+  // what is already there rather than flashing a full-page spinner over it
+  if (loading && !customer) {
     return (
       <ThemedView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -820,7 +853,11 @@ export default function CustomerDetailScreen() {
           </View>
 
           {/* Orders: the two things someone opens a customer to do. The list is
-              pre-filtered to this customer; create pre-fills the picker. */}
+              pre-filtered to this customer; create pre-fills the picker.
+              Hidden while editing: leaving to create an order lets the server
+              derive new tags, and coming back to a form still holding the old
+              ones would save them straight over the derivation. */}
+          {!isEditing && (
           <View style={styles.orderActionsRow}>
             <TouchableOpacity
               style={styles.orderActionBtn}
@@ -855,6 +892,7 @@ export default function CustomerDetailScreen() {
               </ThemedText>
             </TouchableOpacity>
           </View>
+          )}
 
           {/* Contact Information */}
           <View style={styles.section}>
@@ -1014,7 +1052,9 @@ export default function CustomerDetailScreen() {
                     <View style={styles.tagBadgeWrap} testID="customer-tags">
                       {(customer.tags || []).map((tag) => (
                         <View key={tag} style={styles.tagBadge} testID={`customer-tag-${tag}`}>
-                          <ThemedText style={styles.tagBadgeText}>{tag}</ThemedText>
+                          {/* labelFor renders directly — translated for catalog
+                              tags, verbatim for custom (te can mangle custom) */}
+                          <ThemedText style={styles.tagBadgeText}>{labelFor(tag)}</ThemedText>
                         </View>
                       ))}
                     </View>
