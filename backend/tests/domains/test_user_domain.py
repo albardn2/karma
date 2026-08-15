@@ -41,7 +41,6 @@ def make_user(**kwargs) -> UserModel:
     object.__setattr__(u, "is_deleted", False)
     object.__setattr__(u, "is_active", True)
     object.__setattr__(u, "track_location", False)
-    object.__setattr__(u, "location_ping_seconds", 15)
     # attach is_admin based on scope
     return u
 

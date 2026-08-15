@@ -25,7 +25,6 @@ interface User {
   language?: string | null;
   is_active?: boolean | null;
   track_location?: boolean | null;
-  location_ping_seconds?: number | null;
   /** the role preset merged with any per-user override; null means unrestricted */
   effective_permissions?: Permissions | null;
   created_at: string;
@@ -106,9 +105,7 @@ export default function UserDetailScreen() {
     ],
     [
       t('users.tracking'),
-      u.track_location
-        ? t('users.trackingOn', { n: u.location_ping_seconds ?? 15 })
-        : t('users.trackingOff'),
+      u.track_location ? t('users.enabled') : t('users.trackingOff'),
     ],
     [t('users.created'), u.created_at ? formatNumericDate(new Date(u.created_at)) : '—'],
   ];
@@ -123,7 +120,6 @@ export default function UserDetailScreen() {
           params: {
             uuid: u.uuid,
             track_location: String(!!u.track_location),
-            location_ping_seconds: String(u.location_ping_seconds ?? 15),
           },
         }),
     },

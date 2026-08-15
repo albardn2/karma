@@ -156,9 +156,10 @@ class User(Base):
     # because the request chokepoint re-reads this row on every request —
     # on already-issued tokens, so live sessions die immediately.
     is_active = Column(Boolean, nullable=False, default=True, server_default=true())
-    # location tracking: master switch + live publish cadence (seconds)
+    # location tracking master switch — whether THIS user is tracked at all.
+    # The publish cadence is no longer per-user: it lives on the global
+    # LocationTrackingConfig (super-admin), applied to everyone.
     track_location = Column(Boolean, nullable=False, default=False, server_default=false())
-    location_ping_seconds = Column(Integer, nullable=False, default=15, server_default='15')
 
     # Method to set password securely
     def set_password(self, plaintext_password):
@@ -2463,6 +2464,9 @@ class LocationTrackingConfig(Base):
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
+    # how often the mobile app publishes a live position while tracking, for
+    # every tracked user (moved here from per-user so it is set once, globally)
+    live_ping_seconds = Column(Integer, nullable=False, default=15, server_default='15')
     trip_cadence_seconds = Column(Integer, nullable=False, default=30)
     history_cadence_seconds = Column(Integer, nullable=False, default=120)
     history_retention_days = Column(Integer, nullable=False, default=14)

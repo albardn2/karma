@@ -111,9 +111,9 @@ class UserUpdate(BaseModel):
     language: Optional[str] = None
     password: Optional[str] = None
     rfid_token: Optional[str] = None  # RFID token for user identification
-    # location tracking (admin-managed)
+    # location tracking (admin-managed): the per-user master switch. The publish
+    # cadence is global now (LocationTrackingConfig), no longer per-user.
     track_location: Optional[bool] = None
-    location_ping_seconds: Optional[int] = pydantic.Field(None, gt=0, le=3600)
     # deactivation (admin-managed; absent from MeUpdate on purpose, so a
     # deactivated user cannot reactivate themselves)
     is_active: Optional[bool] = None
@@ -166,7 +166,6 @@ class UserRead(BaseModel):
     phone_number: Optional[str]
     language: Optional[str]
     track_location: bool = False
-    location_ping_seconds: int = 15
     created_at: datetime
     permission_scope: Optional[str]
     is_deleted: bool
