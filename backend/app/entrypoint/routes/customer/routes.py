@@ -209,13 +209,16 @@ def delete_customer(uuid: str):
         if not customer:
             raise NotFoundError("Customer not found")
 
-        customer_orders = uow.customer_order_repository.find_all(uuid=uuid, is_deleted=False)
+        # each of these is keyed by customer_uuid: `uuid` here is the customer's,
+        # while `uuid` on those models is their own primary key, so filtering on
+        # it can never match and the guard would silently never fire
+        customer_orders = uow.customer_order_repository.find_all(customer_uuid=uuid, is_deleted=False, limit=1)
         if customer_orders:
             raise BadRequestError("Customer has orders and cannot be deleted")
-        debit_note_items = uow.debit_note_item_repository.find_all(uuid=uuid, is_deleted=False)
+        debit_note_items = uow.debit_note_item_repository.find_all(customer_uuid=uuid, is_deleted=False, limit=1)
         if debit_note_items:
             raise BadRequestError("Customer has debit notes and cannot be deleted")
-        credit_note_items = uow.credit_note_item_repository.find_all(uuid=uuid, is_deleted=False)
+        credit_note_items = uow.credit_note_item_repository.find_all(customer_uuid=uuid, is_deleted=False, limit=1)
         if credit_note_items:
             raise BadRequestError("Customer has credit notes and cannot be deleted")
         for k,v in customer.balance_per_currency.items():

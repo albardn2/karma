@@ -83,19 +83,24 @@ class TripStopOperator(OperatorInterface):
         anyone to maintain the same fact twice. blacklist and
         interested:prioritize_next_visit additionally raise their own flags.
 
-        A manual stop has no customer (trip_stop.customer_uuid is nullable) and
-        simply tags nothing. Re-completing a stop with a corrected outcome moves
-        the tags again, which is the intended behaviour: the latest verdict wins.
+        Completing a stop also SPENDS prioritize_next_stop: the visit that flag
+        was asking for is this one. A stop with no customer (trip_stop
+        .customer_uuid is nullable) tags nothing. Re-completing a stop with a
+        corrected outcome moves the tags again, which is the intended
+        behaviour: the latest verdict wins.
         """
-        from app.domains.customer.auto_tags import apply_auto_tags, tags_for_outcome
+        from app.domains.customer.auto_tags import (
+            apply_auto_tags, tags_cleared_by_outcome, tags_for_outcome,
+        )
 
         if not trip_stop.customer_uuid:
             return
         tags = tags_for_outcome(outcome)
-        if not tags:
+        clear = tags_cleared_by_outcome(outcome)
+        if not tags and not clear:
             return
         customer = uow.customer_repository.find_one(uuid=trip_stop.customer_uuid, is_deleted=False)
-        apply_auto_tags(uow, customer=customer, tags=tags, actor_uuid=actor_uuid)
+        apply_auto_tags(uow, customer=customer, tags=tags, clear=clear, actor_uuid=actor_uuid)
 
     def validate(self):
         raise NotImplementedError("The validate method must be implemented by subclasses.")

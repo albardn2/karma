@@ -11,7 +11,9 @@ Three triggers write through here (each cites this module):
   * customer order created     -> customer_sale:one_time_sale | :repeated_sale,
                                   and customer_interest:interested
   * trip stop completed        -> customer_interest from the outcome family,
-                                  plus the blacklist / prioritize_next_stop flags
+                                  plus the blacklist / prioritize_next_stop flags,
+                                  and it SPENDS prioritize_next_stop once the
+                                  visit it asked for has happened
 
 Two rules hold everywhere:
 
@@ -95,6 +97,38 @@ def tags_for_outcome(outcome) -> list[str]:
     return tags
 
 
+# the families that mean a rep actually reached the customer and formed a view
+_VERDICT_FAMILIES = ("sale", "interested", "not_interested", "blacklist")
+
+
+def tags_cleared_by_outcome(outcome) -> list[str]:
+    """Which flags a completed stop SPENDS.
+
+    prioritize_next_stop means "see this customer sooner next round". The visit
+    it was asking for is this one, so recording a verdict here uses it up. Left
+    to accumulate it would end up on everyone who ever got that outcome, and a
+    flag that is set on everybody points at nobody.
+
+    Two cases deliberately do not spend it:
+
+      * interested:prioritize_next_visit — the rep is asking for priority AGAIN.
+        tags_for_outcome re-raises the flag for exactly this outcome, so it must
+        not be cleared in the same breath.
+      * skipped:* — the visit did not happen. The customer was out, or there was
+        no time. Clearing here would quietly drop their priority without anyone
+        having spoken to them, which is the very thing the flag exists to
+        prevent, and it matches the rule that a skipped stop changes nothing.
+    """
+    key = outcome_machine_key(outcome)
+    if not key:
+        return []
+    if key.split(":", 1)[0] not in _VERDICT_FAMILIES:
+        return []
+    if key == "interested:prioritize_next_visit":
+        return []
+    return [PRIORITIZE_TAG]
+
+
 def with_default_sale_tag(tags) -> list[str]:
     """The tag list a brand-new customer starts with: nobody has bought yet.
 
@@ -115,22 +149,31 @@ def with_default_sale_tag(tags) -> list[str]:
     return tags + [SALE_NONE]
 
 
-def apply_auto_tags(uow, *, customer, tags, actor_uuid=None) -> list[str]:
-    """Apply derived tags to `customer`, replacing any existing value per key.
+def apply_auto_tags(uow, *, customer, tags=(), clear=(), actor_uuid=None) -> list[str]:
+    """Apply derived tags to `customer`: set each of `tags`, replacing any
+    existing value of its key, and remove each key named in `clear`.
 
-    Returns the tags actually written (empty when nothing changed), so callers
-    can log or assert. Nothing is committed: the caller's unit of work owns the
-    transaction, so the tag, its history event, and the order or stop completion
-    that caused it all land together or not at all.
+    Returns the tags SET (a removal is visible on customer.tags, not here).
+    Nothing is committed: the caller's unit of work owns the transaction, so the
+    tag, its history event, and the order or stop completion that caused it all
+    land together or not at all.
 
     Skipped, deliberately and silently:
-      * no customer (a manual trip stop has no customer_uuid)
+      * no customer (a stop can be repointed to have none)
       * a tag whose exact value is already present — no write, no event
+      * a key in `clear` the customer does not carry
       * a NEW key on a customer already holding MAX_TAGS tags. Replacing an
         existing key never grows the list, so this only bites the genuinely full
         customer, and the alternative — failing the order — is far worse.
     """
-    if customer is None or not tags:
+    if customer is None:
+        return []
+    tags = list(tags or [])
+    # setting a key wins over clearing it, so a caller that both raises and
+    # spends a flag in one call cannot depend on argument order
+    set_keys = {split_tag(t)[0].lower() for t in tags}
+    clear = [t for t in (clear or []) if split_tag(t)[0].lower() not in set_keys]
+    if not tags and not clear:
         return []
 
     old = list(customer.tags or [])
@@ -149,7 +192,13 @@ def apply_auto_tags(uow, *, customer, tags, actor_uuid=None) -> list[str]:
         new = without + [tag]
         applied.append(tag)
 
-    if not applied:
+    for tag in clear:
+        key = split_tag(tag)[0].lower()
+        new = [t for t in new if split_tag(t)[0].lower() != key]
+
+    # compare against the list we started with rather than trusting `applied`:
+    # a call that only spent a flag still has to be written
+    if new == old:
         return []
 
     # REASSIGN, never mutate in place: customer.tags is a plain ARRAY(String)

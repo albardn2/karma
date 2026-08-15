@@ -41,6 +41,7 @@ from app.domains.customer.auto_tags import (
     SALE_REPEATED,
     apply_auto_tags,
     outcome_machine_key,
+    tags_cleared_by_outcome,
     tags_for_outcome,
     with_default_sale_tag,
 )
@@ -81,9 +82,9 @@ class _Customer:
         self.tags = list(tags)
 
 
-def _apply(customer, tags, actor="user-1"):
+def _apply(customer, tags=(), clear=(), actor="user-1"):
     uow = _FakeUow()
-    written = apply_auto_tags(uow, customer=customer, tags=tags, actor_uuid=actor)
+    written = apply_auto_tags(uow, customer=customer, tags=tags, clear=clear, actor_uuid=actor)
     return uow, written
 
 
@@ -132,6 +133,104 @@ def test_blacklist_outcome_both_marks_and_records_disinterest():
     is not interested, so an interest report and a blacklist report agree."""
     tags = tags_for_outcome(TripStopOutcome.BLACKLIST.value)
     assert BLACKLIST_TAG in tags and INTEREST_NO in tags
+
+
+# --- what a stop SPENDS -----------------------------------------------------
+#
+# prioritize_next_stop asks for the next visit to come sooner. That visit is the
+# next completed stop, so a verdict there uses the flag up — otherwise it sticks
+# to every customer who ever earned it and stops distinguishing anyone.
+
+SPENT_BY_OUTCOME = {
+    TripStopOutcome.SALE: [PRIORITIZE_TAG],
+    TripStopOutcome.INTERESTED_HAVE_INVENTORY: [PRIORITIZE_TAG],
+    TripStopOutcome.INTERESTED_NEEDS_BETTER_PRICE: [PRIORITIZE_TAG],
+    TripStopOutcome.INTERESTED_INSUFFICIENT_FUNDS: [PRIORITIZE_TAG],
+    # asking for priority again must not spend the flag it is re-raising
+    TripStopOutcome.INTERESTED_PRIORITIZE_NEXT_VISIT: [],
+    TripStopOutcome.NOT_INTERESTED_COMPETITOR: [PRIORITIZE_TAG],
+    TripStopOutcome.NOT_INTERESTED_BAD_PRODUCT: [PRIORITIZE_TAG],
+    TripStopOutcome.NOT_INTERSTED_PRICE_TOO_HIGH: [PRIORITIZE_TAG],
+    TripStopOutcome.NOT_INTERESTED_OTHER: [PRIORITIZE_TAG],
+    # the visit never happened, so the priority it was owed is still owed
+    TripStopOutcome.SKIPPED_CUSTOMER_NOT_AVAILABLE: [],
+    TripStopOutcome.SKIPPED_VEHICLE_BREAKDOWN: [],
+    TripStopOutcome.SKIPPED_NO_PARKING: [],
+    TripStopOutcome.SKIPPED_NO_TIME: [],
+    TripStopOutcome.SKIPPED_OTHER: [],
+    TripStopOutcome.BLACKLIST: [PRIORITIZE_TAG],
+}
+
+
+def test_every_outcome_has_a_decided_spend():
+    assert set(SPENT_BY_OUTCOME) == set(TripStopOutcome), (
+        "TripStopOutcome changed: decide whether the new option spends "
+        "prioritize_next_stop and add it to SPENT_BY_OUTCOME"
+    )
+
+
+@pytest.mark.parametrize("outcome", list(TripStopOutcome), ids=lambda o: o.name)
+def test_outcome_spend(outcome):
+    assert tags_cleared_by_outcome(outcome.value) == SPENT_BY_OUTCOME[outcome]
+
+
+@pytest.mark.parametrize("outcome", [None, "", "unknown:thing - نص"])
+def test_unreadable_outcome_spends_nothing(outcome):
+    assert tags_cleared_by_outcome(outcome) == []
+
+
+def test_a_visit_spends_the_priority_flag():
+    customer = _Customer(PRIORITIZE_TAG, "customer_interest:interested", "agent")
+    uow, _ = _apply(
+        customer,
+        tags=tags_for_outcome(TripStopOutcome.SALE.value),
+        clear=tags_cleared_by_outcome(TripStopOutcome.SALE.value),
+    )
+    assert PRIORITIZE_TAG not in customer.tags
+    # the manual tag is untouched, and the removal is in the history
+    assert "agent" in customer.tags
+    assert ("prioritize_next_stop", "", None) in {
+        (e.key, e.old_value, e.new_value) for e in uow.session.added
+    }
+
+
+def test_asking_for_priority_again_does_not_spend_it():
+    """The re-raise and the spend must not cancel out on the same stop."""
+    outcome = TripStopOutcome.INTERESTED_PRIORITIZE_NEXT_VISIT.value
+    customer = _Customer(PRIORITIZE_TAG)
+    _apply(customer, tags=tags_for_outcome(outcome), clear=tags_cleared_by_outcome(outcome))
+    assert PRIORITIZE_TAG in customer.tags
+
+
+def test_a_skipped_stop_leaves_the_priority_owed():
+    outcome = TripStopOutcome.SKIPPED_NO_TIME.value
+    customer = _Customer(PRIORITIZE_TAG)
+    uow, _ = _apply(customer, tags=tags_for_outcome(outcome), clear=tags_cleared_by_outcome(outcome))
+    assert customer.tags == [PRIORITIZE_TAG]
+    assert uow.session.added == []
+
+
+def test_spending_a_flag_the_customer_lacks_writes_nothing():
+    customer = _Customer("customer_interest:interested")
+    uow, _ = _apply(customer, tags=[INTEREST_YES], clear=[PRIORITIZE_TAG])
+    assert uow.session.added == []
+    assert uow.customer_repository.saved == []
+
+
+def test_a_clear_alone_is_still_persisted():
+    """The write must not be gated on something having been SET."""
+    customer = _Customer(PRIORITIZE_TAG)
+    uow, written = _apply(customer, tags=[], clear=[PRIORITIZE_TAG])
+    assert written == []          # nothing was set...
+    assert customer.tags == []    # ...but the flag is gone
+    assert uow.customer_repository.saved == [customer]
+    assert len(uow.session.added) == 1
+
+
+def test_setting_a_key_beats_clearing_it_regardless_of_order():
+    customer = _Customer()
+    _apply(customer, tags=[PRIORITIZE_TAG], clear=[PRIORITIZE_TAG])
+    assert customer.tags == [PRIORITIZE_TAG]
 
 
 def test_prioritize_outcome_keeps_the_customer_interested():
