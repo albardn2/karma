@@ -44,6 +44,8 @@ class TripStopOutcome(str, Enum):
     INTERESTED_NEEDS_BETTER_PRICE = "interested:needs_better_price - مهتم: يحتاج إلى سعر أفضل"
     # wants the goods but cannot pay today — interested, not a refusal
     INTERESTED_INSUFFICIENT_FUNDS = "interested:insufficient_funds - مهتم: السيولة غير كافية"
+    # flag to visit sooner next round
+    INTERESTED_PRIORITIZE_NEXT_VISIT = "interested:prioritize_next_visit - مهتم: إعطاء الأولوية للزيارة القادمة"
     NOT_INTERESTED_COMPETITOR = "not_interested:competitors_product - غير مهتم: منتج المنافس"
     NOT_INTERESTED_BAD_PRODUCT = "not_interested:bad_product - غير مهتم: منتج سيئ"
     NOT_INTERSTED_PRICE_TOO_HIGH = "not_interested:price_too_high - غير مهتم: السعر مرتفع جدًا"
