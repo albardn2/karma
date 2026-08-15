@@ -1017,7 +1017,9 @@ export default function CustomerDetailScreen() {
                     <View style={styles.tagBadgeWrap} testID="customer-tags">
                       {(customer.tags || []).map((tag) => (
                         <View key={tag} style={styles.tagBadge} testID={`customer-tag-${tag}`}>
-                          <ThemedText style={styles.tagBadgeText}>{te(labelFor(tag))}</ThemedText>
+                          {/* labelFor renders directly — translated for catalog
+                              tags, verbatim for custom (te can mangle custom) */}
+                          <ThemedText style={styles.tagBadgeText}>{labelFor(tag)}</ThemedText>
                         </View>
                       ))}
                     </View>

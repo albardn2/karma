@@ -257,9 +257,13 @@ def list_customers():
         # validator forbids commas inside a tag; LIKE wildcards in the query
         # are escaped so "100%" is a literal tag, not a pattern.
         from sqlalchemy import or_
-        from app.dto.customer import MAX_TAGS
+        from app.dto.customer import MAX_TAGS, _PREDEFINED_ALIASES
         joined = func.array_to_string(CustomerModel.tags, ",")
+        # accept the VISIBLE spelling of a predefined tag too: an AR-mode user
+        # only ever sees the Arabic half of the label, so typing it here must
+        # match the stored machine tag rather than silently return nothing
         tag_list = [t.strip() for t in params.tags.split(",") if t.strip()]
+        tag_list = [_PREDEFINED_ALIASES.get(t, t) for t in tag_list]
         # each bare key adds two non-indexable array_to_string LIKEs per row;
         # cap the count so a filter can't turn every list call into a heavy scan
         if len(tag_list) > MAX_TAGS:

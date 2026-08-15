@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiCall, isOk } from '@/utils/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export interface PredefinedTag {
   /** the clean machine string that gets STORED, e.g. "customer_sale:no_sale" */
@@ -15,10 +16,13 @@ let cached: PredefinedTag[] | null = null;
 /**
  * The predefined distribution-analytics tags, served by /customer/tag-catalog.
  * Single source of truth on the server: pickers render from it and `labelFor`
- * translates a stored tag back to its bilingual label for display. Custom tags
- * aren't in the catalog and fall through as-is — deliberately untranslated.
+ * translates a stored tag back to its per-language display text. Custom tags
+ * aren't in the catalog and are returned VERBATIM — they must never pass
+ * through te()/enumLabel, whose composite split and dictionary fallbacks would
+ * mangle a custom tag containing " - "+Arabic or colliding with an enum key.
  */
 export function useTagCatalog() {
+  const { te } = useLanguage();
   const [catalog, setCatalog] = useState<PredefinedTag[]>(cached ?? []);
 
   useEffect(() => {
@@ -41,8 +45,15 @@ export function useTagCatalog() {
     [catalog],
   );
 
-  /** bilingual label for a predefined tag; the raw tag itself for custom ones */
-  const labelFor = useCallback((tag: string) => byTag.get(tag) ?? tag, [byTag]);
+  /** display text: translated label for a predefined tag, the raw tag itself
+   *  for custom ones. Render the result DIRECTLY — do not wrap it in te(). */
+  const labelFor = useCallback(
+    (tag: string) => {
+      const label = byTag.get(tag);
+      return label ? te(label) : tag;
+    },
+    [byTag, te],
+  );
 
   return { catalog, labelFor };
 }

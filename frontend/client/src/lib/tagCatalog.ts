@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface PredefinedTag {
   /** the clean machine string that gets STORED, e.g. "customer_sale:no_sale" */
@@ -15,10 +16,13 @@ export interface PredefinedTag {
  *
  * Single source of truth on the server (like the trip-stop outcome list): the
  * picker renders from it and `labelFor` translates a stored tag back to its
- * bilingual label for display. Custom tags aren't in the catalog and fall
- * through as-is — deliberately untranslated.
+ * per-language display text. Custom tags aren't in the catalog and are
+ * returned VERBATIM — they must never pass through te()/enumLabel, whose
+ * composite split and dictionary fallbacks would mangle a custom tag that
+ * happens to contain " - "+Arabic or collide with an enum key.
  */
 export function useTagCatalog() {
+  const { te } = useLanguage();
   const { data } = useQuery<{ tags: PredefinedTag[] }>({
     queryKey: ["/customer/tag-catalog"],
     queryFn: () => apiRequest("/customer/tag-catalog"),
@@ -33,8 +37,15 @@ export function useTagCatalog() {
     [catalog],
   );
 
-  /** bilingual label for a predefined tag; the raw tag itself for custom ones */
-  const labelFor = useCallback((tag: string) => byTag.get(tag) ?? tag, [byTag]);
+  /** display text: translated label for a predefined tag, the raw tag itself
+   *  for custom ones. Render the result DIRECTLY — do not wrap it in te(). */
+  const labelFor = useCallback(
+    (tag: string) => {
+      const label = byTag.get(tag);
+      return label ? te(label) : tag;
+    },
+    [byTag, te],
+  );
 
   return { catalog, labelFor };
 }

@@ -49,6 +49,34 @@ PREDEFINED_CUSTOMER_TAGS: list[dict] = [
 ]
 
 
+def _label_aliases() -> dict[str, str]:
+    """Visible-text spellings of each predefined tag → its clean machine tag.
+
+    AR-mode users see only the Arabic half of a catalog label on chips and
+    badges, and nothing stops them retyping that text into the free-text tag
+    input (or the list filter). Without a backstop those spellings are valid
+    tags in their own right — 'بيع العميل: لا يوجد بيع' normalizes to an
+    Arabic-KEYED tag that coexists with 'customer_sale:no_sale' and silently
+    splits every transition/delta metric into two populations. So the
+    validator converges: the full bilingual label, its Arabic half, and the
+    colon-tightened twin normalize_tags would otherwise produce all map back
+    to the canonical machine tag.
+    """
+    aliases: dict[str, str] = {}
+    for entry in PREDEFINED_CUSTOMER_TAGS:
+        tag, label = entry["tag"], entry["label"]
+        arabic = label.split(" - ", 1)[1]
+        aliases[label] = tag
+        aliases[arabic] = tag
+        if ":" in arabic:
+            key, value = (part.strip() for part in arabic.split(":", 1))
+            aliases[f"{key}:{value}"] = tag
+    return aliases
+
+
+_PREDEFINED_ALIASES = _label_aliases()
+
+
 def split_tag(tag: str) -> tuple[str, str]:
     """(key, value) for a normalized tag. A bare key has value '' — the tag
     validator forbids an empty value on a key:value tag, so '' can only mean
@@ -86,6 +114,10 @@ def normalize_tags(v):
         tag = str(raw).strip()
         if not tag:
             raise ValueError("empty tag")
+        # converge visible catalog-label text to the machine tag BEFORE the
+        # shape checks: a full bilingual label has two colons and would be
+        # rejected, and the Arabic half would be accepted as an unrelated tag
+        tag = _PREDEFINED_ALIASES.get(tag, tag)
         if len(tag) > MAX_TAG_LENGTH:
             raise ValueError(f"tag longer than {MAX_TAG_LENGTH} characters: {tag[:20]}…")
         if "," in tag:
@@ -97,6 +129,10 @@ def normalize_tags(v):
             if not key or not value:
                 raise ValueError(f"key and value must both be non-empty: {tag}")
             tag = f"{key}:{value}"
+            # second alias pass: colon-tightening may only now have produced a
+            # catalog spelling (e.g. 'بيع العميل:لا يوجد بيع' typed without the
+            # display's space after the colon)
+            tag = _PREDEFINED_ALIASES.get(tag, tag)
         if tag in seen:
             continue
         key = split_tag(tag)[0]

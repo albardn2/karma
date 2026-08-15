@@ -44,7 +44,8 @@ export function TagInput({
   const [known, setKnown] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   // predefined distribution-analytics tags ("<tag> - <arabic>" labels);
-  // labelFor translates a stored tag back for display, custom tags pass raw
+  // labelFor renders a stored tag — translated for catalog hits, VERBATIM for
+  // custom tags (never route a custom tag through te, it can mangle it)
   const { catalog, labelFor } = useTagCatalog();
 
   useEffect(() => {
@@ -64,20 +65,34 @@ export function TagInput({
 
   const atCap = value.length >= MAX_TAGS;
 
-  const add = (raw: string) => {
+  // clearDraft=false for the predefined picker, so choosing from it never
+  // wipes a custom tag the user is mid-typing in the free-text box
+  const add = (raw: string, clearDraft = true) => {
     const tag = normalizeTag(raw);
     if (!tag) return;
     // one value per key: adding "interest:not_interested" replaces any existing
-    // "interest:*" rather than stacking a second value the server would reject
-    const key = tagKey(tag);
-    const withoutSameKey = value.filter((existing) => tagKey(existing) !== key);
+    // "interest:*" rather than stacking a second value the server would reject.
+    // Keys compare case-insensitively so "Blacklist" and "blacklist" can't
+    // coexist as one-tap near-duplicates that would split analytics counts.
+    const key = tagKey(tag).toLowerCase();
+    const withoutSameKey = value.filter((existing) => tagKey(existing).toLowerCase() !== key);
     // cap on the RESULT, so swapping a same-key value is never blocked at the cap
     if (withoutSameKey.length >= MAX_TAGS) return;
     if (!withoutSameKey.includes(tag)) onChange([...withoutSameKey, tag]);
-    setDraft('');
+    if (clearDraft) setDraft('');
   };
 
   const remove = (tag: string) => onChange(value.filter((t) => t !== tag));
+
+  // whether the predefined tag applies to this customer already (any case)
+  const applied = (tag: string) => value.some((existing) => existing.toLowerCase() === tag.toLowerCase());
+
+  // the picker stays available at the cap when it can still SWAP a same-key
+  // value (add() permits that), e.g. flipping customer_sale:no_sale to
+  // repeated_sale on a customer already carrying 25 tags
+  const canPickPredefined =
+    catalog.length > 0 &&
+    (!atCap || catalog.some((entry) => value.some((existing) => tagKey(existing).toLowerCase() === tagKey(entry.tag).toLowerCase())));
 
   return (
     <View>
@@ -85,7 +100,7 @@ export function TagInput({
         <View style={styles.chipWrap}>
           {value.map((tag) => (
             <View key={tag} style={styles.chip} testID={`tag-chip-${tag}`}>
-              <ThemedText style={styles.chipText}>{te(labelFor(tag))}</ThemedText>
+              <ThemedText style={styles.chipText}>{labelFor(tag)}</ThemedText>
               <TouchableOpacity onPress={() => remove(tag)} hitSlop={8} testID={`tag-remove-${tag}`}>
                 <ThemedText style={styles.chipX}>✕</ThemedText>
               </TouchableOpacity>
@@ -121,7 +136,7 @@ export function TagInput({
       {/* predefined distribution-analytics tags: bottom-sheet picker fed by the
           server catalog, labels translated per language; the clean tag is what
           gets stored. Custom tags keep using the free-text input above. */}
-      {!atCap && catalog.length > 0 && (
+      {canPickPredefined && (
         <TouchableOpacity
           style={styles.predefinedButton}
           onPress={() => setPickerOpen(true)}
@@ -142,7 +157,7 @@ export function TagInput({
               onPress={() => add(tag)}
               testID={`tag-suggest-${tag}`}
             >
-              <ThemedText style={styles.suggestText}>+ {te(labelFor(tag))}</ThemedText>
+              <ThemedText style={styles.suggestText}>+ {labelFor(tag)}</ThemedText>
             </TouchableOpacity>
           ))}
         </View>
@@ -163,15 +178,17 @@ export function TagInput({
                   key={entry.tag}
                   style={styles.modalOption}
                   onPress={() => {
-                    add(entry.tag);
+                    // keep the draft: picking predefined must not wipe a
+                    // custom tag the user is mid-typing
+                    add(entry.tag, false);
                     setPickerOpen(false);
                   }}
                   testID={`tag-predefined-opt-${entry.tag}`}
                 >
                   <ThemedText
-                    style={[styles.modalOptionText, value.includes(entry.tag) && styles.modalOptionActive]}
+                    style={[styles.modalOptionText, applied(entry.tag) && styles.modalOptionActive]}
                   >
-                    {value.includes(entry.tag) ? '✓ ' : ''}{te(entry.label)}
+                    {applied(entry.tag) ? '✓ ' : ''}{te(entry.label)}
                   </ThemedText>
                 </TouchableOpacity>
               ))}

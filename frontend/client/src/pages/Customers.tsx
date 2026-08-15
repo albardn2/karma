@@ -366,8 +366,9 @@ export default function Customers() {
                     <div className="flex flex-wrap gap-1">
                       {customer.tags.map((tag) => (
                         <Badge key={tag} variant="outline" className="text-xs font-normal">
-                          {/* predefined tags translate via the catalog; custom stay raw */}
-                          {te(labelFor(tag))}
+                          {/* predefined tags translate via the catalog; custom stay raw
+                              (labelFor renders directly — no te, it can mangle custom tags) */}
+                          {labelFor(tag)}
                         </Badge>
                       ))}
                     </div>

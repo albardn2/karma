@@ -315,8 +315,9 @@ export default function CustomerDetail() {
                   <div className="flex flex-wrap gap-1.5" data-testid="customer-tags">
                     {customer.tags.map((tag) => (
                       <Badge key={tag} variant="secondary" className="font-normal" data-testid={`customer-tag-${tag}`}>
-                        {/* predefined tags translate via the catalog; custom stay raw */}
-                        {te(labelFor(tag))}
+                        {/* predefined tags translate via the catalog; custom stay raw
+                            (labelFor renders directly — no te, it can mangle custom tags) */}
+                        {labelFor(tag)}
                       </Badge>
                     ))}
                   </div>
