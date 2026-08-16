@@ -76,7 +76,13 @@ const navigation = [
   { key: "nav.creditNoteItems", href: "/credit-note-items", icon: FileText },
   { key: "nav.debitNoteItems", href: "/debit-note-items", icon: FileText },
   { key: "nav.processes", href: "/processes", icon: Factory },
-  { key: "nav.workflowExecution", href: "/workflow-execution", icon: Play },
+  // Distribution IS the workflow module, renamed for what people actually use
+  // it for and pointed straight at the trips list instead of a workflow picker
+  // with one option. `module` is pinned because the ACL id is otherwise derived
+  // from the href, and the backend's permission list knows "workflow-execution"
+  // — deriving "distribution" from the new href would hide the entry from every
+  // non-admin and from every account whose feature cap lists the old id.
+  { key: "nav.distribution", href: "/distribution", module: "workflow-execution", icon: Truck },
   // adminOnly entries are filtered out for non-admin users below
   { key: "nav.liveMap", href: "/live-map", icon: MapPin, adminOnly: true },
   // alwaysVisible: NOT subject to the tenant feature cap. A company must always be

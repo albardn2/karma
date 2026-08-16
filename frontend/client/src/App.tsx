@@ -88,6 +88,7 @@ import ProcessDetail from "@/pages/ProcessDetail";
 import WorkflowDetail from "@/pages/WorkflowDetail";
 import WorkflowCreate from "@/pages/WorkflowCreate";
 import WorkflowExecution from "@/pages/WorkflowExecution";
+import Distribution from "@/pages/Distribution";
 import WorkflowExecutionDetail from "@/pages/WorkflowExecutionDetail";
 import WorkflowExecutionTaskDetail from "@/pages/WorkflowExecutionTaskDetail";
 import AccountSettings from "@/pages/AccountSettings";
@@ -184,6 +185,10 @@ function Router() {
       <Route path="/workflows" component={() => <ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
       <Route path="/workflows/new" component={() => <ProtectedRoute><WorkflowCreate /></ProtectedRoute>} />
       <Route path="/workflows/:uuid" component={() => <ProtectedRoute><WorkflowDetail /></ProtectedRoute>} />
+      {/* The menu entry points here. The /workflow-execution routes below stay
+          reachable for deep links and for the task detail the stop-completion
+          flow navigates to. */}
+      <Route path="/distribution" component={() => <ProtectedRoute><Distribution /></ProtectedRoute>} />
       <Route path="/workflow-execution" component={() => <ProtectedRoute><WorkflowExecution /></ProtectedRoute>} />
       <Route path="/workflow-execution/:workflow_uuid/:execution_uuid" component={() => <ProtectedRoute><WorkflowExecutionTaskDetail /></ProtectedRoute>} />
       <Route path="/workflow-execution/:uuid" component={() => <ProtectedRoute><WorkflowExecutionDetail /></ProtectedRoute>} />

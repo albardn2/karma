@@ -69,9 +69,29 @@ const parseNaiveUtc = (ts: string): Date =>
   new Date(ts.includes("T") && !/(?:Z|[+-]\d{2}:?\d{2})$/.test(ts) ? `${ts}Z` : ts);
 
 
-export default function WorkflowExecutionDetail() {
+/**
+ * The executions of one workflow.
+ *
+ * Reached two ways. From /workflow-execution/:uuid the workflow comes off the
+ * route, and the Back button returns to the picker. From /distribution the
+ * Distribution page has already resolved the trip workflow by name and passes
+ * it in — there is no picker to go back to, so the button is suppressed.
+ */
+export default function WorkflowExecutionDetail({
+  workflowUuid: workflowUuidProp,
+  showBack = true,
+  title,
+}: {
+  workflowUuid?: string;
+  showBack?: boolean;
+  /** Overrides the heading. Given a title, the page is a named module rather
+   *  than "the executions of some workflow", so the internal workflow name is
+   *  dropped from the subtitle too — "simple_trip_workflow" is an identifier,
+   *  not something to show under a heading that reads Distribution. */
+  title?: string;
+} = {}) {
   const [, params] = useRoute("/workflow-execution/:uuid");
-  const workflowUuid = params?.uuid || "";
+  const workflowUuid = workflowUuidProp || params?.uuid || "";
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { t, te } = useLanguage();
@@ -301,17 +321,19 @@ export default function WorkflowExecutionDetail() {
           {/* Header */}
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
-              <Link href="/workflow-execution">
-                <Button variant="ghost" size="sm" data-testid="button-back">
-                  <ArrowLeft className="h-4 w-4 me-2" />
-                  {t('common.back')}
-                </Button>
-              </Link>
+              {showBack && (
+                <Link href="/workflow-execution">
+                  <Button variant="ghost" size="sm" data-testid="button-back">
+                    <ArrowLeft className="h-4 w-4 me-2" />
+                    {t('common.back')}
+                  </Button>
+                </Link>
+              )}
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {t('workflows.workflowExecutions')}
+                  {title ?? t('workflows.workflowExecutions')}
                 </h1>
-                {workflow && (
+                {!title && workflow && (
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                     {workflow.name}
                   </p>

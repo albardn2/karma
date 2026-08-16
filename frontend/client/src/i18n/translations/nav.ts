@@ -30,6 +30,10 @@ export const en: Record<string, string> = {
   'nav.debitNoteItems': 'Debit Note Items',
   'nav.processes': 'Processes',
   'nav.workflows': 'Workflows',
+  // the menu entry; matches the Expo app's distribution tile so the two
+  // clients call the same thing by the same name
+  'nav.distribution': 'Distribution',
+  // still used by the /workflow-execution picker page, reachable by deep link
   'nav.workflowExecution': 'Workflow Execution',
   'nav.accountSettings': 'Account settings',
   'nav.liveMap': 'Live Map',
@@ -68,6 +72,7 @@ export const ar: Record<string, string> = {
   'nav.debitNoteItems': 'إشعارات مدينة',
   'nav.processes': 'عمليات الإنتاج',
   'nav.workflows': 'سير العمل',
+  'nav.distribution': 'التوزيع',
   'nav.workflowExecution': 'تنفيذ سير العمل',
   'nav.accountSettings': 'إعدادات الحساب',
   'nav.liveMap': 'الخريطة المباشرة',
