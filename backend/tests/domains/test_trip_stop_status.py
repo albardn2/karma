@@ -122,6 +122,40 @@ def test_mixed_case_is_not_the_skipped_family():
     assert status_for_outcome("Skipped:no_time - x") == COMPLETED
 
 
+# --- cancelling a trip must not rewrite what the rep reported ---------------
+
+def _cancel_trip_would_overwrite(stop_status: str) -> bool:
+    """The exempt list from TripDomain.cancel_trip, lifted verbatim.
+
+    A paraphrase of the predicate would pass this test while the shipped one
+    failed, so the list is imported from the module rather than retyped.
+    """
+    from app.domains.trip.domain import TripDomain  # noqa: F401  (import guard)
+    import inspect
+
+    from app.domains.trip import domain as trip_domain
+
+    src = inspect.getsource(trip_domain.TripDomain.cancel_trip)
+    exempt = set()
+    for name in ("COMPLETED", "SKIPPED", "CANCELLED", "PLANNED", "IN_PROGRESS"):
+        if f"TripStopStatus.{name}.value" in src.split("if stop.status not in")[1].split("]")[0]:
+            exempt.add(getattr(TripStopStatus, name).value)
+    return stop_status not in exempt
+
+
+@pytest.mark.parametrize("status", [COMPLETED, SKIPPED])
+def test_cancelling_a_trip_preserves_a_worked_stop(status):
+    """Both are stops the rep actually worked. SKIPPED was missing from the
+    exempt list — harmless while nothing wrote it, live the moment a skipped:*
+    outcome does, and it would erase a recorded skip."""
+    assert not _cancel_trip_would_overwrite(status)
+
+
+@pytest.mark.parametrize("status", [TripStopStatus.PLANNED.value, TripStopStatus.IN_PROGRESS.value])
+def test_cancelling_a_trip_still_cancels_unworked_stops(status):
+    assert _cancel_trip_would_overwrite(status)
+
+
 def test_an_unknown_family_completes_the_stop():
     """A future outcome describing something that happened leaves the stop
     worked — only an explicit skip means the stop was passed over."""

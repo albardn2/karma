@@ -25,8 +25,16 @@ still worked the stop, and calling it skipped would wrongly keep the customer
 eligible for an immediate revisit.
 
 A stop counts as worked if it carries an outcome, or its task execution reached
-`completed` — the latter is what catches the blank-outcome rows. Stops still
-genuinely in flight, planned stops, and cancelled stops are untouched.
+`completed` — the same predicate visit_dates.py uses, so the set marked
+completed/skipped here is exactly the set customer.last_stop already counts as a
+visit; the two derived facts cannot disagree. Stops still genuinely in flight,
+planned stops, and cancelled stops are untouched.
+
+A second statement cancels stops left open on trips that were since DELETED.
+Deleting a trip cancels its open stops today, but rows deleted before that code
+existed still read in_progress, and the distribution filter neither joins Trip
+nor excludes deleted ones — so they block their customers from ever being routed
+again, on behalf of a trip nobody can see.
 
 Revision ID: c1d4f7a92b58
 Revises: b3c8e5f14a72
@@ -61,8 +69,23 @@ WHERE ts.status = 'in_progress'
 """
 
 
+# Stops left open on a trip that was deleted. Deleting a trip cancels its open
+# stops today (trip/routes.py), but rows deleted before that existed still read
+# planned/in_progress, and the distribution filter neither joins Trip nor
+# excludes deleted ones — so those stops block their customers from ever being
+# routed again, on a trip nobody can see. Same repair the live code performs,
+# applied to the rows that predate it.
+_CANCEL_ORPHANED = """
+UPDATE trip_stop
+SET status = 'cancelled'
+WHERE status IN ('planned', 'in_progress')
+  AND trip_uuid IN (SELECT uuid FROM trip WHERE is_deleted)
+"""
+
+
 def upgrade():
     op.execute(_REPAIR)
+    op.execute(_CANCEL_ORPHANED)
 
 
 def downgrade():
