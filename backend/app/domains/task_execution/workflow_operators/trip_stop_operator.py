@@ -38,6 +38,27 @@ class TripStopOperatorSchema(BaseModel):
     mixed_small: Optional[float] = None
     notes: Optional[str] = None
 
+def status_for_outcome(outcome) -> str:
+    """The status a completed stop lands in, from what the rep reported.
+
+    Only an explicit skipped:* outcome makes a stop SKIPPED. Everything else is
+    COMPLETED — including a blank outcome, which the API accepts because the
+    field is an unvalidated string: the rep worked the stop, whatever got
+    recorded.
+
+    Deliberately NOT is_effective_outcome(), which calls a blank outcome "did
+    not reach the customer". That is the right rule for a visit DATE and the
+    wrong one for a status, where the question is only whether the stop was
+    worked or passed over.
+    """
+    from app.domains.customer.auto_tags import outcome_machine_key
+
+    key = outcome_machine_key(outcome)
+    if key.split(":", 1)[0] == "skipped":
+        return TripStopStatus.SKIPPED.value
+    return TripStopStatus.COMPLETED.value
+
+
 class TripStopOperator(OperatorInterface):
 
     def execute(self,uow:SqlAlchemyUnitOfWork,
@@ -55,6 +76,12 @@ class TripStopOperator(OperatorInterface):
 
         trip_stop = self.get_trip_stop(uow=uow)
         trip_stop.outcome = operator_schema.outcome
+        # A stop has been sitting at in_progress forever once worked: nothing
+        # ever advanced it, which left every customer who had been on a trip
+        # permanently ineligible for the next one (the distribution query
+        # excludes anyone holding a planned/in_progress stop) and left its
+        # "don't revisit within N days" rule matching nothing at all.
+        trip_stop.status = status_for_outcome(operator_schema.outcome)
         sales_outcome = {
             "mixed_large_extra": operator_schema.mixed_large_extra,
             "mixed_large": operator_schema.mixed_large,
