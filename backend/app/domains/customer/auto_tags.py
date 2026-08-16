@@ -11,9 +11,9 @@ Three triggers write through here (each cites this module):
   * customer order created     -> customer_sale:one_time_sale | :repeated_sale,
                                   and customer_interest:interested
   * trip stop completed        -> customer_interest from the outcome family,
-                                  plus the blacklist / prioritize_next_stop flags,
-                                  and it SPENDS prioritize_next_stop once the
-                                  visit it asked for has happened
+                                  plus the blacklist / prioritize_next_stop flags
+                                  — and it RETIRES those same two flags once a
+                                  visit has produced newer information
 
 Two rules hold everywhere:
 
@@ -172,6 +172,16 @@ _VERDICT_FAMILIES = ("sale", "interested", "not_interested", "blacklist")
 def tags_cleared_by_outcome(outcome) -> list[str]:
     """Which flags a completed stop SPENDS.
 
+    Both bare flags are answered by the next real visit, for different reasons.
+
+    blacklist is cleared by any verdict that is not itself a blacklist. The
+    rep standing in front of the customer has newer information than whoever
+    set the flag, so a visit that ends in anything else — a sale, interest, even
+    a plain refusal — retires it. Note what that means in practice: a single
+    not_interested:other un-blacklists someone. That is the accepted cost of
+    keeping the flag current rather than letting it harden into folklore; a
+    blacklist that nobody can dislodge by visiting is one nobody can trust.
+
     prioritize_next_stop means "see this customer sooner next round". The visit
     it was asking for is this one, so recording a verdict here uses it up. Left
     to accumulate it would end up on everyone who ever got that outcome, and a
@@ -186,15 +196,26 @@ def tags_cleared_by_outcome(outcome) -> list[str]:
         no time. Clearing here would quietly drop their priority without anyone
         having spoken to them, which is the very thing the flag exists to
         prevent, and it matches the rule that a skipped stop changes nothing.
+
+    skipped:* spends NEITHER flag, for the same reason in both cases: nobody
+    reached the customer, so there is no newer information to act on.
     """
     key = outcome_machine_key(outcome)
     if not key:
         return []
-    if key.split(":", 1)[0] not in _VERDICT_FAMILIES:
+    family = key.split(":", 1)[0]
+    if family not in _VERDICT_FAMILIES:
         return []
-    if key == "interested:prioritize_next_visit":
-        return []
-    return [PRIORITIZE_TAG]
+
+    cleared: list[str] = []
+    if key != "interested:prioritize_next_visit":
+        cleared.append(PRIORITIZE_TAG)
+    if family != "blacklist":
+        # a blacklist outcome re-states the flag rather than retiring it;
+        # tags_for_outcome adds it back, and apply_auto_tags lets a set beat a
+        # clear on the same key, so the two can never fight
+        cleared.append(BLACKLIST_TAG)
+    return cleared
 
 
 def with_default_sale_tag(tags) -> list[str]:
