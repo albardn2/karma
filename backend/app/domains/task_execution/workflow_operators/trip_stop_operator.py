@@ -63,9 +63,6 @@ class TripStopOperator(OperatorInterface):
         trip_stop.sales_outcome = sales_outcome
         trip_stop.notes = operator_schema.notes
         uow.trip_stop_repository.save(trip_stop, commit=False)
-        self.tag_customer_from_outcome(uow=uow, trip_stop=trip_stop,
-                                       outcome=operator_schema.outcome,
-                                       actor_uuid=payload.completed_by_uuid)
         task_exe.result = operator_schema.model_dump(mode="json")
         task_exe.status = WorkflowStatus.COMPLETED.value
         task_exe.end_time = datetime.now()
@@ -74,9 +71,17 @@ class TripStopOperator(OperatorInterface):
         # Save the task execution with the result
         uow.task_execution_repository.save(task_exe, commit=False)
 
-    def tag_customer_from_outcome(self, uow: SqlAlchemyUnitOfWork, trip_stop,
-                                  outcome: str, actor_uuid=None) -> None:
-        """Turn what the rep reported into tags on the customer.
+        # LAST, and the order matters: the customer's visit dates are recomputed
+        # from their stops, so this stop's outcome and its end_time both have to
+        # be saved before the query runs — otherwise it reads the state this
+        # completion just replaced.
+        self.update_customer_from_outcome(uow=uow, trip_stop=trip_stop,
+                                          outcome=operator_schema.outcome,
+                                          actor_uuid=payload.completed_by_uuid)
+
+    def update_customer_from_outcome(self, uow: SqlAlchemyUnitOfWork, trip_stop,
+                                     outcome: str, actor_uuid=None) -> None:
+        """Turn what the rep reported into tags and visit dates on the customer.
 
         The outcome the rep already picks is the cheapest interest signal the
         business has, so the customer_interest tag follows it rather than asking
@@ -92,15 +97,24 @@ class TripStopOperator(OperatorInterface):
         from app.domains.customer.auto_tags import (
             apply_auto_tags, tags_cleared_by_outcome, tags_for_outcome,
         )
+        from app.domains.customer.visit_dates import recompute_visit_dates
 
         if not trip_stop.customer_uuid:
             return
+        customer = uow.customer_repository.find_one(uuid=trip_stop.customer_uuid, is_deleted=False)
+        if not customer:
+            return
+
+        # Recomputed from the customer's stops rather than stamped with "now",
+        # so a corrected outcome walks the dates back instead of leaving
+        # last_effective_stop asserting a visit the correction erased. See
+        # app/domains/customer/visit_dates.py.
+        recompute_visit_dates(uow, customer)
+
         tags = tags_for_outcome(outcome)
         clear = tags_cleared_by_outcome(outcome)
-        if not tags and not clear:
-            return
-        customer = uow.customer_repository.find_one(uuid=trip_stop.customer_uuid, is_deleted=False)
-        apply_auto_tags(uow, customer=customer, tags=tags, clear=clear, actor_uuid=actor_uuid)
+        if tags or clear:
+            apply_auto_tags(uow, customer=customer, tags=tags, clear=clear, actor_uuid=actor_uuid)
 
     def validate(self):
         raise NotImplementedError("The validate method must be implemented by subclasses.")
