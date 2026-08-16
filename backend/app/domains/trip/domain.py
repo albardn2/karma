@@ -221,7 +221,15 @@ class TripDomain:
 
         trip_stops = trip.stops
         for stop in trip_stops:
-            if stop.status not in [TripStopStatus.COMPLETED.value, TripStopStatus.CANCELLED.value]:
+            # SKIPPED belongs beside COMPLETED here: both are stops the rep
+            # actually worked, and cancelling the trip must not rewrite what
+            # they reported. The omission was harmless while nothing ever wrote
+            # SKIPPED; now that a skipped:* outcome does, cancelling a trip
+            # would erase a recorded skip and drop the stop out of the
+            # "stops that were worked" queries that power the trip history.
+            if stop.status not in [TripStopStatus.COMPLETED.value,
+                                   TripStopStatus.SKIPPED.value,
+                                   TripStopStatus.CANCELLED.value]:
                 stop.status = TripStopStatus.CANCELLED.value
         uow.trip_repository.save(model=trip, commit=False)
         return TripRead.from_orm(trip)

@@ -41,7 +41,13 @@ class CustomerRepository(AbstractRepository[Customer]):
         # Use timezone-aware UTC to avoid naive/aware comparison issues
         cutoff = datetime.now(timezone.utc) - timedelta(days=last_visit_threshold_days)
 
-        qry = self._session.query(Customer)
+        # Scope to the caller's account. This is the one Customer read path that
+        # built its query by hand instead of going through the repository
+        # helpers, so it had no tenant filter at all — it could route another
+        # account's customers into this account's trip. Latent until now only
+        # because the status filter below excluded almost everybody; releasing
+        # those customers is exactly what widens it.
+        qry = self._session.query(Customer).filter(*self._scope_filters(None))
 
         # remove customers with is_deleted=True
         qry = qry.filter(Customer.is_deleted == False)
