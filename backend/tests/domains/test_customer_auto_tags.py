@@ -138,38 +138,92 @@ def test_blacklist_outcome_both_marks_and_records_disinterest():
     assert BLACKLIST_TAG in tags and INTEREST_NO in tags
 
 
-# --- what a stop SPENDS -----------------------------------------------------
+# --- what a stop RETIRES ----------------------------------------------------
 #
-# prioritize_next_stop asks for the next visit to come sooner. That visit is the
-# next completed stop, so a verdict there uses the flag up — otherwise it sticks
-# to every customer who ever earned it and stops distinguishing anyone.
+# Both bare flags are answered by the next real visit. prioritize_next_stop asks
+# for that visit to come sooner, so a verdict there uses it up. blacklist is
+# retired by any verdict that is not itself a blacklist: the rep standing in
+# front of the customer has newer information than whoever set the flag.
 
 SPENT_BY_OUTCOME = {
-    TripStopOutcome.SALE: [PRIORITIZE_TAG],
-    TripStopOutcome.INTERESTED_HAVE_INVENTORY: [PRIORITIZE_TAG],
-    TripStopOutcome.INTERESTED_NEEDS_BETTER_PRICE: [PRIORITIZE_TAG],
-    TripStopOutcome.INTERESTED_INSUFFICIENT_FUNDS: [PRIORITIZE_TAG],
-    # asking for priority again must not spend the flag it is re-raising
-    TripStopOutcome.INTERESTED_PRIORITIZE_NEXT_VISIT: [],
-    TripStopOutcome.NOT_INTERESTED_COMPETITOR: [PRIORITIZE_TAG],
-    TripStopOutcome.NOT_INTERESTED_BAD_PRODUCT: [PRIORITIZE_TAG],
-    TripStopOutcome.NOT_INTERSTED_PRICE_TOO_HIGH: [PRIORITIZE_TAG],
-    TripStopOutcome.NOT_INTERESTED_OTHER: [PRIORITIZE_TAG],
-    # the visit never happened, so the priority it was owed is still owed
+    TripStopOutcome.SALE: [PRIORITIZE_TAG, BLACKLIST_TAG],
+    TripStopOutcome.INTERESTED_HAVE_INVENTORY: [PRIORITIZE_TAG, BLACKLIST_TAG],
+    TripStopOutcome.INTERESTED_NEEDS_BETTER_PRICE: [PRIORITIZE_TAG, BLACKLIST_TAG],
+    TripStopOutcome.INTERESTED_INSUFFICIENT_FUNDS: [PRIORITIZE_TAG, BLACKLIST_TAG],
+    # asking for priority again must not spend the flag it is re-raising, but it
+    # is still a visit, so it still retires a blacklist
+    TripStopOutcome.INTERESTED_PRIORITIZE_NEXT_VISIT: [BLACKLIST_TAG],
+    # a refusal is newer information too — one of these un-blacklists someone,
+    # which is the accepted cost of keeping the flag current
+    TripStopOutcome.NOT_INTERESTED_COMPETITOR: [PRIORITIZE_TAG, BLACKLIST_TAG],
+    TripStopOutcome.NOT_INTERESTED_BAD_PRODUCT: [PRIORITIZE_TAG, BLACKLIST_TAG],
+    TripStopOutcome.NOT_INTERSTED_PRICE_TOO_HIGH: [PRIORITIZE_TAG, BLACKLIST_TAG],
+    TripStopOutcome.NOT_INTERESTED_OTHER: [PRIORITIZE_TAG, BLACKLIST_TAG],
+    # nobody reached the customer, so neither flag has been answered
     TripStopOutcome.SKIPPED_CUSTOMER_NOT_AVAILABLE: [],
     TripStopOutcome.SKIPPED_VEHICLE_BREAKDOWN: [],
     TripStopOutcome.SKIPPED_NO_PARKING: [],
     TripStopOutcome.SKIPPED_NO_TIME: [],
     TripStopOutcome.SKIPPED_OTHER: [],
+    # re-stating the blacklist must not retire it
     TripStopOutcome.BLACKLIST: [PRIORITIZE_TAG],
 }
 
 
 def test_every_outcome_has_a_decided_spend():
     assert set(SPENT_BY_OUTCOME) == set(TripStopOutcome), (
-        "TripStopOutcome changed: decide whether the new option spends "
-        "prioritize_next_stop and add it to SPENT_BY_OUTCOME"
+        "TripStopOutcome changed: decide whether the new option retires "
+        "prioritize_next_stop and/or blacklist, and add it to SPENT_BY_OUTCOME"
     )
+
+
+def test_a_sale_retires_a_blacklist():
+    """Buying is the strongest counter-evidence there is."""
+    outcome = TripStopOutcome.SALE.value
+    customer = _Customer(BLACKLIST_TAG, INTEREST_NO)
+    uow, _ = _apply(customer, tags=tags_for_outcome(outcome),
+                    clear=tags_cleared_by_outcome(outcome))
+    assert BLACKLIST_TAG not in customer.tags
+    assert INTEREST_YES in customer.tags
+    assert ("blacklist", "", None) in {
+        (e.key, e.old_value, e.new_value) for e in uow.session.added
+    }
+
+
+def test_a_refusal_also_retires_a_blacklist():
+    """The accepted cost of keeping the flag current: one not_interested visit
+    un-blacklists someone. They stay not_interested — the two are separate
+    facts, and only the flag is retired."""
+    outcome = TripStopOutcome.NOT_INTERESTED_OTHER.value
+    customer = _Customer(BLACKLIST_TAG)
+    _apply(customer, tags=tags_for_outcome(outcome), clear=tags_cleared_by_outcome(outcome))
+    assert customer.tags == [INTEREST_NO]
+
+
+def test_restating_the_blacklist_does_not_retire_it():
+    """set beats clear on the same key, so the add and the retire cannot fight
+    even though a blacklist outcome is itself a verdict."""
+    outcome = TripStopOutcome.BLACKLIST.value
+    customer = _Customer(BLACKLIST_TAG)
+    _apply(customer, tags=tags_for_outcome(outcome), clear=tags_cleared_by_outcome(outcome))
+    assert BLACKLIST_TAG in customer.tags
+
+
+def test_a_skipped_stop_leaves_a_blacklist_alone():
+    """Nobody reached the customer, so there is no newer information."""
+    outcome = TripStopOutcome.SKIPPED_CUSTOMER_NOT_AVAILABLE.value
+    customer = _Customer(BLACKLIST_TAG)
+    uow, _ = _apply(customer, tags=tags_for_outcome(outcome),
+                    clear=tags_cleared_by_outcome(outcome))
+    assert customer.tags == [BLACKLIST_TAG]
+    assert uow.session.added == []
+
+
+def test_retiring_a_blacklist_leaves_manual_tags_alone():
+    customer = _Customer(BLACKLIST_TAG, "agent", "region:malki")
+    outcome = TripStopOutcome.SALE.value
+    _apply(customer, tags=tags_for_outcome(outcome), clear=tags_cleared_by_outcome(outcome))
+    assert set(customer.tags) == {"agent", "region:malki", INTEREST_YES}
 
 
 @pytest.mark.parametrize("outcome", list(TripStopOutcome), ids=lambda o: o.name)
