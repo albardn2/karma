@@ -220,6 +220,11 @@ class CustomerRead(CustomerBase):
     created_at: datetime
     is_deleted: bool
     balance_per_currency: dict[Currency, float]
+    # Derived from trip stops, never accepted from a client — they are absent
+    # from CustomerCreate/CustomerUpdate on purpose, and those DTOs forbid
+    # extras, so an attempt to set them is a 400 rather than a silent overwrite.
+    last_stop: Optional[datetime] = None
+    last_effective_stop: Optional[datetime] = None
 
     @field_validator("coordinates", mode="before")
     def _wkb_or_wkt_to_latlon(cls, v):

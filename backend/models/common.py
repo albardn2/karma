@@ -246,6 +246,17 @@ class Customer(Base):
     # plain strings so "vip" and "region:malki" filter with the same operators
     tags = Column(ARRAY(String), nullable=False, default=list, server_default='{}')
     coordinates = Column(Geometry("POINT", srid=4326), nullable=True)
+    # When a rep last stood at this customer's door, denormalised off trip_stop
+    # so "who hasn't been seen lately" is a column read rather than a scan of
+    # every stop the customer has ever had. (No index yet — nothing queries
+    # these columns; add a composite one alongside the first read path.)
+    #   last_stop           — the last completed stop, whatever came of it
+    #   last_effective_stop — the last one that actually reached the customer,
+    #                         i.e. any outcome outside the skipped:* family
+    # Both NULL until a stop completes. They are DERIVED: the trip-stop operator
+    # is the only writer, so nothing else should set them.
+    last_stop = Column(DateTime, nullable=True)
+    last_effective_stop = Column(DateTime, nullable=True)
     is_deleted = Column(Boolean, default=False)
 
     # relations

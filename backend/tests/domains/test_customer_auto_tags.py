@@ -40,6 +40,7 @@ from app.domains.customer.auto_tags import (
     SALE_ONE_TIME,
     SALE_REPEATED,
     apply_auto_tags,
+    is_effective_outcome,
     outcome_machine_key,
     sale_tag_after_void,
     sale_tag_for_live_order_count,
@@ -295,6 +296,64 @@ def test_prioritize_outcome_keeps_the_customer_interested():
     not a replacement, or a prioritized customer would vanish from interest."""
     tags = tags_for_outcome(TripStopOutcome.INTERESTED_PRIORITIZE_NEXT_VISIT.value)
     assert tags == [INTEREST_YES, PRIORITIZE_TAG]
+
+
+# --- was the customer actually reached? ------------------------------------
+#
+# Drives customer.last_effective_stop. Defined as the complement of skipped, not
+# a whitelist: an outcome describing something that DID happen should count on
+# the day it is added, without anyone remembering this function.
+
+EFFECTIVE_BY_OUTCOME = {
+    TripStopOutcome.SALE: True,
+    TripStopOutcome.INTERESTED_HAVE_INVENTORY: True,
+    TripStopOutcome.INTERESTED_NEEDS_BETTER_PRICE: True,
+    TripStopOutcome.INTERESTED_INSUFFICIENT_FUNDS: True,
+    TripStopOutcome.INTERESTED_PRIORITIZE_NEXT_VISIT: True,
+    # a refusal is a conversation: the rep got to the door and was told no
+    TripStopOutcome.NOT_INTERESTED_COMPETITOR: True,
+    TripStopOutcome.NOT_INTERESTED_BAD_PRODUCT: True,
+    TripStopOutcome.NOT_INTERSTED_PRICE_TOO_HIGH: True,
+    TripStopOutcome.NOT_INTERESTED_OTHER: True,
+    TripStopOutcome.BLACKLIST: True,
+    # the trip failed to happen — nobody was reached
+    TripStopOutcome.SKIPPED_CUSTOMER_NOT_AVAILABLE: False,
+    TripStopOutcome.SKIPPED_VEHICLE_BREAKDOWN: False,
+    TripStopOutcome.SKIPPED_NO_PARKING: False,
+    TripStopOutcome.SKIPPED_NO_TIME: False,
+    TripStopOutcome.SKIPPED_OTHER: False,
+}
+
+
+def test_every_outcome_has_a_decided_effectiveness():
+    assert set(EFFECTIVE_BY_OUTCOME) == set(TripStopOutcome), (
+        "TripStopOutcome changed: decide whether the new option counts as "
+        "reaching the customer and add it to EFFECTIVE_BY_OUTCOME"
+    )
+
+
+@pytest.mark.parametrize("outcome", list(TripStopOutcome), ids=lambda o: o.name)
+def test_outcome_effectiveness(outcome):
+    assert is_effective_outcome(outcome.value) is EFFECTIVE_BY_OUTCOME[outcome]
+
+
+@pytest.mark.parametrize("outcome", [None, "", "   "])
+def test_an_unreadable_outcome_is_not_effective(outcome):
+    """We cannot claim to have reached someone on the strength of a value
+    nothing can parse."""
+    assert is_effective_outcome(outcome) is False
+
+
+def test_an_unknown_but_readable_outcome_counts_as_effective():
+    """The complement-of-skipped rule in action: a future outcome describing
+    something that happened is effective without touching this code."""
+    assert is_effective_outcome("negotiating:follow_up - نص") is True
+
+
+def test_effectiveness_reads_the_machine_half_not_the_arabic():
+    """The Arabic half of a skipped outcome must not decide the answer."""
+    assert is_effective_outcome(TripStopOutcome.SKIPPED_NO_TIME.value) is False
+    assert is_effective_outcome("skipped:no_time") is False
 
 
 # --- the key extraction ----------------------------------------------------

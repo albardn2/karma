@@ -169,6 +169,26 @@ def sale_tag_after_void(customer, *, live_orders: int) -> list[str]:
 _VERDICT_FAMILIES = ("sale", "interested", "not_interested", "blacklist")
 
 
+def is_effective_outcome(outcome) -> bool:
+    """Did this stop actually reach the customer?
+
+    Everything except the skipped:* family counts: a refusal or a blacklist is
+    still a rep standing at the door having a conversation, whereas "customer
+    not available" and "no time" are the trip failing to happen.
+
+    Defined as the complement of skipped rather than a whitelist of known
+    families, deliberately: a new outcome describing something that DID happen
+    should count as effective the day it is added, without anyone remembering
+    this function. An unreadable outcome (NULL, '', legacy free text with no
+    family) is not effective — we cannot claim to have reached someone on the
+    strength of a value nothing can parse.
+    """
+    key = outcome_machine_key(outcome)
+    if not key:
+        return False
+    return key.split(":", 1)[0] != "skipped"
+
+
 def tags_cleared_by_outcome(outcome) -> list[str]:
     """Which flags a completed stop SPENDS.
 
