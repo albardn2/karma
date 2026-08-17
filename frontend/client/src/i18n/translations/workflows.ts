@@ -96,6 +96,8 @@ export const en: Record<string, string> = {
   'workflows.workflowExecutions': 'Workflow Executions',
   // shown by the Distribution page when the tenant has no trip workflow seeded
   'distribution.workflowMissing': 'No distribution workflow is set up for this account yet. Ask an administrator to provision it.',
+  // the lookup itself failed — deliberately distinct from "not provisioned"
+  'distribution.workflowLoadFailed': 'Could not load the distribution workflow. Check your connection and try again.',
   'workflows.executeWorkflow': 'Execute Workflow',
   'workflows.noExecutionsFound': 'No workflow executions found',
   'workflows.started': 'Started',
@@ -307,6 +309,7 @@ export const ar: Record<string, string> = {
   // Workflow executions table
   'workflows.workflowExecutions': 'عمليات تنفيذ سير العمل',
   'distribution.workflowMissing': 'لم يتم إعداد سير عمل التوزيع لهذا الحساب بعد. يرجى الطلب من المسؤول تفعيله.',
+  'distribution.workflowLoadFailed': 'تعذّر تحميل سير عمل التوزيع. تحقق من الاتصال وحاول مرة أخرى.',
   'workflows.executeWorkflow': 'تنفيذ سير العمل',
   'workflows.noExecutionsFound': 'لم يتم العثور على عمليات تنفيذ لسير العمل',
   'workflows.started': 'البدء',

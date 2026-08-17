@@ -643,7 +643,10 @@ export default function WorkflowExecutionDetail({
               <DialogHeader>
                 <DialogTitle>{t('workflows.executeWorkflow')}</DialogTitle>
                 <DialogDescription>
-                  {t('workflows.startNewExecution', { name: workflow?.name || '' })}
+                  {/* the module's own name when it has one — otherwise the raw
+                      workflow identifier leaks into end-user copy here too,
+                      which is the thing `title` exists to prevent */}
+                  {t('workflows.startNewExecution', { name: title ?? workflow?.name ?? '' })}
                 </DialogDescription>
               </DialogHeader>
 

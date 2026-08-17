@@ -28,7 +28,7 @@ interface WorkflowsResponse {
 export default function Distribution() {
   const { t } = useLanguage();
 
-  const { data, isLoading } = useQuery<WorkflowsResponse>({
+  const { data, isLoading, isError } = useQuery<WorkflowsResponse>({
     queryKey: ["/workflow/", TRIP_WORKFLOW_NAME],
     queryFn: () => apiRequest(`/workflow/?name=${TRIP_WORKFLOW_NAME}&per_page=1`),
     // the tenant's trip workflow is seeded once and never renamed
@@ -40,6 +40,22 @@ export default function Distribution() {
       <AppLayout>
         <div className="flex-1 flex items-center justify-center p-8">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // A lookup that FAILED is not the same as an account with no workflow. Both
+  // leave data undefined, so without this branch a backend outage would tell a
+  // perfectly provisioned tenant to go ask an administrator to provision it —
+  // sending them, and whoever they escalate to, hunting in the wrong place.
+  if (isError) {
+    return (
+      <AppLayout>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+            {t("distribution.workflowLoadFailed")}
+          </p>
         </div>
       </AppLayout>
     );
