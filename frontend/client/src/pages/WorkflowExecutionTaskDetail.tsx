@@ -207,7 +207,13 @@ export default function WorkflowExecutionTaskDetail() {
           fieldSchema = field.required ? z.string().min(1) : z.string();
           break;
         case 'checklist':
-          fieldSchema = z.array(z.string());
+          // same trap as the required select above: `required` on a checklist
+          // was decorative — [] passed and the backend 400ed with a raw toast
+          // instead of an inline error. Bites the setup form's assigned_date,
+          // the system's first required checklist.
+          fieldSchema = field.required
+            ? z.array(z.string()).min(1)
+            : z.array(z.string());
           break;
         case 'file_upload':
           fieldSchema = z.any(); // File uploads need special handling

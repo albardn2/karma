@@ -26,9 +26,11 @@ def resolve_strategy(result) -> str:
     """The routing strategy a setup result asks for, whichever form wrote it.
 
     New form: an explicit `strategy` value (the single-pick select may arrive
-    as a one-element list). Old form: `manual_stops` decided the fork — absent
-    entirely means a result that predates even that, which only the manual path
-    can serve.
+    as a one-element list). Old form: `manual_stops` decided the fork. A result
+    with NEITHER key predates the manual toggle entirely (pre-2026-07) — that
+    schema required the routing inputs, so such a result is a routed one and
+    must resolve to the path that can read them; only a result bare of the
+    routed signature too falls back to manual.
     """
     result = result or {}
     raw = result.get("strategy")
@@ -40,4 +42,6 @@ def resolve_strategy(result) -> str:
             return value
     if "manual_stops" in result:
         return MANUAL if result.get("manual_stops") else LEGACY_CLUSTER
+    if "start_warehouse_name" in result:
+        return LEGACY_CLUSTER
     return MANUAL

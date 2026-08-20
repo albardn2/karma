@@ -35,6 +35,7 @@ Revises: c1d4f7a92b58
 """
 import json
 
+import sqlalchemy as sa
 from alembic import op
 
 revision = 'e7b3f9c25a84'
@@ -69,13 +70,16 @@ OLD_FIELDS = [
     _field("trip_name", "text", max_length=120,
            placeholder="Optional — defaults to today's date"),
     _field("manual_stops", "checklist", options=["yes"]),
-    _field("service_areas", "checklist", options=[]),
+    # multiple=True deviates from the byte-exact old descriptors (which said
+    # false while every client multi-picked anyway): the NEW clients honor the
+    # flag, so a DB-only downgrade must not turn these single-pick
+    _field("service_areas", "checklist", options=[], multiple=True),
     _field("start_warehouse_name", "select", options=[]),
     _field("end_warehouse_name", "select", options=[]),
     _field("start_point", "text"),
     _field("end_point", "text"),
     _field("assigned_user_uuid", "select", options=[], placeholder=""),
-    _field("customer_categories", "checklist", options=[]),
+    _field("customer_categories", "checklist", options=[], multiple=True),
     _field("vehicle_plate", "select", options=[]),
     _field("last_visit_threshold_days", "number", minimum=1, maximum=100),
     _field("max_stops", "number", minimum=0, maximum=200),
@@ -85,14 +89,22 @@ OLD_FIELDS = [
 
 def _set_fields(fields):
     payload = json.dumps({"data": None, "fields": fields})
-    # keyed on name+operator: the one global template row (workflow_uuid set),
-    # never the per-trip throwaway task rows (those are stop/finish tasks and
-    # have different operators anyway)
-    op.execute(
-        "UPDATE task SET task_inputs = '"
-        + payload.replace("'", "''")
-        + "'::jsonb WHERE name = 'setup_trip_config' AND operator = 'start_trip_operator'"
+    # keyed on operator ALONE, like the two form migrations before this one:
+    # the row's NAME is unpinned database data (every consumer — both clients
+    # and all backend query sites — locates this form by operator, so a row
+    # named anything else works fine today and a name-keyed UPDATE would skip
+    # it silently, leaving the old 13-field form to be rejected wholesale by
+    # the new extra=forbid schema). The per-trip throwaway task rows all carry
+    # other operators, so operator alone is exact.
+    result = op.get_bind().execute(
+        sa.text(
+            "UPDATE task SET task_inputs = '"
+            + payload.replace("'", "''")
+            + "'::jsonb WHERE operator = 'start_trip_operator'"
+        )
     )
+    # 0 rows is legitimate only on a fresh database that has no template yet
+    print(f"setup form rewrite touched {result.rowcount} task row(s)")
 
 
 def upgrade():

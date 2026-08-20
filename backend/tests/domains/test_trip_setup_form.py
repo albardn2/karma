@@ -12,7 +12,8 @@ toggle. Two things here are load-bearing enough to pin:
   2. THE VALIDATION. The schema is extra=forbid and the old clients' bundles
      briefly outlive a deploy, so the exact failure shape of an old-form
      submission matters; and the date window is what keeps "assigned date"
-     meaning something — yesterday must not be schedulable.
+     meaning something — with one day of grace at the lower bound for the
+     form-read-before-midnight / submit-after race.
 """
 from datetime import datetime, timedelta
 
@@ -69,8 +70,21 @@ def test_old_routed_result_goes_to_the_legacy_pipeline():
     assert resolve_strategy({"manual_stops": False, "start_warehouse_name": "hosh blas"}) == LEGACY_CLUSTER
 
 
-def test_prehistoric_result_defaults_to_manual():
-    """Neither key present: only the manual path can serve it."""
+def test_prehistoric_routed_result_goes_to_the_legacy_pipeline():
+    """Executions from before the manual_stops toggle existed (pre-2026-07)
+    have NEITHER key — but that schema required the routing inputs, so the
+    result carries the routed signature and was routed under the old code.
+    Defaulting it to manual would silently convert a routed trip in flight
+    into an empty manual one."""
+    assert resolve_strategy({
+        "service_areas": ["malki"],
+        "start_warehouse_name": "hosh blas",
+        "end_warehouse_name": "hosh blas",
+        "last_visit_threshold_days": 14,
+    }) == LEGACY_CLUSTER
+
+
+def test_a_result_bare_of_both_generations_defaults_to_manual():
     assert resolve_strategy({}) == MANUAL
     assert resolve_strategy(None) == MANUAL
 
@@ -93,10 +107,18 @@ def test_every_offered_date_validates():
         assert StartTripOperatorSchema(**_valid(assigned_date=o)).assigned_date == o
 
 
-def test_yesterday_is_not_schedulable():
+def test_yesterday_gets_the_midnight_grace():
+    """The option list is generated at form-READ time, so 'today' picked just
+    before Damascus midnight arrives as yesterday when submitted just after.
+    One day of grace on the lower bound absorbs the race."""
     y = (_damascus_today() - timedelta(days=1)).strftime("%d-%m-%Y")
+    assert StartTripOperatorSchema(**_valid(assigned_date=y)).assigned_date == y
+
+
+def test_two_days_ago_is_not_schedulable():
+    stale = (_damascus_today() - timedelta(days=2)).strftime("%d-%m-%Y")
     with pytest.raises(BadRequestError):
-        StartTripOperatorSchema(**_valid(assigned_date=y))
+        StartTripOperatorSchema(**_valid(assigned_date=stale))
 
 
 def test_beyond_the_window_is_not_schedulable():
@@ -129,11 +151,34 @@ def test_strategy_defaults_to_manual():
     assert StartTripOperatorSchema(**payload).strategy == MANUAL
 
 
+def test_blank_strategy_means_the_default():
+    """The web posts every field, so an untouched select (whose placeholder
+    reads 'manual') arrives as '' — present-but-blank must behave like absent,
+    or the placeholder promises a default nobody applies."""
+    assert StartTripOperatorSchema(**_valid(strategy="")).strategy == MANUAL
+    assert StartTripOperatorSchema(**_valid(strategy="  ")).strategy == MANUAL
+    assert StartTripOperatorSchema(**_valid(strategy=[])).strategy == MANUAL
+
+
+def test_blank_assignee_or_vehicle_is_rejected():
+    """Plain `str` accepts '' — and a blank assignee would silently skip both
+    the existence check and the one-trip guard in execute()."""
+    with pytest.raises(BadRequestError):
+        StartTripOperatorSchema(**_valid(assigned_user_uuid=""))
+    with pytest.raises(BadRequestError):
+        StartTripOperatorSchema(**_valid(vehicle_plate="   "))
+
+
 def test_unknown_strategy_is_rejected():
     """The dropdown only offers registered strategies, so anything else is an
     API caller guessing — refused, not silently run as manual."""
     with pytest.raises(BadRequestError):
         StartTripOperatorSchema(**_valid(strategy="teleport"))
+
+
+def test_blank_desired_stops_means_absent():
+    assert StartTripOperatorSchema(**_valid(desired_stops="")).desired_stops is None
+    assert StartTripOperatorSchema(**_valid(desired_stops=None)).desired_stops is None
 
 
 def test_desired_stops_bounds():

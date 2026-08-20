@@ -33,7 +33,12 @@ class TaskInputField(BaseModel):
     max: Optional[Union[int, float]] = None  # Maximum value for number fields
     options: Optional[List[str]] = None  # Options for select, checklist, or radio buttons
     button_text: Optional[str] = None  # For button type fields
-    multiple: Optional[bool] = False  # For file upload (allow multiple files)
+    # Checklists: False means single-pick, True/absent means multi-pick. The
+    # default must stay None, NOT False — most stored descriptors never wrote
+    # the key, and a False default would serialize onto all of them, flipping
+    # every admin-built checklist to single-pick in both clients (they test
+    # `multiple === false`). Also used by file uploads (allow multiple files).
+    multiple: Optional[bool] = None
     accept: Optional[str] = None  # For file upload (file types)
     rows: Optional[int] = None  # For textarea fields, number of rows
     cols: Optional[int] = None  # For textarea fields, number of columns

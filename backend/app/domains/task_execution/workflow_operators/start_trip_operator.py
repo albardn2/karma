@@ -57,21 +57,45 @@ class StartTripOperatorSchema(BaseModel):
     vehicle_plate: str
 
     @field_validator("assigned_date", "strategy", mode="before")
-    def unwrap_single_pick(cls, v):
+    def unwrap_single_pick(cls, v, info):
         # single-pick checklists submit a one-element list
         if isinstance(v, list):
             if len(v) != 1:
+                # an empty strategy just means "use the default"; an empty
+                # date is a required pick genuinely missing
+                if info.field_name == "strategy" and not v:
+                    return ""
                 raise BadRequestError("exactly one option must be picked")
             v = v[0]
+        return v
+
+    @field_validator("desired_stops", mode="before")
+    def blank_number_means_absent(cls, v):
+        # clients that post every field send an untouched number input as ""
+        if isinstance(v, str) and not v.strip():
+            return None
         return v
 
     @field_validator("strategy")
     def strategy_must_exist(cls, v):
         value = str(v).strip().lower()
+        # the web posts every field, so an untouched select arrives as "" —
+        # present-but-blank means the same thing as absent: the default
+        if not value:
+            return MANUAL
         if value not in FORM_STRATEGIES:
             raise BadRequestError(
                 f"Unknown routing strategy '{v}'. Available: {', '.join(FORM_STRATEGIES)}"
             )
+        return value
+
+    @field_validator("assigned_user_uuid", "vehicle_plate")
+    def must_not_be_blank(cls, v, info):
+        # plain `str` accepts "" — and a blank assignee would silently skip
+        # both the existence check and the one-trip guard below
+        value = str(v).strip()
+        if not value:
+            raise BadRequestError(f"{info.field_name} is required")
         return value
 
     @field_validator("assigned_date")
@@ -81,7 +105,11 @@ class StartTripOperatorSchema(BaseModel):
         except ValueError:
             raise BadRequestError("assigned_date must be dd-mm-yyyy")
         today = _damascus_today()
-        if not (today <= picked <= today + timedelta(days=ASSIGNED_DATE_WINDOW_DAYS)):
+        # the lower bound gets a day of grace: the option list is generated at
+        # form-READ time, so "today" picked at 23:50 Damascus and submitted at
+        # 00:05 is yesterday by then — rejecting it strands the driver at
+        # exactly the moment the error makes the least sense
+        if not (today - timedelta(days=1) <= picked <= today + timedelta(days=ASSIGNED_DATE_WINDOW_DAYS)):
             raise BadRequestError(
                 f"assigned_date must be between today and {ASSIGNED_DATE_WINDOW_DAYS} days out"
             )
