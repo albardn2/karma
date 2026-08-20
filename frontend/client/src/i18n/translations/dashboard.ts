@@ -43,6 +43,9 @@ export const en: Record<string, string> = {
   'dashboards.myRevenueDesc': 'Revenue from orders you created.',
   'dashboards.myMaterialsSold': 'My Materials Sold',
   'dashboards.myMaterialsSoldDesc': 'Quantities sold via orders you created.',
+  // the user-analytics embed: the page already names the user, so no name here
+  'dashboards.userMaterialsSold': 'Materials Sold',
+  'dashboards.userMaterialsSoldDesc': 'Quantities sold via orders this user created.',
   'dashboards.myNewCustomers': 'My New Customers',
   'dashboards.myNewCustomersDesc': 'Customers you created per period.',
   'dashboards.myTripStops': 'My Trip Stops',
@@ -139,6 +142,8 @@ export const ar: Record<string, string> = {
   'dashboards.myRevenueDesc': 'الإيرادات من الطلبات التي أنشأتها.',
   'dashboards.myMaterialsSold': 'موادي المباعة',
   'dashboards.myMaterialsSoldDesc': 'الكميات المباعة عبر الطلبات التي أنشأتها.',
+  'dashboards.userMaterialsSold': 'المواد المباعة',
+  'dashboards.userMaterialsSoldDesc': 'الكميات المباعة عبر الطلبات التي أنشأها هذا المستخدم.',
   'dashboards.myNewCustomers': 'عملائي الجدد',
   'dashboards.myNewCustomersDesc': 'العملاء الذين أنشأتهم لكل فترة.',
   'dashboards.myTripStops': 'محطات رحلاتي',

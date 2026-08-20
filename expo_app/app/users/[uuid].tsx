@@ -112,6 +112,18 @@ export default function UserDetailScreen() {
 
   const actions: DetailAction<User>[] = [
     {
+      label: t('users.viewAnalytics'),
+      testID: 'users-analytics',
+      onPress: (u) =>
+        router.push({
+          // cast: expo-router's generated route types lag a freshly added
+          // screen until Metro regenerates them — same precedent as the
+          // home menu's section navigation
+          pathname: '/users/analytics',
+          params: { uuid: u.uuid, username: u.username },
+        } as never),
+    },
+    {
       label: t('users.editTracking'),
       testID: 'users-tracking',
       onPress: (u) =>

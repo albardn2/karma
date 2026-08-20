@@ -52,7 +52,19 @@ const short = (s: string, n = 12) => (s.length > n ? `${s.slice(0, n - 1)}…` :
  * by (material, unit) and never sums across materials, so the bars are honest even
  * though the y-axis mixes units.
  */
-export default function MaterialsSoldDashboard({ mine = false, embedded = false }: { mine?: boolean; embedded?: boolean }) {
+export default function MaterialsSoldDashboard({
+  mine = false,
+  embedded = false,
+  userUuid,
+}: {
+  mine?: boolean;
+  embedded?: boolean;
+  /** Renders ONE user's materials — items of orders that user created — via the
+   *  admin-gated per-user endpoint. Used embedded on the user-analytics page,
+   *  where the surrounding page already names the user, so the heading switches
+   *  to a section-sized title without a person's name in it. */
+  userUuid?: string;
+}) {
   const { t } = useLanguage();
   const [gran, setGranRaw] = useState<Gran>("month");
   const [offset, setOffset] = useState(0);
@@ -64,12 +76,18 @@ export default function MaterialsSoldDashboard({ mine = false, embedded = false 
     setOffset(0);
   };
 
-  // the personal variant hits the self-scoped endpoint: items of the caller's
-  // own orders only
-  const endpoint = mine ? "/dashboard/my-materials-sold" : "/dashboard/materials-sold";
+  // three variants of the same payload: business-wide, the caller's own orders,
+  // or one chosen user's orders (management view)
+  const endpoint = userUuid
+    ? "/dashboard/user-materials-sold"
+    : mine
+      ? "/dashboard/my-materials-sold"
+      : "/dashboard/materials-sold";
+  const qs =
+    `granularity=${gran}&offset=${offset}` + (userUuid ? `&user_uuid=${userUuid}` : "");
   const { data, isLoading, error } = useQuery<Payload>({
-    queryKey: [endpoint, gran, offset],
-    queryFn: () => apiRequest(`${endpoint}?granularity=${gran}&offset=${offset}`),
+    queryKey: [endpoint, userUuid ?? "", gran, offset],
+    queryFn: () => apiRequest(`${endpoint}?${qs}`),
     retry: false,
   });
 
@@ -98,11 +116,23 @@ export default function MaterialsSoldDashboard({ mine = false, embedded = false 
     <DashboardShell embedded={embedded}>
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {t(mine ? "dashboards.myMaterialsSold" : "dashboards.materialsSold")}
+            <h2 className={userUuid ? "text-lg font-semibold text-gray-900" : "text-2xl font-bold text-gray-900"}>
+              {t(
+                userUuid
+                  ? "dashboards.userMaterialsSold"
+                  : mine
+                    ? "dashboards.myMaterialsSold"
+                    : "dashboards.materialsSold",
+              )}
             </h2>
             <p className="text-sm text-gray-600">
-              {t(mine ? "dashboards.myMaterialsSoldDesc" : "dashboards.materialsSoldDesc")}
+              {t(
+                userUuid
+                  ? "dashboards.userMaterialsSoldDesc"
+                  : mine
+                    ? "dashboards.myMaterialsSoldDesc"
+                    : "dashboards.materialsSoldDesc",
+              )}
             </p>
           </div>
           {!forbidden && (

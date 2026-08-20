@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import MaterialsSoldDashboard from "@/pages/MaterialsSoldDashboard";
 import {
   ResponsiveContainer,
   BarChart,
@@ -529,6 +530,13 @@ export function UserAnalytics({ userUuid }: { userUuid: string }) {
           )}
         </CardContent>
       </Card>
+
+      {/* materials this user sold — the same chart + summary table as the
+          dashboards, scoped to orders THIS user created. The component brings
+          its own period navigator and cards; embedded skips the page shell. */}
+      <div data-testid="user-materials-sold">
+        <MaterialsSoldDashboard userUuid={userUuid} embedded />
+      </div>
     </div>
   );
 }
