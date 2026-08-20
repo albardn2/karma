@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from app.domains.task_execution.workflow_operators.operator_interface import OperatorInterface
+from app.domains.task_execution.workflow_operators.trip_setup import FORM_STRATEGIES, MANUAL
 from app.dto.task_execution import TaskExecutionComplete
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.dto.workflow_execution import (
     WorkflowStatus
@@ -12,53 +13,79 @@ from app.dto.workflow_execution import (
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 
 
+# The trip is scheduled for a day the dispatcher picks from a rolling window:
+# today through a week out. Dates are Damascus-local (UTC+3) like the trip-name
+# default — the servers run UTC and the business does not, so a trip planned
+# after 21:00 must not be told "today" is already yesterday.
+ASSIGNED_DATE_WINDOW_DAYS = 7
+ASSIGNED_DATE_FORMAT = "%d-%m-%Y"
+
+
+def _damascus_today():
+    return (datetime.utcnow() + timedelta(hours=3)).date()
+
+
+def assigned_date_options() -> list[str]:
+    """The pickable dates, oldest first — generated fresh on every form read
+    (dto/task.py enriches the field with these), never stored, because a baked
+    list of dates is stale by tomorrow."""
+    today = _damascus_today()
+    return [
+        (today + timedelta(days=i)).strftime(ASSIGNED_DATE_FORMAT)
+        for i in range(ASSIGNED_DATE_WINDOW_DAYS + 1)
+    ]
 
 
 class StartTripOperatorSchema(BaseModel):
+    """The 2026-08 setup form: six fields.
+
+    The routing inputs the old form carried (warehouses, categories, visit
+    threshold, min/max stops) left with the routing revamp; `strategy` names
+    the algorithm instead, and only `manual` exists until the new algorithms
+    land. Old executions' stored results are read via trip_setup.resolve_strategy,
+    not this schema — this validates NEW submissions only.
+    """
     model_config = ConfigDict(extra="forbid")
 
-    # optional label for the run, typed on the start-trip form. Blank is normal:
-    # CreateTripOperator fills it with the start date.
-    trip_name: Optional[str] = None
-
-    # manual mode: the driver adds stops ad hoc during the trip; only the
-    # vehicle and assigned user are needed (routing inputs are skipped)
-    manual_stops: Optional[bool] = False
     service_areas: Optional[list[str]] = None
-    start_warehouse_name: Optional[str] = None
-    end_warehouse_name: Optional[str] = None
+    assigned_user_uuid: str
+    # dd-mm-yyyy, from the rolling window above; the single-pick checklist may
+    # deliver it as a one-element list
+    assigned_date: str
+    desired_stops: Optional[int] = Field(None, ge=1, le=200)
+    strategy: str = MANUAL
     vehicle_plate: str
-    last_visit_threshold_days: Optional[int] = None
-    start_point: Optional[str] = None
-    end_point: Optional[str] = None
-    assigned_user_uuid: Optional[str] = None
-    customer_categories: Optional[list[str]] = None
-    max_stops: Optional[int] = None
-    min_stops: Optional[int] = None
 
-    @field_validator("manual_stops", mode="before")
-    def coerce_manual_stops(cls, v):
-        # the form may send a checklist (list of picked options) or a string
+    @field_validator("assigned_date", "strategy", mode="before")
+    def unwrap_single_pick(cls, v):
+        # single-pick checklists submit a one-element list
         if isinstance(v, list):
-            return len(v) > 0
-        if isinstance(v, str):
-            return v.strip().lower() in ("yes", "true", "1", "enabled")
-        return bool(v)
+            if len(v) != 1:
+                raise BadRequestError("exactly one option must be picked")
+            v = v[0]
+        return v
 
-    @model_validator(mode="after")
-    def check_required_by_mode(self):
-        if self.manual_stops:
-            if not self.assigned_user_uuid:
-                raise BadRequestError("assigned_user_uuid is required when manual_stops is enabled")
-        else:
-            missing = [
-                name for name in
-                ("service_areas", "start_warehouse_name", "end_warehouse_name", "last_visit_threshold_days")
-                if not getattr(self, name)
-            ]
-            if missing:
-                raise BadRequestError(f"Missing required fields for routed trip: {', '.join(missing)}")
-        return self
+    @field_validator("strategy")
+    def strategy_must_exist(cls, v):
+        value = str(v).strip().lower()
+        if value not in FORM_STRATEGIES:
+            raise BadRequestError(
+                f"Unknown routing strategy '{v}'. Available: {', '.join(FORM_STRATEGIES)}"
+            )
+        return value
+
+    @field_validator("assigned_date")
+    def date_in_window(cls, v):
+        try:
+            picked = datetime.strptime(str(v).strip(), ASSIGNED_DATE_FORMAT).date()
+        except ValueError:
+            raise BadRequestError("assigned_date must be dd-mm-yyyy")
+        today = _damascus_today()
+        if not (today <= picked <= today + timedelta(days=ASSIGNED_DATE_WINDOW_DAYS)):
+            raise BadRequestError(
+                f"assigned_date must be between today and {ASSIGNED_DATE_WINDOW_DAYS} days out"
+            )
+        return picked.strftime(ASSIGNED_DATE_FORMAT)
 
 
 class StartTripOperator(OperatorInterface):

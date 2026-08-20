@@ -314,9 +314,15 @@ class CreateTripOperator(OperatorInterface):
 
 
     def is_manual_stops(self) -> bool:
+        # strategy-aware, with the legacy manual_stops fallback for executions
+        # started under the old form — see trip_setup.resolve_strategy
+        from app.domains.task_execution.workflow_operators.trip_setup import (
+            MANUAL, resolve_strategy,
+        )
+
         for task_exe in self.all_tasks_executions:
             if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
-                return bool(task_exe.result.get("manual_stops"))
+                return resolve_strategy(task_exe.result) == MANUAL
         return False
 
     def get_service_areas(self) -> list:

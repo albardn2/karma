@@ -951,7 +951,10 @@ export default function WorkflowExecutionTaskDetail() {
                               onCheckedChange={(checked) => {
                                 const current = Array.isArray(formField.value) ? (formField.value as string[]) : [];
                                 if (checked) {
-                                  formField.onChange([...current, option]);
+                                  // a single-pick checklist (multiple=false, e.g. the
+                                  // trip's assigned_date) replaces the selection —
+                                  // appending would submit two dates and be refused
+                                  formField.onChange(field.multiple === false ? [option] : [...current, option]);
                                 } else {
                                   formField.onChange(current.filter((v: string) => v !== option));
                                 }

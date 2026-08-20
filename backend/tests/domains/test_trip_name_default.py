@@ -1,9 +1,11 @@
 """A trip always ends up with a name, even when nobody types one.
 
-The name is typed on the start-trip form and read back out of that task's stored
-result by CreateTripOperator. Defaulting happens on the SERVER rather than in
-either client, so the two agree and so a trip created by an API caller that never
-rendered the form still gets a label.
+The 2026-08 setup form no longer offers a trip-name field, so every new trip
+takes the date default; executions started under the old form may still carry a
+typed `trip_name` in their stored result, which CreateTripOperator reads back.
+Defaulting happens on the SERVER rather than in either client, so the two agree
+and so a trip created by an API caller that never rendered the form still gets
+a label.
 
 The date is deliberately Damascus local (UTC+3), not UTC: the servers run UTC and
 the business does not, so a trip started at 22:00 Damascus would otherwise be
@@ -110,31 +112,34 @@ def test_no_start_trip_task_at_all_still_yields_a_name():
 # against name "trip_name", and the tests above could not see it because they call
 # get_trip_name() directly. These two assert the contract from both clients' side.
 
-def test_the_form_descriptors_label_matches_its_name():
+def test_every_form_descriptors_label_matches_its_name():
     """Whatever the migration writes must be usable as a schema key."""
-    from migrations.versions.c3e81f5a29b7_trip_name import TRIP_NAME_FIELD
+    from migrations.versions.e7b3f9c25a84_setup_form_revamp import NEW_FIELDS
 
-    assert TRIP_NAME_FIELD["label"] == TRIP_NAME_FIELD["name"], (
-        "the web posts results keyed by label; a label that is not a declared "
-        "schema field is rejected by extra='forbid'"
-    )
+    for field in NEW_FIELDS:
+        assert field["label"] == field["name"], (
+            "the web posts results keyed by label; a label that is not a "
+            "declared schema field is rejected by extra='forbid'"
+        )
 
 
-@pytest.mark.parametrize("key_source", ["name", "label"])
-def test_the_start_trip_schema_accepts_the_key_either_client_would_send(key_source):
+def test_the_start_trip_schema_accepts_every_key_the_form_declares():
     from app.domains.task_execution.workflow_operators.start_trip_operator import (
         StartTripOperatorSchema,
+        assigned_date_options,
     )
-    from migrations.versions.c3e81f5a29b7_trip_name import TRIP_NAME_FIELD
+    from migrations.versions.e7b3f9c25a84_setup_form_revamp import NEW_FIELDS
 
-    key = TRIP_NAME_FIELD[key_source]
-    # manual mode is the shortest valid submission: vehicle plate + assignee.
-    # A routed trip additionally demands service areas, both warehouses and the
-    # visit threshold (see check_required_by_mode).
-    schema = StartTripOperatorSchema(**{
-        "vehicle_plate": "ABC-123",
-        "manual_stops": ["yes"],
+    # a full submission keyed exactly as the web client keys it (by label)
+    values = {
+        "service_areas": ["Malki"],
         "assigned_user_uuid": "zaid",
-        key: "Sunday run",
-    })
-    assert schema.trip_name == "Sunday run"
+        "assigned_date": [assigned_date_options()[0]],
+        "desired_stops": 12,
+        "strategy": ["manual"],
+        "vehicle_plate": "ABC-123",
+    }
+    submission = {f["label"]: values[f["name"]] for f in NEW_FIELDS}
+    schema = StartTripOperatorSchema(**submission)
+    assert schema.strategy == "manual"
+    assert schema.vehicle_plate == "ABC-123"

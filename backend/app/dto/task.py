@@ -117,6 +117,20 @@ class TaskRead(TaskBase):
                 if f.label == "end_warehouse_name":
                     warehouses = uow.warehouse_repository.find_all(is_deleted=False)
                     f.options = [wh.name for wh in warehouses]
+                if f.label == "assigned_date":
+                    # a rolling window is stale by tomorrow, so the options are
+                    # generated on every read rather than stored on the task
+                    from app.domains.task_execution.workflow_operators.start_trip_operator import (
+                        assigned_date_options,
+                    )
+                    f.options = assigned_date_options()
+                if f.label == "strategy":
+                    # served from the registry so the form and the validator
+                    # cannot drift as the routing revamp adds algorithms
+                    from app.domains.task_execution.workflow_operators.trip_setup import (
+                        FORM_STRATEGIES,
+                    )
+                    f.options = list(FORM_STRATEGIES)
         return obj
 
 # DTO for pagination and filtering when listing Tasks

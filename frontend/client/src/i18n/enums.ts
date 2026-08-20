@@ -43,6 +43,11 @@ const ENUM_AR: Record<string, string> = {
   min_stops: 'الحد الأدنى للمحطات',
   outcome: 'النتيجة',
   notes: 'ملاحظات',
+  // 2026-08 setup form revamp
+  assigned_date: 'تاريخ الرحلة',
+  desired_stops: 'عدد المحطات المطلوب',
+  strategy: 'الاستراتيجية',
+  manual: 'يدوي',
 };
 
 const ARABIC_CHARS = /[؀-ۿ]/;
