@@ -1951,8 +1951,11 @@ class Task(Base):
     __tablename__ = "task"
 
     uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    # platform-global definition — deliberately NOT tenant-scoped: every
-    # account shares the same workflow/task definitions (superuser-managed)
+    # Definition rows (workflow_uuid set) are platform-global and deliberately
+    # NOT tenant-scoped. Dynamic rows (workflow_uuid NULL, minted per trip
+    # stop) carry customer PII and ARE tenant data: TaskRepository derives
+    # their tenancy through task_execution.account_uuid — do not query this
+    # table around the repository in request scope.
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     workflow_uuid = Column(String(36), ForeignKey("workflow.uuid"), nullable=True)
     parent_task_uuid = Column(String(36), ForeignKey("task.uuid"), nullable=True)  # Self-referencing foreign key
