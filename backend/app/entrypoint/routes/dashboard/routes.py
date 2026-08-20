@@ -1342,8 +1342,31 @@ def user_materials_sold():
     foreign uuid would quietly return an all-zero period (the item query is
     account-scoped), which reads as "this user sold nothing" — a lie of the
     quiet kind, and inconsistent with the 404 the page's other endpoints raise.
+
+    The role check is REPEATED in the handler because the decorator alone
+    cannot hold it: scopes_required admits any fine-grained user whenever the
+    required scopes are not strictly admin-only, leaving the blueprint ACL —
+    dashboard:read, which the accountant preset grants — as the real gate. The
+    trip-stop per-user endpoints dodge that only because accountants happen to
+    lack any trip_stop grant; this one lives under /dashboard, so without the
+    in-handler check an accountant could read any colleague's per-user sales.
+    Same pattern, same reason as trip audit's _require_auditor.
     """
-    from app.entrypoint.routes.common.errors import BadRequestError, NotFoundError
+    from flask import g
+
+    from app.entrypoint.routes.common.errors import ApiError, BadRequestError, NotFoundError
+
+    if not getattr(g, "is_admin", False):
+        scopes = set(getattr(g, "user_scopes", set()) or set())
+        allowed = {
+            PermissionScope.ADMIN.value,
+            PermissionScope.SUPER_ADMIN.value,
+            PermissionScope.OPERATION_MANAGER.value,
+        }
+        if not (scopes & allowed):
+            raise ApiError(
+                "Per-user analytics are for supervisory roles", status_code=403
+            )
 
     user_uuid = request.args.get("user_uuid")
     if not user_uuid:

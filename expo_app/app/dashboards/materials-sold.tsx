@@ -53,7 +53,18 @@ const short = (s: string, n = 7) => (s.length > n ? `${s.slice(0, n - 1)}…` : 
  * the server groups by (material, unit) and never sums across materials. Bar labels
  * are truncated for phone width — the table below carries the full names.
  */
-export function MaterialsSoldScreenImpl({ mine = false, embedded = false }: { mine?: boolean; embedded?: boolean }) {
+export function MaterialsSoldScreenImpl({
+  mine = false,
+  embedded = false,
+  userUuid,
+}: {
+  mine?: boolean;
+  embedded?: boolean;
+  /** One chosen user's materials — items of orders that user created — via the
+   *  admin-gated per-user endpoint. Embedded on the user-analytics screen,
+   *  which already names the user, so the section title carries no name. */
+  userUuid?: string;
+}) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -73,22 +84,27 @@ export function MaterialsSoldScreenImpl({ mine = false, embedded = false }: { mi
     setOffset(0);
   };
 
-  // the personal variant hits the self-scoped endpoint: items of the caller's
-  // own orders only
-  const endpoint = mine ? '/dashboard/my-materials-sold' : '/dashboard/materials-sold';
+  // three variants of the same payload: business-wide, the caller's own orders,
+  // or one chosen user's orders (management view)
+  const endpoint = userUuid
+    ? '/dashboard/user-materials-sold'
+    : mine
+      ? '/dashboard/my-materials-sold'
+      : '/dashboard/materials-sold';
   const load = useCallback(
     async (isRefresh = false) => {
       if (!isRefresh) setLoading(true);
       setFailed(false);
       const res = await apiCall<Payload>(
-        `${endpoint}?granularity=${gran}&offset=${offset}`,
+        `${endpoint}?granularity=${gran}&offset=${offset}` +
+          (userUuid ? `&user_uuid=${userUuid}` : ''),
       );
       if (isOk(res.status) && res.data) setData(res.data);
       else setFailed(true);
       setLoading(false);
       setRefreshing(false);
     },
-    [gran, offset, endpoint],
+    [gran, offset, endpoint, userUuid],
   );
 
   useEffect(() => {
@@ -216,7 +232,15 @@ export function MaterialsSoldScreenImpl({ mine = false, embedded = false }: { mi
   if (embedded) {
     return (
       <View style={styles.embeddedSection}>
-        <ThemedText style={styles.embeddedTitle}>{t(mine ? 'dashboards.myMaterialsSold' : 'dashboards.materialsSold')}</ThemedText>
+        <ThemedText style={styles.embeddedTitle}>
+          {t(
+            userUuid
+              ? 'dashboards.userMaterialsSold'
+              : mine
+                ? 'dashboards.myMaterialsSold'
+                : 'dashboards.materialsSold',
+          )}
+        </ThemedText>
         {inner}
       </View>
     );
