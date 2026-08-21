@@ -1,8 +1,10 @@
 """A trip always ends up with a name, even when nobody types one.
 
-The 2026-08 setup form no longer offers a trip-name field, so every new trip
-takes the date default; executions started under the old form may still carry a
-typed `trip_name` in their stored result, which CreateTripOperator reads back.
+The 2026-08 setup form no longer offers a trip-name field: StartTripOperator
+stamps a derived '<assignee>-<dd-mm-yyyy>' into the setup result at completion
+(trip_name_for), and CreateTripOperator reads it back the same way it always
+read the typed name. Executions started under the old form still carry whatever
+the dispatcher typed; the date default remains for results with neither.
 Defaulting happens on the SERVER rather than in either client, so the two agree
 and so a trip created by an API caller that never rendered the form still gets
 a label.
@@ -73,6 +75,18 @@ def test_the_default_is_damascus_local_not_utc():
     assert got == (datetime.utcnow() + timedelta(hours=3)).strftime("%Y-%m-%d")
     # and it is genuinely offset from UTC, so the +3 is not decorative
     assert (datetime.utcnow() + timedelta(hours=3)) > datetime.utcnow()
+
+
+def test_the_stamped_derived_name_is_read_back():
+    """StartTripOperator stamps '<assignee>-<dd-mm-yyyy>' at setup completion;
+    the create step must carry it onto the trip verbatim."""
+    from app.domains.task_execution.workflow_operators.start_trip_operator import (
+        trip_name_for,
+    )
+
+    stamped = trip_name_for("drv_test", "21-08-2026")
+    assert stamped == "drv_test-21-08-2026"
+    assert name_from({"trip_name": stamped}) == stamped
 
 
 def test_a_typed_name_wins():

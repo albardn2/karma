@@ -334,8 +334,10 @@ class CreateTripOperator(OperatorInterface):
             if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("service_areas")
     def get_trip_name(self) -> str:
-        """The name typed on the start-trip form, or the start date if it was left
-        blank — which is the normal case.
+        """The trip_name stored in the setup result — since the 2026-08 revamp
+        that is the derived '<assignee>-<dd-mm-yyyy>' stamped by
+        StartTripOperator (trip_name_for), on older executions whatever the
+        dispatcher typed — or the start date when neither is there.
 
         Defaulted here rather than on either client so both agree, and so a trip
         created by an API caller that never saw the form still gets a label. The

@@ -25,6 +25,13 @@ def _damascus_today():
     return (datetime.utcnow() + timedelta(hours=3)).date()
 
 
+def trip_name_for(username: str, assigned_date: str) -> str:
+    """The trip's name: nobody types it since the 2026-08 revamp — it is
+    stamped into the setup result at completion as '<assignee>-<dd-mm-yyyy>',
+    where CreateTripOperator.get_trip_name picks it up."""
+    return f"{username}-{assigned_date}"
+
+
 def assigned_date_options() -> list[str]:
     """The pickable dates, oldest first — generated fresh on every form read
     (dto/task.py enriches the field with these), never stored, because a baked
@@ -133,46 +140,49 @@ class StartTripOperator(OperatorInterface):
         # A user may be assigned to at most one in-progress trip at a time. Block
         # starting this trip if the assignee already has another in-progress trip
         # assigned to them (their start_trip result.assigned_user_uuid matches).
-        if operator_schema.assigned_user_uuid:
-            from models.common import (
-                WorkflowExecution as WFEModel,
-                TaskExecution as TEModel,
-                Task as TaskModel,
+        from models.common import (
+            WorkflowExecution as WFEModel,
+            TaskExecution as TEModel,
+            Task as TaskModel,
+        )
+        # the assignee is chosen by username (or uuid); resolve to a real
+        # user so we key the check off a UNIQUE identity — never fall back to
+        # matching a non-unique raw string (e.g. a first name).
+        assignee = (
+            uow.user_repository.find_one(uuid=operator_schema.assigned_user_uuid, is_deleted=False)
+            or uow.user_repository.find_one(username=operator_schema.assigned_user_uuid, is_deleted=False)
+        )
+        if not assignee:
+            raise BadRequestError(
+                f"Assigned user '{operator_schema.assigned_user_uuid}' was not found"
             )
-            # the assignee is chosen by username (or uuid); resolve to a real
-            # user so we key the check off a UNIQUE identity — never fall back to
-            # matching a non-unique raw string (e.g. a first name).
-            assignee = (
-                uow.user_repository.find_one(uuid=operator_schema.assigned_user_uuid, is_deleted=False)
-                or uow.user_repository.find_one(username=operator_schema.assigned_user_uuid, is_deleted=False)
+        # assignment is stored as either the username or the uuid — match both
+        values = [assignee.uuid, assignee.username]
+        existing = (
+            uow.session.query(WFEModel.uuid)
+            .join(TEModel, TEModel.workflow_execution_uuid == WFEModel.uuid)
+            .join(TaskModel, TaskModel.uuid == TEModel.task_uuid)
+            .filter(
+                WFEModel.status == WorkflowStatus.IN_PROGRESS.value,
+                WFEModel.account_uuid == uow.account_uuid,
+                WFEModel.is_deleted.is_(False),
+                WFEModel.uuid != task_exe.workflow_execution_uuid,
+                TaskModel.operator == "start_trip_operator",
+                TEModel.result["assigned_user_uuid"].astext.in_(values),
             )
-            if not assignee:
-                raise BadRequestError(
-                    f"Assigned user '{operator_schema.assigned_user_uuid}' was not found"
-                )
-            # assignment is stored as either the username or the uuid — match both
-            values = [assignee.uuid, assignee.username]
-            existing = (
-                uow.session.query(WFEModel.uuid)
-                .join(TEModel, TEModel.workflow_execution_uuid == WFEModel.uuid)
-                .join(TaskModel, TaskModel.uuid == TEModel.task_uuid)
-                .filter(
-                    WFEModel.status == WorkflowStatus.IN_PROGRESS.value,
-                    WFEModel.account_uuid == uow.account_uuid,
-                    WFEModel.is_deleted.is_(False),
-                    WFEModel.uuid != task_exe.workflow_execution_uuid,
-                    TaskModel.operator == "start_trip_operator",
-                    TEModel.result["assigned_user_uuid"].astext.in_(values),
-                )
-                .first()
+            .first()
+        )
+        if existing:
+            raise BadRequestError(
+                "This user already has a trip in progress; finish or cancel it "
+                "before assigning another."
             )
-            if existing:
-                raise BadRequestError(
-                    "This user already has a trip in progress; finish or cancel it "
-                    "before assigning another."
-                )
 
-        task_exe.result = operator_schema.model_dump(mode="json")
+        result = operator_schema.model_dump(mode="json")
+        # derived, not typed — always the resolved USERNAME, even when the
+        # form submitted the uuid
+        result["trip_name"] = trip_name_for(assignee.username, operator_schema.assigned_date)
+        task_exe.result = result
         task_exe.status = WorkflowStatus.COMPLETED.value
         task_exe.end_time = datetime.now()
         task_exe.completed_by_uuid = payload.completed_by_uuid
