@@ -120,7 +120,11 @@ def normalize_tags(v):
         tag = _PREDEFINED_ALIASES.get(tag, tag)
         if len(tag) > MAX_TAG_LENGTH:
             raise ValueError(f"tag longer than {MAX_TAG_LENGTH} characters: {tag[:20]}…")
-        if "," in tag:
+        if "," in tag or "،" in tag:
+            # ASCII comma: the list-filter query param is CSV. Arabic comma:
+            # the routing-strategy IS_IN filter splits typed values on it (the
+            # AR keyboard's natural comma) — a tag containing one could never
+            # be targeted by that filter
             raise ValueError(f"tag may not contain a comma: {tag}")
         if tag.count(":") > 1:
             raise ValueError(f"tag may have at most one ':' (key or key:value): {tag}")

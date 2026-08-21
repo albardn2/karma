@@ -42,8 +42,12 @@ class CustomerRepository(AbstractRepository[Customer]):
             .join(Invoice, Invoice.customer_order_uuid == CustomerOrder.uuid)
             .filter(
                 CustomerOrder.customer_uuid.in_(customer_uuids),
-                CustomerOrder.is_deleted == False,  # noqa: E712
-                Invoice.is_deleted == False,  # noqa: E712
+                # isnot(True), not == False: is_deleted was added nullable with
+                # no backfill on these tables, and the Python walk treats NULL
+                # as live (`if not x.is_deleted`) — `= false` would silently
+                # drop legacy NULL rows the customer page counts as debt
+                CustomerOrder.is_deleted.isnot(True),
+                Invoice.is_deleted.isnot(True),
                 Invoice.currency == currency,
             )
             .group_by(CustomerOrder.customer_uuid)
@@ -56,7 +60,7 @@ class CustomerRepository(AbstractRepository[Customer]):
             )
             .filter(
                 DebitNoteItem.customer_uuid.in_(customer_uuids),
-                DebitNoteItem.is_deleted == False,  # noqa: E712
+                DebitNoteItem.is_deleted.isnot(True),
                 DebitNoteItem.currency == currency,
             )
             .group_by(DebitNoteItem.customer_uuid)
@@ -69,7 +73,7 @@ class CustomerRepository(AbstractRepository[Customer]):
             )
             .filter(
                 CreditNoteItem.customer_uuid.in_(customer_uuids),
-                CreditNoteItem.is_deleted == False,  # noqa: E712
+                CreditNoteItem.is_deleted.isnot(True),
                 CreditNoteItem.currency == currency,
             )
             .group_by(CreditNoteItem.customer_uuid)

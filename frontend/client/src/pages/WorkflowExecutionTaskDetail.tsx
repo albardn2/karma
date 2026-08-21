@@ -70,15 +70,21 @@ export default function WorkflowExecutionTaskDetail() {
   const executionUuid = params?.execution_uuid || "";
   const { toast } = useToast();
   const { user, isAdmin } = useAuth();
-  // creating a routing strategy is admin/operation-manager work (backend
-  // _WRITE_SCOPES + role presets); read-only roles get the dropdown without
-  // the builder entry instead of a 403 after filling the whole modal
+  // Show the builder entry only to users who can actually POST it. The
+  // enforced backend gate for non-admins is the fine-grained endpoint ACL
+  // (routing_strategy:create), which /auth/me exposes as
+  // effective_permissions.endpoints (same source the Sidebar reads) — a role
+  // check would hide the entry from an explicitly-granted user and show it to
+  // an explicitly-revoked operation manager. Admins bypass the user ACL but
+  // the tenant feature cap (account_permissions) binds them too.
+  const grantsStrategyCreate = (perms: any) =>
+    Array.isArray(perms?.endpoints?.routing_strategy) &&
+    perms.endpoints.routing_strategy.includes('create');
+  const userPerms = (user as any)?.effective_permissions ?? null;
+  const accountPerms = (user as any)?.account_permissions ?? null;
   const canCreateStrategy =
-    isAdmin ||
-    (user?.permission_scope ?? '')
-      .split(',')
-      .map((s) => s.trim())
-      .includes('operation_manager');
+    (isAdmin || (userPerms ? grantsStrategyCreate(userPerms) : false)) &&
+    (!accountPerms || grantsStrategyCreate(accountPerms));
   const { t, te, tef } = useLanguage();
   const [selectedTaskExecutionUuid, setSelectedTaskExecutionUuid] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);

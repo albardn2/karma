@@ -111,6 +111,19 @@ def test_tag_values_converge_catalog_label_spellings():
 
 def test_is_in_splits_the_arabic_comma_too():
     """The AR keyboard produces U+060C; following the Arabic placeholder must
-    not silently produce one merged un-matchable value."""
+    not silently produce one merged un-matchable value. Splitting on it is
+    safe because normalize_tags forbids BOTH commas inside customer tags."""
     cfg = RoutingStrategyConfig(**_cfg(tag_filters=[{"op": "IS_IN", "value": "vip، agent"}]))
     assert cfg.priorities[0].tag_filters[0].value == ["vip", "agent"]
+
+
+def test_customer_tags_refuse_both_commas():
+    """The invariant the IS_IN split relies on lives in normalize_tags."""
+    import pytest as _pytest
+
+    from app.dto.customer import normalize_tags
+
+    with _pytest.raises(ValueError):
+        normalize_tags(["a,b"])
+    with _pytest.raises(ValueError):
+        normalize_tags(["منطقة، خاصة"])

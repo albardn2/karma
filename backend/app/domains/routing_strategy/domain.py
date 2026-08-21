@@ -10,12 +10,14 @@ from app.entrypoint.routes.common.errors import BadRequestError, NotFoundError
 from models.common import RoutingStrategy as RoutingStrategyModel
 
 
-def _flush_or_duplicate(uow: SqlAlchemyUnitOfWork, name: str):
-    """Surface the CI-unique index violation as a 400 NOW rather than a 500 at
-    commit: the pre-check (find_by_name_ci) gives the friendly message but two
-    concurrent requests can both pass it — the index is the real guard."""
+def _save_or_duplicate(uow: SqlAlchemyUnitOfWork, strategy: RoutingStrategyModel, name: str):
+    """save() flushes internally (AbstractRepository.save has its own
+    try/flush/re-raise), so the CI-unique index violation surfaces HERE — two
+    concurrent requests can both pass the find_by_name_ci pre-check, and the
+    index is the real guard. Map that race to the same friendly 400 the
+    pre-check gives instead of the global handler's generic 409."""
     try:
-        uow.session.flush()
+        uow.routing_strategy_repository.save(model=strategy, commit=False)
     except IntegrityError as exc:
         if "uq_routing_strategy_account_lower_name" in str(exc.orig):
             raise BadRequestError(f"A routing strategy named '{name}' already exists")
@@ -35,8 +37,7 @@ class RoutingStrategyDomain:
             config=payload.config.model_dump(mode="json"),
             created_by_uuid=payload.created_by_uuid,
         )
-        uow.routing_strategy_repository.save(model=strategy, commit=False)
-        _flush_or_duplicate(uow, payload.name)
+        _save_or_duplicate(uow, strategy, payload.name)
         return RoutingStrategyRead.from_orm(strategy)
 
     @staticmethod
@@ -51,8 +52,7 @@ class RoutingStrategyDomain:
             strategy.name = payload.name
         if payload.config is not None:
             strategy.config = payload.config.model_dump(mode="json")
-        uow.routing_strategy_repository.save(model=strategy, commit=False)
-        _flush_or_duplicate(uow, strategy.name)
+        _save_or_duplicate(uow, strategy, strategy.name)
         return RoutingStrategyRead.from_orm(strategy)
 
     @staticmethod
