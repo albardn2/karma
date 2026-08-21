@@ -385,6 +385,12 @@
                 "create",
                 "read"
             ],
+            "routing_strategy": [
+                "create",
+                "read",
+                "update",
+                "delete"
+            ],
             "service_area": [
                 "read"
             ],
@@ -504,6 +510,9 @@
             ],
             "quality_control": [
                 "create",
+                "read"
+            ],
+            "routing_strategy": [
                 "read"
             ],
             "service_area": [

@@ -2117,6 +2117,26 @@ class ServiceArea(Base):
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+class RoutingStrategy(Base):
+    """A saved priority-routing recipe for trip setup (2026-08 revamp).
+
+    `config` holds the ordered priorities, each with its filters (tags,
+    category, debt, last-effective-stop age) and an optional per-priority
+    stop cap — shape validated by app/dto/routing_strategy.RoutingStrategyConfig.
+    The strategy is offered by NAME in the setup form's dropdown next to the
+    built-in 'manual', and looked up case-insensitively when the route step
+    runs. Tenant-scoped: each account curates its own strategies.
+    """
+    __tablename__ = "routing_strategy"
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    name = Column(String(64), nullable=False)
+    config = Column(JSONB, nullable=False)
+    is_deleted = Column(Boolean, nullable=False, default=False, server_default=false())
+
+
 class Trip(Base):
     __tablename__ = "trip"
     uuid        = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))

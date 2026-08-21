@@ -44,10 +44,61 @@ class TripRouteOperator(OperatorInterface):
         self.task_exe = task_exe
         self.all_tasks_executions = task_exe.workflow_execution.task_executions
 
-        # manual-stops mode: the driver adds stops ad hoc, no routing to compute
-        if self.is_manual_stops():
+        from app.domains.task_execution.workflow_operators.trip_setup import (
+            LEGACY_CLUSTER,
+            MANUAL,
+            resolve_strategy,
+        )
+
+        strategy = resolve_strategy(self.get_start_trip_result())
+
+        # manual mode: the driver adds stops ad hoc, no routing to compute
+        if strategy == MANUAL:
             operator_schema.customer_uuids = []
             operator_schema.waypoints = []
+            operator_schema.route_coordinates = []
+            task_exe.result = operator_schema.model_dump(mode="json")
+            task_exe.status = WorkflowStatus.COMPLETED.value
+            task_exe.end_time = datetime.now()
+            task_exe.completed_by_uuid = payload.completed_by_uuid
+            uow.task_execution_repository.save(task_exe, commit=False)
+            return
+
+        # saved priority strategy (anything that isn't a built-in)
+        if strategy != LEGACY_CLUSTER:
+            from app.domains.trip.priority_router import PriorityRouter
+            from app.dto.routing_strategy import RoutingStrategyConfig
+
+            strategy_row = uow.routing_strategy_repository.find_by_name_ci(strategy)
+            if not strategy_row:
+                raise BadRequestError(
+                    f"Routing strategy '{strategy}' no longer exists. "
+                    "Re-run the setup step with an available strategy."
+                )
+            # the row is data — validate the stored shape loudly rather than
+            # routing garbage from a hand-edited or stale config
+            config = RoutingStrategyConfig(**(strategy_row.config or {}))
+
+            polygon = None
+            service_area_names = self.get_service_areas()
+            if service_area_names:
+                service_areas = uow.service_area_repository._find_all_by_filters(
+                    filters=[ServiceAreaModel.name.in_(service_area_names)]
+                )
+                polys = [p for sa in service_areas for p in _parts(to_shape(sa.geometry))]
+                if not polys:
+                    raise BadRequestError(
+                        f"None of the service areas {service_area_names} were found"
+                    )
+                polygon = MultiPolygon(polys)
+
+            ordered_customers, waypoints = PriorityRouter(uow).run(
+                config=config,
+                desired_stops=self.get_desired_stops(),
+                polygon=polygon,
+            )
+            operator_schema.customer_uuids = [c.uuid for c in ordered_customers]
+            operator_schema.waypoints = waypoints
             operator_schema.route_coordinates = []
             task_exe.result = operator_schema.model_dump(mode="json")
             task_exe.status = WorkflowStatus.COMPLETED.value
@@ -119,17 +170,15 @@ class TripRouteOperator(OperatorInterface):
         return self.__class__.__name__
 
 
-    def is_manual_stops(self) -> bool:
-        # strategy-aware, with the legacy manual_stops fallback for executions
-        # started under the old form — see trip_setup.resolve_strategy
-        from app.domains.task_execution.workflow_operators.trip_setup import (
-            MANUAL, resolve_strategy,
-        )
-
+    def get_start_trip_result(self) -> Optional[dict]:
         for task_exe in self.all_tasks_executions:
             if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
-                return resolve_strategy(task_exe.result) == MANUAL
-        return False
+                return task_exe.result
+        return None
+
+    def get_desired_stops(self) -> Optional[int]:
+        result = self.get_start_trip_result() or {}
+        return result.get("desired_stops")
 
     def get_service_areas(self) -> str:
         """

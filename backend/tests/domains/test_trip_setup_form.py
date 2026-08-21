@@ -169,11 +169,62 @@ def test_blank_assignee_or_vehicle_is_rejected():
         StartTripOperatorSchema(**_valid(vehicle_plate="   "))
 
 
-def test_unknown_strategy_is_rejected():
-    """The dropdown only offers registered strategies, so anything else is an
-    API caller guessing — refused, not silently run as manual."""
+def test_builtin_strategy_is_lowercased_custom_names_keep_their_casing():
+    """Built-ins match case-insensitively; anything else is a saved strategy
+    NAME, kept as typed — execute() verifies it against the DB (a pure schema
+    can't query)."""
+    assert StartTripOperatorSchema(**_valid(strategy="MANUAL")).strategy == MANUAL
+    assert StartTripOperatorSchema(**_valid(strategy="VIP First")).strategy == "VIP First"
+
+
+def _execute_setup(payload_result, strategy_row):
+    from unittest.mock import MagicMock
+
+    from app.domains.task_execution.workflow_operators.start_trip_operator import (
+        StartTripOperator,
+    )
+    from app.dto.task_execution import TaskExecutionComplete
+
+    task_exe = MagicMock()
+    task_exe.result = None
+    task_exe.workflow_execution.trips = []
+    uow = MagicMock()
+    uow.task_execution_repository.find_one.return_value = task_exe
+    uow.routing_strategy_repository.find_by_name_ci.return_value = strategy_row
+    uow.session.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = None
+    StartTripOperator().execute(
+        uow=uow,
+        payload=TaskExecutionComplete(uuid="te-1", result=payload_result, completed_by_uuid="x"),
+    )
+    return task_exe
+
+
+def test_unknown_strategy_is_rejected_at_setup():
+    """The dropdown only offers built-ins plus saved strategies, so anything
+    else is an API caller guessing — refused while the dispatcher is still at
+    the form, not when the route step blows up later."""
     with pytest.raises(BadRequestError):
-        StartTripOperatorSchema(**_valid(strategy="teleport"))
+        _execute_setup(_valid(strategy="teleport"), strategy_row=None)
+
+
+def test_saved_strategy_requires_desired_stops():
+    from unittest.mock import MagicMock
+
+    row = MagicMock()
+    row.name = "vip first"
+    payload = _valid(strategy="vip first")
+    payload.pop("desired_stops")
+    with pytest.raises(BadRequestError):
+        _execute_setup(payload, strategy_row=row)
+
+
+def test_saved_strategy_is_stored_under_its_canonical_casing():
+    from unittest.mock import MagicMock
+
+    row = MagicMock()
+    row.name = "VIP First"
+    task_exe = _execute_setup(_valid(strategy="vip first"), strategy_row=row)
+    assert task_exe.result["strategy"] == "VIP First"
 
 
 def test_blank_desired_stops_means_absent():

@@ -130,12 +130,14 @@ class TaskRead(TaskBase):
                     )
                     f.options = assigned_date_options()
                 if f.label == "strategy":
-                    # served from the registry so the form and the validator
-                    # cannot drift as the routing revamp adds algorithms
+                    # built-ins from the registry plus the tenant's saved
+                    # priority strategies, live on every read — creating a
+                    # strategy makes it pickable without touching the task row
                     from app.domains.task_execution.workflow_operators.trip_setup import (
                         FORM_STRATEGIES,
                     )
-                    f.options = list(FORM_STRATEGIES)
+                    saved = uow.routing_strategy_repository.find_all(is_deleted=False)
+                    f.options = list(FORM_STRATEGIES) + sorted(s.name for s in saved)
         return obj
 
 # DTO for pagination and filtering when listing Tasks

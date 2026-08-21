@@ -48,6 +48,7 @@ import { TripOperatorMap } from "@/components/map/TripOperatorMap";
 import { CustomerLocationMap } from "@/components/map/CustomerLocationMap";
 import { CreateOrderDialog } from "@/components/customer-orders/CreateOrderDialog";
 import { AddStopDialog } from "@/components/trips/AddStopDialog";
+import { CreateRoutingStrategyDialog } from "@/components/trips/CreateRoutingStrategyDialog";
 import { CreateTripExpenseDialog } from "@/components/expenses/CreateTripExpenseDialog";
 import { CustomerRecentOrders } from "@/components/customer-orders/CustomerRecentOrders";
 import { TripStopVisitHistory } from "@/components/trips/TripStopVisitHistory";
@@ -59,25 +60,8 @@ import type { TaskExecution, TaskExecutionPage, TaskExecutionComplete } from "@/
 import type { Task } from "@shared/schema";
 import type { TaskInputField, FieldType } from "@/types/taskInputs";
 
-// The trip name the start-trip form suggests: the date, then the assignee, then
-// the regions — "2026-07-30", "2026-07-30-zaid", "2026-07-30-zaid-malki-Mezzeh".
-//
-// Anchored to Damascus (UTC+3) rather than the device clock so the web, the app
-// and the server's own fallback all produce the same date for the same trip; a
-// laptop left on another timezone would otherwise name a trip a day out.
-export const TRIP_NAME_MAX = 120;
-
-export function deriveTripName(assignee?: string | null, regions?: string[] | null): string {
-  const damascusDate = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const parts = [damascusDate];
-  if (assignee && String(assignee).trim()) parts.push(String(assignee).trim());
-  for (const region of regions || []) {
-    if (region && String(region).trim()) parts.push(String(region).trim());
-  }
-  // the column is String(120); cut here so what is shown is what is stored
-  return parts.join('-').slice(0, TRIP_NAME_MAX);
-}
-
+// dropdown row that opens the strategy builder instead of picking a value
+const CREATE_STRATEGY_SENTINEL = "__create_strategy__";
 
 export default function WorkflowExecutionTaskDetail() {
   const [, params] = useRoute("/workflow-execution/:workflow_uuid/:execution_uuid");
@@ -90,6 +74,7 @@ export default function WorkflowExecutionTaskDetail() {
   const [selectedTaskExecutionUuid, setSelectedTaskExecutionUuid] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [strategyDialogOpen, setStrategyDialogOpen] = useState(false);
 
   // Fetch workflow execution details (includes task_executions)
   const { data: workflowExecution, isLoading: executionLoading, error: executionError } = useQuery<WorkflowExecution>({
@@ -290,32 +275,6 @@ export default function WorkflowExecutionTaskDetail() {
   }, [selectedTaskExecution?.uuid, taskInputFields.length]);
 
   // Keep the suggested trip name in step with the assignee and the regions.
-  // Only ever overwrites a value this effect itself put there (or an empty
-  // field): the moment somebody types their own name it stops interfering,
-  // which is the difference between a helpful default and a fight.
-  const hasTripNameField = taskInputFields.some((f: any) => f?.name === 'trip_name');
-  const lastSuggestedName = useRef<string | null>(null);
-  const watchedAssignee = form.watch('assigned_user_uuid' as any);
-  const watchedRegions = form.watch('service_areas' as any);
-  useEffect(() => {
-    if (!hasTripNameField) return;
-    const suggestion = deriveTripName(
-      watchedAssignee as any,
-      Array.isArray(watchedRegions) ? (watchedRegions as string[]) : []
-    );
-    const current = form.getValues('trip_name' as any);
-    const untouched = !current || current === lastSuggestedName.current;
-    if (untouched && current !== suggestion) {
-      form.setValue('trip_name' as any, suggestion as any, { shouldDirty: false });
-    }
-    if (untouched) lastSuggestedName.current = suggestion;
-    // Deliberately NOT watching the name itself. Doing so re-filled the box the
-    // instant it went empty, so anyone who cleared the suggestion to type their
-    // own was fighting it from the first keystroke. Clearing now leaves it empty;
-    // changing a selection brings a suggestion back, which is the same escape
-    // hatch without the fight.
-  }, [hasTripNameField, watchedAssignee, JSON.stringify(watchedRegions)]);
-
   // Task execution completion mutation
   const completeTaskMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -900,7 +859,11 @@ export default function WorkflowExecutionTaskDetail() {
     const key = field.name;
 
     switch (field.type) {
-      case 'select':
+      case 'select': {
+        // the setup form's strategy dropdown carries a builder entry: picking
+        // it opens the create-strategy modal instead of selecting a value
+        const isStrategyField =
+          task?.operator === 'start_trip_operator' && field.name === 'strategy';
         return (
           <FormField
             key={key}
@@ -911,7 +874,16 @@ export default function WorkflowExecutionTaskDetail() {
                 <FormLabel>
                   {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
-                <Select onValueChange={formField.onChange} value={formField.value}>
+                <Select
+                  onValueChange={(value) => {
+                    if (isStrategyField && value === CREATE_STRATEGY_SENTINEL) {
+                      setStrategyDialogOpen(true);
+                      return; // keep the current selection
+                    }
+                    formField.onChange(value);
+                  }}
+                  value={formField.value}
+                >
                   <FormControl>
                     <SelectTrigger data-testid={`select-${key}`}>
                       <SelectValue placeholder={field.placeholder || t('workflows.selectAnOption')} />
@@ -923,6 +895,11 @@ export default function WorkflowExecutionTaskDetail() {
                         {te(option)}
                       </SelectItem>
                     ))}
+                    {isStrategyField && (
+                      <SelectItem value={CREATE_STRATEGY_SENTINEL} data-testid="create-strategy-option">
+                        {t('workflows.createStrategyOption')}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -930,6 +907,7 @@ export default function WorkflowExecutionTaskDetail() {
             )}
           />
         );
+      }
 
       case 'checklist':
         return (
@@ -1339,6 +1317,19 @@ export default function WorkflowExecutionTaskDetail() {
                   <div className="flex justify-between items-center">
                     <CardTitle>{t('workflows.taskExecutionProgress')}</CardTitle>
                     <div className="flex items-center gap-3">
+                      <CreateRoutingStrategyDialog
+                        open={strategyDialogOpen}
+                        onOpenChange={setStrategyDialogOpen}
+                        onCreated={async (strategyName) => {
+                          // the dropdown's options come from the task read
+                          // (enriched server-side) — refresh, THEN select the
+                          // new strategy so its item exists
+                          await queryClient.refetchQueries({
+                            queryKey: ["/task/", selectedTaskExecution?.task_uuid],
+                          });
+                          form.setValue("strategy" as any, strategyName, { shouldValidate: true });
+                        }}
+                      />
                       {canAddStop && (
                         <AddStopDialog
                           workflowExecutionUuid={executionUuid}

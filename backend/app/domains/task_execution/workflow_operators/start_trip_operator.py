@@ -84,16 +84,18 @@ class StartTripOperatorSchema(BaseModel):
         return v
 
     @field_validator("strategy")
-    def strategy_must_exist(cls, v):
-        value = str(v).strip().lower()
+    def normalize_strategy(cls, v):
+        value = str(v).strip()
         # the web posts every field, so an untouched select arrives as "" —
         # present-but-blank means the same thing as absent: the default
         if not value:
             return MANUAL
-        if value not in FORM_STRATEGIES:
-            raise BadRequestError(
-                f"Unknown routing strategy '{v}'. Available: {', '.join(FORM_STRATEGIES)}"
-            )
+        # built-ins are matched case-insensitively; anything else is a saved
+        # RoutingStrategy name, verified against the DB in execute() (a pure
+        # schema can't query) — casing is kept so the stored result shows the
+        # name as the tenant wrote it
+        if value.lower() in FORM_STRATEGIES:
+            return value.lower()
         return value
 
     @field_validator("assigned_user_uuid", "vehicle_plate")
@@ -136,6 +138,27 @@ class StartTripOperator(OperatorInterface):
         task_exe = uow.task_execution_repository.find_one(uuid=payload.uuid)
         if not task_exe:
             raise BadRequestError(f"TaskExecution not found with uuid: {payload.uuid}")
+
+        # A saved strategy must exist NOW, not when the route step runs — the
+        # dispatcher is still looking at the form and can fix it. Built-ins
+        # skip the lookup. legacy_cluster is a bridge value for old stored
+        # results, never a valid new submission (it's not creatable either:
+        # RESERVED_STRATEGY_NAMES).
+        if operator_schema.strategy not in FORM_STRATEGIES:
+            strategy_row = uow.routing_strategy_repository.find_by_name_ci(
+                operator_schema.strategy
+            )
+            if not strategy_row:
+                raise BadRequestError(
+                    f"Unknown routing strategy '{operator_schema.strategy}'."
+                )
+            # the priority walk has no total target without it
+            if not operator_schema.desired_stops:
+                raise BadRequestError(
+                    "desired_stops is required when a routing strategy is picked"
+                )
+            # store the canonical casing the strategy was saved under
+            operator_schema.strategy = strategy_row.name
 
         # A user may be assigned to at most one in-progress trip at a time. Block
         # starting this trip if the assignee already has another in-progress trip

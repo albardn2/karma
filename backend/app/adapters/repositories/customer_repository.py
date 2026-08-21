@@ -18,6 +18,37 @@ class CustomerRepository(AbstractRepository[Customer]):
         super().__init__(*args, **kwargs)
         self._type = Customer
 
+    def fetch_priority_routing_pool(
+            self,
+            polygon: Optional[Union[Polygon, MultiPolygon]] = None,
+    ) -> List[Customer]:
+        """The candidate pool for the priority router (2026-08 strategies).
+
+        Base eligibility only — the strategy's own filters (tags, category,
+        debt, last-effective-stop age) run in Python on top of this:
+          - tenant-scoped, not deleted, HAS coordinates (clustering needs them)
+          - inside the given polygon when the setup picked service areas;
+            everywhere otherwise
+          - not already on an active trip (any planned/in_progress stop),
+            same rule as the legacy pipeline
+        Deliberately NOT applied here: the legacy completed-stop recency
+        exclusion — recency is a per-priority filter now
+        (last_effective_stop_days).
+        """
+        qry = self._session.query(Customer).filter(*self._scope_filters(None))
+        qry = qry.filter(Customer.is_deleted == False)  # noqa: E712
+        qry = qry.filter(Customer.coordinates.isnot(None))
+        if polygon is not None:
+            qry = qry.filter(
+                func.ST_Within(Customer.coordinates, from_shape(polygon, srid=4326))
+            )
+        qry = qry.filter(
+            ~Customer.trip_stops.any(
+                TripStop.status.in_(["planned", "in_progress"])
+            )
+        )
+        return qry.all()
+
     def fetch_distribution_customers_for_polygon(
             self,
             polygon: Union[Polygon, MultiPolygon],
