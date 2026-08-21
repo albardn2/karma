@@ -198,6 +198,54 @@ def test_assigned_user_and_vehicle_are_required():
             StartTripOperatorSchema(**payload)
 
 
+def test_a_recompleted_setup_renames_the_derived_trip():
+    """The engine allows re-completing a completed task, so setup can be
+    re-submitted after the trip exists (switch the driver, move the date).
+    The trip's name is derived from exactly those inputs: a trip still
+    carrying the old derived name must follow the restamp — but a name someone
+    set by hand stays theirs."""
+    from unittest.mock import MagicMock
+
+    from app.domains.task_execution.workflow_operators.start_trip_operator import (
+        StartTripOperator,
+        trip_name_for,
+    )
+    from app.dto.task_execution import TaskExecutionComplete
+
+    today = _damascus_today().strftime("%d-%m-%Y")
+    old_name = trip_name_for("drv_a", today)
+
+    derived_trip = MagicMock(is_deleted=False, name_=None)
+    derived_trip.name = old_name
+    manual_trip = MagicMock(is_deleted=False)
+    manual_trip.name = "hand-renamed"
+
+    task_exe = MagicMock()
+    task_exe.result = {"trip_name": old_name, "assigned_user_uuid": "drv_a"}
+    task_exe.workflow_execution.trips = [derived_trip, manual_trip]
+
+    assignee = MagicMock(uuid="u-b")
+    assignee.username = "drv_b"
+
+    uow = MagicMock()
+    uow.task_execution_repository.find_one.return_value = task_exe
+    uow.user_repository.find_one.return_value = assignee
+    uow.session.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = None
+
+    StartTripOperator().execute(
+        uow=uow,
+        payload=TaskExecutionComplete(
+            uuid="te-1",
+            result=_valid(assigned_user_uuid="drv_b"),
+            completed_by_uuid="someone",
+        ),
+    )
+
+    assert derived_trip.name == trip_name_for("drv_b", today)
+    assert manual_trip.name == "hand-renamed"
+    assert task_exe.result["trip_name"] == trip_name_for("drv_b", today)
+
+
 def test_old_form_fields_are_refused_loudly():
     """extra=forbid: a stale client posting the old shape gets a validation
     error naming the field, not a trip configured with silently dropped inputs."""

@@ -178,6 +178,8 @@ class StartTripOperator(OperatorInterface):
                 "before assigning another."
             )
 
+        previous_name = (task_exe.result or {}).get("trip_name")
+
         result = operator_schema.model_dump(mode="json")
         # derived, not typed — always the resolved USERNAME, even when the
         # form submitted the uuid
@@ -186,6 +188,21 @@ class StartTripOperator(OperatorInterface):
         task_exe.status = WorkflowStatus.COMPLETED.value
         task_exe.end_time = datetime.now()
         task_exe.completed_by_uuid = payload.completed_by_uuid
+
+        # The engine allows re-completing a completed task, so setup can be
+        # re-submitted AFTER the trip was created (e.g. to switch the driver or
+        # the date). The trip's name is derived from exactly those inputs, so a
+        # trip still carrying the previously derived name must follow the
+        # restamp — otherwise it permanently asserts the wrong driver. A name
+        # someone set by hand (trip PUT) is left alone.
+        if previous_name is not None:
+            old_name = str(previous_name).strip()[:120]
+            new_name = result["trip_name"][:120]
+            if old_name != new_name:
+                for trip in task_exe.workflow_execution.trips:
+                    if not trip.is_deleted and trip.name == old_name:
+                        trip.name = new_name
+                        uow.trip_repository.save(model=trip, commit=False)
 
         # Save the task execution with the result
         uow.task_execution_repository.save(task_exe, commit=False)
