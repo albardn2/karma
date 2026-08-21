@@ -36,8 +36,18 @@ def upgrade():
         op.f('ix_routing_strategy_account_uuid'), 'routing_strategy',
         ['account_uuid'], unique=False,
     )
+    # names are matched case-insensitively (find_by_name_ci), so uniqueness
+    # must be enforced the same way AND in the database — the app-level
+    # check-then-insert alone loses the race between two concurrent creates,
+    # after which the route step resolves an arbitrary duplicate. Partial:
+    # a soft-deleted strategy's name is reusable.
+    op.execute(
+        "CREATE UNIQUE INDEX uq_routing_strategy_account_lower_name "
+        "ON routing_strategy (account_uuid, lower(name)) WHERE NOT is_deleted"
+    )
 
 
 def downgrade():
+    op.execute("DROP INDEX IF EXISTS uq_routing_strategy_account_lower_name")
     op.drop_index(op.f('ix_routing_strategy_account_uuid'), table_name='routing_strategy')
     op.drop_table('routing_strategy')

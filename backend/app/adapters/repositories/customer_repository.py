@@ -18,6 +18,66 @@ class CustomerRepository(AbstractRepository[Customer]):
         super().__init__(*args, **kwargs)
         self._type = Customer
 
+    def fetch_outstanding_balances(self, customer_uuids: List[str], currency: str) -> dict:
+        """Outstanding balance per customer in ONE currency, set-based.
+
+        The exact mirror of Customer._calculate_balance_per_currency —
+        Σ net_amount_due of non-deleted invoices reached through non-deleted
+        orders, + Σ debit_note_items.amount_due − Σ credit_note_items.amount_due
+        — but as three grouped queries instead of a per-customer lazy-load walk
+        of the whole invoice graph (which the repo has already measured melting
+        down at scale: see the map-path comment in dto/customer.py). Built for
+        the priority router's debt filter, which may evaluate hundreds of
+        candidates inside one request.
+        """
+        from models.common import CreditNoteItem, CustomerOrder, DebitNoteItem, Invoice
+
+        if not customer_uuids:
+            return {}
+        balances = {uuid: 0.0 for uuid in customer_uuids}
+        invoice_rows = (
+            self._session.query(
+                CustomerOrder.customer_uuid, func.sum(Invoice.net_amount_due)
+            )
+            .join(Invoice, Invoice.customer_order_uuid == CustomerOrder.uuid)
+            .filter(
+                CustomerOrder.customer_uuid.in_(customer_uuids),
+                CustomerOrder.is_deleted == False,  # noqa: E712
+                Invoice.is_deleted == False,  # noqa: E712
+                Invoice.currency == currency,
+            )
+            .group_by(CustomerOrder.customer_uuid)
+        )
+        for customer_uuid, total in invoice_rows:
+            balances[customer_uuid] += float(total or 0)
+        debit_rows = (
+            self._session.query(
+                DebitNoteItem.customer_uuid, func.sum(DebitNoteItem.amount_due)
+            )
+            .filter(
+                DebitNoteItem.customer_uuid.in_(customer_uuids),
+                DebitNoteItem.is_deleted == False,  # noqa: E712
+                DebitNoteItem.currency == currency,
+            )
+            .group_by(DebitNoteItem.customer_uuid)
+        )
+        for customer_uuid, total in debit_rows:
+            balances[customer_uuid] += float(total or 0)
+        credit_rows = (
+            self._session.query(
+                CreditNoteItem.customer_uuid, func.sum(CreditNoteItem.amount_due)
+            )
+            .filter(
+                CreditNoteItem.customer_uuid.in_(customer_uuids),
+                CreditNoteItem.is_deleted == False,  # noqa: E712
+                CreditNoteItem.currency == currency,
+            )
+            .group_by(CreditNoteItem.customer_uuid)
+        )
+        for customer_uuid, total in credit_rows:
+            balances[customer_uuid] -= float(total or 0)
+        return balances
+
     def fetch_priority_routing_pool(
             self,
             polygon: Optional[Union[Polygon, MultiPolygon]] = None,

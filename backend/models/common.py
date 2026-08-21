@@ -1865,11 +1865,14 @@ class CreditNoteItem(Base):
 
     @amount_paid.expression
     def amount_paid(cls):
+        # filters PAYOUT rows, matching the Python branch above — this said
+        # Payment.is_deleted for a while (copy-paste from the debit twin),
+        # which cross-joined the unrelated payment table into the subquery
         return (
             select(func.coalesce(func.sum(Payout.amount), 0))
             .where(
                 Payout.credit_note_item_uuid == cls.uuid,
-                Payment.is_deleted.is_(False)
+                Payout.is_deleted.is_(False)
             )
             .scalar_subquery()
         )

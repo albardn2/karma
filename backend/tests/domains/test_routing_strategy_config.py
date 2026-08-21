@@ -86,6 +86,31 @@ def test_stored_shape_revalidates():
 def test_names_reserved_and_bounded():
     ok = RoutingStrategyCreate(name="  vip first  ", config=_cfg())
     assert ok.name == "vip first"
-    for bad in ("manual", "MANUAL", "legacy_cluster", "", "   ", "a" * 65, "a,b"):
+    for bad in ("manual", "MANUAL", "legacy_cluster", "", "   ", "a" * 65,
+                "a,b", "أ،ب", "__create_strategy__", "_hidden"):
         with pytest.raises(ValidationError):
             RoutingStrategyCreate(name=bad, config=_cfg())
+
+
+def test_tag_values_converge_catalog_label_spellings():
+    """AR-mode dispatchers retype the visible chip text; customer tags are
+    canonicalized on write (normalize_tags), so the filter values must
+    converge the same spellings or they can never match any stored tag."""
+    cfg = RoutingStrategyConfig(**_cfg(tag_filters=[
+        {"op": "EQUAL", "value": "اهتمام العميل: مهتم"},
+        {"op": "IS_IN", "value": ["customer_sale: no_sale", "القائمة السوداء"]},
+        {"op": "CONTAINS", "value": "بيع العميل: بيع متكرر"},
+        {"op": "EQUAL", "value": "my custom tag"},  # non-catalog stays as typed
+    ]))
+    filters = cfg.priorities[0].tag_filters
+    assert filters[0].value == "customer_interest:interested"
+    assert filters[1].value == ["customer_sale:no_sale", "blacklist"]
+    assert filters[2].value == "customer_sale:repeated_sale"
+    assert filters[3].value == "my custom tag"
+
+
+def test_is_in_splits_the_arabic_comma_too():
+    """The AR keyboard produces U+060C; following the Arabic placeholder must
+    not silently produce one merged un-matchable value."""
+    cfg = RoutingStrategyConfig(**_cfg(tag_filters=[{"op": "IS_IN", "value": "vip، agent"}]))
+    assert cfg.priorities[0].tag_filters[0].value == ["vip", "agent"]

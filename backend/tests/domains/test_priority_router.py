@@ -48,6 +48,14 @@ def customer(uuid, lon, lat, tags=(), category="minimarket",
 def router_for(pool):
     uow = MagicMock()
     uow.customer_repository.fetch_priority_routing_pool.return_value = pool
+
+    # mirror the repository's set-based balance aggregation off the fakes'
+    # balance dicts — the router must batch-load, never walk per customer
+    def balances(uuids, currency):
+        by_id = {c.uuid: c for c in pool}
+        return {u: float(by_id[u].balance_per_currency.get(currency, 0) or 0) for u in uuids}
+
+    uow.customer_repository.fetch_outstanding_balances.side_effect = balances
     return PriorityRouter(uow)
 
 
@@ -255,7 +263,7 @@ def test_desired_stops_is_required():
         router_for([customer("c1", 36.28, 33.51)]).run(config(StrategyPriority()), desired_stops=None)
 
 
-def test_debt_priority_walks_balances():
+def test_debt_priority_filters_on_batch_balances():
     debtor = customer("debtor", 36.28, 33.51, debt={"USD": 500.0, "SYP": 0})
     clean = customer("clean", 36.281, 33.511)
     cfg = config(StrategyPriority(
@@ -263,3 +271,24 @@ def test_debt_priority_walks_balances():
     ))
     ordered, _ = router_for([debtor, clean]).run(cfg, desired_stops=5)
     assert [c.uuid for c in ordered] == ["debtor"]
+
+
+def test_debt_balances_are_batch_loaded_for_the_narrowed_candidates_only():
+    """One aggregation call per debt priority, scoped to the candidates the
+    cheap filters already passed — never a per-customer walk of the pool."""
+    debtor = customer("debtor", 36.28, 33.51, tags=["vip"], debt={"SYP": 900.0})
+    other_vip = customer("v2", 36.281, 33.511, tags=["vip"])
+    non_vip = customer("plain", 36.30, 33.52, debt={"SYP": 900.0})
+    router = router_for([debtor, other_vip, non_vip])
+    cfg = config(StrategyPriority(
+        tag_filters=[{"op": "EQUAL", "value": "vip"}],
+        debt_filter={"op": "LARGER_THAN", "amount": 0, "currency": "SYP"},
+    ))
+    ordered, _ = router.run(cfg, desired_stops=5)
+    assert [c.uuid for c in ordered] == ["debtor"]
+    fetch = router._uow.customer_repository.fetch_outstanding_balances
+    assert fetch.call_count == 1
+    called_uuids, called_currency = fetch.call_args[0]
+    # only the tag-narrowed candidates, not the whole pool
+    assert sorted(called_uuids) == ["debtor", "v2"]
+    assert called_currency == "SYP"

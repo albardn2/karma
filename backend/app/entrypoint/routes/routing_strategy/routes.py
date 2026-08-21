@@ -17,9 +17,12 @@ from app.entrypoint.routes.common.errors import NotFoundError
 from app.entrypoint.routes.routing_strategy import routing_strategy_blueprint
 from models.common import RoutingStrategy as RoutingStrategyModel
 
-# Writes: the people who plan distribution. Reads are broader — the setup
+# Writes: the people who plan distribution. Reads add operators (the setup
 # form's dropdown is enriched server-side under the task blueprint, but the
-# builder UI lists existing strategies before creating one.
+# builder UI lists existing strategies before creating one). These scopes
+# must stay in lockstep with role_presets.json's routing_strategy grants —
+# the fine-grained ACL is the enforced gate for non-admins, so a scope listed
+# here without a preset grant is inert.
 _WRITE_SCOPES = (
     PermissionScope.ADMIN.value,
     PermissionScope.SUPER_ADMIN.value,
@@ -27,7 +30,6 @@ _WRITE_SCOPES = (
 )
 _READ_SCOPES = _WRITE_SCOPES + (
     PermissionScope.OPERATOR.value,
-    PermissionScope.SALES_MANAGER.value,
 )
 
 

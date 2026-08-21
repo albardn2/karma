@@ -69,7 +69,16 @@ export default function WorkflowExecutionTaskDetail() {
   const workflowUuid = params?.workflow_uuid || "";
   const executionUuid = params?.execution_uuid || "";
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
+  // creating a routing strategy is admin/operation-manager work (backend
+  // _WRITE_SCOPES + role presets); read-only roles get the dropdown without
+  // the builder entry instead of a 403 after filling the whole modal
+  const canCreateStrategy =
+    isAdmin ||
+    (user?.permission_scope ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .includes('operation_manager');
   const { t, te, tef } = useLanguage();
   const [selectedTaskExecutionUuid, setSelectedTaskExecutionUuid] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -864,6 +873,7 @@ export default function WorkflowExecutionTaskDetail() {
         // it opens the create-strategy modal instead of selecting a value
         const isStrategyField =
           task?.operator === 'start_trip_operator' && field.name === 'strategy';
+        const offerCreateStrategy = isStrategyField && canCreateStrategy;
         return (
           <FormField
             key={key}
@@ -876,7 +886,7 @@ export default function WorkflowExecutionTaskDetail() {
                 </FormLabel>
                 <Select
                   onValueChange={(value) => {
-                    if (isStrategyField && value === CREATE_STRATEGY_SENTINEL) {
+                    if (offerCreateStrategy && value === CREATE_STRATEGY_SENTINEL) {
                       setStrategyDialogOpen(true);
                       return; // keep the current selection
                     }
@@ -895,7 +905,7 @@ export default function WorkflowExecutionTaskDetail() {
                         {te(option)}
                       </SelectItem>
                     ))}
-                    {isStrategyField && (
+                    {offerCreateStrategy && (
                       <SelectItem value={CREATE_STRATEGY_SENTINEL} data-testid="create-strategy-option">
                         {t('workflows.createStrategyOption')}
                       </SelectItem>

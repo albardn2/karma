@@ -37,9 +37,13 @@ def resolve_strategy(result) -> str:
     if raw:
         if isinstance(raw, list):
             raw = raw[0] if raw else ""
-        value = str(raw).strip().lower()
+        value = str(raw).strip()
         if value:
-            return value
+            # built-ins fold to lowercase; a saved strategy's name keeps its
+            # stored casing — Python str.lower() disagrees with SQL lower()
+            # on some non-ASCII case pairs, so the CI lookup downstream
+            # (find_by_name_ci) must be the ONLY case-folding authority
+            return value.lower() if value.lower() in (MANUAL, LEGACY_CLUSTER) else value
     if "manual_stops" in result:
         return MANUAL if result.get("manual_stops") else LEGACY_CLUSTER
     if "start_warehouse_name" in result:

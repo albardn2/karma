@@ -60,6 +60,14 @@ def test_single_pick_list_resolves():
     assert resolve_strategy({"strategy": ["manual"]}) == MANUAL
 
 
+def test_custom_strategy_names_keep_their_stored_casing():
+    """Built-ins fold to lowercase; saved names pass through untouched —
+    Python str.lower() disagrees with SQL lower() on some non-ASCII case
+    pairs, so the CI lookup (find_by_name_ci) is the only folding authority."""
+    assert resolve_strategy({"strategy": "VIP First"}) == "VIP First"
+    assert resolve_strategy({"strategy": "MANUAL"}) == MANUAL
+
+
 def test_old_manual_result_stays_manual():
     assert resolve_strategy({"manual_stops": True, "vehicle_plate": "x"}) == MANUAL
 

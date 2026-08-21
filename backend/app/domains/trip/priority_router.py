@@ -16,10 +16,12 @@ them top to bottom until the trip's desired_stops budget is filled:
   3. each priority contributes at most min(its max_stops, remaining budget)
      stops; running out of candidates is fine — the walk just moves on.
 
-Filters are evaluated in Python, not SQL: the tenant pools are a few hundred
-customers, debt has no materialized column anywhere (the dashboards iterate
-in Python too — see Customer.balance_per_currency), and pure functions keep
-the whole filter engine unit-testable without a database.
+Tag/category/recency filters are evaluated in Python — pure functions keep
+the engine unit-testable without a database, and the tenant pools are a few
+hundred customers. Debt is the exception: it has no materialized column
+anywhere, so it is aggregated set-based per priority for the already-narrowed
+candidates (customer_repository.fetch_outstanding_balances), never by walking
+each customer's invoice graph through lazy loads.
 
 Output contract matches TripRouteOperatorSchema: ordered customers plus
 (lat, lon) waypoints. route_coordinates stays empty — the web map falls back
@@ -99,6 +101,10 @@ def last_effective_stop_passes(last_effective_stop, days: Optional[int], now: da
 
 
 def customer_matches_priority(customer, priority: StrategyPriority, now: datetime) -> bool:
+    """The cheap, in-memory filters. Debt is deliberately NOT here: it needs
+    invoice aggregation, so the router batch-loads balances for the already-
+    narrowed candidates (fetch_outstanding_balances) instead of walking each
+    customer's invoice graph through lazy loads."""
     for f in priority.tag_filters:
         if not tag_filter_matches(customer.tags, f.op, f.value):
             return False
@@ -110,15 +116,6 @@ def customer_matches_priority(customer, priority: StrategyPriority, now: datetim
         customer.last_effective_stop, priority.last_effective_stop_days, now,
     ):
         return False
-    if priority.debt_filter is not None:
-        # evaluated LAST and only when configured: balance_per_currency walks
-        # the customer's invoices in Python (there is no materialized debt
-        # column anywhere in the system)
-        f = priority.debt_filter
-        if not debt_filter_matches(
-            customer.balance_per_currency, f.op, f.amount, f.currency.value,
-        ):
-            return False
     return True
 
 
@@ -226,6 +223,20 @@ class PriorityRouter:
                 c for c in pool
                 if c.uuid not in picked_ids and customer_matches_priority(c, priority, now)
             ]
+            if candidates and priority.debt_filter is not None:
+                # one set-based aggregation for the narrowed candidates — never
+                # a per-customer lazy walk of the invoice graph
+                f = priority.debt_filter
+                balances = self._uow.customer_repository.fetch_outstanding_balances(
+                    [c.uuid for c in candidates], f.currency.value,
+                )
+                candidates = [
+                    c for c in candidates
+                    if debt_filter_matches(
+                        {f.currency.value: balances.get(c.uuid, 0.0)},
+                        f.op, f.amount, f.currency.value,
+                    )
+                ]
             if not candidates:
                 continue
             if picked:

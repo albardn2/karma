@@ -1,3 +1,5 @@
+from sqlalchemy.exc import IntegrityError
+
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.dto.routing_strategy import (
     RoutingStrategyCreate,
@@ -6,6 +8,18 @@ from app.dto.routing_strategy import (
 )
 from app.entrypoint.routes.common.errors import BadRequestError, NotFoundError
 from models.common import RoutingStrategy as RoutingStrategyModel
+
+
+def _flush_or_duplicate(uow: SqlAlchemyUnitOfWork, name: str):
+    """Surface the CI-unique index violation as a 400 NOW rather than a 500 at
+    commit: the pre-check (find_by_name_ci) gives the friendly message but two
+    concurrent requests can both pass it — the index is the real guard."""
+    try:
+        uow.session.flush()
+    except IntegrityError as exc:
+        if "uq_routing_strategy_account_lower_name" in str(exc.orig):
+            raise BadRequestError(f"A routing strategy named '{name}' already exists")
+        raise
 
 
 class RoutingStrategyDomain:
@@ -22,6 +36,7 @@ class RoutingStrategyDomain:
             created_by_uuid=payload.created_by_uuid,
         )
         uow.routing_strategy_repository.save(model=strategy, commit=False)
+        _flush_or_duplicate(uow, payload.name)
         return RoutingStrategyRead.from_orm(strategy)
 
     @staticmethod
@@ -37,6 +52,7 @@ class RoutingStrategyDomain:
         if payload.config is not None:
             strategy.config = payload.config.model_dump(mode="json")
         uow.routing_strategy_repository.save(model=strategy, commit=False)
+        _flush_or_duplicate(uow, strategy.name)
         return RoutingStrategyRead.from_orm(strategy)
 
     @staticmethod
