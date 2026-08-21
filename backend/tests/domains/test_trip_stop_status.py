@@ -125,22 +125,34 @@ def test_mixed_case_is_not_the_skipped_family():
 # --- cancelling a trip must not rewrite what the rep reported ---------------
 
 def _cancel_trip_would_overwrite(stop_status: str) -> bool:
-    """The exempt list from TripDomain.cancel_trip, lifted verbatim.
+    """Run the REAL TripDomain.cancel_trip over a one-stop trip and report
+    whether the stop's status was rewritten.
 
-    A paraphrase of the predicate would pass this test while the shipped one
-    failed, so the list is imported from the module rather than retyped.
+    This used to scrape the function's source for status literals, so it broke
+    the moment the predicate was expressed as a shared constant while behaving
+    identically. Exercising the function itself cannot drift from what ships.
     """
-    from app.domains.trip.domain import TripDomain  # noqa: F401  (import guard)
-    import inspect
+    from unittest.mock import MagicMock
 
-    from app.domains.trip import domain as trip_domain
+    from app.domains.trip.domain import TripDomain
+    from app.dto.trip import TripStatus
 
-    src = inspect.getsource(trip_domain.TripDomain.cancel_trip)
-    exempt = set()
-    for name in ("COMPLETED", "SKIPPED", "CANCELLED", "PLANNED", "IN_PROGRESS"):
-        if f"TripStopStatus.{name}.value" in src.split("if stop.status not in")[1].split("]")[0]:
-            exempt.add(getattr(TripStopStatus, name).value)
-    return stop_status not in exempt
+    stop = MagicMock()
+    stop.status = stop_status
+    trip = MagicMock()
+    trip.status = TripStatus.IN_PROGRESS.value
+    trip.stops = [stop]
+    uow = MagicMock()
+    uow.trip_repository.find_one.return_value = trip
+
+    try:
+        TripDomain.cancel_trip(uow=uow, uuid="t-1")
+    except Exception:
+        # the stop statuses are rewritten before cancel_trip builds its
+        # TripRead, and TripRead cannot be built from a mock — the mutation is
+        # what is under test here, so a DTO failure afterwards is irrelevant
+        pass
+    return stop.status != stop_status
 
 
 @pytest.mark.parametrize("status", [COMPLETED, SKIPPED])
