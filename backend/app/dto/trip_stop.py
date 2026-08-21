@@ -26,6 +26,19 @@ class TripStopStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+# A stop the operator is DONE with, whatever the verdict. Everything else —
+# planned, in_progress, a status added later, a hand-written value — means the
+# customer is still scheduled on a trip and must not be routed onto another
+# one. Routing excludes by "not finished" rather than by listing the pending
+# statuses, so a new status defaults to blocking (the safe direction) instead
+# of silently double-booking customers.
+FINISHED_TRIP_STOP_STATUSES = (
+    TripStopStatus.COMPLETED.value,
+    TripStopStatus.SKIPPED.value,
+    TripStopStatus.CANCELLED.value,
+)
+
+
 class TripStopCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -63,6 +63,24 @@ def config(*priorities):
     return RoutingStrategyConfig(priorities=list(priorities))
 
 
+# --- pool eligibility ---------------------------------------------------------
+
+def test_every_stop_status_is_classified_as_finished_or_blocking():
+    """The pool excludes customers with an UNFINISHED stop, expressed as "not
+    in the finished set" — so a status added later blocks by default instead of
+    silently letting a customer be double-booked onto a second trip. This test
+    fails when someone adds a status without deciding which side it is on."""
+    from app.dto.trip_stop import FINISHED_TRIP_STOP_STATUSES, TripStopStatus
+
+    finished = set(FINISHED_TRIP_STOP_STATUSES)
+    blocking = {s.value for s in TripStopStatus} - finished
+    assert finished == {"completed", "skipped", "cancelled"}
+    # planned = not started yet, in_progress = being worked; both mean the
+    # customer is already scheduled somewhere (manual stops are born
+    # in_progress, so they block too)
+    assert blocking == {"planned", "in_progress"}
+
+
 # --- the filter engine --------------------------------------------------------
 
 def test_tag_equal_and_not_equal_are_case_insensitive_whole_tag_matches():

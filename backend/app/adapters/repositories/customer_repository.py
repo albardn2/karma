@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from typing import Union, List, Optional
 
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 
 from app.adapters.repositories._abstract_repo import AbstractRepository
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Polygon, MultiPolygon
 
+from app.dto.trip_stop import FINISHED_TRIP_STOP_STATUSES
 from models.common import (
     Customer,
     TripStop,
@@ -93,8 +94,12 @@ class CustomerRepository(AbstractRepository[Customer]):
           - tenant-scoped, not deleted, HAS coordinates (clustering needs them)
           - inside the given polygon when the setup picked service areas;
             everywhere otherwise
-          - not already on an active trip (any planned/in_progress stop),
-            same rule as the legacy pipeline
+          - NO unfinished stop anywhere: a customer whose stop has not reached
+            a finished status (completed/skipped/cancelled) is still scheduled
+            on some trip and must not be routed onto another. Stated as "not
+            finished" rather than "planned or in_progress" so a stop with a
+            status nobody anticipated still blocks; manual mid-trip stops are
+            covered because they are created in_progress.
         Deliberately NOT applied here: the legacy completed-stop recency
         exclusion — recency is a per-priority filter now
         (last_effective_stop_days).
@@ -108,7 +113,13 @@ class CustomerRepository(AbstractRepository[Customer]):
             )
         qry = qry.filter(
             ~Customer.trip_stops.any(
-                TripStop.status.in_(["planned", "in_progress"])
+                or_(
+                    # NOT IN (...) yields NULL for a NULL status, which `any()`
+                    # would not match — spell the NULL case out so a status-less
+                    # stop blocks like any other unfinished one
+                    TripStop.status.is_(None),
+                    TripStop.status.notin_(FINISHED_TRIP_STOP_STATUSES),
+                )
             )
         )
         return qry.all()
