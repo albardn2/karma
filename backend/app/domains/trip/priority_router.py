@@ -133,19 +133,34 @@ def _dist2(a: Tuple[float, float], b: Tuple[float, float]) -> float:
     return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
 
 
+# A neighbourhood needs a few members before one can be meaningfully denser
+# than another. Grouping by the cap alone breaks at cap=1: k becomes the
+# candidate count, every cluster is a singleton, every spread is 0.0, and the
+# "densest" pick degenerates to whichever point KMeans happened to label 0 —
+# a coin flip that then drags the whole trip, because every later priority
+# anchors on what is already picked.
+NEIGHBOURHOOD_FLOOR = 3
+
+
 def pick_densest_cluster(candidates: list, cap: int) -> list:
     """The legacy pipeline's idea, kept: one trip serves one tight
-    neighbourhood. KMeans the candidates into ~n/cap clusters, trim each to
-    its cap nearest-to-centroid members, take the best cluster.
+    neighbourhood. KMeans the candidates into neighbourhoods, score each on
+    how tight it is, then take the cap most central members of the winner.
 
-    "Best" fills the cap FIRST and breaks ties on tightness (mean squared
-    distance): the legacy sum-of-distances score let a tiny two-customer
-    cluster beat a full one — a priority asked for max_stops customers and
-    got starved by its own densest pair."""
+    Two things the score must get right:
+      - it compares NEIGHBOURHOODS, not the final selection: scoring after
+        trimming to the cap makes every score 0.0 once cap is 1 (see
+        NEIGHBOURHOOD_FLOOR);
+      - it fills the cap FIRST and breaks ties on tightness (mean squared
+        distance). The legacy sum-of-distances score let a tiny two-customer
+        cluster beat a full one, so a priority asked for max_stops customers
+        and got starved by its own densest pair.
+    """
     if len(candidates) <= cap:
         return list(candidates)
     xys = [_xy(c) for c in candidates]
-    k = max(1, len(candidates) // cap)
+    group = max(cap, NEIGHBOURHOOD_FLOOR)
+    k = max(1, len(candidates) // group)
     labels = KMeans(n_clusters=k, random_state=0).fit([list(p) for p in xys]).labels_
     best, best_key = None, None
     for cluster_id in range(k):
@@ -154,13 +169,19 @@ def pick_densest_cluster(candidates: list, cap: int) -> list:
             continue
         center = _centroid([xy for _, xy in members])
         members.sort(key=lambda m: _dist2(m[1], center))
-        members = members[:cap]
+        members = members[:group]
         center = _centroid([xy for _, xy in members])
+        members.sort(key=lambda m: _dist2(m[1], center))
         mean_spread = sum(_dist2(xy, center) for _, xy in members) / len(members)
-        key = (-len(members), mean_spread)
+        # Rank on how full the NEIGHBOURHOOD is, then how tight it is. Counting
+        # only up to the cap is not enough: a lone far-flung customer forms a
+        # one-member cluster whose spread is a perfect 0.0, so it would beat a
+        # real pocket on the tie-break. Comparing fullness against the group
+        # size makes a sparse cluster lose to a populated one first.
+        key = (-min(len(members), group), mean_spread)
         if best_key is None or key < best_key:
             best, best_key = members, key
-    return [c for c, _ in best]
+    return [c for c, _ in best[:cap]]
 
 
 def pick_nearest(candidates: list, cap: int, anchor: Tuple[float, float]) -> list:

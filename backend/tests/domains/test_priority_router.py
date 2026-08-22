@@ -183,6 +183,29 @@ def test_a_full_cluster_beats_a_tighter_but_smaller_one():
     assert all(c.uuid.startswith("f") for c in chosen)
 
 
+def test_a_cap_of_one_still_picks_from_the_dense_pocket():
+    """cap=1 used to make every KMeans cluster a singleton: all spreads 0.0,
+    so the "densest" pick was whichever point got label 0 — and because later
+    priorities anchor on what is already picked, that coin flip dragged the
+    whole trip (a 134km route where a 0.7km one was available).
+
+    Asserted over several input orderings: the old scoring got this right only
+    by luck, and luck runs out."""
+    pocket = [(36.2800 + i * 0.0002, 33.5100) for i in range(6)]
+    outliers = [(36.60, 33.90), (36.05, 33.20), (36.75, 33.05)]
+    for rotation in range(len(pocket) + len(outliers)):
+        points = pocket + outliers
+        points = points[rotation:] + points[:rotation]
+        cands = [customer(f"c{i}", lon, lat) for i, (lon, lat) in enumerate(points)]
+        picked = pick_densest_cluster(cands, cap=1)
+        assert len(picked) == 1
+        lon, lat = points[[c.uuid for c in cands].index(picked[0].uuid)]
+        assert (lon, lat) in pocket, (
+            f"rotation {rotation} picked the outlier {(lon, lat)} instead of a "
+            "dense-pocket customer"
+        )
+
+
 def test_cluster_returns_everyone_when_under_cap():
     few = [customer("a", 36.0, 33.0), customer("b", 36.5, 33.5)]
     assert pick_densest_cluster(few, cap=10) == few

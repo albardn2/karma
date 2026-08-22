@@ -122,9 +122,21 @@ export function CreateRoutingStrategyDialog({
     }),
   });
 
+  // Ranges mirror StrategyPriority in backend/app/dto/routing_strategy.py.
+  // The modal is not a <form> and Save is type="button", so the inputs' own
+  // min/max attributes never trigger native validation — without these checks
+  // an out-of-range number comes back as a bare "Validation error (422)" that
+  // names neither the priority nor the field.
+  const wholeNumberInRange = (raw: string, low: number, high: number) => {
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= low && n <= high;
+  };
+
   const validationError = (): string | null => {
     if (!name.trim()) return t("workflows.strategyNameRequired");
-    for (const p of priorities) {
+    for (let i = 0; i < priorities.length; i++) {
+      const p = priorities[i];
+      const where = String(i + 1);
       for (const f of p.tagFilters) {
         if (!f.value.trim()) return t("workflows.strategyTagValueRequired");
       }
@@ -134,6 +146,12 @@ export function CreateRoutingStrategyDialog({
       }
       if (p.debtOp !== NONE && (p.debtAmount.trim() === "" || isNaN(Number(p.debtAmount)))) {
         return t("workflows.strategyDebtAmountRequired");
+      }
+      if (p.lastEffectiveDays.trim() !== "" && !wholeNumberInRange(p.lastEffectiveDays, 0, 3650)) {
+        return t("workflows.strategyDaysOutOfRange", { n: where });
+      }
+      if (p.maxStops.trim() !== "" && !wholeNumberInRange(p.maxStops, 1, 200)) {
+        return t("workflows.strategyMaxStopsOutOfRange", { n: where });
       }
     }
     return null;
