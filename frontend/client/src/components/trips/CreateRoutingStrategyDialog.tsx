@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -71,17 +71,55 @@ const emptyPriority = (): PriorityDraft => ({
   maxStops: "",
 });
 
+export interface EditableStrategy {
+  uuid: string;
+  name: string;
+  config: any;
+}
+
+/** A stored config back into builder fields — the inverse of buildConfig.
+ *  Editing must show exactly what is saved, so an absent recency value stays
+ *  BLANK here rather than picking up DEFAULT_RECENCY_DAYS. */
+const configToDrafts = (config: any): PriorityDraft[] => {
+  const priorities = Array.isArray(config?.priorities) ? config.priorities : [];
+  if (!priorities.length) return [emptyPriority()];
+  return priorities.map((p: any) => ({
+    tagFilters: (p?.tag_filters ?? []).map((f: any) => ({
+      op: f?.op ?? "EQUAL",
+      // IS_IN round-trips through the comma-joined text input
+      value: Array.isArray(f?.value) ? f.value.join(", ") : String(f?.value ?? ""),
+    })),
+    categoryOp: p?.category_filter?.op ?? NONE,
+    categoryValue: Array.isArray(p?.category_filter?.value)
+      ? ""
+      : String(p?.category_filter?.value ?? ""),
+    categoryValues: Array.isArray(p?.category_filter?.value) ? p.category_filter.value : [],
+    debtOp: p?.debt_filter?.op ?? NONE,
+    debtAmount: p?.debt_filter?.amount === undefined || p?.debt_filter?.amount === null
+      ? ""
+      : String(p.debt_filter.amount),
+    debtCurrency: (p?.debt_filter?.currency ?? "SYP") as PriorityDraft["debtCurrency"],
+    lastEffectiveDays: p?.last_effective_stop_days === undefined || p?.last_effective_stop_days === null
+      ? ""
+      : String(p.last_effective_stop_days),
+    maxStops: p?.max_stops === undefined || p?.max_stops === null ? "" : String(p.max_stops),
+  }));
+};
+
 interface CreateRoutingStrategyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  // called with the saved strategy's canonical name after a successful create
-  onCreated: (name: string) => void;
+  // present = edit that strategy; absent = create a new one
+  editing?: EditableStrategy | null;
+  // called with the saved strategy's canonical name after a successful save
+  onSaved: (name: string) => void;
 }
 
 export function CreateRoutingStrategyDialog({
   open,
   onOpenChange,
-  onCreated,
+  editing,
+  onSaved,
 }: CreateRoutingStrategyDialogProps) {
   const { t, te } = useLanguage();
   const { toast } = useToast();
@@ -89,6 +127,15 @@ export function CreateRoutingStrategyDialog({
 
   const [name, setName] = useState("");
   const [priorities, setPriorities] = useState<PriorityDraft[]>([emptyPriority()]);
+
+  // Seed on every OPEN, not just on mount: the same dialog instance serves
+  // create and edit, so a stale draft from the last time it was open must not
+  // leak into the next one.
+  useEffect(() => {
+    if (!open) return;
+    setName(editing?.name ?? "");
+    setPriorities(editing ? configToDrafts(editing.config) : [emptyPriority()]);
+  }, [open, editing?.uuid]);
 
   const { data: categories = [] } = useQuery<string[]>({
     queryKey: ["/customer/categories"],
@@ -163,22 +210,27 @@ export function CreateRoutingStrategyDialog({
     return null;
   };
 
-  const createMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: () =>
-      apiRequest("/routing-strategy/", {
-        method: "POST",
-        body: { name: name.trim(), config: buildConfig() },
-      }),
-    onSuccess: (created: { name: string }) => {
-      toast({ title: t("workflows.strategyCreated") });
+      editing
+        ? apiRequest(`/routing-strategy/${editing.uuid}`, {
+            method: "PUT",
+            body: { name: name.trim(), config: buildConfig() },
+          })
+        : apiRequest("/routing-strategy/", {
+            method: "POST",
+            body: { name: name.trim(), config: buildConfig() },
+          }),
+    onSuccess: (saved: { name: string }) => {
+      toast({ title: editing ? t("workflows.strategyUpdated") : t("workflows.strategyCreated") });
       setName("");
       setPriorities([emptyPriority()]);
       onOpenChange(false);
-      onCreated(created.name);
+      onSaved(saved.name);
     },
     onError: (error) => {
       toast({
-        title: t("workflows.strategyCreateFailed"),
+        title: editing ? t("workflows.strategyUpdateFailed") : t("workflows.strategyCreateFailed"),
         description: apiErrorMessage(error, ""),
         variant: "destructive",
       });
@@ -191,14 +243,14 @@ export function CreateRoutingStrategyDialog({
       toast({ title: problem, variant: "destructive" });
       return;
     }
-    createMutation.mutate();
+    saveMutation.mutate();
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t("workflows.createStrategyTitle")}</DialogTitle>
+          <DialogTitle>{editing ? t("workflows.editStrategyTitle") : t("workflows.createStrategyTitle")}</DialogTitle>
           <DialogDescription>{t("workflows.createStrategyDescription")}</DialogDescription>
         </DialogHeader>
 
@@ -481,10 +533,10 @@ export function CreateRoutingStrategyDialog({
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={createMutation.isPending}
+            disabled={saveMutation.isPending}
             data-testid="save-strategy"
           >
-            {createMutation.isPending ? t("common.saving") : t("workflows.strategySave")}
+            {saveMutation.isPending ? t("common.saving") : t("workflows.strategySave")}
           </Button>
         </div>
       </DialogContent>

@@ -39,6 +39,7 @@ import {
   Loader2,
   Ban,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -48,7 +49,7 @@ import { TripOperatorMap } from "@/components/map/TripOperatorMap";
 import { CustomerLocationMap } from "@/components/map/CustomerLocationMap";
 import { CreateOrderDialog } from "@/components/customer-orders/CreateOrderDialog";
 import { AddStopDialog } from "@/components/trips/AddStopDialog";
-import { CreateRoutingStrategyDialog } from "@/components/trips/CreateRoutingStrategyDialog";
+import { CreateRoutingStrategyDialog, type EditableStrategy } from "@/components/trips/CreateRoutingStrategyDialog";
 import { CreateTripExpenseDialog } from "@/components/expenses/CreateTripExpenseDialog";
 import { CustomerRecentOrders } from "@/components/customer-orders/CustomerRecentOrders";
 import { TripStopVisitHistory } from "@/components/trips/TripStopVisitHistory";
@@ -92,6 +93,7 @@ export default function WorkflowExecutionTaskDetail() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [strategyDialogOpen, setStrategyDialogOpen] = useState(false);
+  const [editingStrategy, setEditingStrategy] = useState<EditableStrategy | null>(null);
 
   // Fetch workflow execution details (includes task_executions)
   const { data: workflowExecution, isLoading: executionLoading, error: executionError } = useQuery<WorkflowExecution>({
@@ -133,6 +135,19 @@ export default function WorkflowExecutionTaskDetail() {
     },
     enabled: !!selectedTaskExecution?.task_uuid,
   });
+
+  // The strategy dropdown carries names only; editing one needs its uuid and
+  // stored config. Fetched only when this form has a strategy field and the
+  // user may write strategies, so read-only roles issue no request.
+  const isStartTripTask = task?.operator === "start_trip_operator";
+  const { data: savedStrategies } = useQuery<{ routing_strategies: EditableStrategy[] }>({
+    queryKey: ["/routing-strategy/"],
+    queryFn: () => apiRequest("/routing-strategy/?per_page=100"),
+    enabled: !!isStartTripTask && canCreateStrategy,
+  });
+  const strategyByName = new Map(
+    (savedStrategies?.routing_strategies ?? []).map((row) => [row.name.toLowerCase(), row]),
+  );
 
   // Parse task inputs from the task definition
   const taskInputFields: TaskInputField[] = (() => {
@@ -915,6 +930,7 @@ export default function WorkflowExecutionTaskDetail() {
                 <Select
                   onValueChange={(value) => {
                     if (offerCreateStrategy && value === CREATE_STRATEGY_SENTINEL) {
+                      setEditingStrategy(null); // create, not edit
                       setStrategyDialogOpen(true);
                       return; // keep the current selection
                     }
@@ -928,11 +944,45 @@ export default function WorkflowExecutionTaskDetail() {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {field.options?.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {te(option)}
-                      </SelectItem>
-                    ))}
+                    {field.options?.map((option) => {
+                      // saved strategies get an inline edit affordance; the
+                      // built-in "manual" has nothing to edit
+                      const editable = offerCreateStrategy
+                        ? strategyByName.get(option.toLowerCase())
+                        : undefined;
+                      return (
+                        <SelectItem key={option} value={option}>
+                          <span className="flex items-center gap-2">
+                            {te(option)}
+                            {editable && (
+                              <span
+                                role="button"
+                                tabIndex={-1}
+                                aria-label={t('workflows.editStrategyTitle')}
+                                title={t('workflows.editStrategyTitle')}
+                                className="opacity-60 hover:opacity-100"
+                                data-testid={`edit-strategy-${option}`}
+                                // Radix selects the row on pointerup, so the
+                                // pointer events are stopped here. If a build
+                                // of Radix ever selects anyway the fallback is
+                                // benign: the row is chosen AND the editor
+                                // opens for that same strategy.
+                                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                onPointerUp={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setEditingStrategy(editable);
+                                  setStrategyDialogOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </span>
+                            )}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                     {offerCreateStrategy && (
                       <SelectItem value={CREATE_STRATEGY_SENTINEL} data-testid="create-strategy-option">
                         {t('workflows.createStrategyOption')}
@@ -1357,14 +1407,23 @@ export default function WorkflowExecutionTaskDetail() {
                     <div className="flex items-center gap-3">
                       <CreateRoutingStrategyDialog
                         open={strategyDialogOpen}
-                        onOpenChange={setStrategyDialogOpen}
-                        onCreated={async (strategyName) => {
+                        onOpenChange={(next) => {
+                          setStrategyDialogOpen(next);
+                          if (!next) setEditingStrategy(null);
+                        }}
+                        editing={editingStrategy}
+                        onSaved={async (strategyName) => {
                           // the dropdown's options come from the task read
-                          // (enriched server-side) — refresh, THEN select the
-                          // new strategy so its item exists
-                          await queryClient.refetchQueries({
-                            queryKey: ["/task/", selectedTaskExecution?.task_uuid],
-                          });
+                          // (enriched server-side) and the editable rows from
+                          // the strategy list — refresh BOTH, then select the
+                          // saved name so its item exists (a rename would
+                          // otherwise leave the old value selected)
+                          await Promise.all([
+                            queryClient.refetchQueries({
+                              queryKey: ["/task/", selectedTaskExecution?.task_uuid],
+                            }),
+                            queryClient.refetchQueries({ queryKey: ["/routing-strategy/"] }),
+                          ]);
                           form.setValue("strategy" as any, strategyName, { shouldValidate: true });
                         }}
                       />
