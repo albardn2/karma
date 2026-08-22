@@ -35,6 +35,12 @@ const DEBT_OPS = ["LARGER_THAN", "SMALLER_THAN"] as const;
 const CURRENCIES = ["SYP", "USD"] as const;
 // Radix Select can't hold an empty-string item value; sentinel for "off"
 const NONE = "__none__";
+// Every priority starts with a recency floor rather than none. The legacy
+// routing pipeline always excluded customers with a recent completed stop; the
+// strategy engine made recency a per-priority filter, and a BLANK field means
+// "revisit anyone", which is a surprising default to land on silently. Prefilled
+// so skipping recent visits is opt-OUT: clear the box to route regardless.
+const DEFAULT_RECENCY_DAYS = "7";
 
 interface TagFilterDraft {
   op: (typeof TAG_OPS)[number];
@@ -61,7 +67,7 @@ const emptyPriority = (): PriorityDraft => ({
   debtOp: NONE,
   debtAmount: "",
   debtCurrency: "SYP",
-  lastEffectiveDays: "",
+  lastEffectiveDays: DEFAULT_RECENCY_DAYS,
   maxStops: "",
 });
 
