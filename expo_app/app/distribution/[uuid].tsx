@@ -113,6 +113,23 @@ const parseLatLng = (s?: string | null): { lat: number | null; lng: number | nul
   return { lat: isNaN(lat) ? null : lat, lng: isNaN(lng) ? null : lng };
 };
 
+/** apiCall hands back the raw response body, so a 400 would otherwise be shown
+ *  as literal JSON. Pull the message out when it is the API's {"error": "..."}
+ *  shape, and fall back to a plain sentence for anything else. */
+function errorMessage(raw: string | undefined | null, fallback: string): string {
+  const text = (raw || '').trim();
+  if (!text) return fallback;
+  try {
+    const parsed = JSON.parse(text);
+    const message = parsed?.error || parsed?.msg;
+    if (typeof message === 'string' && message.trim()) return message;
+  } catch {
+    // not JSON — a bare string body is fine to show as-is
+    if (!text.startsWith('{') && !text.startsWith('[')) return text;
+  }
+  return fallback;
+}
+
 // Topologically order task executions by their depends_on chain (names → uuids),
 // ties broken by created_at. Returns a { taskExecutionUuid: position } map so
 // trip stops render in true visit order (done → current → upcoming), including
@@ -344,6 +361,15 @@ export default function ExecutionDetailScreen() {
     return Array.isArray(coords) ? coords : [];
   }, [execution]);
 
+  // A manual trip has NO stops until the driver adds them, and a finished one
+  // has none left — in both cases there is nothing to re-sort, so the button
+  // hides and the automatic pass after the trip step stays quiet instead of
+  // asking for GPS and reporting a failure the driver cannot act on.
+  const pendingStopCount = useMemo(
+    () => tripStops.filter((s) => s.status === 'not_started' || s.status === 'in_progress').length,
+    [tripStops]
+  );
+
   const currentStopUuid = useMemo(
     () => tripStops.find((s) => s.status === 'in_progress')?.tripStopUuid || null,
     [tripStops]
@@ -395,13 +421,15 @@ export default function ExecutionDetailScreen() {
   // The position comes from this device on purpose: the server's location feed
   // is opt-in and arrives on a cadence, so the phone in the van is the only
   // dependable answer to "where are we".
-  const resortStops = async (): Promise<boolean> => {
+  const resortStops = async (opts?: { silent?: boolean }): Promise<boolean> => {
     if (!execution) return false;
+    // nothing pending → nothing to sort; do not prompt for location either
+    if (pendingStopCount === 0) return false;
     setResorting(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(t('trip.resortTitle'), t('trip.resortNeedsLocation'));
+        if (!opts?.silent) Alert.alert(t('trip.resortTitle'), t('trip.resortNeedsLocation'));
         return false;
       }
       const pos = await Location.getCurrentPositionAsync({
@@ -415,13 +443,13 @@ export default function ExecutionDetailScreen() {
         }),
       });
       if (res.status !== 200) {
-        Alert.alert(t('trip.error'), res.error || t('trip.couldNotResort'));
+        if (!opts?.silent) Alert.alert(t('trip.error'), errorMessage(res.error, t('trip.couldNotResort')));
         return false;
       }
       await fetchExecution(false);
       return true;
     } catch (e: any) {
-      Alert.alert(t('trip.error'), t('trip.couldNotResort'));
+      if (!opts?.silent) Alert.alert(t('trip.error'), t('trip.couldNotResort'));
       return false;
     } finally {
       setResorting(false);
@@ -462,7 +490,7 @@ export default function ExecutionDetailScreen() {
       // reports its own failure and the trip continues in its planned order.
       const wasTripStep = activeTask.operator === 'trip_operator';
       await fetchExecution(false);
-      if (wasTripStep) await resortStops();
+      if (wasTripStep) await resortStops({ silent: true });
     } catch (e: any) {
       Alert.alert(t('trip.error'), e?.message || t('trip.couldNotCompleteTask'));
     } finally {
@@ -557,7 +585,7 @@ export default function ExecutionDetailScreen() {
             onAddStop={() => router.push({ pathname: '/distribution/add-stop', params: { executionUuid: execution.uuid } })}
             onAddExpense={() => router.push({ pathname: '/distribution/expense', params: { executionUuid: execution.uuid } })}
             onSetCurrent={setCurrentStop}
-            onResort={resortStops}
+            onResort={pendingStopCount > 0 ? resortStops : undefined}
             resorting={resorting}
             armedStopUuid={armedStopUuid}
             onArm={setArmedStopUuid}
