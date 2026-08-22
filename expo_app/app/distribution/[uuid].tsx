@@ -12,6 +12,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
+import * as Location from 'expo-location';
 import { apiCall } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { TripMap, TripMapArea, TripMapStop } from '@/components/TripMap';
@@ -176,6 +177,7 @@ export default function ExecutionDetailScreen() {
   // shared "Set current" armed selection (map pin tap or list long-press);
   // lifted here so a tap elsewhere on either surface dismisses it.
   const [armedStopUuid, setArmedStopUuid] = useState<string | null>(null);
+  const [resorting, setResorting] = useState(false);
   // service areas picked in the trip setup, drawn on the map as boundaries
   const [serviceAreas, setServiceAreas] = useState<TripMapArea[]>([]);
 
@@ -262,8 +264,15 @@ export default function ExecutionDetailScreen() {
     () => (execution?.task_executions || []).filter((t) => t.operator === 'trip_stop_operator'),
     [execution]
   );
+  // uuid + status + CHAIN: a re-sort can leave every status untouched and only
+  // rewire depends_on (you are already next to the current stop, the tail
+  // reorders behind it). Without the chain in here the rebuild effect would not
+  // re-run and the sheet would keep showing the old order.
   const stopSignature = useMemo(
-    () => stopTasks.map((t) => `${t.uuid}:${t.status}`).join('|'),
+    () =>
+      stopTasks
+        .map((t) => `${t.uuid}:${t.status}:${(t.depends_on || []).join('>')}`)
+        .join('|'),
     [stopTasks]
   );
 
@@ -323,6 +332,18 @@ export default function ExecutionDetailScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopSignature, tripPhase]);
 
+  // The road path the last re-sort planned. It lives on the route step's result,
+  // which /resort-stops rewrites, so it is the path through the stops as they
+  // are ordered NOW — empty until something has been planned, in which case the
+  // map shows pins only.
+  const routePath = useMemo(() => {
+    const routeTe = (execution?.task_executions || []).find(
+      (te) => te.operator === 'trip_route_operator'
+    );
+    const coords = (routeTe?.result as any)?.route_coordinates;
+    return Array.isArray(coords) ? coords : [];
+  }, [execution]);
+
   const currentStopUuid = useMemo(
     () => tripStops.find((s) => s.status === 'in_progress')?.tripStopUuid || null,
     [tripStops]
@@ -370,6 +391,43 @@ export default function ExecutionDetailScreen() {
     await fetchExecution(false);
   };
 
+  // Reorder the remaining stops nearest-first from where the driver is now.
+  // The position comes from this device on purpose: the server's location feed
+  // is opt-in and arrives on a cadence, so the phone in the van is the only
+  // dependable answer to "where are we".
+  const resortStops = async (): Promise<boolean> => {
+    if (!execution) return false;
+    setResorting(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(t('trip.resortTitle'), t('trip.resortNeedsLocation'));
+        return false;
+      }
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const res = await apiCall(`/workflow-execution/${execution.uuid}/resort-stops`, {
+        method: 'POST',
+        body: JSON.stringify({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        }),
+      });
+      if (res.status !== 200) {
+        Alert.alert(t('trip.error'), res.error || t('trip.couldNotResort'));
+        return false;
+      }
+      await fetchExecution(false);
+      return true;
+    } catch (e: any) {
+      Alert.alert(t('trip.error'), t('trip.couldNotResort'));
+      return false;
+    } finally {
+      setResorting(false);
+    }
+  };
+
   const finishTrip = () => {
     if (!finishTask) return;
     Alert.alert(t('trip.finishTrip'), t('trip.finishTripConfirm'), [
@@ -398,7 +456,13 @@ export default function ExecutionDetailScreen() {
         body: JSON.stringify({ uuid: activeTask.uuid, result: {} }),
       });
       if (res.status !== 200) throw new Error(res.error || t('trip.failedToCompleteTask'));
+      // Completing the TRIP step is the moment the driver actually sets off,
+      // so the plan is re-sorted around where they are standing rather than
+      // around wherever it was computed at setup. Best-effort: resortStops
+      // reports its own failure and the trip continues in its planned order.
+      const wasTripStep = activeTask.operator === 'trip_operator';
       await fetchExecution(false);
+      if (wasTripStep) await resortStops();
     } catch (e: any) {
       Alert.alert(t('trip.error'), e?.message || t('trip.couldNotCompleteTask'));
     } finally {
@@ -463,6 +527,7 @@ export default function ExecutionDetailScreen() {
             onArm={setArmedStopUuid}
             onSetCurrent={setCurrentStop}
             areas={serviceAreas}
+            routePath={routePath}
           />
           {isAdmin && (
             <TouchableOpacity
@@ -492,6 +557,8 @@ export default function ExecutionDetailScreen() {
             onAddStop={() => router.push({ pathname: '/distribution/add-stop', params: { executionUuid: execution.uuid } })}
             onAddExpense={() => router.push({ pathname: '/distribution/expense', params: { executionUuid: execution.uuid } })}
             onSetCurrent={setCurrentStop}
+            onResort={resortStops}
+            resorting={resorting}
             armedStopUuid={armedStopUuid}
             onArm={setArmedStopUuid}
             finishAction={finishActive ? { label: t('trip.finishTripButton'), onPress: finishTrip } : null}

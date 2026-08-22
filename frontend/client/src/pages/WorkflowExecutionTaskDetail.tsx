@@ -553,10 +553,15 @@ export default function WorkflowExecutionTaskDetail() {
     return (completedCount / taskExecutions.length) * 100;
   };
 
-  // Extract trip route data for trip_operator and trip_create_operator tasks
+  // Route data for the TRIP step only. The planning steps (setup, route
+  // calculation, trip creation) deliberately draw nothing: before the driver
+  // is standing somewhere, any line on the map is a guess, and the map's
+  // polyline falls back to straight hops between stops when no road geometry
+  // exists — which reads as a planned route while being none. The trip step
+  // draws the real path, refreshed by the re-sort against the driver's
+  // position (POST /workflow-execution/<uuid>/resort-stops).
   const getTripRouteData = () => {
-    // Check if current task is trip_operator or trip_create_operator
-    if (!task || (task.operator !== "trip_operator" && task.operator !== "trip_create_operator")) {
+    if (!task || task.operator !== "trip_operator") {
       return null;
     }
 
