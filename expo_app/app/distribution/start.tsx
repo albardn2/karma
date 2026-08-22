@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
-  Switch,
   TextInput,
   TouchableOpacity,
   View,
@@ -19,19 +18,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 
 const TRIP_WORKFLOW_NAME = 'simple_trip_workflow';
 
-// routing-only fields; hidden when manual_stops is on (backend validates per
-// mode). service_areas intentionally NOT here: it also shows in manual mode
-// (optional) so the trip map can draw the picked areas' boundaries.
-const ROUTING_FIELDS = new Set([
-  'start_warehouse_name',
-  'end_warehouse_name',
-  'start_point',
-  'end_point',
-  'customer_categories',
-  'last_visit_threshold_days',
-  'max_stops',
-  'min_stops',
-]);
+// The 2026-08 setup form is six fields (service areas, assignee, assigned date,
+// desired stops, strategy, vehicle). The screen renders whatever descriptors the
+// task serves, so it needs no per-field special-casing — only the single-pick
+// checklist behaviour (assigned_date) and the validation gate below know
+// field names.
 
 interface Field {
   name: string;
@@ -40,25 +31,8 @@ interface Field {
   required?: boolean;
   options?: string[] | null;
   placeholder?: string | null;
-}
-
-// The trip name the setup form suggests: the date, then the assignee, then the
-// regions — "2026-07-30", "2026-07-30-zaid", "2026-07-30-zaid-malki-Mezzeh".
-//
-// Anchored to Damascus (UTC+3) rather than the device clock, so this screen, the
-// web form and the server's own fallback all name the same trip the same way; a
-// phone left on another timezone would otherwise be a day out.
-const TRIP_NAME_MAX = 120;
-
-function deriveTripName(assignee?: string | null, regions?: string[] | null): string {
-  const damascusDate = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const parts = [damascusDate];
-  if (assignee && String(assignee).trim()) parts.push(String(assignee).trim());
-  for (const region of regions || []) {
-    if (region && String(region).trim()) parts.push(String(region).trim());
-  }
-  // the column is String(120); cut here so what is shown is what is stored
-  return parts.join('-').slice(0, TRIP_NAME_MAX);
+  /** false on a checklist means exactly one option may be picked */
+  multiple?: boolean;
 }
 
 
@@ -73,30 +47,6 @@ export default function StartTripScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  // the last name this screen suggested, so a name the user typed is left alone
-  const lastSuggestedName = useRef<string | null>(null);
-
-  // Keep the suggested trip name in step with the assignee and the regions.
-  // Only ever replaces a value this effect put there (or an empty field): once
-  // somebody types their own name it stops interfering.
-  useEffect(() => {
-    if (!fields.some((f) => f.name === 'trip_name')) return;
-    const regions = Array.isArray(values.service_areas) ? values.service_areas : [];
-    const suggestion = deriveTripName(values.assigned_user_uuid, regions);
-    const current = values.trip_name;
-    const untouched = !current || current === lastSuggestedName.current;
-    if (untouched && current !== suggestion) {
-      lastSuggestedName.current = suggestion;
-      setValues((prev) => ({ ...prev, trip_name: suggestion }));
-    } else if (untouched) {
-      lastSuggestedName.current = suggestion;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    // Deliberately NOT watching values.trip_name. Doing so re-filled the field
-    // the instant it went empty, so clearing the suggestion to type your own name
-    // meant fighting it from the first keystroke. Changing a selection still
-    // brings a suggestion back.
-  }, [fields, values.assigned_user_uuid, JSON.stringify(values.service_areas)]);
 
   // load the workflow + its setup form fields
   useEffect(() => {
@@ -131,65 +81,61 @@ export default function StartTripScreen() {
       if (myUsername && setupFields.find((f) => f.name === 'assigned_user_uuid')?.options?.includes(myUsername)) {
         initial['assigned_user_uuid'] = myUsername;
       }
+      // the trip is usually for today, and manual is the only strategy until
+      // the routing revamp lands more — sensible defaults, both changeable
+      const dateField = setupFields.find((f) => f.name === 'assigned_date');
+      if (dateField?.options?.length) initial['assigned_date'] = [dateField.options[0]];
+      const strategyField = setupFields.find((f) => f.name === 'strategy');
+      if (strategyField?.options?.includes('manual')) initial['strategy'] = 'manual';
       setValues(initial);
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const manualStops = useMemo(() => {
-    const v = values['manual_stops'];
-    return Array.isArray(v) ? v.length > 0 : !!v;
-  }, [values]);
-
-  const visibleFields = useMemo(
-    () =>
-      fields.filter((f) => {
-        if (f.name === 'manual_stops') return false; // rendered as a dedicated toggle
-        if (manualStops && ROUTING_FIELDS.has(f.name)) return false;
-        return true;
-      }),
-    [fields, manualStops]
-  );
+  const visibleFields = fields;
 
   const setValue = (name: string, value: any) =>
     setValues((prev) => ({ ...prev, [name]: value }));
 
-  const toggleChecklist = (name: string, option: string) =>
+  const toggleChecklist = (name: string, option: string, single = false) =>
     setValues((prev) => {
       const cur: string[] = prev[name] || [];
-      return {
-        ...prev,
-        [name]: cur.includes(option) ? cur.filter((o) => o !== option) : [...cur, option],
-      };
+      if (cur.includes(option)) {
+        return { ...prev, [name]: cur.filter((o) => o !== option) };
+      }
+      // a single-pick checklist (multiple=false, e.g. the trip's assigned date)
+      // replaces the selection — appending would submit two and be refused
+      return { ...prev, [name]: single ? [option] : [...cur, option] };
     });
 
-  // client-side gate mirroring the backend's per-mode requirements
+  // client-side gate mirroring the backend schema's requirements
   const validate = (): string | null => {
     if (!values['vehicle_plate']) return t('start.selectVehicle');
-    if (manualStops) {
-      if (!values['assigned_user_uuid']) return t('start.selectAssignedUser');
-    } else {
-      if (!(values['service_areas'] || []).length) return t('start.selectServiceArea');
-      if (!values['start_warehouse_name']) return t('start.selectStartWarehouse');
-      if (!values['end_warehouse_name']) return t('start.selectEndWarehouse');
-      if (!values['last_visit_threshold_days']) return t('start.setLastVisitThreshold');
+    if (!values['assigned_user_uuid']) return t('start.selectAssignedUser');
+    if (!(values['assigned_date'] || []).length) return t('start.selectAssignedDate');
+    // a saved routing strategy has no total target without desired_stops, and
+    // the backend refuses the submission — catch it before the round trip,
+    // which on this screen would also roll the new execution back
+    const strategy = String(values['strategy'] ?? '').trim();
+    if (strategy && strategy.toLowerCase() !== 'manual' && !String(values['desired_stops'] ?? '').trim()) {
+      return t('start.desiredStopsRequiredForStrategy');
     }
     return null;
   };
 
   const buildResult = () => {
-    const result: Record<string, any> = { manual_stops: manualStops };
+    const result: Record<string, any> = {};
     for (const f of fields) {
-      if (f.name === 'manual_stops') continue;
-      if (manualStops && ROUTING_FIELDS.has(f.name)) continue;
       const v = values[f.name];
       if (f.type === 'checklist') {
         result[f.name] = v || [];
       } else if (f.type === 'number') {
-        result[f.name] = v === '' || v == null ? null : Number(v);
-      } else {
-        result[f.name] = v === '' ? null : v;
+        // the schema bounds desired_stops but treats absent as "not specified";
+        // an empty input must therefore be omitted, not sent as null-ish 0
+        if (v !== '' && v != null) result[f.name] = Number(v);
+      } else if (v !== '' && v != null) {
+        result[f.name] = v;
       }
     }
     return result;
@@ -260,7 +206,7 @@ export default function StartTripScreen() {
                   testID={`opt-${f.name}-${opt}`}
                 >
                   <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
-                    {f.name === 'customer_categories' ? te(opt) : opt}
+                    {f.name === 'customer_categories' || f.name === 'strategy' ? te(opt) : opt}
                   </ThemedText>
                 </TouchableOpacity>
               );
@@ -274,6 +220,7 @@ export default function StartTripScreen() {
     }
     if (f.type === 'checklist') {
       const selected: string[] = values[f.name] || [];
+      const single = f.multiple === false;
       return (
         <View key={f.name} style={styles.fieldBlock}>
           <ThemedText style={styles.fieldLabel}>{tef(f.name)}</ThemedText>
@@ -284,7 +231,7 @@ export default function StartTripScreen() {
                 <TouchableOpacity
                   key={opt}
                   style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => toggleChecklist(f.name, opt)}
+                  onPress={() => toggleChecklist(f.name, opt, single)}
                   testID={`opt-${f.name}-${opt}`}
                 >
                   <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
@@ -333,22 +280,6 @@ export default function StartTripScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-          {/* manual stops toggle */}
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleTextWrap}>
-              <ThemedText style={styles.toggleTitle}>{t('start.manualStops')}</ThemedText>
-              <ThemedText style={styles.toggleHint}>
-                {t('start.manualStopsHint')}
-              </ThemedText>
-            </View>
-            <Switch
-              value={manualStops}
-              onValueChange={(on) => setValue('manual_stops', on ? ['yes'] : [])}
-              trackColor={{ true: '#5469D4' }}
-              testID="toggle-manual-stops"
-            />
-          </View>
-
           {visibleFields.map(renderField)}
 
           <TouchableOpacity
@@ -375,20 +306,6 @@ const styles = StyleSheet.create({
   errorTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4, textAlign: 'center' },
   errorText: { fontSize: 14, opacity: 0.6, textAlign: 'center' },
   form: { padding: 16, paddingBottom: 40 },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(84,105,212,0.25)',
-    backgroundColor: 'rgba(84,105,212,0.06)',
-    marginBottom: 20,
-  },
-  toggleTextWrap: { flex: 1, marginRight: 12 },
-  toggleTitle: { fontSize: 15, fontWeight: '600' },
-  toggleHint: { fontSize: 12, opacity: 0.6, marginTop: 2 },
   fieldBlock: { marginBottom: 18 },
   fieldLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

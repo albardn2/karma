@@ -230,6 +230,7 @@ def app():
     from app.entrypoint.routes.customer import customer_blueprint
     from app.entrypoint.routes.material import material_blueprint
     from app.entrypoint.routes.vendor import vendor_blueprint
+    from app.entrypoint.routes.routing_strategy import routing_strategy_blueprint
     from app.entrypoint.routes.employee import employee_blueprint
     from app.entrypoint.routes.expense import expense_blueprint
     from app.entrypoint.routes.pricing import pricing_blueprint
@@ -258,6 +259,7 @@ def app():
     app.register_blueprint(customer_blueprint, url_prefix="/customers")
     app.register_blueprint(material_blueprint,  url_prefix="/materials")
     app.register_blueprint(vendor_blueprint,    url_prefix="/vendor")
+    app.register_blueprint(routing_strategy_blueprint, url_prefix="/routing-strategy")
     app.register_blueprint(employee_blueprint,  url_prefix="/employee")
     app.register_blueprint(expense_blueprint,   url_prefix="/expense")
     app.register_blueprint(pricing_blueprint, url_prefix="/pricing")

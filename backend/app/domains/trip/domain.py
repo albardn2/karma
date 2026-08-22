@@ -13,7 +13,7 @@ from app.dto.trip import (
 )
 
 from app.dto.trip import TripStatus
-from app.dto.trip_stop import TripStopStatus
+from app.dto.trip_stop import FINISHED_TRIP_STOP_STATUSES, TripStopStatus
 
 
 class TripDomain:
@@ -227,9 +227,9 @@ class TripDomain:
             # SKIPPED; now that a skipped:* outcome does, cancelling a trip
             # would erase a recorded skip and drop the stop out of the
             # "stops that were worked" queries that power the trip history.
-            if stop.status not in [TripStopStatus.COMPLETED.value,
-                                   TripStopStatus.SKIPPED.value,
-                                   TripStopStatus.CANCELLED.value]:
+            # Same set the routing pool treats as finished — shared so the two
+            # cannot drift when a status is added.
+            if stop.status not in FINISHED_TRIP_STOP_STATUSES:
                 stop.status = TripStopStatus.CANCELLED.value
         uow.trip_repository.save(model=trip, commit=False)
         return TripRead.from_orm(trip)

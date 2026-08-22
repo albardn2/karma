@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, Polygon, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import MapView, { Marker, Polygon, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { PolygonRings } from '@/utils/wkt';
 
@@ -15,6 +15,11 @@ export interface TripMapStop {
 }
 
 // a service area drawn as translucent polygon(s) under the stop pins
+/** Road path through the remaining stops, [lat, lon] pairs, as planned by the
+ *  last re-sort. Empty while nothing has been planned — the map then shows
+ *  pins only rather than an invented straight-line route. */
+export type TripMapPath = number[][];
+
 export interface TripMapArea {
   uuid: string;
   name: string;
@@ -44,6 +49,7 @@ export function TripMap({
   onArm,
   onSetCurrent,
   areas = [],
+  routePath = [],
 }: {
   stops: TripMapStop[];
   currentStopUuid: string | null;
@@ -52,8 +58,23 @@ export function TripMap({
   onArm?: (uuid: string | null) => void;
   onSetCurrent?: (stop: TripMapStop) => void;
   areas?: TripMapArea[];
+  routePath?: TripMapPath;
 }) {
   const { t } = useLanguage();
+  // [lat, lon] pairs -> map coordinates, dropping anything unusable so one bad
+  // point cannot blank the whole line
+  const validPath = useMemo(
+    () =>
+      (routePath || [])
+        .filter(
+          (p) =>
+            Array.isArray(p) && p.length >= 2 &&
+            Number.isFinite(p[0]) && Number.isFinite(p[1]) &&
+            Math.abs(p[0]) <= 90 && Math.abs(p[1]) <= 180
+        )
+        .map((p) => ({ latitude: p[0], longitude: p[1] })),
+    [routePath]
+  );
   const mapRef = useRef<MapView>(null);
   const [ready, setReady] = useState(false);
   // On iOS (Apple provider) a marker tap ALSO fires MapView.onPress, which would
@@ -141,6 +162,12 @@ export function TripMap({
               tappable={false}
             />
           ))
+        )}
+
+        {/* the planned road path, drawn UNDER the pins so markers stay tappable.
+            Only ever what the server planned — no straight-line stand-in. */}
+        {validPath.length > 1 && (
+          <Polyline coordinates={validPath} strokeColor="#5469D4" strokeWidth={4} />
         )}
 
         {pinned.map((s) => {

@@ -33,7 +33,12 @@ class TaskInputField(BaseModel):
     max: Optional[Union[int, float]] = None  # Maximum value for number fields
     options: Optional[List[str]] = None  # Options for select, checklist, or radio buttons
     button_text: Optional[str] = None  # For button type fields
-    multiple: Optional[bool] = False  # For file upload (allow multiple files)
+    # Checklists: False means single-pick, True/absent means multi-pick. The
+    # default must stay None, NOT False — most stored descriptors never wrote
+    # the key, and a False default would serialize onto all of them, flipping
+    # every admin-built checklist to single-pick in both clients (they test
+    # `multiple === false`). Also used by file uploads (allow multiple files).
+    multiple: Optional[bool] = None
     accept: Optional[str] = None  # For file upload (file types)
     rows: Optional[int] = None  # For textarea fields, number of rows
     cols: Optional[int] = None  # For textarea fields, number of columns
@@ -117,6 +122,22 @@ class TaskRead(TaskBase):
                 if f.label == "end_warehouse_name":
                     warehouses = uow.warehouse_repository.find_all(is_deleted=False)
                     f.options = [wh.name for wh in warehouses]
+                if f.label == "assigned_date":
+                    # a rolling window is stale by tomorrow, so the options are
+                    # generated on every read rather than stored on the task
+                    from app.domains.task_execution.workflow_operators.start_trip_operator import (
+                        assigned_date_options,
+                    )
+                    f.options = assigned_date_options()
+                if f.label == "strategy":
+                    # built-ins from the registry plus the tenant's saved
+                    # priority strategies, live on every read — creating a
+                    # strategy makes it pickable without touching the task row
+                    from app.domains.task_execution.workflow_operators.trip_setup import (
+                        FORM_STRATEGIES,
+                    )
+                    saved = uow.routing_strategy_repository.find_all(is_deleted=False)
+                    f.options = list(FORM_STRATEGIES) + sorted(s.name for s in saved)
         return obj
 
 # DTO for pagination and filtering when listing Tasks

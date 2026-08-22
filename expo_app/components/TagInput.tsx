@@ -13,7 +13,7 @@ const MAX_TAGS = 25;
 
 export function normalizeTag(raw: string): string | null {
   const tag = raw.trim();
-  if (!tag || tag.length > MAX_TAG_LENGTH || tag.includes(',')) return null;
+  if (!tag || tag.length > MAX_TAG_LENGTH || tag.includes(',') || tag.includes('،')) return null;
   if ((tag.match(/:/g) || []).length > 1) return null;
   if (tag.includes(':')) {
     const [key, value] = tag.split(':').map((p) => p.trim());

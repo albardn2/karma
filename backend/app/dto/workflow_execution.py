@@ -95,6 +95,19 @@ class SetCurrentStopParams(BaseModel):
     task_execution_uuid: str  # the trip_stop task execution to make current
 
 
+class ResortStopsParams(BaseModel):
+    """Reorder the trip's remaining stops nearest-first from here.
+
+    The position is supplied by the client that triggers it — the driver's
+    device — because the server has no reliable notion of "now" for a van: the
+    location feed is opt-in per user and arrives over MQTT on a cadence.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+
+
 class WorkflowExecutionPage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

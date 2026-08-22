@@ -228,12 +228,12 @@ class CreateTripOperator(OperatorInterface):
         if not vehicle:
             raise BadRequestError(f"Vehicle not found with plate number: {vehicle_plate}")
 
-        manual_stops = self.is_manual_stops()
-
-        # warehouses are only part of the routed flow; manual trips skip them
+        # warehouses were inputs of the LEGACY routed form only; manual trips
+        # and the 2026-08 priority strategies have none (the new form dropped
+        # the fields), so only a legacy_cluster execution demands them
         start_warehouse = None
         end_warehouse = None
-        if not manual_stops:
+        if self.resolved_strategy() == "legacy_cluster":
             start_warehouse_name = self.get_start_warehouse_name()
             start_warehouse = uow.warehouse_repository.find_one(name=start_warehouse_name)
             if not start_warehouse:
@@ -313,11 +313,17 @@ class CreateTripOperator(OperatorInterface):
         return self.__class__.__name__
 
 
-    def is_manual_stops(self) -> bool:
+    def resolved_strategy(self) -> str:
+        # strategy-aware, with the legacy manual_stops fallback for executions
+        # started under the old form — see trip_setup.resolve_strategy
+        from app.domains.task_execution.workflow_operators.trip_setup import (
+            resolve_strategy,
+        )
+
         for task_exe in self.all_tasks_executions:
             if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
-                return bool(task_exe.result.get("manual_stops"))
-        return False
+                return resolve_strategy(task_exe.result)
+        return resolve_strategy(None)
 
     def get_service_areas(self) -> list:
         """
@@ -328,8 +334,10 @@ class CreateTripOperator(OperatorInterface):
             if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
                 return task_exe.result.get("service_areas")
     def get_trip_name(self) -> str:
-        """The name typed on the start-trip form, or the start date if it was left
-        blank — which is the normal case.
+        """The trip_name stored in the setup result — since the 2026-08 revamp
+        that is the derived '<assignee>-<dd-mm-yyyy>' stamped by
+        StartTripOperator (trip_name_for), on older executions whatever the
+        dispatcher typed — or the start date when neither is there.
 
         Defaulted here rather than on either client so both agree, and so a trip
         created by an API caller that never saw the form still gets a label. The

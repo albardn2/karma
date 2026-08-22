@@ -39,6 +39,7 @@ import {
   Loader2,
   Ban,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -48,6 +49,7 @@ import { TripOperatorMap } from "@/components/map/TripOperatorMap";
 import { CustomerLocationMap } from "@/components/map/CustomerLocationMap";
 import { CreateOrderDialog } from "@/components/customer-orders/CreateOrderDialog";
 import { AddStopDialog } from "@/components/trips/AddStopDialog";
+import { CreateRoutingStrategyDialog, type EditableStrategy } from "@/components/trips/CreateRoutingStrategyDialog";
 import { CreateTripExpenseDialog } from "@/components/expenses/CreateTripExpenseDialog";
 import { CustomerRecentOrders } from "@/components/customer-orders/CustomerRecentOrders";
 import { TripStopVisitHistory } from "@/components/trips/TripStopVisitHistory";
@@ -59,25 +61,10 @@ import type { TaskExecution, TaskExecutionPage, TaskExecutionComplete } from "@/
 import type { Task } from "@shared/schema";
 import type { TaskInputField, FieldType } from "@/types/taskInputs";
 
-// The trip name the start-trip form suggests: the date, then the assignee, then
-// the regions — "2026-07-30", "2026-07-30-zaid", "2026-07-30-zaid-malki-Mezzeh".
-//
-// Anchored to Damascus (UTC+3) rather than the device clock so the web, the app
-// and the server's own fallback all produce the same date for the same trip; a
-// laptop left on another timezone would otherwise name a trip a day out.
-export const TRIP_NAME_MAX = 120;
-
-export function deriveTripName(assignee?: string | null, regions?: string[] | null): string {
-  const damascusDate = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const parts = [damascusDate];
-  if (assignee && String(assignee).trim()) parts.push(String(assignee).trim());
-  for (const region of regions || []) {
-    if (region && String(region).trim()) parts.push(String(region).trim());
-  }
-  // the column is String(120); cut here so what is shown is what is stored
-  return parts.join('-').slice(0, TRIP_NAME_MAX);
-}
-
+// dropdown row that opens the strategy builder instead of picking a value
+const CREATE_STRATEGY_SENTINEL = "__create_strategy__";
+// the one built-in strategy that routes nothing, so it needs no stop target
+const MANUAL_STRATEGY = "manual";
 
 export default function WorkflowExecutionTaskDetail() {
   const [, params] = useRoute("/workflow-execution/:workflow_uuid/:execution_uuid");
@@ -85,11 +72,34 @@ export default function WorkflowExecutionTaskDetail() {
   const workflowUuid = params?.workflow_uuid || "";
   const executionUuid = params?.execution_uuid || "";
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
+  // Show the builder entry only to users who can actually POST it. The
+  // enforced backend gate for non-admins is the fine-grained endpoint ACL
+  // (routing_strategy:create), which /auth/me exposes as
+  // effective_permissions.endpoints (same source the Sidebar reads) — a role
+  // check would hide the entry from an explicitly-granted user and show it to
+  // an explicitly-revoked operation manager. Admins bypass the user ACL but
+  // the tenant feature cap (account_permissions) binds them too.
+  const grantsStrategy = (perms: any, action: string) =>
+    Array.isArray(perms?.endpoints?.routing_strategy) &&
+    perms.endpoints.routing_strategy.includes(action);
+  const userPerms = (user as any)?.effective_permissions ?? null;
+  const accountPerms = (user as any)?.account_permissions ?? null;
+  // create and update are SEPARATE grants (permissions.METHOD_ACTIONS maps
+  // POST->create, PUT->update), and the admin UI exposes them as independent
+  // checkboxes — so "create + read" is a real configuration. Gating the edit
+  // button on the create grant would show it to someone whose PUT 403s.
+  const canActOnStrategy = (action: string) =>
+    (isAdmin || (userPerms ? grantsStrategy(userPerms, action) : false)) &&
+    (!accountPerms || grantsStrategy(accountPerms, action));
+  const canCreateStrategy = canActOnStrategy('create');
+  const canUpdateStrategy = canActOnStrategy('update');
   const { t, te, tef } = useLanguage();
   const [selectedTaskExecutionUuid, setSelectedTaskExecutionUuid] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [strategyDialogOpen, setStrategyDialogOpen] = useState(false);
+  const [editingStrategy, setEditingStrategy] = useState<EditableStrategy | null>(null);
 
   // Fetch workflow execution details (includes task_executions)
   const { data: workflowExecution, isLoading: executionLoading, error: executionError } = useQuery<WorkflowExecution>({
@@ -131,6 +141,19 @@ export default function WorkflowExecutionTaskDetail() {
     },
     enabled: !!selectedTaskExecution?.task_uuid,
   });
+
+  // The strategy dropdown carries names only; editing one needs its uuid and
+  // stored config. Fetched only when this form has a strategy field and the
+  // user may write strategies, so read-only roles issue no request.
+  const isStartTripTask = task?.operator === "start_trip_operator";
+  const { data: savedStrategies } = useQuery<{ routing_strategies: EditableStrategy[] }>({
+    queryKey: ["/routing-strategy/"],
+    queryFn: () => apiRequest("/routing-strategy/?per_page=100"),
+    enabled: !!isStartTripTask && (canCreateStrategy || canUpdateStrategy),
+  });
+  const strategyByName = new Map(
+    (savedStrategies?.routing_strategies ?? []).map((row) => [row.name.toLowerCase(), row]),
+  );
 
   // Parse task inputs from the task definition
   const taskInputFields: TaskInputField[] = (() => {
@@ -207,7 +230,13 @@ export default function WorkflowExecutionTaskDetail() {
           fieldSchema = field.required ? z.string().min(1) : z.string();
           break;
         case 'checklist':
-          fieldSchema = z.array(z.string());
+          // same trap as the required select above: `required` on a checklist
+          // was decorative — [] passed and the backend 400ed with a raw toast
+          // instead of an inline error. Bites the setup form's assigned_date,
+          // the system's first required checklist.
+          fieldSchema = field.required
+            ? z.array(z.string()).min(1)
+            : z.array(z.string());
           break;
         case 'file_upload':
           fieldSchema = z.any(); // File uploads need special handling
@@ -230,6 +259,26 @@ export default function WorkflowExecutionTaskDetail() {
       schemaObject[field.name] = fieldSchema;
     });
     
+    // Cross-field rule: a saved routing strategy has no total target without
+    // desired_stops, and the backend refuses the submission (start_trip_operator).
+    // Enforce it here so the dispatcher gets an inline field error instead of a
+    // raw error toast after the round trip.
+    const hasStrategy = taskInputFields.some((f: any) => f?.name === 'strategy');
+    const hasDesiredStops = taskInputFields.some((f: any) => f?.name === 'desired_stops');
+    if (hasStrategy && hasDesiredStops) {
+      return z.object(schemaObject).superRefine((values: any, ctx) => {
+        const strategy = String(values?.strategy ?? '').trim();
+        if (!strategy || strategy.toLowerCase() === MANUAL_STRATEGY) return;
+        const stops = values?.desired_stops;
+        if (stops === undefined || stops === null || stops === '') {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['desired_stops'],
+            message: t('workflows.desiredStopsRequiredForStrategy'),
+          });
+        }
+      });
+    }
     return z.object(schemaObject);
   };
 
@@ -284,32 +333,6 @@ export default function WorkflowExecutionTaskDetail() {
   }, [selectedTaskExecution?.uuid, taskInputFields.length]);
 
   // Keep the suggested trip name in step with the assignee and the regions.
-  // Only ever overwrites a value this effect itself put there (or an empty
-  // field): the moment somebody types their own name it stops interfering,
-  // which is the difference between a helpful default and a fight.
-  const hasTripNameField = taskInputFields.some((f: any) => f?.name === 'trip_name');
-  const lastSuggestedName = useRef<string | null>(null);
-  const watchedAssignee = form.watch('assigned_user_uuid' as any);
-  const watchedRegions = form.watch('service_areas' as any);
-  useEffect(() => {
-    if (!hasTripNameField) return;
-    const suggestion = deriveTripName(
-      watchedAssignee as any,
-      Array.isArray(watchedRegions) ? (watchedRegions as string[]) : []
-    );
-    const current = form.getValues('trip_name' as any);
-    const untouched = !current || current === lastSuggestedName.current;
-    if (untouched && current !== suggestion) {
-      form.setValue('trip_name' as any, suggestion as any, { shouldDirty: false });
-    }
-    if (untouched) lastSuggestedName.current = suggestion;
-    // Deliberately NOT watching the name itself. Doing so re-filled the box the
-    // instant it went empty, so anyone who cleared the suggestion to type their
-    // own was fighting it from the first keystroke. Clearing now leaves it empty;
-    // changing a selection brings a suggestion back, which is the same escape
-    // hatch without the fight.
-  }, [hasTripNameField, watchedAssignee, JSON.stringify(watchedRegions)]);
-
   // Task execution completion mutation
   const completeTaskMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -530,10 +553,15 @@ export default function WorkflowExecutionTaskDetail() {
     return (completedCount / taskExecutions.length) * 100;
   };
 
-  // Extract trip route data for trip_operator and trip_create_operator tasks
+  // Route data for the TRIP step only. The planning steps (setup, route
+  // calculation, trip creation) deliberately draw nothing: before the driver
+  // is standing somewhere, any line on the map is a guess, and the map's
+  // polyline falls back to straight hops between stops when no road geometry
+  // exists — which reads as a planned route while being none. The trip step
+  // draws the real path, refreshed by the re-sort against the driver's
+  // position (POST /workflow-execution/<uuid>/resort-stops).
   const getTripRouteData = () => {
-    // Check if current task is trip_operator or trip_create_operator
-    if (!task || (task.operator !== "trip_operator" && task.operator !== "trip_create_operator")) {
+    if (!task || task.operator !== "trip_operator") {
       return null;
     }
 
@@ -894,18 +922,41 @@ export default function WorkflowExecutionTaskDetail() {
     const key = field.name;
 
     switch (field.type) {
-      case 'select':
+      case 'select': {
+        // the setup form's strategy dropdown carries a builder entry: picking
+        // it opens the create-strategy modal instead of selecting a value
+        const isStrategyField =
+          task?.operator === 'start_trip_operator' && field.name === 'strategy';
+        const offerCreateStrategy = isStrategyField && canCreateStrategy;
         return (
           <FormField
             key={key}
             control={form.control}
             name={key as any}
-            render={({ field: formField }) => (
+            render={({ field: formField }) => {
+              // the saved strategy currently selected, if any — derived from the
+              // controlled value so the edit button follows the selection
+              const editableSelectedStrategy = isStrategyField
+                ? strategyByName.get(String(formField.value ?? '').toLowerCase())
+                : undefined;
+              return (
               <FormItem>
                 <FormLabel>
                   {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
-                <Select onValueChange={formField.onChange} value={formField.value}>
+                <div className="flex items-center gap-2">
+                <div className="flex-1">
+                <Select
+                  onValueChange={(value) => {
+                    if (offerCreateStrategy && value === CREATE_STRATEGY_SENTINEL) {
+                      setEditingStrategy(null); // create, not edit
+                      setStrategyDialogOpen(true);
+                      return; // keep the current selection
+                    }
+                    formField.onChange(value);
+                  }}
+                  value={formField.value}
+                >
                   <FormControl>
                     <SelectTrigger data-testid={`select-${key}`}>
                       <SelectValue placeholder={field.placeholder || t('workflows.selectAnOption')} />
@@ -917,13 +968,45 @@ export default function WorkflowExecutionTaskDetail() {
                         {te(option)}
                       </SelectItem>
                     ))}
+                    {offerCreateStrategy && (
+                      <SelectItem value={CREATE_STRATEGY_SENTINEL} data-testid="create-strategy-option">
+                        {t('workflows.createStrategyOption')}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
+                </div>
+                {/* Edits the SELECTED strategy. Deliberately not a pencil
+                    inside each dropdown row: the shared SelectItem wraps its
+                    children in Radix's ItemText, which is mirrored into the
+                    collapsed trigger (the icon would reappear there as a dead
+                    control), and a button inside a listbox option cannot take
+                    keyboard focus. Beside the field it is a real focusable
+                    control that works for mouse and keyboard alike. */}
+                {isStrategyField && canUpdateStrategy && editableSelectedStrategy && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label={t('workflows.editStrategyTitle')}
+                    title={t('workflows.editStrategyTitle')}
+                    data-testid="edit-selected-strategy"
+                    onClick={() => {
+                      setEditingStrategy(editableSelectedStrategy);
+                      setStrategyDialogOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                </div>
                 <FormMessage />
               </FormItem>
-            )}
+              );
+            }}
           />
         );
+      }
 
       case 'checklist':
         return (
@@ -951,7 +1034,10 @@ export default function WorkflowExecutionTaskDetail() {
                               onCheckedChange={(checked) => {
                                 const current = Array.isArray(formField.value) ? (formField.value as string[]) : [];
                                 if (checked) {
-                                  formField.onChange([...current, option]);
+                                  // a single-pick checklist (multiple=false, e.g. the
+                                  // trip's assigned_date) replaces the selection —
+                                  // appending would submit two dates and be refused
+                                  formField.onChange(field.multiple === false ? [option] : [...current, option]);
                                 } else {
                                   formField.onChange(current.filter((v: string) => v !== option));
                                 }
@@ -1330,6 +1416,37 @@ export default function WorkflowExecutionTaskDetail() {
                   <div className="flex justify-between items-center">
                     <CardTitle>{t('workflows.taskExecutionProgress')}</CardTitle>
                     <div className="flex items-center gap-3">
+                      <CreateRoutingStrategyDialog
+                        open={strategyDialogOpen}
+                        onOpenChange={(next) => {
+                          setStrategyDialogOpen(next);
+                          if (!next) setEditingStrategy(null);
+                        }}
+                        editing={editingStrategy}
+                        onSaved={async (strategyName, previousName) => {
+                          // the dropdown's options come from the task read
+                          // (enriched server-side) and the edit button from the
+                          // strategy list — refresh BOTH before touching the
+                          // selection, so the value being set exists as an item
+                          const current = String(form.getValues("strategy" as any) ?? "");
+                          await Promise.all([
+                            queryClient.refetchQueries({
+                              queryKey: ["/task/", selectedTaskExecution?.task_uuid],
+                            }),
+                            queryClient.refetchQueries({ queryKey: ["/routing-strategy/"] }),
+                          ]);
+                          // Select the saved name only when it is this trip's
+                          // business: a fresh create (the dispatcher asked for
+                          // it), or a rename of the strategy already selected.
+                          // Editing any OTHER strategy must not silently switch
+                          // the trip onto it.
+                          const renamedTheSelectedOne =
+                            !!previousName && previousName.toLowerCase() === current.toLowerCase();
+                          if (!previousName || renamedTheSelectedOne) {
+                            form.setValue("strategy" as any, strategyName, { shouldValidate: true });
+                          }
+                        }}
+                      />
                       {canAddStop && (
                         <AddStopDialog
                           workflowExecutionUuid={executionUuid}

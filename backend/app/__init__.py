@@ -42,6 +42,7 @@ from app.entrypoint.routes.workflow_execution import workflow_execution_blueprin
 from app.entrypoint.routes.task_execution import task_execution_blueprint
 from app.entrypoint.routes.quality_control import quality_control_blueprint
 from app.entrypoint.routes.vehicle import vehicle_blueprint
+from app.entrypoint.routes.routing_strategy import routing_strategy_blueprint
 from app.entrypoint.routes.service_area import service_area_blueprint
 from app.entrypoint.routes.location import location_blueprint
 from app.entrypoint.routes.trip import trip_blueprint
@@ -326,6 +327,7 @@ def create_app(config_object=Config):
     app.register_blueprint(task_execution_blueprint, url_prefix='/task-execution')
     app.register_blueprint(quality_control_blueprint, url_prefix='/quality-control')
     app.register_blueprint(vehicle_blueprint, url_prefix='/vehicle')
+    app.register_blueprint(routing_strategy_blueprint, url_prefix='/routing-strategy')
     app.register_blueprint(service_area_blueprint, url_prefix='/service-area')
     app.register_blueprint(location_blueprint, url_prefix='/location')
     app.register_blueprint(trip_blueprint, url_prefix='/trip')

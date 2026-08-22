@@ -414,6 +414,72 @@ def set_current_stop(uuid: str):
         }
     return jsonify(result), 200
 
+@workflow_execution_blueprint.route("/<string:uuid>/resort-stops", methods=["POST"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.OPERATOR.value,
+    PermissionScope.DRIVER.value,
+    PermissionScope.SALES.value)
+def resort_stops(uuid: str):
+    """Reorder the remaining stops nearest-first from the caller's position.
+
+    Rewires the depends_on chain (the order the driver is actually unlocked
+    in), renumbers trip_stop.index, and refreshes the route step's stored
+    waypoints/route_coordinates so both clients' maps draw the path that is
+    now planned rather than the one computed at setup.
+    """
+    from app.domains.trip.stop_resort import resort_pending_stops
+    from app.dto.task_execution import OperatorType
+    from app.dto.trip import TripStatus
+    from app.dto.workflow_execution import ResortStopsParams
+
+    params = ResortStopsParams(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid, is_deleted=False)
+        if not workflow_exe:
+            raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
+        _assert_execution_access(uow, workflow_exe)
+        trips = workflow_exe.trips
+        if not trips:
+            raise BadRequestError("This workflow execution has no trip yet")
+        if trips[0].status != TripStatus.IN_PROGRESS.value:
+            raise BadRequestError(f"Trip is not in progress (status: {trips[0].status})")
+
+        result = resort_pending_stops(
+            uow=uow,
+            workflow_exe=workflow_exe,
+            latitude=params.latitude,
+            longitude=params.longitude,
+        )
+
+        # the maps read waypoints/route_coordinates off the route step's result,
+        # so the freshly planned path belongs there — keeping customer_uuids
+        # untouched, since that is what the trip was built from
+        route_exe = next(
+            (te for te in workflow_exe.task_executions
+             if te.operator == OperatorType.TRIP_ROUTE_OPERATOR.value),
+            None,
+        )
+        if route_exe is not None:
+            stored = dict(route_exe.result or {})
+            stored["waypoints"] = [list(p) for p in result["waypoints"]]
+            stored["route_coordinates"] = [list(p) for p in result["route_coordinates"]]
+            route_exe.result = stored
+            uow.task_execution_repository.save(model=route_exe, commit=False)
+
+        uow.commit()
+    return jsonify({
+        "task_execution_uuids": result["task_execution_uuids"],
+        "current_task_execution_uuid": result["current_task_execution_uuid"],
+        "stop_count": len(result["task_execution_uuids"]),
+        "waypoints": [list(p) for p in result["waypoints"]],
+        "route_coordinates": [list(p) for p in result["route_coordinates"]],
+    }), 200
+
+
 # # Route to update a Workflow
 # @workflow_execution_blueprint.route("/<string:uuid>", methods=["PUT"])
 # @jwt_required()

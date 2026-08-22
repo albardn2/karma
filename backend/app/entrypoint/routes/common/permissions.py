@@ -120,7 +120,7 @@ RESOURCES = [
     "dashboard", "debit_note_item", "employee", "exchange_rate", "expense",
     "financial_account", "fixed_asset", "inventory", "inventory_event",
     "invoice", "invoice_item", "location", "material", "payment", "payout",
-    "pricing", "process", "process_template", "purchase_order",
+    "pricing", "process", "process_template", "purchase_order", "routing_strategy",
     "purchase_order_item", "quality_control", "service_area", "task",
     "task_execution", "transaction", "trip", "trip_stop", "vehicle",
     "vehicle_inventory", "vehicle_inventory_event", "vendor", "warehouse",

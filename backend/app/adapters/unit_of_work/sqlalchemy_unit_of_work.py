@@ -38,6 +38,7 @@ from app.adapters.repositories.task_execution_repository import TaskExecutionRep
 from app.adapters.repositories.quality_control_repository import QualityControlRepository
 from app.adapters.repositories.vehicle_repository import VehicleRepository
 from app.adapters.repositories.service_area_repository import ServiceAreaRepository
+from app.adapters.repositories.routing_strategy_repository import RoutingStrategyRepository
 from app.adapters.repositories.trip_repository import TripRepository
 from app.adapters.repositories.trip_stop_repository import TripStopRepository
 from app.adapters.repositories.vehicle_inventory_repository import VehicleInventoryRepository
@@ -111,6 +112,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.quality_control_repository = QualityControlRepository(session=self.session, account_uuid=self.account_uuid)
         self.vehicle_repository = VehicleRepository(session=self.session, account_uuid=self.account_uuid)
         self.service_area_repository = ServiceAreaRepository(session=self.session, account_uuid=self.account_uuid)
+        self.routing_strategy_repository = RoutingStrategyRepository(session=self.session, account_uuid=self.account_uuid)
         self.trip_repository = TripRepository(session=self.session, account_uuid=self.account_uuid)
         self.trip_stop_repository = TripStopRepository(session=self.session, account_uuid=self.account_uuid)
         self.vehicle_inventory_repository = VehicleInventoryRepository(session=self.session, account_uuid=self.account_uuid)

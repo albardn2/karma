@@ -94,6 +94,10 @@ const ENUM_AR: Record<string, string> = {
   vehicle_plate: 'لوحة المركبة',
   last_visit_threshold_days: 'مدة آخر زيارة (أيام)',
   max_stops: 'الحد الأقصى للمحطات',
+  // 2026-08 setup form revamp
+  assigned_date: 'تاريخ الرحلة',
+  desired_stops: 'عدد المحطات المطلوب',
+  strategy: 'الاستراتيجية',
   min_stops: 'الحد الأدنى للمحطات',
   outcome: 'النتيجة',
   notes: 'ملاحظات',

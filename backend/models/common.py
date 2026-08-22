@@ -1865,11 +1865,14 @@ class CreditNoteItem(Base):
 
     @amount_paid.expression
     def amount_paid(cls):
+        # filters PAYOUT rows, matching the Python branch above — this said
+        # Payment.is_deleted for a while (copy-paste from the debit twin),
+        # which cross-joined the unrelated payment table into the subquery
         return (
             select(func.coalesce(func.sum(Payout.amount), 0))
             .where(
                 Payout.credit_note_item_uuid == cls.uuid,
-                Payment.is_deleted.is_(False)
+                Payout.is_deleted.is_(False)
             )
             .scalar_subquery()
         )
@@ -2116,6 +2119,26 @@ class ServiceArea(Base):
     is_deleted  = Column(Boolean, default=False)
     created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+class RoutingStrategy(Base):
+    """A saved priority-routing recipe for trip setup (2026-08 revamp).
+
+    `config` holds the ordered priorities, each with its filters (tags,
+    category, debt, last-effective-stop age) and an optional per-priority
+    stop cap — shape validated by app/dto/routing_strategy.RoutingStrategyConfig.
+    The strategy is offered by NAME in the setup form's dropdown next to the
+    built-in 'manual', and looked up case-insensitively when the route step
+    runs. Tenant-scoped: each account curates its own strategies.
+    """
+    __tablename__ = "routing_strategy"
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    name = Column(String(64), nullable=False)
+    config = Column(JSONB, nullable=False)
+    is_deleted = Column(Boolean, nullable=False, default=False, server_default=false())
+
 
 class Trip(Base):
     __tablename__ = "trip"

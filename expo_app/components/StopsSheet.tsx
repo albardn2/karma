@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Pressable,
   PanResponder,
@@ -43,6 +44,8 @@ export function StopsSheet({
   onAddStop,
   onAddExpense,
   onSetCurrent,
+  onResort,
+  resorting,
   armedStopUuid,
   onArm,
   finishAction,
@@ -55,6 +58,10 @@ export function StopsSheet({
   // corner, since this is where the driver's thumb already is
   onAddExpense?: () => void;
   onSetCurrent?: (stop: SheetStop) => void;
+  // Reorder the stops that are still open, nearest-first from the driver's
+  // current position — the plan made this morning is not the plan at 3pm.
+  onResort?: () => void | Promise<unknown>;
+  resorting?: boolean;
   // The armed "Set current" selection is lifted to the parent so a tap
   // anywhere else — on the map or in this list — dismisses it.
   armedStopUuid?: string | null;
@@ -136,6 +143,20 @@ export function StopsSheet({
               {onAddExpense && (
                 <TouchableOpacity style={styles.expenseBtn} onPress={onAddExpense} testID="sheet-add-expense">
                   <ThemedText style={styles.expenseBtnText}>{t('tripExpense.button')}</ThemedText>
+                </TouchableOpacity>
+              )}
+              {onResort && (
+                <TouchableOpacity
+                  style={[styles.expenseBtn, resorting && styles.btnBusy]}
+                  onPress={() => { if (!resorting) onResort(); }}
+                  disabled={resorting}
+                  testID="sheet-resort"
+                >
+                  {resorting ? (
+                    <ActivityIndicator size="small" color="#4B5563" />
+                  ) : (
+                    <ThemedText style={styles.expenseBtnText}>{t('sheet.resort')}</ThemedText>
+                  )}
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={styles.addBtn} onPress={onAddStop} testID="sheet-add-stop">
@@ -229,6 +250,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)', backgroundColor: '#fff',
   },
   expenseBtnText: { fontSize: 12, fontWeight: '700', color: '#111827' },
+  // keeps the pill the same size while the spinner replaces its label, so the
+  // header does not jump when a re-sort is running
+  btnBusy: { opacity: 0.6, minWidth: 64, alignItems: 'center' },
   addBtn: { backgroundColor: '#5469D4', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   list: { paddingHorizontal: 16, paddingTop: 8 },
