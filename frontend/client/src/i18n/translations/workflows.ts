@@ -147,6 +147,7 @@ export const en: Record<string, string> = {
   'workflows.noInputFields': 'No input fields defined for this task.',
   'workflows.selectAnOption': 'Select an option',
   // strategy builder (priority routing, 2026-08)
+  'workflows.desiredStopsRequiredForStrategy': 'Set the desired number of stops for this strategy',
   'workflows.createStrategyOption': '+ Create new strategy',
   'workflows.createStrategyTitle': 'Create routing strategy',
   'workflows.createStrategyDescription': 'Ordered priorities: each one filters customers, the tightest group is picked, and the walk stops at the desired number of stops.',
@@ -391,6 +392,7 @@ export const ar: Record<string, string> = {
   'workflows.noInputFields': 'لا توجد حقول إدخال معرّفة لهذه المهمة.',
   'workflows.selectAnOption': 'اختر خياراً',
   // منشئ الاستراتيجية (التوجيه بالأولويات، 2026-08)
+  'workflows.desiredStopsRequiredForStrategy': 'حدد عدد المحطات المطلوب لهذه الاستراتيجية',
   'workflows.createStrategyOption': '+ إنشاء استراتيجية جديدة',
   'workflows.createStrategyTitle': 'إنشاء استراتيجية توجيه',
   'workflows.createStrategyDescription': 'أولويات مرتّبة: كل أولوية ترشّح العملاء، وتُختار المجموعة الأقرب مكانياً، ويتوقف السير عند عدد المحطات المطلوب.',

@@ -114,6 +114,13 @@ export default function StartTripScreen() {
     if (!values['vehicle_plate']) return t('start.selectVehicle');
     if (!values['assigned_user_uuid']) return t('start.selectAssignedUser');
     if (!(values['assigned_date'] || []).length) return t('start.selectAssignedDate');
+    // a saved routing strategy has no total target without desired_stops, and
+    // the backend refuses the submission — catch it before the round trip,
+    // which on this screen would also roll the new execution back
+    const strategy = String(values['strategy'] ?? '').trim();
+    if (strategy && strategy.toLowerCase() !== 'manual' && !String(values['desired_stops'] ?? '').trim()) {
+      return t('start.desiredStopsRequiredForStrategy');
+    }
     return null;
   };
 

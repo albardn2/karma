@@ -62,6 +62,8 @@ import type { TaskInputField, FieldType } from "@/types/taskInputs";
 
 // dropdown row that opens the strategy builder instead of picking a value
 const CREATE_STRATEGY_SENTINEL = "__create_strategy__";
+// the one built-in strategy that routes nothing, so it needs no stop target
+const MANUAL_STRATEGY = "manual";
 
 export default function WorkflowExecutionTaskDetail() {
   const [, params] = useRoute("/workflow-execution/:workflow_uuid/:execution_uuid");
@@ -236,6 +238,26 @@ export default function WorkflowExecutionTaskDetail() {
       schemaObject[field.name] = fieldSchema;
     });
     
+    // Cross-field rule: a saved routing strategy has no total target without
+    // desired_stops, and the backend refuses the submission (start_trip_operator).
+    // Enforce it here so the dispatcher gets an inline field error instead of a
+    // raw error toast after the round trip.
+    const hasStrategy = taskInputFields.some((f: any) => f?.name === 'strategy');
+    const hasDesiredStops = taskInputFields.some((f: any) => f?.name === 'desired_stops');
+    if (hasStrategy && hasDesiredStops) {
+      return z.object(schemaObject).superRefine((values: any, ctx) => {
+        const strategy = String(values?.strategy ?? '').trim();
+        if (!strategy || strategy.toLowerCase() === MANUAL_STRATEGY) return;
+        const stops = values?.desired_stops;
+        if (stops === undefined || stops === null || stops === '') {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['desired_stops'],
+            message: t('workflows.desiredStopsRequiredForStrategy'),
+          });
+        }
+      });
+    }
     return z.object(schemaObject);
   };
 
