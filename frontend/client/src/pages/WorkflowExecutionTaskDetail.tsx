@@ -80,14 +80,20 @@ export default function WorkflowExecutionTaskDetail() {
   // check would hide the entry from an explicitly-granted user and show it to
   // an explicitly-revoked operation manager. Admins bypass the user ACL but
   // the tenant feature cap (account_permissions) binds them too.
-  const grantsStrategyCreate = (perms: any) =>
+  const grantsStrategy = (perms: any, action: string) =>
     Array.isArray(perms?.endpoints?.routing_strategy) &&
-    perms.endpoints.routing_strategy.includes('create');
+    perms.endpoints.routing_strategy.includes(action);
   const userPerms = (user as any)?.effective_permissions ?? null;
   const accountPerms = (user as any)?.account_permissions ?? null;
-  const canCreateStrategy =
-    (isAdmin || (userPerms ? grantsStrategyCreate(userPerms) : false)) &&
-    (!accountPerms || grantsStrategyCreate(accountPerms));
+  // create and update are SEPARATE grants (permissions.METHOD_ACTIONS maps
+  // POST->create, PUT->update), and the admin UI exposes them as independent
+  // checkboxes — so "create + read" is a real configuration. Gating the edit
+  // button on the create grant would show it to someone whose PUT 403s.
+  const canActOnStrategy = (action: string) =>
+    (isAdmin || (userPerms ? grantsStrategy(userPerms, action) : false)) &&
+    (!accountPerms || grantsStrategy(accountPerms, action));
+  const canCreateStrategy = canActOnStrategy('create');
+  const canUpdateStrategy = canActOnStrategy('update');
   const { t, te, tef } = useLanguage();
   const [selectedTaskExecutionUuid, setSelectedTaskExecutionUuid] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -143,7 +149,7 @@ export default function WorkflowExecutionTaskDetail() {
   const { data: savedStrategies } = useQuery<{ routing_strategies: EditableStrategy[] }>({
     queryKey: ["/routing-strategy/"],
     queryFn: () => apiRequest("/routing-strategy/?per_page=100"),
-    enabled: !!isStartTripTask && canCreateStrategy,
+    enabled: !!isStartTripTask && (canCreateStrategy || canUpdateStrategy),
   });
   const strategyByName = new Map(
     (savedStrategies?.routing_strategies ?? []).map((row) => [row.name.toLowerCase(), row]),
@@ -922,11 +928,19 @@ export default function WorkflowExecutionTaskDetail() {
             key={key}
             control={form.control}
             name={key as any}
-            render={({ field: formField }) => (
+            render={({ field: formField }) => {
+              // the saved strategy currently selected, if any — derived from the
+              // controlled value so the edit button follows the selection
+              const editableSelectedStrategy = isStrategyField
+                ? strategyByName.get(String(formField.value ?? '').toLowerCase())
+                : undefined;
+              return (
               <FormItem>
                 <FormLabel>
                   {tef(field.name)} {field.required && <span className="text-red-500">*</span>}
                 </FormLabel>
+                <div className="flex items-center gap-2">
+                <div className="flex-1">
                 <Select
                   onValueChange={(value) => {
                     if (offerCreateStrategy && value === CREATE_STRATEGY_SENTINEL) {
@@ -944,45 +958,11 @@ export default function WorkflowExecutionTaskDetail() {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {field.options?.map((option) => {
-                      // saved strategies get an inline edit affordance; the
-                      // built-in "manual" has nothing to edit
-                      const editable = offerCreateStrategy
-                        ? strategyByName.get(option.toLowerCase())
-                        : undefined;
-                      return (
-                        <SelectItem key={option} value={option}>
-                          <span className="flex items-center gap-2">
-                            {te(option)}
-                            {editable && (
-                              <span
-                                role="button"
-                                tabIndex={-1}
-                                aria-label={t('workflows.editStrategyTitle')}
-                                title={t('workflows.editStrategyTitle')}
-                                className="opacity-60 hover:opacity-100"
-                                data-testid={`edit-strategy-${option}`}
-                                // Radix selects the row on pointerup, so the
-                                // pointer events are stopped here. If a build
-                                // of Radix ever selects anyway the fallback is
-                                // benign: the row is chosen AND the editor
-                                // opens for that same strategy.
-                                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                onPointerUp={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setEditingStrategy(editable);
-                                  setStrategyDialogOpen(true);
-                                }}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </span>
-                            )}
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
+                    {field.options?.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {te(option)}
+                      </SelectItem>
+                    ))}
                     {offerCreateStrategy && (
                       <SelectItem value={CREATE_STRATEGY_SENTINEL} data-testid="create-strategy-option">
                         {t('workflows.createStrategyOption')}
@@ -990,9 +970,35 @@ export default function WorkflowExecutionTaskDetail() {
                     )}
                   </SelectContent>
                 </Select>
+                </div>
+                {/* Edits the SELECTED strategy. Deliberately not a pencil
+                    inside each dropdown row: the shared SelectItem wraps its
+                    children in Radix's ItemText, which is mirrored into the
+                    collapsed trigger (the icon would reappear there as a dead
+                    control), and a button inside a listbox option cannot take
+                    keyboard focus. Beside the field it is a real focusable
+                    control that works for mouse and keyboard alike. */}
+                {isStrategyField && canUpdateStrategy && editableSelectedStrategy && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label={t('workflows.editStrategyTitle')}
+                    title={t('workflows.editStrategyTitle')}
+                    data-testid="edit-selected-strategy"
+                    onClick={() => {
+                      setEditingStrategy(editableSelectedStrategy);
+                      setStrategyDialogOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                </div>
                 <FormMessage />
               </FormItem>
-            )}
+              );
+            }}
           />
         );
       }
@@ -1412,19 +1418,28 @@ export default function WorkflowExecutionTaskDetail() {
                           if (!next) setEditingStrategy(null);
                         }}
                         editing={editingStrategy}
-                        onSaved={async (strategyName) => {
+                        onSaved={async (strategyName, previousName) => {
                           // the dropdown's options come from the task read
-                          // (enriched server-side) and the editable rows from
-                          // the strategy list — refresh BOTH, then select the
-                          // saved name so its item exists (a rename would
-                          // otherwise leave the old value selected)
+                          // (enriched server-side) and the edit button from the
+                          // strategy list — refresh BOTH before touching the
+                          // selection, so the value being set exists as an item
+                          const current = String(form.getValues("strategy" as any) ?? "");
                           await Promise.all([
                             queryClient.refetchQueries({
                               queryKey: ["/task/", selectedTaskExecution?.task_uuid],
                             }),
                             queryClient.refetchQueries({ queryKey: ["/routing-strategy/"] }),
                           ]);
-                          form.setValue("strategy" as any, strategyName, { shouldValidate: true });
+                          // Select the saved name only when it is this trip's
+                          // business: a fresh create (the dispatcher asked for
+                          // it), or a rename of the strategy already selected.
+                          // Editing any OTHER strategy must not silently switch
+                          // the trip onto it.
+                          const renamedTheSelectedOne =
+                            !!previousName && previousName.toLowerCase() === current.toLowerCase();
+                          if (!previousName || renamedTheSelectedOne) {
+                            form.setValue("strategy" as any, strategyName, { shouldValidate: true });
+                          }
                         }}
                       />
                       {canAddStop && (

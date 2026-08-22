@@ -111,8 +111,10 @@ interface CreateRoutingStrategyDialogProps {
   onOpenChange: (open: boolean) => void;
   // present = edit that strategy; absent = create a new one
   editing?: EditableStrategy | null;
-  // called with the saved strategy's canonical name after a successful save
-  onSaved: (name: string) => void;
+  // (canonical saved name, the name it had before this save or null when it
+  // was just created) — the caller needs the previous name to decide whether
+  // the trip's selection should follow a rename
+  onSaved: (name: string, previousName: string | null) => void;
 }
 
 export function CreateRoutingStrategyDialog({
@@ -226,7 +228,7 @@ export function CreateRoutingStrategyDialog({
       setName("");
       setPriorities([emptyPriority()]);
       onOpenChange(false);
-      onSaved(saved.name);
+      onSaved(saved.name, editing?.name ?? null);
     },
     onError: (error) => {
       toast({
