@@ -155,6 +155,12 @@ export default function WorkflowExecutionTaskDetail() {
     (savedStrategies?.routing_strategies ?? []).map((row) => [row.name.toLowerCase(), row]),
   );
 
+  // The 4th step IS the start, so the trip is under way exactly once that step
+  // has completed. Used to decide whether the map shows a preview or the path.
+  const tripStarted = taskExecutions.some(
+    (te: any) => te.operator === "trip_operator" && te.status === "completed"
+  );
+
   // Parse task inputs from the task definition
   const taskInputFields: TaskInputField[] = (() => {
     if (!task?.taskInputs) return [];
@@ -1491,15 +1497,32 @@ export default function WorkflowExecutionTaskDetail() {
                     </p>
                   </CardHeader>
                   <CardContent>
-                    {/* Trip Operator Map */}
+                    {/* The trip step's map. BEFORE the driver starts, this is a
+                        preview: pins only, because the driving path is worked
+                        out from their real position the moment they hit Start.
+                        Afterwards the stored path exists and is drawn. */}
                     {tripRouteData && (
                       <div className="mb-6">
                         <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
-                          {t('workflows.tripRoute')}
+                          {tripStarted ? t('workflows.tripRoute') : t('workflows.tripPreview')}
                         </h3>
+                        {!tripStarted && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-3" data-testid="text-trip-preview-hint">
+                            {t('workflows.tripPreviewHint', {
+                              count: String(tripRouteData.waypoints.length),
+                            })}
+                          </p>
+                        )}
                         <TripOperatorMap
                           waypoints={tripRouteData.waypoints}
                           routeCoordinates={tripRouteData.routeCoordinates}
+                          /* Draw a line only when a REAL road path exists. It is
+                             written by the re-sort against the driver's position
+                             after they start; until then (and on a trip started
+                             from the web, where nothing re-sorts) there is none,
+                             and this component would otherwise join the stops
+                             with straight lines that read as a planned route. */
+                          pointsOnly={(tripRouteData.routeCoordinates?.length ?? 0) === 0}
                         />
                       </div>
                     )}

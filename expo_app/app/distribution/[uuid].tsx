@@ -303,10 +303,15 @@ export default function ExecutionDetailScreen() {
     })();
   }, [activeTask?.uuid, tripPhase]);
 
-  // load all trip stops with coordinates (map mode)
+  // The 4th step previews where the trip will go, so the stops are needed
+  // before the trip is under way too — but only there, not on the setup /
+  // route / create steps, which would fetch a task per stop for nothing.
+  const previewingStops = !tripPhase && activeTask?.operator === 'trip_operator';
+
+  // load all trip stops with coordinates (map mode + the 4th-step preview)
   useEffect(() => {
     (async () => {
-      if (!tripPhase || stopTasks.length === 0) { setTripStops([]); return; }
+      if ((!tripPhase && !previewingStops) || stopTasks.length === 0) { setTripStops([]); return; }
       setStopsLoading(true);
       const built = (
         await Promise.all(
@@ -347,7 +352,7 @@ export default function ExecutionDetailScreen() {
       setStopsLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopSignature, tripPhase]);
+  }, [stopSignature, tripPhase, previewingStops]);
 
   // The road path the last re-sort planned. It lives on the route step's result,
   // which /resort-stops rewrites, so it is the path through the stops as they
@@ -624,6 +629,28 @@ export default function ExecutionDetailScreen() {
             {activeFields.length > 0 && (
               <ThemedText style={styles.actionHint}>{t('trip.stepHasInputs')}</ThemedText>
             )}
+            {/* Where this trip will go, before committing to it. Pins only:
+                the driving path is computed from the driver's actual position
+                the moment they hit Start, so drawing one now would be a guess
+                (and TripMap would happily join the pins with straight lines). */}
+            {previewingStops && tripStops.length > 0 && (
+              <View style={styles.previewMap} testID="trip-preview-map">
+                <TripMap
+                  stops={tripStops}
+                  currentStopUuid={null}
+                  onStopPress={() => {}}
+                  areas={serviceAreas}
+                  routePath={[]}
+                />
+              </View>
+            )}
+            {previewingStops && (
+              <ThemedText style={styles.actionHint}>
+                {stopsLoading
+                  ? t('trip.previewLoading')
+                  : t('trip.previewStops', { count: String(tripStops.length) })}
+              </ThemedText>
+            )}
             <TouchableOpacity
               style={[styles.actionButton, (submitting || activeFields.length > 0) && styles.actionButtonDisabled]}
               onPress={completeActive}
@@ -698,6 +725,12 @@ const styles = StyleSheet.create({
   actionCard: { borderRadius: 12, borderWidth: 1, borderColor: 'rgba(84,105,212,0.25)', backgroundColor: 'rgba(84,105,212,0.06)', padding: 16, marginBottom: 20 },
   actionHeading: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', opacity: 0.6, letterSpacing: 0.5 },
   actionTaskName: { fontSize: 18, fontWeight: '700', marginTop: 4, marginBottom: 12 },
+  // a fixed height because TripMap fills its parent and a ScrollView gives it
+  // none; rounded+clipped so the map corners follow the card
+  previewMap: {
+    height: 220, borderRadius: 12, overflow: 'hidden', marginTop: 12,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
+  },
   actionHint: { fontSize: 13, opacity: 0.6, marginBottom: 12 },
   doneText: { fontSize: 15, fontWeight: '600', textAlign: 'center', paddingVertical: 8 },
   actionButton: { marginTop: 4, backgroundColor: '#5469D4', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
