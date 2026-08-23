@@ -250,19 +250,29 @@ class CreateTripOperator(OperatorInterface):
                                    name=self.get_trip_name(),
                                    created_by_uuid=payload.completed_by_uuid,
                                    vehicle_uuid=vehicle.uuid,
-                                   status=TripStatus.IN_PROGRESS.value,
+                                   # PLANNED, not in progress: the trip exists so
+                                   # stops can be laid out, but nobody has set
+                                   # off yet. TripOperator (the 4th step) is what
+                                   # starts it — which is also what makes per-trip
+                                   # location tracking begin, since the ingest
+                                   # only stamps pings for in-progress trips.
+                                   status=TripStatus.PLANNED.value,
                                    start_warehouse_uuid=start_warehouse.uuid if start_warehouse else None,
                                    end_warehouse_uuid=end_warehouse.uuid if end_warehouse else None,
-                                   start_time=datetime.now(),
+                                   # stamped when the trip actually starts
+                                   # (TripOperator), so the location playback
+                                   # window covers driving rather than planning
+                                   start_time=None,
                                    service_area_names = service_area_names or [],
                                    workflow_execution_uuid=task_exe.workflow_execution.uuid,
                                ))
 
-        # snapshot the vehicle's per-material inventory at trip start
-        from app.domains.vehicle_inventory.domain import VehicleInventoryDomain
+        # The opening stock snapshot is NOT taken here. The trip is only planned
+        # at this point — the van gets loaded between planning and setting off,
+        # so a snapshot now would record an empty van, and every trip-summary
+        # reading the planned trip would report that stock as "loaded". It is
+        # taken when the trip actually starts (TripOperator).
         trip = task_exe.workflow_execution.trips[0]
-        trip.start_inventory = VehicleInventoryDomain.balances_for_vehicle(uow=uow, vehicle_uuid=vehicle.uuid)
-        uow.trip_repository.save(model=trip, commit=False)
 
         # create trip stops (routed mode; manual mode has no pre-computed customers)
         created_task_names = []

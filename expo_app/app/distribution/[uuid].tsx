@@ -303,10 +303,15 @@ export default function ExecutionDetailScreen() {
     })();
   }, [activeTask?.uuid, tripPhase]);
 
-  // load all trip stops with coordinates (map mode)
+  // The 4th step previews where the trip will go, so the stops are needed
+  // before the trip is under way too — but only there, not on the setup /
+  // route / create steps, which would fetch a task per stop for nothing.
+  const previewingStops = !tripPhase && activeTask?.operator === 'trip_operator';
+
+  // load all trip stops with coordinates (map mode + the 4th-step preview)
   useEffect(() => {
     (async () => {
-      if (!tripPhase || stopTasks.length === 0) { setTripStops([]); return; }
+      if ((!tripPhase && !previewingStops) || stopTasks.length === 0) { setTripStops([]); return; }
       setStopsLoading(true);
       const built = (
         await Promise.all(
@@ -347,7 +352,7 @@ export default function ExecutionDetailScreen() {
       setStopsLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopSignature, tripPhase]);
+  }, [stopSignature, tripPhase, previewingStops]);
 
   // The road path the last re-sort planned. It lives on the route step's result,
   // which /resort-stops rewrites, so it is the path through the stops as they
@@ -468,7 +473,7 @@ export default function ExecutionDetailScreen() {
             method: 'POST',
             body: JSON.stringify({ uuid: finishTask.uuid, result: {} }),
           });
-          if (res.status !== 200) Alert.alert(t('trip.error'), res.error || t('trip.couldNotFinishTrip'));
+          if (res.status !== 200) Alert.alert(t('trip.error'), errorMessage(res.error, t('trip.couldNotFinishTrip')));
           else fetchExecution(false);
         },
       },
@@ -483,7 +488,10 @@ export default function ExecutionDetailScreen() {
         method: 'POST',
         body: JSON.stringify({ uuid: activeTask.uuid, result: {} }),
       });
-      if (res.status !== 200) throw new Error(res.error || t('trip.failedToCompleteTask'));
+      // the 4th step can now 400 routinely ("already has a trip under way"),
+      // and res.error is the raw response body — unwrap it or the driver
+      // reads literal JSON
+      if (res.status !== 200) throw new Error(errorMessage(res.error, t('trip.failedToCompleteTask')));
       // Completing the TRIP step is the moment the driver actually sets off,
       // so the plan is re-sorted around where they are standing rather than
       // around wherever it was computed at setup. Best-effort: resortStops
@@ -624,13 +632,52 @@ export default function ExecutionDetailScreen() {
             {activeFields.length > 0 && (
               <ThemedText style={styles.actionHint}>{t('trip.stepHasInputs')}</ThemedText>
             )}
+            {/* Where this trip will go, before committing to it. Pins only:
+                the driving path is computed from the driver's actual position
+                the moment they hit Start, so drawing one now would be a guess
+                (and TripMap would happily join the pins with straight lines). */}
+            {previewingStops && tripStops.length > 0 && (
+              <View style={styles.previewMap} testID="trip-preview-map">
+                <TripMap
+                  stops={tripStops}
+                  currentStopUuid={null}
+                  onStopPress={() => {}}
+                  areas={serviceAreas}
+                  routePath={[]}
+                  frameAllStops
+                />
+              </View>
+            )}
+            {/* keyed on stopTasks (known synchronously), not the fetched pins:
+                a MANUAL trip correctly has zero planned stops — telling its
+                driver "0 stops planned, a route is coming" would be wrong on
+                both counts — and a routed trip must not flash "0" while the
+                pins are still loading */}
+            {previewingStops && stopTasks.length > 0 && (
+              <ThemedText style={styles.actionHint}>
+                {stopsLoading
+                  ? t('trip.previewLoading')
+                  : stopTasks.length === 1
+                    ? t('trip.previewStopsOne')
+                    : t('trip.previewStops', { count: String(stopTasks.length) })}
+              </ThemedText>
+            )}
             <TouchableOpacity
               style={[styles.actionButton, (submitting || activeFields.length > 0) && styles.actionButtonDisabled]}
               onPress={completeActive}
               disabled={submitting || activeFields.length > 0}
               testID="button-complete-active"
             >
-              {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.actionButtonText}>{t('trip.completeTask', { task: taskLabel(activeTask, t) })}</ThemedText>}
+              {submitting ? <ActivityIndicator color="#fff" /> : (
+                <ThemedText style={styles.actionButtonText}>
+                  {/* the 4th step is not "completing a task", it is setting off:
+                      it flips the trip from planned to under way (and starts
+                      per-trip location tracking), so it says so */}
+                  {activeTask.operator === 'trip_operator'
+                    ? t('trip.startTripButton')
+                    : t('trip.completeTask', { task: taskLabel(activeTask, t) })}
+                </ThemedText>
+              )}
             </TouchableOpacity>
           </View>
         ) : (
@@ -689,6 +736,12 @@ const styles = StyleSheet.create({
   actionCard: { borderRadius: 12, borderWidth: 1, borderColor: 'rgba(84,105,212,0.25)', backgroundColor: 'rgba(84,105,212,0.06)', padding: 16, marginBottom: 20 },
   actionHeading: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', opacity: 0.6, letterSpacing: 0.5 },
   actionTaskName: { fontSize: 18, fontWeight: '700', marginTop: 4, marginBottom: 12 },
+  // a fixed height because TripMap fills its parent and a ScrollView gives it
+  // none; rounded+clipped so the map corners follow the card
+  previewMap: {
+    height: 220, borderRadius: 12, overflow: 'hidden', marginTop: 12,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
+  },
   actionHint: { fontSize: 13, opacity: 0.6, marginBottom: 12 },
   doneText: { fontSize: 15, fontWeight: '600', textAlign: 'center', paddingVertical: 8 },
   actionButton: { marginTop: 4, backgroundColor: '#5469D4', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },

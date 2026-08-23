@@ -49,3 +49,34 @@ def resolve_strategy(result) -> str:
     if "start_warehouse_name" in result:
         return LEGACY_CLUSTER
     return MANUAL
+
+
+def resolve_assignee(uow, raw):
+    """The user a setup result names, or None.
+
+    The form stores whichever identifier the client sent — a uuid from the web,
+    a username from the app — so both are tried. Callers key their guards off
+    the resolved user's UNIQUE identifiers rather than the raw string, because a
+    first name is not unique and would silently collide.
+    """
+    if not raw:
+        return None
+    return (
+        uow.user_repository.find_one(uuid=raw, is_deleted=False)
+        or uow.user_repository.find_one(username=raw, is_deleted=False)
+    )
+
+
+def assignee_identifiers(assignee) -> list:
+    """Both spellings an assignment may be stored under."""
+    return [assignee.uuid, assignee.username]
+
+
+def start_trip_result(task_executions):
+    """The setup result for a workflow execution, or None."""
+    from app.dto.task_execution import OperatorType
+
+    for task_exe in task_executions:
+        if task_exe.operator == OperatorType.START_TRIP_OPERATOR.value:
+            return task_exe.result
+    return None

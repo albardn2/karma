@@ -259,7 +259,8 @@ def test_assigned_user_and_vehicle_are_required():
 
 def test_a_recompleted_setup_renames_the_derived_trip():
     """The engine allows re-completing a completed task, so setup can be
-    re-submitted after the trip exists (switch the driver, move the date).
+    re-submitted after the trip exists (switch the driver, move the date) —
+    while the trip is still PLANNED; once started, driver and day are frozen.
     The trip's name is derived from exactly those inputs: a trip still
     carrying the old derived name must follow the restamp — but a name someone
     set by hand stays theirs."""
@@ -274,9 +275,13 @@ def test_a_recompleted_setup_renames_the_derived_trip():
     today = _damascus_today().strftime("%d-%m-%Y")
     old_name = trip_name_for("drv_a", today)
 
-    derived_trip = MagicMock(is_deleted=False, name_=None)
+    from app.dto.trip import TripStatus
+
+    derived_trip = MagicMock(
+        is_deleted=False, name_=None, status=TripStatus.PLANNED.value
+    )
     derived_trip.name = old_name
-    manual_trip = MagicMock(is_deleted=False)
+    manual_trip = MagicMock(is_deleted=False, status=TripStatus.PLANNED.value)
     manual_trip.name = "hand-renamed"
 
     task_exe = MagicMock()

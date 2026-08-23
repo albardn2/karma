@@ -160,27 +160,62 @@ class StartTripOperator(OperatorInterface):
             # store the canonical casing the strategy was saved under
             operator_schema.strategy = strategy_row.name
 
-        # A user may be assigned to at most one in-progress trip at a time. Block
-        # starting this trip if the assignee already has another in-progress trip
-        # assigned to them (their start_trip result.assigned_user_uuid matches).
+        # One open workflow per assignee PER DAY. A dispatcher may plan the whole
+        # week for a driver — Monday and Tuesday can both be open — but planning
+        # the same day twice is a mistake, not a plan. (The stricter "one trip at
+        # a time" rule lives on the TRIP, enforced when the driver starts it in
+        # trip_operator, since that is when they can only be in one place.)
         from models.common import (
             WorkflowExecution as WFEModel,
             TaskExecution as TEModel,
             Task as TaskModel,
         )
-        # the assignee is chosen by username (or uuid); resolve to a real
-        # user so we key the check off a UNIQUE identity — never fall back to
-        # matching a non-unique raw string (e.g. a first name).
-        assignee = (
-            uow.user_repository.find_one(uuid=operator_schema.assigned_user_uuid, is_deleted=False)
-            or uow.user_repository.find_one(username=operator_schema.assigned_user_uuid, is_deleted=False)
+        from app.domains.task_execution.workflow_operators.trip_setup import (
+            assignee_identifiers,
+            resolve_assignee,
         )
+
+        assignee = resolve_assignee(uow, operator_schema.assigned_user_uuid)
         if not assignee:
             raise BadRequestError(
                 f"Assigned user '{operator_schema.assigned_user_uuid}' was not found"
             )
-        # assignment is stored as either the username or the uuid — match both
-        values = [assignee.uuid, assignee.username]
+
+        # Re-submission is meant for fixing a PLAN — switch the driver or the
+        # date while the trip still sits at PLANNED. Once the trip has started
+        # it is a fact, not a plan: the one-trip-at-a-time rule was checked
+        # against the driver who set off, and it never re-runs (the trip is no
+        # longer PLANNED), so a rename here would smuggle a second under-way
+        # trip onto the new driver behind that guard's back.
+        from app.dto.trip import TripStatus
+
+        previous_result = task_exe.result or {}
+        started_trip = next(
+            (
+                t
+                for t in task_exe.workflow_execution.trips
+                if not t.is_deleted and t.status != TripStatus.PLANNED.value
+            ),
+            None,
+        )
+        if started_trip is not None:
+            previous_assignee = resolve_assignee(
+                uow, previous_result.get("assigned_user_uuid")
+            )
+            same_driver = (
+                previous_assignee is not None
+                and previous_assignee.uuid == assignee.uuid
+            )
+            same_date = (
+                previous_result.get("assigned_date") == operator_schema.assigned_date
+            )
+            if not (same_driver and same_date):
+                raise BadRequestError(
+                    "The trip has already started, so its driver and day can no "
+                    "longer be changed. Cancel this workflow and plan a new one "
+                    "instead."
+                )
+
         existing = (
             uow.session.query(WFEModel.uuid)
             .join(TEModel, TEModel.workflow_execution_uuid == WFEModel.uuid)
@@ -191,14 +226,18 @@ class StartTripOperator(OperatorInterface):
                 WFEModel.is_deleted.is_(False),
                 WFEModel.uuid != task_exe.workflow_execution_uuid,
                 TaskModel.operator == "start_trip_operator",
-                TEModel.result["assigned_user_uuid"].astext.in_(values),
+                TEModel.result["assigned_user_uuid"].astext.in_(assignee_identifiers(assignee)),
+                # the day is what makes it a duplicate; results from before the
+                # 2026-08 form carry no assigned_date, so they never collide
+                TEModel.result["assigned_date"].astext == operator_schema.assigned_date,
             )
             .first()
         )
         if existing:
             raise BadRequestError(
-                "This user already has a trip in progress; finish or cancel it "
-                "before assigning another."
+                f"{assignee.username} already has a trip planned for "
+                f"{operator_schema.assigned_date}; finish or cancel it before "
+                "planning another for that day."
             )
 
         previous_name = (task_exe.result or {}).get("trip_name")

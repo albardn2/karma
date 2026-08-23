@@ -10,19 +10,31 @@ import { useLanguage } from "@/contexts/LanguageContext";
 interface TripOperatorMapProps {
   waypoints: number[][];
   routeCoordinates?: number[][];
+  /** Pins only, no line and no animation controls. Used for the pre-start
+   *  preview: the driving path is computed from the driver's real position when
+   *  they hit Start, and this component otherwise falls back to joining the
+   *  stops with straight lines — which reads as a planned route while being a
+   *  guess. */
+  pointsOnly?: boolean;
 }
 
 // Component to fit map bounds to markers
 function FitBounds({ waypoints }: { waypoints: [number, number][] }) {
   const map = useMap();
-  
+  // the array identity changes every render (it is derived inline), so key the
+  // effect on the coordinates themselves or it refits on every keystroke
+  const signature = waypoints.map((w) => w.join(",")).join("|");
+
   useEffect(() => {
-    if (waypoints.length > 0) {
-      const bounds = L.latLngBounds(waypoints);
-      map.fitBounds(bounds, { padding: [50, 50] });
-    }
-  }, [map, waypoints]);
-  
+    if (waypoints.length === 0) return;
+    const bounds = L.latLngBounds(waypoints);
+    // maxZoom matters for a ONE-stop trip: a single point has no extent, so
+    // fitBounds would jump to the tile layer's maximum and show a rooftop
+    // with no context. Capped, the stop arrives with its neighbourhood.
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, signature]);
+
   return null;
 }
 
@@ -44,7 +56,7 @@ function createNumberedIcon(number: number) {
   });
 }
 
-export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMapProps) {
+export function TripOperatorMap({ waypoints, routeCoordinates, pointsOnly = false }: TripOperatorMapProps) {
   const { t } = useLanguage();
   const [isAnimated, setIsAnimated] = useState(false);
   const [stopIndex, setStopIndex] = useState(1);
@@ -107,8 +119,9 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
 
   return (
     <div className="space-y-4">
-      {/* Controls */}
-      <div className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+      {/* Controls — the full/animated toggle and its slider only mean something
+          when there is a path to animate along */}
+      {!pointsOnly && <div className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           <Button
             variant={!isAnimated ? "default" : "outline"}
@@ -147,7 +160,7 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
             />
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Map */}
       <div className="h-96 w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700" dir="ltr">
@@ -163,13 +176,16 @@ export function TripOperatorMap({ waypoints, routeCoordinates }: TripOperatorMap
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
-          {/* Render polyline connecting waypoints/route */}
-          <Polyline
-            positions={animatedPolyline}
-            color="#5469D4"
-            weight={4}
-            opacity={0.7}
-          />
+          {/* Render polyline connecting waypoints/route — omitted entirely for
+              the pre-start preview, where no real path exists yet */}
+          {!pointsOnly && (
+            <Polyline
+              positions={animatedPolyline}
+              color="#5469D4"
+              weight={4}
+              opacity={0.7}
+            />
+          )}
           
           {/* Render waypoint markers with numbers */}
           {validWaypoints.map((position, index) => {
