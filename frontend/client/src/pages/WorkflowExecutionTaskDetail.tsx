@@ -1554,6 +1554,11 @@ export default function WorkflowExecutionTaskDetail() {
                             </>
                           ) : selectedTaskExecution.status === "completed" ? (
                             t('workflows.updateTask')
+                          ) : task?.operator === "trip_operator" ? (
+                            /* the 4th step is not "completing a task": it flips
+                               the trip from planned to under way, and starts
+                               per-trip location tracking */
+                            t('workflows.startTrip')
                           ) : (
                             t('workflows.completeTask')
                           )}

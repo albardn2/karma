@@ -630,7 +630,16 @@ export default function ExecutionDetailScreen() {
               disabled={submitting || activeFields.length > 0}
               testID="button-complete-active"
             >
-              {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.actionButtonText}>{t('trip.completeTask', { task: taskLabel(activeTask, t) })}</ThemedText>}
+              {submitting ? <ActivityIndicator color="#fff" /> : (
+                <ThemedText style={styles.actionButtonText}>
+                  {/* the 4th step is not "completing a task", it is setting off:
+                      it flips the trip from planned to under way (and starts
+                      per-trip location tracking), so it says so */}
+                  {activeTask.operator === 'trip_operator'
+                    ? t('trip.startTripButton')
+                    : t('trip.completeTask', { task: taskLabel(activeTask, t) })}
+                </ThemedText>
+              )}
             </TouchableOpacity>
           </View>
         ) : (

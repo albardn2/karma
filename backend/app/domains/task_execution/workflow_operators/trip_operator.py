@@ -35,7 +35,70 @@ class TripOperator(OperatorInterface):
         if not task_exe:
             raise BadRequestError(f"TaskExecution not found with uuid: {payload.uuid}")
 
+        # THIS STEP STARTS THE TRIP. Everything before it is planning: the trip
+        # row exists so stops can be laid out, but it sits at PLANNED and the
+        # location ingest ignores it (it only stamps pings for in-progress
+        # trips). Completing this step is the driver saying "I am setting off".
+        from models.common import (
+            Trip as TripModel,
+            WorkflowExecution as WFEModel,
+            TaskExecution as TEModel,
+            Task as TaskModel,
+        )
+        from app.domains.task_execution.workflow_operators.trip_setup import (
+            assignee_identifiers,
+            resolve_assignee,
+            start_trip_result,
+        )
+        from app.dto.trip import TripStatus
 
+        trips = task_exe.workflow_execution.trips
+        trip = next((t for t in trips if not t.is_deleted), None)
+        if trip is None:
+            raise BadRequestError("This workflow execution has no trip to start")
+
+        if trip.status == TripStatus.PLANNED.value:
+            setup = start_trip_result(task_exe.workflow_execution.task_executions) or {}
+            assignee = resolve_assignee(uow, setup.get("assigned_user_uuid"))
+
+            # A driver can be in exactly one place, so only one trip may be
+            # UNDERWAY at a time — several may be planned (one per day). This is
+            # the rule the setup step deliberately does not enforce.
+            if assignee is not None:
+                running = (
+                    uow.session.query(TripModel.uuid)
+                    .join(WFEModel, WFEModel.uuid == TripModel.workflow_execution_uuid)
+                    .join(TEModel, TEModel.workflow_execution_uuid == WFEModel.uuid)
+                    .join(TaskModel, TaskModel.uuid == TEModel.task_uuid)
+                    .filter(
+                        TripModel.status == TripStatus.IN_PROGRESS.value,
+                        TripModel.is_deleted.is_(False),
+                        TripModel.account_uuid == uow.account_uuid,
+                        TripModel.uuid != trip.uuid,
+                        TaskModel.operator == "start_trip_operator",
+                        TEModel.result["assigned_user_uuid"].astext.in_(
+                            assignee_identifiers(assignee)
+                        ),
+                    )
+                    .first()
+                )
+                if running:
+                    raise BadRequestError(
+                        f"{assignee.username} already has a trip under way; finish "
+                        "or cancel it before starting this one."
+                    )
+
+            # opening stock, captured now that the van is loaded and leaving
+            from app.domains.vehicle_inventory.domain import VehicleInventoryDomain
+
+            trip.start_inventory = VehicleInventoryDomain.balances_for_vehicle(
+                uow=uow, vehicle_uuid=trip.vehicle_uuid
+            )
+            trip.status = TripStatus.IN_PROGRESS.value
+            # stamped here rather than at creation, so the trip's clock (and the
+            # location playback window) measures driving, not planning
+            trip.start_time = datetime.now()
+            uow.trip_repository.save(model=trip, commit=False)
 
     # task_exe.result = operator_schema.model_dump(mode="json")
         task_exe.status = WorkflowStatus.COMPLETED.value
