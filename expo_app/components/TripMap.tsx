@@ -50,6 +50,7 @@ export function TripMap({
   onSetCurrent,
   areas = [],
   routePath = [],
+  frameAllStops = false,
 }: {
   stops: TripMapStop[];
   currentStopUuid: string | null;
@@ -59,6 +60,11 @@ export function TripMap({
   onSetCurrent?: (stop: TripMapStop) => void;
   areas?: TripMapArea[];
   routePath?: TripMapPath;
+  /** Frame every stop instead of centring on the current one. Used by the
+   *  start-trip preview, whose whole job is showing the shape of the day —
+   *  and which has no current stop, so the default framing would centre on
+   *  whichever stop happened to be first. */
+  frameAllStops?: boolean;
 }) {
   const { t } = useLanguage();
   // [lat, lon] pairs -> map coordinates, dropping anything unusable so one bad
@@ -112,6 +118,29 @@ export function TripMap({
   // once the map is ready and the stops/current stop resolve.
   useEffect(() => {
     if (!ready || !mapRef.current) return;
+    if (frameAllStops && pinned.length > 0) {
+      // Everything in view. A lone stop has no extent to fit, so it gets a
+      // tight region instead of fitToCoordinates' maximum zoom; padding is
+      // modest because the preview is a small card, not a full screen with a
+      // sheet over the bottom of it.
+      if (pinned.length === 1) {
+        mapRef.current.animateToRegion(
+          {
+            latitude: pinned[0].lat as number,
+            longitude: pinned[0].lng as number,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          },
+          500
+        );
+      } else {
+        mapRef.current.fitToCoordinates(
+          pinned.map((s) => ({ latitude: s.lat as number, longitude: s.lng as number })),
+          { edgePadding: { top: 40, right: 40, bottom: 40, left: 40 }, animated: true }
+        );
+      }
+      return;
+    }
     if (current && current.lat != null && current.lng != null) {
       mapRef.current.animateToRegion(
         { latitude: current.lat, longitude: current.lng, latitudeDelta: 0.05, longitudeDelta: 0.05 },
@@ -129,7 +158,7 @@ export function TripMap({
         { edgePadding: { top: 90, right: 80, bottom: 280, left: 80 }, animated: true }
       );
     }
-  }, [ready, current?.tripStopUuid, current?.lat, current?.lng, pinned.length, areas.length]);
+  }, [ready, frameAllStops, current?.tripStopUuid, current?.lat, current?.lng, pinned.length, areas.length]);
 
   return (
     <View style={StyleSheet.absoluteFill}>

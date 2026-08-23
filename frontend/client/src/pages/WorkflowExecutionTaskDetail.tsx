@@ -1508,9 +1508,11 @@ export default function WorkflowExecutionTaskDetail() {
                         </h3>
                         {!tripStarted && (
                           <p className="text-sm text-gray-500 dark:text-gray-400 mb-3" data-testid="text-trip-preview-hint">
-                            {t('workflows.tripPreviewHint', {
-                              count: String(tripRouteData.waypoints.length),
-                            })}
+                            {tripRouteData.waypoints.length === 1
+                              ? t('workflows.tripPreviewHintOne')
+                              : t('workflows.tripPreviewHint', {
+                                  count: String(tripRouteData.waypoints.length),
+                                })}
                           </p>
                         )}
                         <TripOperatorMap

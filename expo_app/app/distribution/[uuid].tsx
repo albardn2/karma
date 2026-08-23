@@ -641,6 +641,7 @@ export default function ExecutionDetailScreen() {
                   onStopPress={() => {}}
                   areas={serviceAreas}
                   routePath={[]}
+                  frameAllStops
                 />
               </View>
             )}
@@ -648,7 +649,9 @@ export default function ExecutionDetailScreen() {
               <ThemedText style={styles.actionHint}>
                 {stopsLoading
                   ? t('trip.previewLoading')
-                  : t('trip.previewStops', { count: String(tripStops.length) })}
+                  : tripStops.length === 1
+                    ? t('trip.previewStopsOne')
+                    : t('trip.previewStops', { count: String(tripStops.length) })}
               </ThemedText>
             )}
             <TouchableOpacity
