@@ -180,6 +180,42 @@ class StartTripOperator(OperatorInterface):
             raise BadRequestError(
                 f"Assigned user '{operator_schema.assigned_user_uuid}' was not found"
             )
+
+        # Re-submission is meant for fixing a PLAN — switch the driver or the
+        # date while the trip still sits at PLANNED. Once the trip has started
+        # it is a fact, not a plan: the one-trip-at-a-time rule was checked
+        # against the driver who set off, and it never re-runs (the trip is no
+        # longer PLANNED), so a rename here would smuggle a second under-way
+        # trip onto the new driver behind that guard's back.
+        from app.dto.trip import TripStatus
+
+        previous_result = task_exe.result or {}
+        started_trip = next(
+            (
+                t
+                for t in task_exe.workflow_execution.trips
+                if not t.is_deleted and t.status != TripStatus.PLANNED.value
+            ),
+            None,
+        )
+        if started_trip is not None:
+            previous_assignee = resolve_assignee(
+                uow, previous_result.get("assigned_user_uuid")
+            )
+            same_driver = (
+                previous_assignee is not None
+                and previous_assignee.uuid == assignee.uuid
+            )
+            same_date = (
+                previous_result.get("assigned_date") == operator_schema.assigned_date
+            )
+            if not (same_driver and same_date):
+                raise BadRequestError(
+                    "The trip has already started, so its driver and day can no "
+                    "longer be changed. Cancel this workflow and plan a new one "
+                    "instead."
+                )
+
         existing = (
             uow.session.query(WFEModel.uuid)
             .join(TEModel, TEModel.workflow_execution_uuid == WFEModel.uuid)

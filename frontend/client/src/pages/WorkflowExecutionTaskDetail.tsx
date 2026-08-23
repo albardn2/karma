@@ -915,14 +915,13 @@ export default function WorkflowExecutionTaskDetail() {
     ? taskInputFields.filter((f) => !ROUTING_FIELD_NAMES.has(f.name))
     : taskInputFields;
 
-  // ad-hoc stops can be added while the trip is underway (trip created, not yet finished)
-  const tripCreated = taskExecutions.some(
-    (te: any) => (te.operator || te.task?.operator) === "trip_create_operator" && te.status === "completed"
-  );
+  // ad-hoc stops can be added while the trip is UNDER WAY — started (4th step
+  // done; before that the trip is only PLANNED and the backend refuses the
+  // stop) and not yet finished
   const tripFinished = taskExecutions.some(
     (te: any) => (te.operator || te.task?.operator) === "trip_finish_operator" && te.status === "completed"
   );
-  const canAddStop = tripCreated && !tripFinished;
+  const canAddStop = tripStarted && !tripFinished;
 
   const renderFormField = (field: TaskInputField) => {
     const key = field.name;

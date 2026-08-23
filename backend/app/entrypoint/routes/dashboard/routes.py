@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from flask import request, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.domains.exchange_rate.converter import CurrencyConverter
@@ -52,6 +52,26 @@ def catalog():
     from app.entrypoint.routes.common.permissions import DASHBOARD_CATALOG
 
     return jsonify(DASHBOARD_CATALOG), 200
+
+
+def _trip_ran():
+    """Filter to trips that actually RAN (or are running) — the universe every
+    trip chart counts over.
+
+    Started trips carry a start_time (stamped when the driver sets off).
+    Legacy rows from before that column may not, so in_progress/completed
+    stand in as proof of running for them. What this excludes: PLANNED trips
+    (they have not happened yet — they will appear the day they start) and
+    plans cancelled before anyone set off (status cancelled, start_time still
+    NULL) — a scrapped plan is not a trip that ran. A trip cancelled MID-way
+    keeps its start_time and stays counted: it did leave the yard.
+    """
+    return or_(
+        TripModel.start_time.isnot(None),
+        TripModel.status.in_(
+            [TripStatus.IN_PROGRESS.value, TripStatus.COMPLETED.value]
+        ),
+    )
 
 
 def _day(dt) -> str:
@@ -199,14 +219,13 @@ def overview():
         # credit Friday's trip to Monday. start_time is stamped when the driver
         # sets off; trips created outside the workflow (the manual web form)
         # may have none, so those fall back to created_at rather than vanishing
-        # from the count. Trips still PLANNED are not counted at all — they have
-        # not happened yet, and they will appear on the day they start.
+        # from the count. Which trips count at all is _trip_ran's call.
         trip_ran_at = func.coalesce(TripModel.start_time, TripModel.created_at)
         trips_rows = (
             s.query(func.date(trip_ran_at), func.count())
             .filter(
                 TripModel.is_deleted.is_(False),
-                TripModel.status != TripStatus.PLANNED.value,
+                _trip_ran(),
                 trip_ran_at >= start,
                 TripModel.account_uuid == uow.account_uuid,
             )
@@ -964,15 +983,23 @@ _UNASSIGNED_KEY = "__unassigned__"
 def trip_stops():
     """Trip-stop counts per period, split per assigned user.
 
-    A stop is counted at its own created_at (for planned stops that is the
-    planning moment, for manual field stops the visit itself — in this data the
-    two almost always share the trip's day) and attributed to its TRIP's
-    assignee: the user on the start_trip task result, the same resolution the
-    trips screens use for "Assigned To", stored as uuid-or-username and mapped
-    to a username here. Stops of unassigned trips land in a reserved
-    "__unassigned__" segment rather than vanishing; beyond the top N users by
-    total the rest aggregate into "__others__" so each bar keeps its true
-    height. Stops have no soft-delete of their own; their trip's is respected.
+    A stop is counted on the day its trip RAN — coalesce(trip.start_time,
+    stop.created_at), the same anchor the overview's trip count uses. Routed
+    stops are inserted at PLANNING time, and a whole week can be planned in
+    advance now, so the stop's own created_at would pile Friday's stops onto
+    Monday; the trip's start_time is the day the work happened. Manual field
+    stops share their trip's day either way, and legacy trips without a
+    start_time fall back to the stop's created_at. Stops of trips that never
+    ran (still planned, or cancelled before starting — see _trip_ran) are not
+    counted: nobody worked them.
+
+    Each stop is attributed to its TRIP's assignee: the user on the start_trip
+    task result, the same resolution the trips screens use for "Assigned To",
+    stored as uuid-or-username and mapped to a username here. Stops of
+    unassigned trips land in a reserved "__unassigned__" segment rather than
+    vanishing; beyond the top N users by total the rest aggregate into
+    "__others__" so each bar keeps its true height. Stops have no soft-delete
+    of their own; their trip's is respected.
     """
     from models.common import (
         Task as TaskModel,
@@ -1002,12 +1029,17 @@ def trip_stops():
     with SqlAlchemyUnitOfWork() as uow:
         s = uow.session
 
+        stop_worked_at = func.coalesce(TripModel.start_time, TripStopModel.created_at)
         rows = (
-            s.query(TripStopModel.created_at, TripModel.workflow_execution_uuid)
+            s.query(stop_worked_at, TripModel.workflow_execution_uuid)
+            # the first column is an expression over both tables, so the join's
+            # left side must be named explicitly
+            .select_from(TripStopModel)
             .join(TripModel, TripStopModel.trip_uuid == TripModel.uuid)
             .filter(
                 TripModel.is_deleted.is_(False),
-                TripStopModel.created_at >= start,
+                _trip_ran(),
+                stop_worked_at >= start,
                 TripStopModel.account_uuid == uow.account_uuid,
             )
             .all()
@@ -1101,12 +1133,14 @@ def trip_stops():
 def my_trip_stops():
     """The caller's own trip stops per period, split completed vs not.
 
-    Same stop universe and bucketing as /trip-stops, filtered to trips ASSIGNED
-    to the caller (the start_trip task result, which stores uuid-or-username, so
-    both are matched). With a single user the per-user split is meaningless, so
-    the stack becomes stop status instead: completed vs everything else
-    (planned / in_progress / skipped) — "of my assigned stops, how many are
-    done". Self-scoped, so no role gate — a driver may see their own numbers.
+    Same stop universe and bucketing as /trip-stops — the day the trip ran,
+    trips that never ran excluded (a stop of a still-planned trip is a plan,
+    not a backlog) — filtered to trips ASSIGNED to the caller (the start_trip
+    task result, which stores uuid-or-username, so both are matched). With a
+    single user the per-user split is meaningless, so the stack becomes stop
+    status instead: completed vs everything else (planned / in_progress /
+    skipped) — "of my assigned stops, how many are done". Self-scoped, so no
+    role gate — a driver may see their own numbers.
     """
     from models.common import (
         Task as TaskModel,
@@ -1161,13 +1195,18 @@ def my_trip_stops():
         }
 
         if my_wfes:
+            stop_worked_at = func.coalesce(
+                TripModel.start_time, TripStopModel.created_at
+            )
             for created, status in (
-                s.query(TripStopModel.created_at, TripStopModel.status)
+                s.query(stop_worked_at, TripStopModel.status)
+                .select_from(TripStopModel)
                 .join(TripModel, TripStopModel.trip_uuid == TripModel.uuid)
                 .filter(
                     TripModel.is_deleted.is_(False),
+                    _trip_ran(),
                     TripModel.workflow_execution_uuid.in_(my_wfes),
-                    TripStopModel.created_at >= start,
+                    stop_worked_at >= start,
                     TripStopModel.account_uuid == uow.account_uuid,
                 )
                 .all()

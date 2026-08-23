@@ -473,7 +473,7 @@ export default function ExecutionDetailScreen() {
             method: 'POST',
             body: JSON.stringify({ uuid: finishTask.uuid, result: {} }),
           });
-          if (res.status !== 200) Alert.alert(t('trip.error'), res.error || t('trip.couldNotFinishTrip'));
+          if (res.status !== 200) Alert.alert(t('trip.error'), errorMessage(res.error, t('trip.couldNotFinishTrip')));
           else fetchExecution(false);
         },
       },
@@ -488,7 +488,10 @@ export default function ExecutionDetailScreen() {
         method: 'POST',
         body: JSON.stringify({ uuid: activeTask.uuid, result: {} }),
       });
-      if (res.status !== 200) throw new Error(res.error || t('trip.failedToCompleteTask'));
+      // the 4th step can now 400 routinely ("already has a trip under way"),
+      // and res.error is the raw response body — unwrap it or the driver
+      // reads literal JSON
+      if (res.status !== 200) throw new Error(errorMessage(res.error, t('trip.failedToCompleteTask')));
       // Completing the TRIP step is the moment the driver actually sets off,
       // so the plan is re-sorted around where they are standing rather than
       // around wherever it was computed at setup. Best-effort: resortStops
@@ -645,13 +648,18 @@ export default function ExecutionDetailScreen() {
                 />
               </View>
             )}
-            {previewingStops && (
+            {/* keyed on stopTasks (known synchronously), not the fetched pins:
+                a MANUAL trip correctly has zero planned stops — telling its
+                driver "0 stops planned, a route is coming" would be wrong on
+                both counts — and a routed trip must not flash "0" while the
+                pins are still loading */}
+            {previewingStops && stopTasks.length > 0 && (
               <ThemedText style={styles.actionHint}>
                 {stopsLoading
                   ? t('trip.previewLoading')
-                  : tripStops.length === 1
+                  : stopTasks.length === 1
                     ? t('trip.previewStopsOne')
-                    : t('trip.previewStops', { count: String(tripStops.length) })}
+                    : t('trip.previewStops', { count: String(stopTasks.length) })}
               </ThemedText>
             )}
             <TouchableOpacity

@@ -61,32 +61,44 @@ class TripOperator(OperatorInterface):
             setup = start_trip_result(task_exe.workflow_execution.task_executions) or {}
             assignee = resolve_assignee(uow, setup.get("assigned_user_uuid"))
 
+            # Every PLANNED trip was set up through the new form, which refused
+            # blank assignees and checked the user existed — so a failed
+            # resolution here means the user was renamed or removed SINCE the
+            # plan was made. The one-trip rule below cannot be checked without
+            # knowing who is driving, and skipping it would let the renamed
+            # driver run two trips at once, so refusing is the only honest move.
+            if assignee is None:
+                raise BadRequestError(
+                    "The user this trip was planned for no longer exists — they "
+                    "may have been renamed or removed. Re-submit the setup step "
+                    "with a current driver before starting the trip."
+                )
+
             # A driver can be in exactly one place, so only one trip may be
             # UNDERWAY at a time — several may be planned (one per day). This is
             # the rule the setup step deliberately does not enforce.
-            if assignee is not None:
-                running = (
-                    uow.session.query(TripModel.uuid)
-                    .join(WFEModel, WFEModel.uuid == TripModel.workflow_execution_uuid)
-                    .join(TEModel, TEModel.workflow_execution_uuid == WFEModel.uuid)
-                    .join(TaskModel, TaskModel.uuid == TEModel.task_uuid)
-                    .filter(
-                        TripModel.status == TripStatus.IN_PROGRESS.value,
-                        TripModel.is_deleted.is_(False),
-                        TripModel.account_uuid == uow.account_uuid,
-                        TripModel.uuid != trip.uuid,
-                        TaskModel.operator == "start_trip_operator",
-                        TEModel.result["assigned_user_uuid"].astext.in_(
-                            assignee_identifiers(assignee)
-                        ),
-                    )
-                    .first()
+            running = (
+                uow.session.query(TripModel.uuid)
+                .join(WFEModel, WFEModel.uuid == TripModel.workflow_execution_uuid)
+                .join(TEModel, TEModel.workflow_execution_uuid == WFEModel.uuid)
+                .join(TaskModel, TaskModel.uuid == TEModel.task_uuid)
+                .filter(
+                    TripModel.status == TripStatus.IN_PROGRESS.value,
+                    TripModel.is_deleted.is_(False),
+                    TripModel.account_uuid == uow.account_uuid,
+                    TripModel.uuid != trip.uuid,
+                    TaskModel.operator == "start_trip_operator",
+                    TEModel.result["assigned_user_uuid"].astext.in_(
+                        assignee_identifiers(assignee)
+                    ),
                 )
-                if running:
-                    raise BadRequestError(
-                        f"{assignee.username} already has a trip under way; finish "
-                        "or cancel it before starting this one."
-                    )
+                .first()
+            )
+            if running:
+                raise BadRequestError(
+                    f"{assignee.username} already has a trip under way; finish "
+                    "or cancel it before starting this one."
+                )
 
             # opening stock, captured now that the van is loaded and leaving
             from app.domains.vehicle_inventory.domain import VehicleInventoryDomain

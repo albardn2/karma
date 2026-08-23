@@ -72,7 +72,7 @@ def test_location_ingest_only_stamps_trips_that_are_under_way():
 
 # --- starting the trip -------------------------------------------------------
 
-def _run_trip_operator(trip, setup_result, running_trip=None):
+def _run_trip_operator(trip, setup_result, running_trip=None, assignee_resolves=True):
     from app.domains.task_execution.workflow_operators.trip_operator import TripOperator
 
     task_exe = MagicMock()
@@ -82,7 +82,7 @@ def _run_trip_operator(trip, setup_result, running_trip=None):
     uow = MagicMock()
     uow.task_execution_repository.find_one.return_value = task_exe
     uow.user_repository.find_one.side_effect = lambda **kw: (
-        _assignee() if kw.get("username") or kw.get("uuid") else None
+        _assignee() if assignee_resolves and (kw.get("username") or kw.get("uuid")) else None
     )
     # the "another trip under way" probe
     (uow.session.query.return_value.join.return_value.join.return_value
@@ -144,6 +144,20 @@ def test_starting_a_trip_that_is_already_under_way_is_a_no_op():
     assert trip.start_time == started_at
 
 
+def test_a_trip_whose_assignee_no_longer_resolves_cannot_start():
+    """A renamed or removed driver makes the stored identifier unresolvable.
+    The one-trip rule cannot be checked without knowing who is driving, so the
+    start must be REFUSED — silently skipping the guard would let the renamed
+    driver run two trips at once."""
+    trip = _planned_trip()
+    with pytest.raises(BadRequestError) as err:
+        _run_trip_operator(
+            trip, {"assigned_user_uuid": "drv_gone"}, assignee_resolves=False
+        )
+    assert "no longer exists" in str(err.value)
+    assert trip.status == TripStatus.PLANNED.value  # left alone
+
+
 def test_a_workflow_with_no_trip_is_refused():
     from app.domains.task_execution.workflow_operators.trip_operator import TripOperator
 
@@ -156,6 +170,86 @@ def test_a_workflow_with_no_trip_is_refused():
             uow=uow,
             payload=TaskExecutionComplete(uuid="te-trip", result={}, completed_by_uuid="x"),
         )
+
+
+# --- a started trip's driver and day are frozen ------------------------------
+
+def _run_setup_restamp(previous_result, new_result, trip):
+    """Re-complete the setup step over mocks: `previous_result` is what the
+    step stored last time, `new_result` is the re-submission."""
+    from app.domains.task_execution.workflow_operators.start_trip_operator import (
+        StartTripOperator,
+    )
+
+    users = {
+        "drv_old": _assignee("drv_old", "u-old"),
+        "drv_new": _assignee("drv_new", "u-new"),
+    }
+    task_exe = MagicMock()
+    task_exe.result = previous_result
+    task_exe.workflow_execution_uuid = "wfe-1"
+    task_exe.workflow_execution.trips = [trip]
+
+    uow = MagicMock()
+    uow.task_execution_repository.find_one.return_value = task_exe
+    uow.user_repository.find_one.side_effect = lambda **kw: users.get(
+        kw.get("uuid") or kw.get("username")
+    )
+    # the per-day planning guard's probe finds nothing
+    (uow.session.query.return_value.join.return_value.join.return_value
+        .filter.return_value.first.return_value) = None
+
+    StartTripOperator().execute(
+        uow=uow,
+        payload=TaskExecutionComplete(
+            uuid="te-setup", result=new_result, completed_by_uuid="x"
+        ),
+    )
+
+
+def test_a_started_trips_driver_cannot_be_switched_by_resubmitting_setup():
+    """Re-submission fixes PLANS. Once the trip is under way the one-trip rule
+    was already checked against the driver who set off and never re-runs, so a
+    rename here would smuggle a second under-way trip onto the new driver."""
+    from app.domains.task_execution.workflow_operators.start_trip_operator import (
+        assigned_date_options,
+    )
+
+    day = assigned_date_options()[0]
+    trip = SimpleNamespace(
+        uuid="trip-1", status=TripStatus.IN_PROGRESS.value,
+        is_deleted=False, name=f"drv_old-{day}",
+    )
+    previous = {"assigned_user_uuid": "drv_old", "assigned_date": day,
+                "vehicle_plate": "V-1", "strategy": "manual",
+                "trip_name": f"drv_old-{day}"}
+    resubmission = {k: v for k, v in previous.items() if k != "trip_name"}
+    with pytest.raises(BadRequestError) as err:
+        _run_setup_restamp(
+            previous,
+            {**resubmission, "assigned_user_uuid": "drv_new"},
+            trip,
+        )
+    assert "already started" in str(err.value)
+
+
+def test_resubmitting_setup_unchanged_is_still_allowed_after_the_start():
+    """Same driver, same day — nothing the started trip asserted is being
+    rewritten, so the re-completion goes through."""
+    from app.domains.task_execution.workflow_operators.start_trip_operator import (
+        assigned_date_options,
+    )
+
+    day = assigned_date_options()[0]
+    trip = SimpleNamespace(
+        uuid="trip-1", status=TripStatus.IN_PROGRESS.value,
+        is_deleted=False, name=f"drv_old-{day}",
+    )
+    previous = {"assigned_user_uuid": "drv_old", "assigned_date": day,
+                "vehicle_plate": "V-1", "strategy": "manual",
+                "trip_name": f"drv_old-{day}"}
+    resubmission = {k: v for k, v in previous.items() if k != "trip_name"}
+    _run_setup_restamp(previous, resubmission, trip)  # must not raise
 
 
 # --- the planning guard is per DAY ------------------------------------------
@@ -192,5 +286,34 @@ def test_the_trips_metric_is_anchored_on_when_the_trip_ran():
     block = src.split(marker, 1)[1].split(".all()", 1)[0]
     assert "func.date(trip_ran_at)" in block
     assert "trip_ran_at >= start" in block
-    assert "TripModel.status != TripStatus.PLANNED.value" in block
+    assert "_trip_ran()" in block
     assert "TripModel.created_at >= start" not in block
+
+
+def test_trips_that_never_ran_are_not_counted():
+    """PLANNED trips have not happened; a plan cancelled before anyone set off
+    never will. Neither is a trip that ran — but a trip cancelled MID-way
+    (start_time stamped) did leave the yard and stays counted, as do legacy
+    in_progress/completed rows from before the start_time column."""
+    import inspect
+
+    from app.entrypoint.routes.dashboard import routes as mod
+
+    src = inspect.getsource(mod._trip_ran)
+    assert "TripModel.start_time.isnot(None)" in src
+    assert "TripStatus.IN_PROGRESS.value" in src
+    assert "TripStatus.COMPLETED.value" in src
+    # neither lifecycle end that can hold a never-started trip may stand in
+    # for having run
+    assert "CANCELLED" not in src.split('"""')[-1]
+    assert "PLANNED" not in src.split('"""')[-1]
+    # and the stops charts must count over the same universe, on the same
+    # run-day anchor — one dashboard, one definition of "ran"
+    routes_src = inspect.getsource(mod)
+    # call sites (the trailing comma excludes the def itself):
+    # overview, trip-stops, my-trip-stops
+    assert routes_src.count("_trip_ran(),") == 3
+    # both stops charts window-filter on the run-day anchor, never on the
+    # stop's own created_at (which is the PLANNING moment for routed stops)
+    assert routes_src.count("stop_worked_at >= start") == 2
+    assert "TripStopModel.created_at >= start" not in routes_src
