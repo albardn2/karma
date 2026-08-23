@@ -173,3 +173,24 @@ def test_the_planning_guard_is_scoped_to_the_assigned_day():
     # the message must name the day, or the dispatcher cannot tell which of
     # their week collided
     assert "already has a trip planned for" in src
+
+
+# --- the dashboard counts trips on the day they RAN --------------------------
+
+def test_the_trips_metric_is_anchored_on_when_the_trip_ran():
+    """Planning a week ahead would otherwise credit Friday's trip to Monday.
+    The count anchors on start_time (falling back to created_at, so trips made
+    outside the workflow do not vanish) and skips trips still PLANNED."""
+    import inspect
+
+    from app.entrypoint.routes.dashboard import routes as mod
+
+    src = inspect.getsource(mod)
+    marker = "trip_ran_at = func.coalesce(TripModel.start_time, TripModel.created_at)"
+    assert marker in src
+    # the window filter and the grouping must both use that anchor, not created_at
+    block = src.split(marker, 1)[1].split(".all()", 1)[0]
+    assert "func.date(trip_ran_at)" in block
+    assert "trip_ran_at >= start" in block
+    assert "TripModel.status != TripStatus.PLANNED.value" in block
+    assert "TripModel.created_at >= start" not in block

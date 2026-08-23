@@ -8,6 +8,7 @@ from sqlalchemy import func
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.domains.exchange_rate.converter import CurrencyConverter
 from app.dto.auth import PermissionScope
+from app.dto.trip import TripStatus
 from app.dto.common_enums import Currency
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.dashboard import dashboard_blueprint
@@ -193,14 +194,23 @@ def overview():
         )
         customers_by_day = {str(d): c for d, c in new_customers_rows}
 
+        # A trip counts on the day it RAN, not the day it was planned. A whole
+        # week can be laid out in advance now, so anchoring on created_at would
+        # credit Friday's trip to Monday. start_time is stamped when the driver
+        # sets off; trips created outside the workflow (the manual web form)
+        # may have none, so those fall back to created_at rather than vanishing
+        # from the count. Trips still PLANNED are not counted at all — they have
+        # not happened yet, and they will appear on the day they start.
+        trip_ran_at = func.coalesce(TripModel.start_time, TripModel.created_at)
         trips_rows = (
-            s.query(func.date(TripModel.created_at), func.count())
+            s.query(func.date(trip_ran_at), func.count())
             .filter(
                 TripModel.is_deleted.is_(False),
-                TripModel.created_at >= start,
+                TripModel.status != TripStatus.PLANNED.value,
+                trip_ran_at >= start,
                 TripModel.account_uuid == uow.account_uuid,
             )
-            .group_by(func.date(TripModel.created_at))
+            .group_by(func.date(trip_ran_at))
             .all()
         )
         trips_by_day = {str(d): c for d, c in trips_rows}
