@@ -8,6 +8,7 @@ import { ShoppingCart, Plus, CheckCircle } from "lucide-react";
 import { PurchaseOrderFilters } from "@/components/purchase-orders/PurchaseOrderFilters";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 interface PurchaseOrder {
   uuid: string;
@@ -315,10 +316,7 @@ export default function PurchaseOrders() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            ${order.total_adjusted_amount?.toFixed(2) || '0.00'}
-                          </span>
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
-                            {order.currency}
+                            {formatCurrency(order.total_adjusted_amount ?? 0, order.currency)}
                           </span>
                           {order.is_paid && (
                             <CheckCircle className="h-4 w-4 text-green-500" />
@@ -334,7 +332,7 @@ export default function PurchaseOrders() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          ${order.net_amount_paid?.toFixed(2) || '0.00'}
+                          {formatCurrency(order.net_amount_paid ?? 0, order.currency)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

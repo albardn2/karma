@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Edit3, Save, X, Trash2, Copy, Check } from "lucide-react";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -641,23 +642,21 @@ export default function PurchaseOrderDetail() {
                   <div>
                     <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.totalAmount')}</Label>
                     <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                      ${purchaseOrder.total_amount?.toFixed(2) || '0.00'}
+                      {formatCurrency(purchaseOrder.total_amount ?? 0, purchaseOrder.currency)}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{purchaseOrder.currency}</p>
                   </div>
                   
                   <div>
                     <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.adjustedAmount')}</Label>
                     <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                      ${purchaseOrder.total_adjusted_amount?.toFixed(2) || '0.00'}
+                      {formatCurrency(purchaseOrder.total_adjusted_amount ?? 0, purchaseOrder.currency)}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{purchaseOrder.currency}</p>
                   </div>
                   
                   <div>
                     <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('purchaseOrders.amountPaid')}</Label>
                     <p className="text-xl font-medium text-green-600 dark:text-green-400">
-                      ${purchaseOrder.net_amount_paid?.toFixed(2) || '0.00'}
+                      {formatCurrency(purchaseOrder.net_amount_paid ?? 0, purchaseOrder.currency)}
                     </p>
                   </div>
                   
@@ -668,7 +667,7 @@ export default function PurchaseOrderDetail() {
                         ? 'text-red-600 dark:text-red-400' 
                         : 'text-gray-900 dark:text-gray-100'
                     }`}>
-                      ${purchaseOrder.net_amount_due?.toFixed(2) || '0.00'}
+                      {formatCurrency(purchaseOrder.net_amount_due ?? 0, purchaseOrder.currency)}
                     </p>
                   </div>
                 </div>
@@ -876,12 +875,12 @@ export default function PurchaseOrderDetail() {
                         </td>
                         <td className="py-4">
                           <div className="text-sm text-gray-900 dark:text-gray-100">
-                            ${item.price_per_unit.toFixed(2)}
+                            {formatCurrency(item.price_per_unit, item.currency)}
                           </div>
                         </td>
                         <td className="py-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            ${item.total_price.toFixed(2)}
+                            {formatCurrency(item.total_price, item.currency)}
                           </div>
                         </td>
                         <td className="py-4">
@@ -1049,14 +1048,14 @@ export default function PurchaseOrderDetail() {
                       <div>
                         <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.pricePerUnit')}</Label>
                         <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                          ${selectedItem.price_per_unit.toFixed(2)} <span className="text-sm font-normal text-gray-500">{te(selectedItem.currency)}</span>
+                          {formatCurrency(selectedItem.price_per_unit, selectedItem.currency)}
                         </p>
                       </div>
 
                       <div className="pt-2 border-t border-green-200 dark:border-green-700">
                         <Label className="text-xs text-gray-500 dark:text-gray-400">{t('purchaseOrders.totalPrice')}</Label>
                         <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                          ${selectedItem.total_price.toFixed(2)} <span className="text-lg font-normal text-gray-500">{te(selectedItem.currency)}</span>
+                          {formatCurrency(selectedItem.total_price, selectedItem.currency)}
                         </p>
                       </div>
                     </div>
