@@ -152,6 +152,15 @@ SELF_SCOPED_DASHBOARD_ENDPOINTS = {
     "dashboard.my_new_customers",
     "dashboard.my_trip_stops",
 }
+
+# Endpoints that are POST only because their input is a structured body, not
+# because they write anything. The chokepoint's method->action mapping would
+# demand `create` for them, locking out read-only roles (an accountant may
+# LIST customers but could not QUERY them) — so these check as reads instead.
+# Flask endpoint names: blueprint.function.
+READ_SHAPED_POST_ENDPOINTS = {
+    "customer.query_customers",
+}
 MODULE_SET = set(MODULES)
 ACTION_SET = set(ACTIONS)
 

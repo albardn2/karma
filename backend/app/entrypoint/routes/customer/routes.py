@@ -343,6 +343,37 @@ def list_customers():
     return jsonify(result), 200
 
 
+@customer_blueprint.route('/query', methods=['POST'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value,
+                 PermissionScope.ACCOUNTANT.value)
+def query_customers():
+    """The map view's query toolbar: AND/OR-chained rows over tags, debt,
+    service areas, names, uuids and categories (dto/customer_query). POST
+    because the query is a structured body, not a flat param list. Returns the
+    same page shape as GET / so the map consumes either interchangeably —
+    unpaginated, since it evaluates over mappable customers only and a map
+    shows all its pins or lies about the count."""
+    from app.domains.customer.query import run_customer_query
+    from app.dto.customer_query import CustomerQuery
+
+    query = CustomerQuery(**(request.get_json(silent=True) or {}))
+    with SqlAlchemyUnitOfWork() as uow:
+        matched = run_customer_query(uow=uow, query=query)
+        items = [CustomerRead.from_orm(c).model_dump(mode='json') for c in matched]
+        result = CustomerPage(
+            customers=items,
+            total_count=len(items),
+            page=1,
+            per_page=max(len(items), 1),
+            pages=1,
+        ).model_dump(mode='json')
+    return jsonify(result), 200
+
+
 @customer_blueprint.route('/tags', methods=['GET'])
 @jwt_required()
 @scopes_required(PermissionScope.ADMIN.value,

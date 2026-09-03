@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from "react-leaflet";
 import { LatLngBounds, Map as LeafletMap } from "leaflet";
 import { Customer } from "@/lib/types";
 import "leaflet/dist/leaflet.css";
@@ -37,6 +37,30 @@ interface CustomerMapProps {
   onBoundsChange: (wktPolygon: string) => void;
   center?: [number, number];
   zoom?: number;
+  /** fit the viewport to the pins whenever the SET of them changes — the query
+   *  toolbar's matches can sit anywhere, and a match the viewport hides would
+   *  read as "no results" */
+  fitToCustomers?: boolean;
+}
+
+function FitToCustomers({ customers, enabled }: { customers: Customer[]; enabled: boolean }) {
+  const map = useMap();
+  // keyed on the coordinate SET so panning (which changes nothing) never
+  // re-fits and yanks the map back while the user is exploring the results
+  const signature = useMemo(
+    () => customers.map((c) => String(c.coordinates)).sort().join("|"),
+    [customers],
+  );
+  useEffect(() => {
+    if (!enabled) return;
+    const points = customers
+      .map((c) => parseCoordinates(c.coordinates))
+      .filter((p): p is [number, number] => p !== null);
+    if (points.length === 0) return;
+    map.fitBounds(new LatLngBounds(points), { padding: [40, 40], maxZoom: 16 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, signature, enabled]);
+  return null;
 }
 
 // Component to handle map events
@@ -135,7 +159,7 @@ function CustomerMarkers({ customers }: { customers: Customer[] }) {
   );
 }
 
-export function CustomerMap({ customers, onBoundsChange, center = [33.5138, 36.2765], zoom = 10 }: CustomerMapProps) {
+export function CustomerMap({ customers, onBoundsChange, center = [33.5138, 36.2765], zoom = 10, fitToCustomers = false }: CustomerMapProps) {
   const mapRef = useRef<LeafletMap>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   
@@ -177,6 +201,7 @@ export function CustomerMap({ customers, onBoundsChange, center = [33.5138, 36.2
         />
         
         <MapEventHandler onBoundsChange={onBoundsChange} />
+        <FitToCustomers customers={customers} enabled={fitToCustomers} />
         <CustomerMarkers customers={customers} />
       </MapContainer>
     </div>
