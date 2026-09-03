@@ -4,20 +4,34 @@ The pool is mappable customers only — the results draw as pins. Rows become
 sets of customer uuids and combine with SQL precedence: consecutive AND rows
 intersect into a group, OR starts a new group, and the groups union. Tag and
 category rows reuse the routing strategies' matchers so "has this tag" means
-the same thing in both builders; debt reuses the same set-based balance
-computation; service-area containment runs in PostGIS.
+the same thing in both builders; service-area containment runs in PostGIS.
+
+DEBT is a customer's WHOLE outstanding balance, not one currency's slice: the
+row's currency is the one to convert INTO, and every currency the customer
+owes is restated at today's rate (CurrencyConverter) and summed before the
+threshold compares. So "debt > 1,000,000 SYP" also catches a USD-only debtor
+whose dollars are worth more than that once converted. (This differs from the
+routing strategies' per-currency debt filter, which stays per-currency by
+design — a route is worked in one currency's terms.)
 """
+from datetime import datetime
 from typing import List
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+from app.domains.exchange_rate.converter import CurrencyConverter
 from app.domains.trip.priority_router import (
     _norm,
     category_filter_matches,
     tag_filter_matches,
 )
+from app.dto.common_enums import Currency
 from app.dto.customer_query import CustomerQuery, QueryConnector, QueryField, QueryRow
 from app.dto.routing_strategy import CategoryFilterOp, TagFilterOp
 from app.entrypoint.routes.common.errors import BadRequestError
+
+# the currencies a customer's debt can be denominated in — both are converted
+# into the row's chosen currency and summed
+_DEBT_CURRENCIES = ("USD", "SYP")
 
 # money equality is a rounding question, not a bit-for-bit one — the same
 # tolerance the invoices use for "paid in full"
@@ -69,15 +83,40 @@ def run_customer_query(uow: SqlAlchemyUnitOfWork, query: CustomerQuery) -> List:
     by_uuid = {c.uuid: c for c in pool}
     all_uuids = set(by_uuid)
 
-    # shared lookups, each computed once however many rows need it
-    balances = {
-        currency: uow.customer_repository.fetch_outstanding_balances(
-            customer_uuids=list(all_uuids), currency=currency
-        )
-        for currency in {
-            row.currency.value for row in query.rows if row.field == QueryField.DEBT
+    # shared lookups, each computed once however many rows need it.
+    # Debt: pull EVERY currency's raw balance (a converted total needs them
+    # all), then convert per row into that row's chosen currency. One converter
+    # per target currency caches its day's rate across all customers.
+    uses_debt = any(row.field == QueryField.DEBT for row in query.rows)
+    raw_balances: dict = {}
+    converters: dict = {}
+    today = datetime.utcnow().date()
+    if uses_debt:
+        raw_balances = {
+            currency: uow.customer_repository.fetch_outstanding_balances(
+                customer_uuids=list(all_uuids), currency=currency
+            )
+            for currency in _DEBT_CURRENCIES
         }
-    }
+        converters = {
+            row.currency: CurrencyConverter(uow, row.currency)
+            for row in query.rows
+            if row.field == QueryField.DEBT
+        }
+
+    def converted_total_debt(customer_uuid: str, target: Currency):
+        """A customer's whole debt restated in `target`, or None if any
+        non-zero component has no rate to convert by — unknown, never a guess,
+        so such a customer is excluded rather than compared on a wrong number."""
+        conv = converters[target]
+        total = 0.0
+        for source in _DEBT_CURRENCIES:
+            owed = float(raw_balances[source].get(customer_uuid, 0) or 0)
+            restated = conv.convert(owed, source, today)
+            if restated is None:
+                return None
+            total += restated
+        return total
     area_members: dict = {}
     for row in query.rows:
         if row.field != QueryField.SERVICE_AREA:
@@ -101,10 +140,11 @@ def run_customer_query(uow: SqlAlchemyUnitOfWork, query: CustomerQuery) -> List:
         if row.field == QueryField.UUID:
             return {u for u, c in by_uuid.items() if _uuid_matches(c, row.op, row.value)}
         if row.field == QueryField.DEBT:
-            per_customer = balances[row.currency.value]
             out = set()
             for u in all_uuids:
-                debt = float(per_customer.get(u, 0) or 0)
+                debt = converted_total_debt(u, row.currency)
+                if debt is None:
+                    continue  # unconvertible — cannot assert it meets the threshold
                 if row.op == "LARGER_THAN" and debt > row.amount:
                     out.add(u)
                 elif row.op == "SMALLER_THAN" and debt < row.amount:

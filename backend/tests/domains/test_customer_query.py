@@ -74,12 +74,76 @@ def test_uuid_is_in():
 
 
 def test_debt_operators_and_equal_tolerance():
+    # single-currency case: SYP threshold over SYP debt (USD balances all 0, so
+    # the converter short-circuits and no rate is consulted)
     balances = {"SYP": {"c1": 150.0, "c2": 49.999, "c3": 50.0}}
     uow = _uow(POOL, balances=balances)
     assert _run(uow, [{"field": "debt", "op": "LARGER_THAN", "amount": 100}]) == ["c1"]
     assert _run(uow, [{"field": "debt", "op": "SMALLER_THAN", "amount": 50}]) == ["c2"]
     # money equality is a rounding question: 49.999 counts as 50
     assert _run(uow, [{"field": "debt", "op": "EQUAL", "amount": 50}]) == ["c2", "c3"]
+
+
+def test_debt_is_the_whole_balance_converted_into_the_chosen_currency():
+    """The row's currency is the one to convert INTO: a customer who owes only
+    USD is caught by a SYP threshold once the dollars are converted, and a
+    customer's USD + SYP debts are summed in the target currency."""
+    from unittest.mock import patch
+
+    # c1 owes only USD, c2 owes only SYP, c3 owes both
+    balances = {
+        "USD": {"c1": 10.0, "c3": 5.0},
+        "SYP": {"c2": 3000.0, "c3": 2000.0},
+    }
+    uow = _uow(POOL, balances=balances)
+
+    class _FakeConverter:
+        # 1 USD = 1000 SYP
+        def __init__(self, uow, target):
+            self.target = target
+
+        def convert(self, amount, source, on):
+            if amount == 0:
+                return 0.0
+            if source == self.target.value:
+                return float(amount)
+            if source == "USD" and self.target.value == "SYP":
+                return float(amount) * 1000
+            if source == "SYP" and self.target.value == "USD":
+                return float(amount) / 1000
+            return None
+
+    with patch("app.domains.customer.query.CurrencyConverter", _FakeConverter):
+        # target SYP: c1=10USD→10000, c2=3000, c3=5000+2000=7000
+        got = _run(uow, [{"field": "debt", "op": "LARGER_THAN", "amount": 6000, "currency": "SYP"}])
+        assert got == ["c1", "c3"]  # the USD-only debtor is caught by a SYP threshold
+        # target USD: c1=10, c2=3000SYP→3, c3=5+2=7
+        got = _run(uow, [{"field": "debt", "op": "LARGER_THAN", "amount": 6, "currency": "USD"}])
+        assert got == ["c1", "c3"]
+
+
+def test_a_customer_whose_debt_cannot_be_converted_is_excluded():
+    """No rate → unknown, never a guessed number: the customer drops out of the
+    result rather than being compared on a wrong total."""
+    from unittest.mock import patch
+
+    balances = {"USD": {"c1": 10.0}, "SYP": {}}
+    uow = _uow(POOL, balances=balances)
+
+    class _NoRateConverter:
+        def __init__(self, uow, target):
+            self.target = target
+
+        def convert(self, amount, source, on):
+            if amount == 0:
+                return 0.0
+            if source == self.target.value:
+                return float(amount)
+            return None  # cross-currency rate unavailable
+
+    with patch("app.domains.customer.query.CurrencyConverter", _NoRateConverter):
+        # c1's USD debt cannot be stated in SYP → excluded despite owing plenty
+        assert _run(uow, [{"field": "debt", "op": "LARGER_THAN", "amount": 1, "currency": "SYP"}]) == []
 
 
 def test_service_area_inside_outside_and_any_of():

@@ -52,8 +52,9 @@ class QueryRow(BaseModel):
     op: str
     # every field except debt: one string, or a list for IS_IN
     value: Union[str, List[str], None] = None
-    # debt only: the threshold and which pound it is counted in — USD and SYP
-    # debts are separate numbers that must never be mixed
+    # debt only: the threshold, and the currency to convert the customer's
+    # WHOLE debt INTO before comparing (every currency they owe is restated at
+    # today's rate and summed — see domains/customer/query.converted_total_debt)
     amount: Optional[float] = None
     currency: Currency = Currency.SYP
     # binds this row to the PREVIOUS one; the first row has nothing to bind to
