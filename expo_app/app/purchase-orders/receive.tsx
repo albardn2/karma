@@ -20,11 +20,10 @@ import { useLanguage } from '@/contexts/LanguageContext';
  * matching picker appears only for the branch chosen — a hidden required field would
  * otherwise block the form with an error pointing at nothing.
  *
- * One caveat the user cannot see and this screen does not pretend to fix: fulfilment
- * only creates inventory when the line's material is a raw_material. For other
- * material types the line is marked fulfilled and no stock appears, because the
- * handler map has a single entry. That is the server's behaviour, not something to
- * paper over client-side.
+ * Fulfilment stocks inventory for raw_material, product and prepared lines alike.
+ * machinery_and_equipment and vehicle lines only flip the flag — deliberately: those
+ * purchases become fixed assets, not stock — yet the destination toggle above is
+ * still required for them, because the DTO demands it regardless of type.
  */
 export default function ReceiveLineScreen() {
   const { purchase_order_item_uuid, material_name, material_uuid, quantity, unit } =

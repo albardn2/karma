@@ -51,11 +51,19 @@ class PurchaseOrderItemDomain:
                 raise BadRequestError("PurchaseOrderItem already unfulfilled")
             po_item.is_fulfilled = False
             po_item.fulfilled_at = None
+            items.append(po_item)
 
-            # delete event
+            # Undo whatever stock the fulfillment created. At most one PO event
+            # can exist per item — but NONE is legitimate: machinery/vehicle
+            # purchases never stock inventory, and items fulfilled while the
+            # handler only covered raw materials have nothing to undo (this
+            # tolerance is also the only way to unstick those).
             inventory_events = [event for event in po_item.inventory_events if not event.is_deleted and event.event_type == InventoryEventType.PURCHASE_ORDER.value]
-            if len(inventory_events) !=1:
+            if len(inventory_events) > 1:
                 raise BadRequestError("PO inventory event count is not 1")
+            if not inventory_events:
+                continue
+
             InventoryEventDomain.delete_inventory_event(
                 uow=uow,
                 uuid=inventory_events[0].uuid
@@ -74,7 +82,6 @@ class PurchaseOrderItemDomain:
                     uow=uow,
                     uuid=inventory_events[0].inventory_uuid
                 )
-                items.append(po_item)
 
         uow.purchase_order_item_repository.batch_save(models=items, commit=False)
         return [PurchaseOrderItemRead.from_orm(po_item) for po_item in items]
