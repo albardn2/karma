@@ -98,6 +98,20 @@ class CustomerRepository(AbstractRepository[Customer]):
             .all()
         )
 
+    def fetch_queryable_customers(self) -> List[Customer]:
+        """Every live customer in the tenant, coordinates or not — the pool the
+        LIST view's query toolbar evaluates over. A list shows a customer whether
+        or not anyone has pinned them on a map, so (unlike fetch_mappable_customers)
+        the coordinate filter is dropped. A service-area row still can't place a
+        location-less customer inside an area, which is correct: they simply do
+        not match that row."""
+        return (
+            self._session.query(Customer)
+            .filter(*self._scope_filters(None))
+            .filter(Customer.is_deleted == False)  # noqa: E712
+            .all()
+        )
+
     def fetch_uuids_within_geometry(self, geometry) -> List[str]:
         """Uuids of live customers whose point sits inside the given stored
         geometry (a service area's polygon, passed as the loaded column value

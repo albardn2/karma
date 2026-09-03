@@ -107,6 +107,10 @@ class CustomerQuery(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     rows: List[QueryRow] = Field(..., min_length=1, max_length=12)
+    # The map draws pins, so it evaluates over customers that HAVE a location;
+    # the list has no such need, so it queries everyone. Default True keeps the
+    # map (and any caller that omits it) on the location-bearing pool.
+    require_coordinates: bool = True
 
     @model_validator(mode="after")
     def normalize_connectors(self):

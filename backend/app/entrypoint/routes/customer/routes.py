@@ -351,12 +351,13 @@ def list_customers():
                  PermissionScope.DRIVER.value,
                  PermissionScope.ACCOUNTANT.value)
 def query_customers():
-    """The map view's query toolbar: AND/OR-chained rows over tags, debt,
-    service areas, names, uuids and categories (dto/customer_query). POST
-    because the query is a structured body, not a flat param list. Returns the
-    same page shape as GET / so the map consumes either interchangeably —
-    unpaginated, since it evaluates over mappable customers only and a map
-    shows all its pins or lies about the count."""
+    """The customer query toolbar: AND/OR-chained rows over tags, debt, service
+    areas, names, uuids and categories (dto/customer_query), on both the map and
+    list views. POST because the query is a structured body, not a flat param
+    list. Returns the same page shape as GET / so either view consumes it
+    interchangeably — unpaginated: it evaluates the whole matching set at once
+    (mappable customers for the map, everyone for the list) so the count is the
+    true total, not a page of it."""
     from app.domains.customer.query import run_customer_query
     from app.dto.customer_query import CustomerQuery
 

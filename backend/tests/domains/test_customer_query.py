@@ -14,17 +14,23 @@ from app.dto.customer_query import CustomerQuery
 from app.entrypoint.routes.common.errors import BadRequestError
 
 
-def _customer(uuid, company="Shop", name="Person", category="cafe", tags=()):
+def _customer(uuid, company="Shop", name="Person", category="cafe", tags=(), coordinates="POINT"):
     return SimpleNamespace(
         uuid=uuid, company_name=company, full_name=name,
         category=category, tags=list(tags),
+        # a truthy placeholder stands in for the geometry column; None = no pin
+        coordinates=coordinates,
     )
 
 
-def _uow(pool, balances=None, areas=None, area_members=None):
-    """areas: {ref: area}; area_members: {area_uuid: [customer uuids inside]}"""
+def _uow(pool, balances=None, areas=None, area_members=None, queryable_pool=None):
+    """areas: {ref: area}; area_members: {area_uuid: [customer uuids inside]}.
+    queryable_pool defaults to the same pool — the coordinate-optional list pool."""
     uow = MagicMock()
     uow.customer_repository.fetch_mappable_customers.return_value = pool
+    uow.customer_repository.fetch_queryable_customers.return_value = (
+        pool if queryable_pool is None else queryable_pool
+    )
     uow.customer_repository.fetch_outstanding_balances.side_effect = (
         lambda customer_uuids, currency: (balances or {}).get(currency, {})
     )
@@ -159,6 +165,24 @@ def test_service_area_inside_outside_and_any_of():
     assert _run(uow, [{"field": "service_area", "op": "IS_IN", "value": ["a1", "a2"]}]) == ["c2", "c3"]
 
 
+def test_service_area_not_equal_ignores_location_less_customers():
+    """A customer with no pin is neither inside nor outside an area — so
+    NOT_EQUAL must not sweep them in as 'outside'. Only positionable customers
+    (those with coordinates) are placed; the rest match no service-area op."""
+    area = SimpleNamespace(uuid="a1", name="Downtown", geometry="geom-a")
+    pool = [
+        _customer("inside1", coordinates="POINT"),   # pinned, inside Downtown
+        _customer("outside1", coordinates="POINT"),  # pinned, outside Downtown
+        _customer("nowhere1", coordinates=None),     # no location at all
+    ]
+    uow = _uow(pool, areas={"a1": area}, area_members={"geom-a": ["inside1"]})
+    # NOT_EQUAL returns only the pinned-and-outside customer, never the
+    # location-less one
+    assert _run(uow, [{"field": "service_area", "op": "NOT_EQUAL", "value": "a1"}]) == ["outside1"]
+    # EQUAL is unchanged: only the one actually inside
+    assert _run(uow, [{"field": "service_area", "op": "EQUAL", "value": "a1"}]) == ["inside1"]
+
+
 def test_unknown_service_area_is_refused_not_empty():
     with pytest.raises(BadRequestError):
         _run(_uow(POOL), [{"field": "service_area", "op": "EQUAL", "value": "nowhere"}])
@@ -203,6 +227,26 @@ def test_the_query_endpoint_checks_as_a_read_not_a_create():
     gates = block.split("missing endpoint permission")[0]
     assert gates.count("effective_method") == 2
     assert "endpoint_allowed(\n            g.account_perms, request.blueprint, request.method" not in src
+
+
+def test_the_list_surface_queries_customers_without_coordinates():
+    """The map pins locations, so it queries the mappable pool; the list shows
+    everyone, so require_coordinates=False draws from the coordinate-optional
+    pool. The flag chooses the repo method."""
+    mappable = [_customer("m1", company="Has Coords")]
+    everyone = mappable + [_customer("n1", company="No Coords")]
+    uow = _uow(mappable, queryable_pool=everyone)
+
+    # map surface (default True) sees only the mappable pool
+    got = run_customer_query(uow, CustomerQuery(rows=[{"field": "name", "op": "CONTAINS", "value": "coords"}]))
+    assert [c.uuid for c in got] == ["m1"]
+
+    # list surface reaches the location-less customer too
+    got = run_customer_query(
+        uow,
+        CustomerQuery(require_coordinates=False, rows=[{"field": "name", "op": "CONTAINS", "value": "coords"}]),
+    )
+    assert sorted(c.uuid for c in got) == ["m1", "n1"]
 
 
 def test_typed_tag_value_converges_like_the_strategy_builder():

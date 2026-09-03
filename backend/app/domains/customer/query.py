@@ -79,7 +79,11 @@ def _resolve_service_area(uow: SqlAlchemyUnitOfWork, ref: str):
 
 
 def run_customer_query(uow: SqlAlchemyUnitOfWork, query: CustomerQuery) -> List:
-    pool = uow.customer_repository.fetch_mappable_customers()
+    pool = (
+        uow.customer_repository.fetch_mappable_customers()
+        if query.require_coordinates
+        else uow.customer_repository.fetch_queryable_customers()
+    )
     by_uuid = {c.uuid: c for c in pool}
     all_uuids = set(by_uuid)
 
@@ -117,6 +121,11 @@ def run_customer_query(uow: SqlAlchemyUnitOfWork, query: CustomerQuery) -> List:
                 return None
             total += restated
         return total
+    # customers we can actually place on the map. On the map pool this is
+    # everyone; on the list pool it is a subset, and a service-area row must
+    # not pretend to know where a location-less customer is (see below).
+    positionable = {u for u, c in by_uuid.items() if c.coordinates is not None}
+
     area_members: dict = {}
     for row in query.rows:
         if row.field != QueryField.SERVICE_AREA:
@@ -156,8 +165,11 @@ def run_customer_query(uow: SqlAlchemyUnitOfWork, query: CustomerQuery) -> List:
             refs = row.value if isinstance(row.value, list) else [row.value]
             inside = set().union(*(area_members[r] for r in refs)) & all_uuids
             # EQUAL and IS_IN both mean "inside" (one area vs any of several);
-            # NOT_EQUAL means "outside it"
-            return all_uuids - inside if row.op == "NOT_EQUAL" else inside
+            # NOT_EQUAL means "outside it" — but only among customers we can
+            # actually place: a location-less customer is neither inside nor
+            # outside, so subtract `inside` from the positionable set, not the
+            # whole pool, or they'd all read as "outside" every area.
+            return positionable - inside if row.op == "NOT_EQUAL" else inside
         raise BadRequestError(f"Unknown query field '{row.field}'")
 
     # AND binds tighter than OR: intersect within a group, union the groups
