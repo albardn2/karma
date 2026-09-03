@@ -9,8 +9,15 @@ from app.entrypoint.routes.common.errors import NotFoundError
 class PurchaseOrderItemFulfillmentHandler:
     def __init__(self):
 
+        # Everything sellable or storable lands in a warehouse when the order
+        # arrives, so fulfilling it must stock inventory. MACHINERY_AND_EQUIPMENT
+        # and VEHICLE are deliberately absent: those purchases become fixed
+        # assets (the po item's fixed_asset link), not stock — fulfilling them
+        # only flips the flag.
         self.material_category_mapper = {
-            MaterialType.RAW_MATERIAL: InventoryFulfillmentHandler
+            MaterialType.RAW_MATERIAL: InventoryFulfillmentHandler,
+            MaterialType.PRODUCT: InventoryFulfillmentHandler,
+            MaterialType.PREPARED: InventoryFulfillmentHandler,
         }
 
     def run(self, uow: SqlAlchemyUnitOfWork,

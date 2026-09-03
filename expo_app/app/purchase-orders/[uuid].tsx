@@ -74,11 +74,10 @@ interface PurchaseOrder {
  * would invent a number the server never recorded. The badge is the whole truth
  * available.
  *
- * WHY THERE IS NO UNFULFIL. The endpoint exists and does write, but it leaves the
- * inventory lot live at zero — so every fulfil/unfulfil cycle strands a phantom lot in
- * the receive screen's own lot picker — and it reports success as an empty array, so a
- * UI cannot tell whether it worked. That needs fixing server-side before it is worth
- * offering.
+ * WHY THERE IS NO UNFULFIL. The endpoint exists, writes, and reports the items it
+ * touched — but it still leaves the inventory lot live at zero, so every
+ * fulfil/unfulfil cycle strands a phantom lot in the receive screen's own lot
+ * picker. That needs fixing server-side before it is worth offering.
  *
  * DELETE IS THE GUARDED ROUTE ONLY. /purchase-order/with-items/<uuid> voids the order
  * and soft-deletes its lines together; the loose route flips one flag and leaves the
