@@ -9,10 +9,10 @@ import { useLanguage } from '@/contexts/LanguageContext';
  * POST /purchase-order-item/fulfill-items takes a batch — {items: [{…}]} — even for a
  * single line, so the flat answers this form collects are reshaped by `transform`.
  *
- * THE QUANTITY IS NOT ASKED FOR. There is no partial receipt: the event quantity is
- * always the full ordered quantity, and quantity_received is never written by any
- * backend code. An input here would imply a capability the server does not have, so
- * the ordered amount is shown as a note instead.
+ * THE QUANTITY IS NOT ASKED FOR. There is no partial receipt: fulfilment receives the
+ * full ordered quantity (the backend records quantity_received = quantity). An input
+ * here would imply a partial capability the server does not have, so the ordered amount
+ * is shown as a note instead.
  *
  * DESTINATION IS EXACTLY ONE OF TWO. warehouse_uuid starts a new lot; inventory_uuid
  * adds to an existing one. Supplying neither is 400 "Either warehouse_uuid or

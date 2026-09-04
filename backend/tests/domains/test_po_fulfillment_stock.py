@@ -82,6 +82,44 @@ def _unfulfill(po_item):
     )
 
 
+def _fulfill(po_item, material_type="machinery_and_equipment"):
+    """Fulfil one item. A material type the handler does not map (machinery)
+    keeps the inventory handler a no-op, so this isolates the flag/received
+    writes without wiring the inventory mocks."""
+    from app.dto.purchase_order_item import POFulfillItem, PurchaseOrderItemBulkFulfill
+
+    uow = MagicMock()
+    uow.purchase_order_item_repository.find_one.return_value = po_item
+    uow.material_repository.find_one.return_value = SimpleNamespace(type=material_type)
+    return PurchaseOrderItemDomain.fulfill_items(
+        uow=uow,
+        payload=PurchaseOrderItemBulkFulfill(
+            items=[POFulfillItem(purchase_order_item_uuid="poi-1", warehouse_uuid="wh-1")]
+        ),
+    )
+
+
+def test_fulfilling_records_the_full_ordered_quantity_as_received():
+    """Fulfilment is all-or-nothing, so a fulfilled line has received exactly
+    what was ordered — the Received column must not read 0 behind a green
+    Fulfilled badge."""
+    po_item = _stuck_item(events=[])
+    po_item.is_fulfilled = False
+    po_item.fulfilled_at = None
+    po_item.quantity_received = 0.0
+    po_item.quantity = 180
+    _fulfill(po_item)
+    assert po_item.is_fulfilled is True
+    assert po_item.quantity_received == 180
+
+
+def test_unfulfilling_resets_quantity_received_to_zero():
+    po_item = _stuck_item(events=[])
+    po_item.quantity_received = 180.0
+    _unfulfill(po_item)
+    assert po_item.quantity_received == 0.0
+
+
 def test_unfulfilling_an_item_that_never_stocked_inventory_clears_the_flags():
     """No event is a real state, not corruption — and tolerating it is the only
     way to unstick items fulfilled while the handler skipped their type."""

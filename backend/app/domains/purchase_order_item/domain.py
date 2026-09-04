@@ -28,6 +28,10 @@ class PurchaseOrderItemDomain:
                 raise BadRequestError("PurchaseOrderItem already fulfilled")
             po_item.is_fulfilled = True
             po_item.fulfilled_at = datetime.now()
+            # Fulfilment is all-or-nothing here — there is no partial receipt —
+            # so a fulfilled line has received exactly what was ordered. Record
+            # it, or the Received column reads 0 next to a green Fulfilled badge.
+            po_item.quantity_received = po_item.quantity
             items.append(po_item)
 
             PurchaseOrderItemFulfillmentHandler().run(uow=uow,
@@ -51,6 +55,8 @@ class PurchaseOrderItemDomain:
                 raise BadRequestError("PurchaseOrderItem already unfulfilled")
             po_item.is_fulfilled = False
             po_item.fulfilled_at = None
+            # nothing is received once the line is un-fulfilled
+            po_item.quantity_received = 0.0
             items.append(po_item)
 
             # Undo whatever stock the fulfillment created. At most one PO event
