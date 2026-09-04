@@ -77,6 +77,7 @@ def _load_request_identity():
     from flask import g, jsonify, request
     from flask_jwt_extended import verify_jwt_in_request, get_jwt
     from app.entrypoint.routes.common.permissions import (
+        READ_SHAPED_POST_ENDPOINTS,
         RESOURCE_SET,
         SELF_SCOPED_DASHBOARD_ENDPOINTS,
         endpoint_allowed,
@@ -207,10 +208,15 @@ def _load_request_identity():
                 {"msg": "This account is pending verification",
                  "code": "account_unverified"}
             ), 403
+        # a POST that only reads (structured query body) is checked as the
+        # read it is, or read-only roles could list a resource but not query it
+        effective_method = (
+            "GET" if request.endpoint in READ_SHAPED_POST_ENDPOINTS else request.method
+        )
         # tenant feature cap binds EVERYONE in the account, admins
         # included (the platform owner is exempt — g.account_perms None)
         if g.account_perms is not None and not endpoint_allowed(
-            g.account_perms, request.blueprint, request.method
+            g.account_perms, request.blueprint, effective_method
         ):
             return jsonify(
                 {"msg": "Forbidden — feature not enabled for this account"}
@@ -222,7 +228,7 @@ def _load_request_identity():
             not g.is_admin
             and g.user_acl is not None
             and request.endpoint not in SELF_SCOPED_DASHBOARD_ENDPOINTS
-            and not endpoint_allowed(g.user_acl, request.blueprint, request.method)
+            and not endpoint_allowed(g.user_acl, request.blueprint, effective_method)
         ):
             return jsonify({"msg": "Forbidden — missing endpoint permission"}), 403
     return None

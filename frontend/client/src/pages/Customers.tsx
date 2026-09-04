@@ -10,8 +10,9 @@ import { AddCustomerDialog } from "@/components/customers/AddCustomerDialog";
 import { CustomerFiltersComponent, type CustomerFilters } from "@/components/customers/CustomerFilters";
 import { CustomersAnalytics } from "@/components/customers/CustomersAnalytics";
 import { CustomerMap } from "@/components/map/CustomerMap";
+import { CustomerQueryToolbar, blankQueryRow, type QueryRowDraft, type QueryRowPayload } from "@/components/customers/CustomerQueryToolbar";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTagCatalog } from "@/lib/tagCatalog";
 import type { Customer, CustomerPage } from "@/lib/types";
@@ -48,6 +49,15 @@ export default function Customers() {
     per_page: 100, // Get more customers for map view
   });
 
+  // The query toolbar's applied rows; null means no query. One customer query,
+  // honoured by whichever view is active: while it is set it OWNS the surface —
+  // the list's paginated GET and the map's bounds fetch both stand down and the
+  // results become the answer instead.
+  const [customerQuery, setCustomerQuery] = useState<QueryRowPayload[] | null>(null);
+  // the drafted rows live here, not in the toolbar: the toolbar unmounts on
+  // every view switch, and the applied query must stay visible and editable
+  const [queryRows, setQueryRows] = useState<QueryRowDraft[]>(() => [blankQueryRow()]);
+
   // Fetch customers for list view with filters - ONLY when in list mode
   const { data: customersData, isLoading } = useQuery<CustomerPage>({
     queryKey: ["/customer/list", filters, viewMode], // Include viewMode in key
@@ -57,7 +67,7 @@ export default function Customers() {
       console.log('Fetching customers for list view:', url);
       return await apiRequest(url);
     },
-    enabled: viewMode === 'list', // Only fetch when in list view
+    enabled: viewMode === 'list' && !customerQuery, // paginated GET; the query owns the list when active
     staleTime: 0, // Always fetch fresh data
     gcTime: 0, // Don't cache data
     refetchOnMount: true,
@@ -73,12 +83,44 @@ export default function Customers() {
       console.log('Fetching customers for map view:', url);
       return await apiRequest(url);
     },
-    enabled: viewMode === 'map', // Only fetch when in map view
+    enabled: viewMode === 'map' && !customerQuery, // viewport mode only
     staleTime: 0, // Always fetch fresh data
     gcTime: 0, // Don't cache data
     refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
+
+  // Evaluate the applied toolbar query server-side
+  const {
+    data: queryCustomersData,
+    isLoading: isQueryLoading,
+    error: queryError,
+  } = useQuery<CustomerPage>({
+    queryKey: ["/customer/query", customerQuery, viewMode],
+    // the map needs pins, so it queries customers that have a location; the
+    // list has no such need and queries everyone (viewMode is in the key, so
+    // switching views re-runs against the right pool)
+    queryFn: () => apiRequest("/customer/query", {
+      method: "POST",
+      body: { rows: customerQuery, require_coordinates: viewMode === 'map' },
+    }),
+    enabled: viewMode !== 'analytics' && !!customerQuery,
+    staleTime: 0,
+    gcTime: 0,
+    retry: false, // a 400 (e.g. unknown service area) will not heal on retry
+    refetchOnWindowFocus: false,
+  });
+
+  // surface a failed query instead of leaving stale pins under a wrong count
+  useEffect(() => {
+    if (queryError) {
+      toast({
+        title: t('customers.queryFailed'),
+        description: apiErrorMessage(queryError, t('customers.queryFailed')),
+        variant: "destructive",
+      });
+    }
+  }, [queryError, toast, t]);
 
   // Fetch customer categories
   const { data: categories } = useQuery<string[]>({
@@ -163,17 +205,30 @@ export default function Customers() {
   // Update display data based on current view and fresh API data
   useEffect(() => {
     if (viewMode === 'list') {
-      const listCustomers = customersData?.customers || [];
-      setDisplayCustomers(listCustomers);
-      setDisplayCount(listCustomers.length);
-      setDisplayText(isLoading ? t('customers.loadingCustomers') : t('customers.countOnPage', { count: listCustomers.length }));
+      const queryActive = !!customerQuery;
+      if (queryActive) {
+        const matched = queryCustomersData?.customers || [];
+        setDisplayCustomers(matched);
+        setDisplayCount(matched.length);
+        setDisplayText(isQueryLoading ? t('customers.queryRunning') : t('customers.queryMatches', { count: matched.length }));
+      } else {
+        const listCustomers = customersData?.customers || [];
+        setDisplayCustomers(listCustomers);
+        setDisplayCount(listCustomers.length);
+        setDisplayText(isLoading ? t('customers.loadingCustomers') : t('customers.countOnPage', { count: listCustomers.length }));
+      }
     } else if (viewMode === 'map') {
-      const mapCustomers = mapCustomersData?.customers || [];
+      const queryActive = !!customerQuery;
+      const mapCustomers = (queryActive ? queryCustomersData?.customers : mapCustomersData?.customers) || [];
       setDisplayCustomers(mapCustomers);
       setDisplayCount(mapCustomers.length);
-      setDisplayText(isMapLoading ? t('customers.loadingCustomersInArea') : t('customers.countInArea', { count: mapCustomers.length }));
+      setDisplayText(
+        queryActive
+          ? (isQueryLoading ? t('customers.queryRunning') : t('customers.queryMatches', { count: mapCustomers.length }))
+          : (isMapLoading ? t('customers.loadingCustomersInArea') : t('customers.countInArea', { count: mapCustomers.length }))
+      );
     }
-  }, [viewMode, customersData, mapCustomersData, isLoading, isMapLoading, t]);
+  }, [viewMode, customersData, mapCustomersData, queryCustomersData, customerQuery, isLoading, isMapLoading, isQueryLoading, t]);
 
   // Reset display immediately when view changes
   useEffect(() => {
@@ -256,7 +311,7 @@ export default function Customers() {
         </div>
 
         {/* Total Customers Banner (list/map views only) */}
-        {viewMode !== 'analytics' && (displayCount > 0 || isLoading || isMapLoading) ? (
+        {viewMode !== 'analytics' && (displayCount > 0 || isLoading || isMapLoading || isQueryLoading || !!customerQuery) ? (
           <div className="mb-6">
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg px-4 py-3">
               <div className="flex items-center">
@@ -321,6 +376,17 @@ export default function Customers() {
           <CustomersAnalytics />
         ) : viewMode === 'list' ? (
           /* Customer List View */
+          <div>
+            <CustomerQueryToolbar
+              categories={categories || []}
+              active={!!customerQuery}
+              matchCount={customerQuery ? displayCount : null}
+              loading={isQueryLoading}
+              rows={queryRows}
+              onRowsChange={setQueryRows}
+              onApply={(rows) => setCustomerQuery(rows)}
+              onClear={() => setCustomerQuery(null)}
+            />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayCustomers.map((customer: Customer) => (
               <Card 
@@ -377,8 +443,20 @@ export default function Customers() {
               </Card>
             ))}
           </div>
+          </div>
         ) : (
           /* Customer Map View */
+          <div>
+            <CustomerQueryToolbar
+              categories={categories || []}
+              active={!!customerQuery}
+              matchCount={customerQuery ? displayCount : null}
+              loading={isQueryLoading}
+              rows={queryRows}
+              onRowsChange={setQueryRows}
+              onApply={(rows) => setCustomerQuery(rows)}
+              onClear={() => setCustomerQuery(null)}
+            />
           <div className="h-[600px] rounded-lg overflow-hidden border relative z-0" dir="ltr">
             {isMapLoading && (
               <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-20">
@@ -394,34 +472,57 @@ export default function Customers() {
               onBoundsChange={handleMapBoundsChange}
               center={[33.5138, 36.2765]}
               zoom={10}
+              fitToCustomers={!!customerQuery}
             />
+          </div>
           </div>
         )}
 
-        {viewMode === 'list' && displayCount === 0 && !isLoading && (
+        {viewMode === 'list' && displayCount === 0 && !isLoading && !isQueryLoading && (
           <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('customers.noCustomersFound')}</h3>
-            <p className="text-gray-600 mb-4">
-              {Object.keys(filters).some(key => key !== 'page' && key !== 'per_page' && filters[key as keyof CustomerFilters])
-                ? t('customers.tryAdjustingFilters')
-                : t('customers.getStartedFirst')}
-            </p>
-            <AddCustomerDialog categories={categories || []} />
+            {customerQuery ? (
+              <>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('customers.queryNoMatches')}</h3>
+                <p className="text-gray-600 mb-4">{t('customers.queryNoMatchesHint')}</p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('customers.noCustomersFound')}</h3>
+                <p className="text-gray-600 mb-4">
+                  {Object.keys(filters).some(key => key !== 'page' && key !== 'per_page' && filters[key as keyof CustomerFilters])
+                    ? t('customers.tryAdjustingFilters')
+                    : t('customers.getStartedFirst')}
+                </p>
+                <AddCustomerDialog categories={categories || []} />
+              </>
+            )}
           </div>
         )}
         
-        {viewMode === 'map' && displayCount === 0 && !isMapLoading && (
+        {viewMode === 'map' && displayCount === 0 && !isMapLoading && !isQueryLoading && (
           <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('customers.noCustomersFoundInArea')}</h3>
-            <p className="text-gray-600 mb-4">
-              {t('customers.panZoomHint')}
-            </p>
-            <AddCustomerDialog categories={categories || []} />
+            {/* while a query owns the map, "pan and zoom" is dead advice —
+                the bounds fetch is off; the fix is editing or clearing the query */}
+            {customerQuery ? (
+              <>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('customers.queryNoMatches')}</h3>
+                <p className="text-gray-600 mb-4">{t('customers.queryNoMatchesHint')}</p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('customers.noCustomersFoundInArea')}</h3>
+                <p className="text-gray-600 mb-4">
+                  {t('customers.panZoomHint')}
+                </p>
+                <AddCustomerDialog categories={categories || []} />
+              </>
+            )}
           </div>
         )}
 
-        {/* Pagination - Only show for list view */}
-        {viewMode === 'list' && customersData && customersData.pages > 1 && (
+        {/* Pagination - list view, viewport (non-query) mode only: a query
+            returns its whole matching set at once, so there are no pages */}
+        {viewMode === 'list' && !customerQuery && customersData && customersData.pages > 1 && (
           <div className="flex justify-center items-center space-x-4 rtl:space-x-reverse mt-8">
             <Button
               variant="outline"

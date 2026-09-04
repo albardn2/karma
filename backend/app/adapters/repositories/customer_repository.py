@@ -83,6 +83,50 @@ class CustomerRepository(AbstractRepository[Customer]):
             balances[customer_uuid] -= float(total or 0)
         return balances
 
+    def fetch_mappable_customers(self) -> List[Customer]:
+        """Every live customer that can appear on the map: tenant-scoped, not
+        deleted, HAS coordinates. The map query toolbar evaluates over this —
+        a debt or name match with no location would silently vanish from a map
+        of pins, so it is excluded up front and the result count stays honest.
+        Unlike the routing pool below, customers with unfinished stops are
+        included: the map answers "where are they", not "who can be routed"."""
+        return (
+            self._session.query(Customer)
+            .filter(*self._scope_filters(None))
+            .filter(Customer.is_deleted == False)  # noqa: E712
+            .filter(Customer.coordinates.isnot(None))
+            .all()
+        )
+
+    def fetch_queryable_customers(self) -> List[Customer]:
+        """Every live customer in the tenant, coordinates or not — the pool the
+        LIST view's query toolbar evaluates over. A list shows a customer whether
+        or not anyone has pinned them on a map, so (unlike fetch_mappable_customers)
+        the coordinate filter is dropped. A service-area row still can't place a
+        location-less customer inside an area, which is correct: they simply do
+        not match that row."""
+        return (
+            self._session.query(Customer)
+            .filter(*self._scope_filters(None))
+            .filter(Customer.is_deleted == False)  # noqa: E712
+            .all()
+        )
+
+    def fetch_uuids_within_geometry(self, geometry) -> List[str]:
+        """Uuids of live customers whose point sits inside the given stored
+        geometry (a service area's polygon, passed as the loaded column value
+        so no WKT round-trip is needed). Containment runs in PostGIS, where
+        the spatial index lives."""
+        rows = (
+            self._session.query(Customer.uuid)
+            .filter(*self._scope_filters(None))
+            .filter(Customer.is_deleted == False)  # noqa: E712
+            .filter(Customer.coordinates.isnot(None))
+            .filter(func.ST_Within(Customer.coordinates, geometry))
+            .all()
+        )
+        return [uuid for (uuid,) in rows]
+
     def fetch_priority_routing_pool(
             self,
             polygon: Optional[Union[Polygon, MultiPolygon]] = None,
