@@ -185,6 +185,34 @@ export function VehicleProfitabilityChart({ vehicleUuid }: { vehicleUuid: string
             </p>
           )}
         </div>
+
+        {/* the numbers behind the bars, newest first */}
+        {hasAny && (
+          <div className="mt-4 overflow-x-auto border-t border-gray-100 dark:border-gray-800 pt-3">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
+                  <th className="pb-2 pe-4">{te(ccy)}</th>
+                  <th className="pb-2 pe-4 text-end">{t("dashboards.revenue")}</th>
+                  <th className="pb-2 pe-4 text-end">{t("dashboards.gross")}</th>
+                  <th className="pb-2 text-end">{t("dashboards.net")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...(data?.groups ?? [])].reverse().map((g) => (
+                  <tr key={g.period_label} className="border-t border-gray-100 dark:border-gray-800">
+                    <td className="py-2 pe-4 font-semibold text-gray-900 dark:text-gray-100">{g.period_label}</td>
+                    <td className="py-2 pe-4 text-end tabular-nums">{fmtMoney(g.revenue)}</td>
+                    <td className="py-2 pe-4 text-end tabular-nums">{fmtMoney(g.gross)}</td>
+                    <td className={`py-2 text-end tabular-nums ${g.net < 0 ? "text-red-600" : "text-gray-700 dark:text-gray-300"}`}>
+                      {fmtMoney(g.net)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -7,6 +7,7 @@ import { ChartLegend, GroupedBarChart, LineChart } from '@/components/Chart';
 import { PickerField } from '@/components/PickerField';
 import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { CostCurrencyToggle, type CostCcy } from '@/components/CostCurrencyToggle';
+import { money } from '@/utils/money';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiCall, isOk } from '@/utils/api';
@@ -467,6 +468,30 @@ export default function VehiclesDetailScreen() {
                             {t('dashboards.uncosted', { qty: String(profitUncosted) })}
                           </ThemedText>
                         )}
+
+                        {/* the numbers behind the bars, newest first */}
+                        <View style={styles.profitTable}>
+                          <View style={styles.profitHead}>
+                            <ThemedText style={styles.profitHeadCcy}>{profitCcy}</ThemedText>
+                            <View style={styles.profitHeadVals}>
+                              <ThemedText style={styles.profitHeadVal}>{t('dashboards.revenue')}</ThemedText>
+                              <ThemedText style={styles.profitHeadVal}>{t('dashboards.gross')}</ThemedText>
+                              <ThemedText style={styles.profitHeadVal}>{t('dashboards.net')}</ThemedText>
+                            </View>
+                          </View>
+                          {[...profitGroups].reverse().map((g) => (
+                            <View key={g.label} style={styles.row}>
+                              <ThemedText style={styles.rowLabel}>{g.label}</ThemedText>
+                              <View style={styles.rowVals}>
+                                <ThemedText style={styles.rowVal}>{money(g.values[0], profitCcy)}</ThemedText>
+                                <ThemedText style={styles.rowVal}>{money(g.values[1], profitCcy)}</ThemedText>
+                                <ThemedText style={[styles.rowVal, g.values[2] < 0 && styles.profitWarn]}>
+                                  {money(g.values[2], profitCcy)}
+                                </ThemedText>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
                       </>
                     ) : (
                       <ThemedText style={styles.more}>
@@ -581,6 +606,15 @@ const styles = StyleSheet.create({
   profitCcy: { marginTop: 8, marginBottom: 4 },
   profitDef: { fontSize: 11, opacity: 0.55, marginTop: 6 },
   profitWarn: { fontSize: 11, color: '#d97706', marginTop: 6 },
+  profitTable: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 8 },
+  profitHead: { flexDirection: 'row', alignItems: 'center', paddingBottom: 6 },
+  profitHeadCcy: { flex: 1, fontSize: 10, fontWeight: '600', opacity: 0.5, textTransform: 'uppercase' },
+  profitHeadVals: { flexDirection: 'row', flex: 2, justifyContent: 'flex-end' },
+  profitHeadVal: { width: 72, textAlign: 'right', fontSize: 10, fontWeight: '600', opacity: 0.5, textTransform: 'uppercase' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  rowLabel: { flex: 1, fontSize: 13, fontWeight: '600' },
+  rowVals: { flexDirection: 'row', flex: 2, justifyContent: 'flex-end' },
+  rowVal: { width: 72, textAlign: 'right', fontSize: 12, opacity: 0.8, fontVariant: ['tabular-nums'] },
   notes: { marginTop: 18 },
   notesText: { fontSize: 13, opacity: 0.7, lineHeight: 19 },
 });
