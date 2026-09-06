@@ -3,9 +3,10 @@ import { Alert, StyleSheet, TouchableOpacity, useWindowDimensions, View } from '
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
-import { ChartLegend, LineChart } from '@/components/Chart';
+import { ChartLegend, GroupedBarChart, LineChart } from '@/components/Chart';
 import { PickerField } from '@/components/PickerField';
 import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
+import { CostCurrencyToggle, type CostCcy } from '@/components/CostCurrencyToggle';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiCall, isOk } from '@/utils/api';
@@ -132,6 +133,18 @@ export default function VehiclesDetailScreen() {
   const [stockFailed, setStockFailed] = useState(false);
   const [movesFailed, setMovesFailed] = useState(false);
 
+  // Profitability (revenue / gross / net) for this vehicle. A financial-only
+  // endpoint — a role without access 403s, and the whole section is dropped
+  // rather than shown broken.
+  const [profitGroups, setProfitGroups] = useState<
+    Array<{ label: string; values: number[] }>
+  >([]);
+  const [profitGran, setProfitGran] = useState<'month' | 'quarter' | 'year'>('month');
+  const [profitCcy, setProfitCcy] = useState<CostCcy>('USD');
+  const [profitUncosted, setProfitUncosted] = useState(0);
+  const [profitForbidden, setProfitForbidden] = useState(false);
+  const [profitFailed, setProfitFailed] = useState(false);
+
   const loadStock = useCallback(async () => {
     const res = await apiCall<{ vehicle_inventories: VehicleLot[] }>(
       `/vehicle-inventory/?vehicle_uuid=${uuid}&per_page=${PER_PAGE}`,
@@ -216,6 +229,38 @@ export default function VehiclesDetailScreen() {
   useEffect(() => {
     loadMovements();
   }, [loadMovements]);
+
+  const loadProfit = useCallback(async () => {
+    setProfitFailed(false);
+    const res = await apiCall<{
+      groups: Array<{ period_label: string; revenue: number; gross: number; net: number }>;
+      disclosure?: { uncosted_quantity?: number };
+    }>(
+      `/dashboard/vehicle-profitability?vehicle_uuid=${uuid}&granularity=${profitGran}&target_currency=${profitCcy}`,
+    );
+    if (res.status === 403) {
+      setProfitForbidden(true);
+      return;
+    }
+    if (isOk(res.status) && res.data) {
+      setProfitGroups(
+        res.data.groups.map((g) => ({
+          label: g.period_label,
+          values: [g.revenue, g.gross, g.net],
+        })),
+      );
+      setProfitUncosted(res.data.disclosure?.uncosted_quantity ?? 0);
+    } else {
+      setProfitFailed(true);
+    }
+  }, [uuid, profitGran, profitCcy]);
+
+  useEffect(() => {
+    loadProfit();
+  }, [loadProfit, reloadKey]);
+
+  const profitSeries = [t('dashboards.revenue'), t('dashboards.gross'), t('dashboards.net')];
+  const profitHasAny = profitGroups.some((g) => g.values.some((v) => v !== 0));
 
   return (
     <ModuleDetailScreen<Vehicle>
@@ -367,6 +412,71 @@ export default function VehiclesDetailScreen() {
             </>
           ),
         },
+        // financial-only: dropped entirely for a role the endpoint 403s
+        ...(profitForbidden
+          ? []
+          : [
+              {
+                title: t('vehicles.profitability'),
+                render: () => (
+                  <>
+                    <ThemedText style={styles.profitHint}>
+                      {t('vehicles.profitabilityHint')}
+                    </ThemedText>
+                    <ScrollingChipRow>
+                      {(['month', 'quarter', 'year'] as const).map((g) => (
+                        <FilterChip
+                          key={g}
+                          label={t(
+                            g === 'month'
+                              ? 'dashboards.gMonth'
+                              : g === 'quarter'
+                                ? 'dashboards.gQuarter'
+                                : 'dashboards.gYear',
+                          )}
+                          active={profitGran === g}
+                          onPress={() => setProfitGran(g)}
+                          testID={`veh-profit-gran-${g}`}
+                        />
+                      ))}
+                    </ScrollingChipRow>
+                    <View style={styles.profitCcy}>
+                      <CostCurrencyToggle
+                        value={profitCcy}
+                        onChange={setProfitCcy}
+                        testIDPrefix="veh-profit-ccy"
+                      />
+                    </View>
+
+                    {profitHasAny ? (
+                      <>
+                        <GroupedBarChart
+                          groups={profitGroups}
+                          series={profitSeries}
+                          width={width - 72}
+                        />
+                        <ChartLegend names={profitSeries} />
+                        <ThemedText style={styles.profitDef}>
+                          {t('vehicles.profitGrossFull')}
+                        </ThemedText>
+                        <ThemedText style={styles.profitDef}>
+                          {t('vehicles.profitNetFull')}
+                        </ThemedText>
+                        {profitUncosted > 0 && (
+                          <ThemedText style={styles.profitWarn}>
+                            {t('dashboards.uncosted', { qty: String(profitUncosted) })}
+                          </ThemedText>
+                        )}
+                      </>
+                    ) : (
+                      <ThemedText style={styles.more}>
+                        {profitFailed ? t('moduleList.failed') : t('dashboards.noData')}
+                      </ThemedText>
+                    )}
+                  </>
+                ),
+              },
+            ]),
       ]}
       actions={[
         {
@@ -467,6 +577,10 @@ const styles = StyleSheet.create({
   clearBtn: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 },
   clearText: { fontSize: 13, color: '#5469D4', fontWeight: '600' },
   more: { fontSize: 11, opacity: 0.5, marginTop: 8 },
+  profitHint: { fontSize: 12, opacity: 0.6, marginBottom: 8 },
+  profitCcy: { marginTop: 8, marginBottom: 4 },
+  profitDef: { fontSize: 11, opacity: 0.55, marginTop: 6 },
+  profitWarn: { fontSize: 11, color: '#d97706', marginTop: 6 },
   notes: { marginTop: 18 },
   notesText: { fontSize: 13, opacity: 0.7, lineHeight: 19 },
 });
