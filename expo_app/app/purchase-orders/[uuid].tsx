@@ -67,12 +67,10 @@ interface PurchaseOrder {
  * only create-with-items overwrites it, so a line's price must be rendered at its own
  * currency or a mixed order would be reported wrongly at every row.
  *
- * WHY THERE IS NO "RECEIVED QUANTITY". `quantity_received` is never written by the
- * fulfilment path — it sets `is_fulfilled` and `fulfilled_at` and nothing else — so all
- * 79 lines on production read 0.0 while being fully received. Printing "Received 0 kg"
- * next to a green Received badge would be a lie, and substituting the ordered quantity
- * would invent a number the server never recorded. The badge is the whole truth
- * available.
+ * RECEIVED QUANTITY. Fulfilment now records `quantity_received = quantity` (fulfilment
+ * is all-or-nothing — no partial receipt), and a migration backfilled the lines that
+ * predate that, so the value is trustworthy. The web detail shows it; this screen still
+ * leans on the Fulfilled badge for compactness rather than a separate received row.
  *
  * WHY THERE IS NO UNFULFIL. The endpoint exists, writes, and reports the items it
  * touched — but it still leaves the inventory lot live at zero, so every
