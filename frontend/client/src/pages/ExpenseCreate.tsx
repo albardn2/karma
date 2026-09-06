@@ -19,6 +19,7 @@ interface ExpenseCreateData {
   currency: string;
   category: string;
   vendor_uuid?: string;
+  vehicle_uuid?: string;
   description?: string;
   should_pay?: boolean;
 }
@@ -54,6 +55,15 @@ export default function ExpenseCreate() {
     queryKey: ["/expense/categories"],
     queryFn: () => apiRequest("/expense/categories"),
   });
+
+  // Fetch vehicles for the optional vehicle association
+  const { data: vehiclesData } = useQuery({
+    queryKey: ["/vehicle/"],
+    // per_page is capped at 100 by VehicleListParams — a higher value 422s
+    queryFn: () => apiRequest("/vehicle/?per_page=100"),
+  });
+  const vehicles: Array<{ uuid: string; plate_number: string; make: string; model: string }> =
+    vehiclesData?.items ?? [];
 
   const createMutation = useMutation({
     mutationFn: (data: ExpenseCreateData) =>
@@ -256,6 +266,30 @@ export default function ExpenseCreate() {
                   onChange={(e) => setFormData(prev => ({ ...prev, vendor_uuid: e.target.value }))}
                   placeholder={t('expenses.vendorUuidOptionalPlaceholder')}
                 />
+              </div>
+
+              {/* Vehicle (optional) */}
+              <div className="space-y-2">
+                <Label htmlFor="vehicle_uuid">{t('expenses.vehicleLabel')}</Label>
+                <Select
+                  value={formData.vehicle_uuid || '__none__'}
+                  onValueChange={(value) =>
+                    setFormData(prev => ({ ...prev, vehicle_uuid: value === '__none__' ? '' : value }))
+                  }
+                >
+                  <SelectTrigger id="vehicle_uuid">
+                    <SelectValue placeholder={t('expenses.selectVehicle')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t('expenses.noVehicle')}</SelectItem>
+                    {vehicles.map((v) => (
+                      <SelectItem key={v.uuid} value={v.uuid}>
+                        {[v.plate_number, [v.make, v.model].filter(Boolean).join(' ')].filter(Boolean).join(' — ')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('expenses.vehicleHelp')}</p>
               </div>
 
               {/* Auto Pay */}

@@ -1391,6 +1391,10 @@ class Expense(Base):
     # set when the cost belongs to a particular run (fuel, tolls, a driver's
     # meal); null for the ordinary overheads that are not trip-specific
     trip_uuid = Column(String(36), ForeignKey("trip.uuid"), nullable=True, index=True)
+    # the vehicle the cost belongs to. May be set directly (a standalone
+    # vehicle expense), but for a trip expense it is derived from the trip's
+    # assigned vehicle, never the two disagreeing.
+    vehicle_uuid = Column(String(36), ForeignKey("vehicle.uuid"), nullable=True, index=True)
     category = Column(String(120), nullable=False)  # e.g., salary, etc.
     is_deleted = Column(Boolean, default=False)
     description = Column(Text, nullable=True)

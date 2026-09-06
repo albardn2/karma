@@ -161,6 +161,8 @@ class DummyUoW:
         self.credit_note_item_repository = DummyRepo("credit_note_item", return_single, return_all)
         self.process_repository = DummyRepo("process", return_single, return_all)
         self.user_repository = DummyRepo("user", return_single, return_all)
+        self.trip_repository = DummyRepo("trip", return_single, return_all)
+        self.vehicle_repository = DummyRepo("vehicle", return_single, return_all)
         # add more repositories here as you need them…
 
     def __enter__(self):

@@ -78,10 +78,24 @@ def update_expense(uuid: str):
         # tenant's (or a soft-deleted) trip, and Trip.expenses is not
         # account-scoped, so a foreign expense would land in that trip's cash
         # reconciliation. A null trip_uuid is an unlink and stays allowed.
-        if data.get('trip_uuid'):
-            trip = uow.trip_repository.find_one(uuid=data['trip_uuid'], is_deleted=False)
+        # The vehicle a trip expense carries is DERIVED from its trip, never
+        # trusted from the request — the two must never disagree. On update the
+        # trip may be the one being set now, or the one the expense already
+        # carries: keying only off a re-sent trip_uuid would let a PUT that
+        # sends just vehicle_uuid override a trip expense's derived vehicle.
+        touches_trip = 'trip_uuid' in data
+        touches_vehicle = 'vehicle_uuid' in data
+        effective_trip_uuid = data['trip_uuid'] if touches_trip else exp.trip_uuid
+        if effective_trip_uuid and (touches_trip or touches_vehicle):
+            trip = uow.trip_repository.find_one(uuid=effective_trip_uuid, is_deleted=False)
             if not trip:
                 raise NotFoundError('Trip not found')
+            data['vehicle_uuid'] = trip.vehicle_uuid
+        elif touches_vehicle and data.get('vehicle_uuid'):
+            # a standalone vehicle (no trip in play): validate against the tenant
+            vehicle = uow.vehicle_repository.find_one(uuid=data['vehicle_uuid'], is_deleted=False)
+            if not vehicle:
+                raise NotFoundError('Vehicle not found')
 
         for field, val in data.items():
             setattr(exp, field, val)
@@ -123,6 +137,8 @@ def list_expenses():
         filters.append(ExpenseModel.vendor_uuid == str(params.vendor_uuid))
     if params.trip_uuid:
         filters.append(ExpenseModel.trip_uuid == str(params.trip_uuid))
+    if params.vehicle_uuid:
+        filters.append(ExpenseModel.vehicle_uuid == str(params.vehicle_uuid))
     if params.category:
         filters.append(ExpenseModel.category == params.category.value)
     if params.start:
