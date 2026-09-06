@@ -666,6 +666,10 @@ export const translations: Record<Lang, Record<string, string>> = {
   'vehicles.onBoard': 'On board',
   'vehicles.noStock': 'Nothing loaded on this vehicle',
   'vehicles.movements': 'Stock movements',
+  'vehicles.profitability': 'Profitability',
+  'vehicles.profitabilityHint': "Revenue, gross and net for sales made on this vehicle's trips.",
+  'vehicles.profitGrossFull': 'Gross = revenue − cost of goods sold',
+  'vehicles.profitNetFull': 'Net = gross − expenses tied to this vehicle',
   'vehicles.noMovements': 'No movements in this period',
 
   'employees.one': 'employee',
@@ -1932,6 +1936,10 @@ export const translations: Record<Lang, Record<string, string>> = {
   'vehicles.onBoard': 'المحمّل حالياً',
   'vehicles.noStock': 'لا توجد مواد محمّلة على هذه المركبة',
   'vehicles.movements': 'حركة المخزون',
+  'vehicles.profitability': 'الربحية',
+  'vehicles.profitabilityHint': 'الإيرادات والربح الإجمالي والصافي للمبيعات عبر رحلات هذه المركبة.',
+  'vehicles.profitGrossFull': 'الإجمالي = الإيرادات − كلفة البضاعة المباعة',
+  'vehicles.profitNetFull': 'الصافي = الإجمالي − النفقات المرتبطة بهذه المركبة',
   'vehicles.noMovements': 'لا توجد حركة في هذه الفترة',
 
   'employees.one': 'موظف',

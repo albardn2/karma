@@ -543,6 +543,194 @@ def profitability():
     ), 200
 
 
+@dashboard_blueprint.route("/vehicle-profitability", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def vehicle_profitability():
+    """Revenue, gross and net profit per period for ONE vehicle.
+
+      revenue = Σ customer-order total_adjusted_amount for orders made on this
+                vehicle's trips (order -> trip_stop -> trip.vehicle_uuid)
+      gross   = revenue − COGS of the SAME orders' sales
+      net     = gross − expenses tied to this vehicle (Expense.vehicle_uuid)
+
+    The three terms share one basis — the order's trip-stop attribution — so
+    revenue and its COGS are the same sales, never a mismatched pair. COGS reuses
+    the warehouse costing engine exactly as /profitability does (weighted-average
+    lot cost in the target currency); a sale from an unknowable-cost lot banks its
+    quantity in `uncosted` rather than counting as free.
+
+    Salaries are deliberately absent: a wage is not attributable to a vehicle, so
+    net here is strictly revenue − COGS − vehicle expenses. Every figure is
+    converted to the target currency at its own date and summed.
+    """
+    from app.domains.inventory.domain import InventoryDomain
+    from app.entrypoint.routes.common.errors import BadRequestError, NotFoundError
+    from models.common import (
+        CustomerOrderItem as CustomerOrderItemModel,
+        TripStop as TripStopModel,
+    )
+
+    vehicle_uuid = (request.args.get("vehicle_uuid") or "").strip()
+    if not vehicle_uuid:
+        raise BadRequestError("vehicle_uuid is required")
+
+    gran = (request.args.get("granularity") or "month").strip().lower()
+    if gran not in _PERIOD_CAPS:
+        gran = "month"
+    cap = _PERIOD_CAPS[gran]
+    try:
+        periods = max(1, min(cap, int(request.args.get("periods", cap))))
+    except ValueError:
+        periods = cap
+    target = _target_currency()
+
+    now = datetime.utcnow()
+    period_starts = [_step_back(now, gran, periods - 1 - i) for i in range(periods)]
+    start = period_starts[0]
+    key_order = [_period_key(ps, gran) for ps in period_starts]
+    starts = {_period_key(ps, gran): ps for ps in period_starts}
+
+    revenue: dict = defaultdict(float)
+    cogs: dict = defaultdict(float)
+    expenses: dict = defaultdict(float)
+    uncosted_qty = 0.0
+    unconv_amt = 0.0
+    unconv_count = 0
+
+    with SqlAlchemyUnitOfWork() as uow:
+        s = uow.session
+
+        # the vehicle must exist and belong to this tenant, or the chart would
+        # silently read as an all-zero vehicle rather than a wrong id
+        vehicle = uow.vehicle_repository.find_one(uuid=vehicle_uuid, is_deleted=False)
+        if not vehicle:
+            raise NotFoundError("Vehicle not found")
+
+        conv = CurrencyConverter(uow, target)
+        cost_ctx = InventoryDomain.new_cost_context(currency=target)
+
+        def bucket(dt):
+            k = _period_key(dt, gran)
+            return k if k in starts else None
+
+        # ---- revenue: orders made on this vehicle's trips ----
+        for o in (
+            s.query(CustomerOrderModel)
+            .join(TripStopModel, TripStopModel.uuid == CustomerOrderModel.trip_stop_uuid)
+            .join(TripModel, TripModel.uuid == TripStopModel.trip_uuid)
+            .filter(
+                CustomerOrderModel.is_deleted.is_(False),
+                CustomerOrderModel.created_at >= start,
+                CustomerOrderModel.account_uuid == uow.account_uuid,
+                TripModel.vehicle_uuid == vehicle_uuid,
+            )
+            .all()
+        ):
+            k = bucket(o.created_at)
+            if not k:
+                continue
+            amt = o.total_adjusted_amount or 0
+            c = conv.convert(amt, o.currency, o.created_at)
+            if c is None:
+                if amt:
+                    unconv_amt += amt
+                    unconv_count += 1
+                continue
+            revenue[k] += c
+
+        # ---- COGS: cost basis of the SAME orders' warehouse 'sale' events ----
+        for e in (
+            s.query(InventoryEventModel)
+            .join(
+                CustomerOrderItemModel,
+                CustomerOrderItemModel.uuid == InventoryEventModel.customer_order_item_uuid,
+            )
+            .join(
+                CustomerOrderModel,
+                CustomerOrderModel.uuid == CustomerOrderItemModel.customer_order_uuid,
+            )
+            .join(TripStopModel, TripStopModel.uuid == CustomerOrderModel.trip_stop_uuid)
+            .join(TripModel, TripModel.uuid == TripStopModel.trip_uuid)
+            .filter(
+                InventoryEventModel.is_deleted.is_(False),
+                InventoryEventModel.event_type == "sale",
+                InventoryEventModel.created_at >= start,
+                InventoryEventModel.account_uuid == uow.account_uuid,
+                TripModel.vehicle_uuid == vehicle_uuid,
+            )
+            .all()
+        ):
+            k = bucket(e.created_at)
+            if not k:
+                continue
+            qty = abs(e.quantity or 0)
+            if not qty:
+                continue
+            lot_cost, _orig = InventoryDomain._lot_cost_and_quantity(
+                uow=uow, inventory_uuid=e.inventory_uuid, ctx=cost_ctx
+            )
+            if lot_cost is None:
+                uncosted_qty += qty
+                continue
+            cogs[k] += qty * lot_cost
+
+        # ---- expenses: those tied to this vehicle ----
+        for x in (
+            s.query(ExpenseModel)
+            .filter(
+                ExpenseModel.is_deleted.is_(False),
+                ExpenseModel.created_at >= start,
+                ExpenseModel.account_uuid == uow.account_uuid,
+                ExpenseModel.vehicle_uuid == vehicle_uuid,
+            )
+            .all()
+        ):
+            k = bucket(x.created_at)
+            if not k:
+                continue
+            c = conv.convert(x.amount or 0, x.currency, x.created_at)
+            if c is None:
+                if x.amount:
+                    unconv_amt += x.amount or 0
+                    unconv_count += 1
+                continue
+            expenses[k] += c
+
+    groups = []
+    for k in key_order:
+        rev = round(revenue[k], 2)
+        gross = round(revenue[k] - cogs[k], 2)
+        net = round(revenue[k] - cogs[k] - expenses[k], 2)
+        groups.append(
+            {
+                "period_label": k,
+                "period_start": starts[k].strftime("%Y-%m-%d"),
+                "revenue": rev,
+                "gross": gross,
+                "net": net,
+            }
+        )
+
+    return jsonify(
+        {
+            "target_currency": target.value,
+            "granularity": gran,
+            "groups": groups,
+            "disclosure": {
+                "uncosted_quantity": round(uncosted_qty, 2),
+                "unconverted_amount": round(unconv_amt, 2),
+                "unconverted_count": unconv_count,
+            },
+        }
+    ), 200
+
+
 # ---------------------------------------------------------------------------
 # Revenue over time — one dataset, two views the client toggles between:
 #   * per period: revenue split into received + debt (a stacked bar)

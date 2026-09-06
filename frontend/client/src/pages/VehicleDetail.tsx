@@ -39,6 +39,7 @@ import { VehicleStatus, type Vehicle, type VehicleUpdateData } from "@/lib/types
 import { VehicleInventoryDialog } from "@/components/vehicles/VehicleInventoryDialog";
 import { VehicleInventoryChart } from "@/components/vehicles/VehicleInventoryChart";
 import { VehicleInventoryTable } from "@/components/vehicles/VehicleInventoryTable";
+import { VehicleProfitabilityChart } from "@/components/vehicles/VehicleProfitabilityChart";
 
 const makeVehicleUpdateSchema = (t: (key: string) => string) =>
   z.object({
@@ -610,6 +611,11 @@ export default function VehicleDetail() {
         {/* Inventory time series chart */}
         <div className="mt-6">
           <VehicleInventoryChart vehicleUuid={uuid as string} />
+        </div>
+
+        {/* Profitability: revenue / gross / net for this vehicle */}
+        <div className="mt-6">
+          <VehicleProfitabilityChart vehicleUuid={uuid as string} />
         </div>
       </div>
     </AppLayout>

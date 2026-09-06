@@ -28,6 +28,10 @@ export const en: Record<string, string> = {
   'vehicles.createdBy': 'Created By',
   'vehicles.metadata': 'Metadata',
   'vehicles.vehicleInformation': 'Vehicle Information',
+  'vehicles.profitability': 'Profitability',
+  'vehicles.profitabilityHint': 'Revenue, gross and net for sales made on this vehicle\'s trips.',
+  'vehicles.profitGrossFull': 'Gross = revenue − cost of goods sold',
+  'vehicles.profitNetFull': 'Net = gross − expenses tied to this vehicle',
 
   // placeholders
   'vehicles.platePlaceholder': 'Enter plate number',
@@ -161,6 +165,10 @@ export const ar: Record<string, string> = {
   'vehicles.createdBy': 'أنشئ بواسطة',
   'vehicles.metadata': 'البيانات الوصفية',
   'vehicles.vehicleInformation': 'معلومات المركبة',
+  'vehicles.profitability': 'الربحية',
+  'vehicles.profitabilityHint': 'الإيرادات والربح الإجمالي والصافي للمبيعات عبر رحلات هذه المركبة.',
+  'vehicles.profitGrossFull': 'الإجمالي = الإيرادات − كلفة البضاعة المباعة',
+  'vehicles.profitNetFull': 'الصافي = الإجمالي − النفقات المرتبطة بهذه المركبة',
 
   // placeholders
   'vehicles.platePlaceholder': 'أدخل رقم اللوحة',
