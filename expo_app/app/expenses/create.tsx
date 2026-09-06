@@ -51,6 +51,21 @@ export default function ExpenseFormScreen() {
         'other',
       ].map((v) => ({ value: v, label: tef(v) })),
     },
+    {
+      name: 'vehicle_uuid',
+      label: t('expenses.vehicle'),
+      kind: 'picker',
+      picker: {
+        endpoint: '/vehicle/',
+        itemsKey: 'items',
+        // plate_number is the only text filter VehicleListParams offers that
+        // suits a search box
+        searchParam: 'plate_number',
+        label: (v) => v.plate_number ?? v.uuid,
+        value: (v) => v.uuid,
+        sublabel: (v) => [v.make, v.model].filter(Boolean).join(' ') || undefined,
+      },
+    },
     { name: 'description', label: t('expenses.descriptionField'), kind: 'multiline' },
   ];
 

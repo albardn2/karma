@@ -82,6 +82,13 @@ def update_expense(uuid: str):
             trip = uow.trip_repository.find_one(uuid=data['trip_uuid'], is_deleted=False)
             if not trip:
                 raise NotFoundError('Trip not found')
+            # a trip expense carries the trip's assigned vehicle, derived not
+            # trusted — same rule the create path applies
+            data['vehicle_uuid'] = trip.vehicle_uuid
+        elif data.get('vehicle_uuid'):
+            vehicle = uow.vehicle_repository.find_one(uuid=data['vehicle_uuid'], is_deleted=False)
+            if not vehicle:
+                raise NotFoundError('Vehicle not found')
 
         for field, val in data.items():
             setattr(exp, field, val)
@@ -123,6 +130,8 @@ def list_expenses():
         filters.append(ExpenseModel.vendor_uuid == str(params.vendor_uuid))
     if params.trip_uuid:
         filters.append(ExpenseModel.trip_uuid == str(params.trip_uuid))
+    if params.vehicle_uuid:
+        filters.append(ExpenseModel.vehicle_uuid == str(params.vehicle_uuid))
     if params.category:
         filters.append(ExpenseModel.category == params.category.value)
     if params.start:

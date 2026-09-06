@@ -20,6 +20,18 @@ class ExpenseDomain:
             trip = uow.trip_repository.find_one(uuid=payload.trip_uuid, is_deleted=False)
             if not trip:
                 raise NotFoundError('Trip not found')
+            # A trip expense belongs to the trip's assigned vehicle. Derive it
+            # rather than trust a submitted vehicle_uuid — the two must never
+            # disagree, and the client (the in-trip flow) does not send one.
+            payload.vehicle_uuid = trip.vehicle_uuid
+        elif payload.vehicle_uuid:
+            # A standalone vehicle expense: the FK alone would accept another
+            # tenant's vehicle, so verify against the account-scoped repo.
+            vehicle = uow.vehicle_repository.find_one(
+                uuid=payload.vehicle_uuid, is_deleted=False
+            )
+            if not vehicle:
+                raise NotFoundError('Vehicle not found')
 
         data = payload.model_dump(mode='json')
         should_pay = data.pop("should_pay", None)

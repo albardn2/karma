@@ -28,6 +28,9 @@ class ExpenseBase(BaseModel):
     category: ExpenseCategory
     vendor_uuid: Optional[str] = None
     trip_uuid: Optional[str] = None
+    # the vehicle the cost belongs to; for a trip expense the domain derives it
+    # from the trip's assigned vehicle, so a submitted value is ignored there
+    vehicle_uuid: Optional[str] = None
     description: Optional[str] = None
 
 
@@ -45,6 +48,7 @@ class ExpenseUpdate(BaseModel):
 
     vendor_uuid: Optional[str] = None
     trip_uuid: Optional[str] = None
+    vehicle_uuid: Optional[str] = None
     category: Optional[ExpenseCategory] = None
     description: Optional[str] = None
 
@@ -73,6 +77,7 @@ class ExpenseListParams(BaseModel):
     uuid : Optional[str] = None
     vendor_uuid: Optional[str] = None
     trip_uuid:   Optional[str] = None
+    vehicle_uuid: Optional[str] = None
     category:    Optional[ExpenseCategory] = None
     status :    Optional[InvoiceStatus] = None
     is_paid:    Optional[bool] = None
