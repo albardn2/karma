@@ -172,6 +172,14 @@ class CustomerOrderItemDomain:
         as the original sale. An unfulfilled line has moved no stock, so setting
         the column is all it takes. Payment state is the caller's gate (this is
         only reached for a fully unpaid order), so no payment ever moves.
+
+        Only the QUANTITY changes: the re-fulfilment stamps fresh timestamps
+        (fulfilled_at, and each new sale event's created_at) with `now()`, which
+        would re-date an already-delivered line to the edit day — moving its
+        delivery date in the UI and its COGS into the current dashboard period.
+        So the original fulfilment moment is captured up front and stamped back
+        onto the line and its new sale events; a correction changes the amount,
+        never when the goods left.
         """
         coi = uow.customer_order_item_repository.find_one(uuid=uuid, is_deleted=False)
         if not coi:
@@ -179,7 +187,9 @@ class CustomerOrderItemDomain:
 
         was_fulfilled = coi.is_fulfilled
         trip_stop_uuid = None
+        original_fulfilled_at = None
         if was_fulfilled:
+            original_fulfilled_at = coi.fulfilled_at
             # remember which stop the vehicle sale was attributed to, so the
             # re-fulfilment lands the new sale on the same trip/vehicle
             veh_sales = [
@@ -207,6 +217,40 @@ class CustomerOrderItemDomain:
                     trip_stop_uuid=trip_stop_uuid,
                 ),
             )
+            # re-date the fresh line + sale events back to the original
+            # fulfilment moment — a quantity fix must not move the delivery date
+            # or the sale's dashboard period. The re-fulfilment created BRAND NEW
+            # event rows, so query them from the session (the coi relationship
+            # collections are stale and would miss them).
+            if original_fulfilled_at is not None:
+                from models.common import (
+                    InventoryEvent as _InventoryEvent,
+                    VehicleInventoryEvent as _VehicleInventoryEvent,
+                )
+
+                coi.fulfilled_at = original_fulfilled_at
+                uow.session.flush()
+                for e in (
+                    uow.session.query(_InventoryEvent)
+                    .filter(
+                        _InventoryEvent.customer_order_item_uuid == uuid,
+                        _InventoryEvent.is_deleted.is_(False),
+                        _InventoryEvent.event_type == InventoryEventType.SALE.value,
+                    )
+                    .all()
+                ):
+                    e.created_at = original_fulfilled_at
+                for e in (
+                    uow.session.query(_VehicleInventoryEvent)
+                    .filter(
+                        _VehicleInventoryEvent.customer_order_item_uuid == uuid,
+                        _VehicleInventoryEvent.is_deleted.is_(False),
+                        _VehicleInventoryEvent.event_type == "sale",
+                    )
+                    .all()
+                ):
+                    e.created_at = original_fulfilled_at
+                uow.session.flush()
 
         fresh = uow.customer_order_item_repository.find_one(uuid=uuid, is_deleted=False)
         return CustomerOrderItemRead.from_orm(fresh)

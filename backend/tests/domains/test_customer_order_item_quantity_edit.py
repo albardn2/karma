@@ -34,6 +34,19 @@ def test_adjust_quantity_resyncs_stock_only_when_fulfilled():
     assert "trip_stop_uuid" in src
 
 
+def test_adjust_quantity_preserves_the_original_fulfilment_dates():
+    """Re-fulfilment stamps now(); a quantity fix must NOT re-date an
+    already-delivered line — the delivery timestamp and the sale's dashboard
+    period (inventory-event created_at) stay put, only the amount changes."""
+    from app.domains.customer_order_item import domain as mod
+
+    src = inspect.getsource(mod.CustomerOrderItemDomain.adjust_quantity)
+    assert "original_fulfilled_at = coi.fulfilled_at" in src
+    assert "coi.fulfilled_at = original_fulfilled_at" in src
+    # the new warehouse + vehicle sale events are re-dated back too
+    assert "e.created_at = original_fulfilled_at" in src
+
+
 def test_quantity_edit_is_gated_to_fully_unpaid_orders():
     from app.entrypoint.routes.customer_order_item import routes as mod
 
