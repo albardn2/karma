@@ -8,6 +8,7 @@ from models.common import CustomerOrderItem as CustomerOrderItemModel
 from app.entrypoint.routes.common.errors import NotFoundError
 
 from app.dto.customer_order_item import CustomerOrderItemBulkFulfill
+from app.dto.customer_order_item import FulfillItem, UnFulfillItem
 
 from app.dto.customer_order_item import CustomerOrderItemBulkDelete
 from app.domains.inventory_event.domain import InventoryEventDomain
@@ -133,13 +134,12 @@ class CustomerOrderItemDomain:
                 raise BadRequestError("CustomerOrderItem is not fulfilled")
             customer_order_item.is_fulfilled = False
             customer_order_item.fulfilled_at = None
-            # create inventory event
+            # reverse the warehouse stock this sale consumed. A FIFO sale can
+            # span several lots, so there may be MORE THAN ONE sale event —
+            # reverse every one, or a multi-lot line leaves stock stranded.
             inventory_events = [event for event in customer_order_item.inventory_events if not event.is_deleted and event.event_type == InventoryEventType.SALE.value]
-            InventoryEventDomain.delete_inventory_event(
-                uow=uow,
-                uuid=inventory_events[0].uuid
-
-            )
+            for ev in inventory_events:
+                InventoryEventDomain.delete_inventory_event(uow=uow, uuid=ev.uuid)
 
             # reverse any vehicle 'sale' events created when this item was fulfilled on a trip
             vehicle_sale_events = [
@@ -154,6 +154,62 @@ class CustomerOrderItemDomain:
         bulk_read = CustomerOrderItemBulkRead(items=[CustomerOrderItemRead.from_orm(m) for m in items])
         return bulk_read
 
+
+    @staticmethod
+    def adjust_quantity(
+        uow: SqlAlchemyUnitOfWork,
+        uuid: str,
+        new_quantity: int,
+    ) -> CustomerOrderItemRead:
+        """Change a line's ordered quantity. The invoice and order totals are
+        derived hybrids off this column, so they recompute for free.
+
+        Stock is not: a FULFILLED line has already drawn its quantity out of
+        warehouse (and, on a trip, vehicle) stock as sale events that snapshot
+        the old figure. So for a fulfilled line we reverse those events and
+        re-fulfil at the new quantity — reusing the unfulfil/fulfil machinery so
+        FIFO lot selection and vehicle attribution follow the exact same rules
+        as the original sale. An unfulfilled line has moved no stock, so setting
+        the column is all it takes. Payment state is the caller's gate (this is
+        only reached for a fully unpaid order), so no payment ever moves.
+        """
+        coi = uow.customer_order_item_repository.find_one(uuid=uuid, is_deleted=False)
+        if not coi:
+            raise NotFoundError("CustomerOrderItem not found")
+
+        was_fulfilled = coi.is_fulfilled
+        trip_stop_uuid = None
+        if was_fulfilled:
+            # remember which stop the vehicle sale was attributed to, so the
+            # re-fulfilment lands the new sale on the same trip/vehicle
+            veh_sales = [
+                e for e in coi.vehicle_inventory_events
+                if not e.is_deleted and e.event_type == "sale"
+            ]
+            trip_stop_uuid = veh_sales[0].trip_stop_uuid if veh_sales else None
+            CustomerOrderItemDomain.unfulfill_items(
+                uow=uow,
+                payload=CustomerOrderItemBulkUnFulfill(
+                    items=[UnFulfillItem(customer_order_item_uuid=uuid)]
+                ),
+            )
+
+        coi.quantity = new_quantity
+        uow.customer_order_item_repository.save(model=coi, commit=False)
+        # flush so the re-fulfilment's FIFO query sees the restored lot balances
+        uow.session.flush()
+
+        if was_fulfilled:
+            CustomerOrderItemDomain.fulfill_items(
+                uow=uow,
+                payload=CustomerOrderItemBulkFulfill(
+                    items=[FulfillItem(customer_order_item_uuid=uuid)],
+                    trip_stop_uuid=trip_stop_uuid,
+                ),
+            )
+
+        fresh = uow.customer_order_item_repository.find_one(uuid=uuid, is_deleted=False)
+        return CustomerOrderItemRead.from_orm(fresh)
 
     @staticmethod
     def delete_items(

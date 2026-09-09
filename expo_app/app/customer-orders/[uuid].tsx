@@ -28,6 +28,7 @@ interface OrderItem {
 
 interface InvoiceItem {
   uuid: string;
+  customer_order_item_uuid?: string | null;
   material_name?: string | null;
   quantity?: number | null;
   price_per_unit?: number | null;
@@ -131,6 +132,34 @@ export default function CustomerOrderDetailScreen() {
     } else {
       Alert.alert(
         t('customerOrders.editPrice'),
+        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+      );
+    }
+  };
+
+  // quantity editor — targets the customer_order_item (where quantity lives);
+  // totals recompute server-side and, if the line was fulfilled, stock re-syncs
+  const [quantityItem, setQuantityItem] = useState<InvoiceItem | null>(null);
+  const [quantityDraft, setQuantityDraft] = useState('');
+  const [quantitySaving, setQuantitySaving] = useState(false);
+
+  const saveQuantity = async () => {
+    const coiUuid = quantityItem?.customer_order_item_uuid;
+    if (!coiUuid) return;
+    const quantity = parseInt(quantityDraft, 10);
+    if (isNaN(quantity) || quantity <= 0) return;
+    setQuantitySaving(true);
+    const res = await apiCall(`/customer-order-item/${coiUuid}/quantity`, {
+      method: 'PUT',
+      body: JSON.stringify({ quantity }),
+    });
+    setQuantitySaving(false);
+    if (isOk(res.status)) {
+      setQuantityItem(null);
+      setReloadKey((k) => k + 1);
+    } else {
+      Alert.alert(
+        t('customerOrders.editQuantity'),
         String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
       );
     }
@@ -347,6 +376,22 @@ export default function CustomerOrderDetailScreen() {
                                 </ThemedText>
                               </TouchableOpacity>
                             )}
+                            {/* quantity edit needs a FULLY unpaid order (it can
+                                move stock); a stricter gate than price */}
+                            {d.price_edit_state === 'unpaid' && li.customer_order_item_uuid && (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setQuantityDraft(String(li.quantity ?? ''));
+                                  setQuantityItem(li);
+                                }}
+                                hitSlop={8}
+                                testID={`edit-quantity-${li.uuid}`}
+                              >
+                                <ThemedText style={styles.editPrice}>
+                                  {t('customerOrders.editQuantity')}
+                                </ThemedText>
+                              </TouchableOpacity>
+                            )}
                           </View>
                         ))}
                       {/* per-invoice, so a second invoice on the order is payable
@@ -497,6 +542,51 @@ export default function CustomerOrderDetailScreen() {
               >
                 <ThemedText style={styles.modalSaveText}>
                   {priceSaving ? t('custdetail.saving') : t('form.save')}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={!!quantityItem}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setQuantityItem(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <ThemedText style={styles.modalTitle}>
+              {t('customerOrders.editQuantity')}
+              {quantityItem?.material_name ? ` — ${quantityItem.material_name}` : ''}
+            </ThemedText>
+            <TextInput
+              style={styles.priceInput}
+              value={quantityDraft}
+              onChangeText={setQuantityDraft}
+              keyboardType="number-pad"
+              placeholder={t('customerOrders.newQuantity')}
+              placeholderTextColor="#9ca3af"
+              autoFocus
+              testID="order-quantity-input"
+            />
+            <View style={styles.modalRow}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setQuantityItem(null)}
+                disabled={quantitySaving}
+              >
+                <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSave, quantitySaving && styles.modalSaveOff]}
+                onPress={saveQuantity}
+                disabled={quantitySaving}
+                testID="order-quantity-save"
+              >
+                <ThemedText style={styles.modalSaveText}>
+                  {quantitySaving ? t('custdetail.saving') : t('form.save')}
                 </ThemedText>
               </TouchableOpacity>
             </View>

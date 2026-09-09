@@ -170,6 +170,8 @@ export const en: Record<string, string> = {
   'customerOrders.invoiceItems': 'Invoice Items',
   'customerOrders.editPrice': 'Edit price',
   'customerOrders.priceUpdated': 'Price updated',
+  'customerOrders.editQuantity': 'Edit quantity',
+  'customerOrders.quantityUpdated': 'Quantity updated',
   'customerOrders.priceEditPaymentNote':
     'This order is settled by a single payment — changing a price also adjusts that payment by the same amount.',
   'customerOrders.orderItemDetails': 'Order Item Details',
@@ -362,6 +364,8 @@ export const ar: Record<string, string> = {
   'customerOrders.invoiceItems': 'أصناف الفاتورة',
   'customerOrders.editPrice': 'تعديل السعر',
   'customerOrders.priceUpdated': 'تم تحديث السعر',
+  'customerOrders.editQuantity': 'تعديل الكمية',
+  'customerOrders.quantityUpdated': 'تم تحديث الكمية',
   'customerOrders.priceEditPaymentNote':
     'هذا الطلب مسدَّد بدفعة واحدة — تغيير السعر سيعدِّل تلك الدفعة بالمقدار نفسه.',
   'customerOrders.orderItemDetails': 'تفاصيل صنف الطلب',

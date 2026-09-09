@@ -1215,6 +1215,8 @@ export const translations: Record<Lang, Record<string, string>> = {
   'customerOrders.editNotes': 'Edit notes',
   'customerOrders.editPrice': 'Edit price',
   'customerOrders.newPricePerUnit': 'New price per unit',
+  'customerOrders.editQuantity': 'Edit quantity',
+  'customerOrders.newQuantity': 'New quantity',
   'customerOrders.priceEditPaymentNote':
     'This order is settled by a single payment — changing a price also adjusts that payment by the same amount.',
   'customerOrders.void': 'Void order (admin)',
@@ -2482,6 +2484,8 @@ export const translations: Record<Lang, Record<string, string>> = {
   'customerOrders.editNotes': 'تعديل الملاحظات',
   'customerOrders.editPrice': 'تعديل السعر',
   'customerOrders.newPricePerUnit': 'السعر الجديد للوحدة',
+  'customerOrders.editQuantity': 'تعديل الكمية',
+  'customerOrders.newQuantity': 'الكمية الجديدة',
   'customerOrders.priceEditPaymentNote':
     'هذا الطلب مسدَّد بدفعة واحدة — تغيير السعر سيعدِّل تلك الدفعة بالمقدار نفسه.',
   'customerOrders.void': 'إلغاء الطلب (مسؤول)',
