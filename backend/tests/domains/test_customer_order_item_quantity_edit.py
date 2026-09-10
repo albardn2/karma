@@ -19,6 +19,23 @@ def test_unfulfill_reverses_every_warehouse_sale_event():
     assert "inventory_events[0]" not in src
 
 
+def test_unfulfill_also_reverses_quantity_edit_adjustments():
+    """A quantity edit on a fulfilled line posts compensating ADJUSTMENT events
+    on both ledgers. Unfulfilling must reverse those too (not just sales), or
+    the lot/van is left off by the edit delta and the line becomes undeletable.
+    Note-linked adjustments (credit/debit notes) are a separate lifecycle and
+    must be left intact."""
+    from app.domains.customer_order_item import domain as mod
+
+    src = inspect.getsource(mod.CustomerOrderItemDomain.unfulfill_items)
+    # warehouse: reverse SALE + ADJUSTMENT, but skip note-linked adjustments
+    assert "InventoryEventType.ADJUSTMENT.value" in src
+    assert "not event.credit_note_item_uuid" in src
+    assert "not event.debit_note_item_uuid" in src
+    # vehicle: reverse both 'sale' and 'adjustment'
+    assert '("sale", "adjustment")' in src
+
+
 def test_adjust_quantity_posts_adjustment_events_without_touching_the_sale():
     """A fulfilled line's stock is corrected by a compensating ADJUSTMENT event
     on BOTH ledgers — the original sale event is the audit record and must not

@@ -133,17 +133,34 @@ class CustomerOrderItemDomain:
                 raise BadRequestError("CustomerOrderItem is not fulfilled")
             customer_order_item.is_fulfilled = False
             customer_order_item.fulfilled_at = None
-            # reverse the warehouse stock this sale consumed. A FIFO sale can
-            # span several lots, so there may be MORE THAN ONE sale event —
-            # reverse every one, or a multi-lot line leaves stock stranded.
-            inventory_events = [event for event in customer_order_item.inventory_events if not event.is_deleted and event.event_type == InventoryEventType.SALE.value]
+            # reverse every warehouse stock movement fulfilment caused on this
+            # line. A FIFO sale can span several lots (MORE THAN ONE sale
+            # event), and a quantity edit on the fulfilled line posts
+            # compensating ADJUSTMENT events — reverse those too, or unfulfill
+            # leaves the lot off by the edit delta (phantom/missing stock) and
+            # the stranded event keeps the line undeletable. Credit/debit-note
+            # adjustments belong to a separate lifecycle (they carry a
+            # *_note_item_uuid) — leave them intact.
+            inventory_events = [
+                event for event in customer_order_item.inventory_events
+                if not event.is_deleted
+                and event.event_type in (
+                    InventoryEventType.SALE.value,
+                    InventoryEventType.ADJUSTMENT.value,
+                )
+                and not event.credit_note_item_uuid
+                and not event.debit_note_item_uuid
+            ]
             for ev in inventory_events:
                 InventoryEventDomain.delete_inventory_event(uow=uow, uuid=ev.uuid)
 
-            # reverse any vehicle 'sale' events created when this item was fulfilled on a trip
+            # reverse vehicle events fulfilment caused on a trip: the 'sale' and
+            # any compensating 'adjustment' from a quantity edit. The vehicle
+            # ledger has no note linkage, so every coi-tied adjustment here is a
+            # quantity re-sync.
             vehicle_sale_events = [
                 e for e in customer_order_item.vehicle_inventory_events
-                if not e.is_deleted and e.event_type == "sale"
+                if not e.is_deleted and e.event_type in ("sale", "adjustment")
             ]
             for e in vehicle_sale_events:
                 VehicleInventoryEventDomain.delete_event(uow=uow, uuid=e.uuid)
