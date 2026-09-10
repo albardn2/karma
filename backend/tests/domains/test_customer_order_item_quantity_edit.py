@@ -19,32 +19,33 @@ def test_unfulfill_reverses_every_warehouse_sale_event():
     assert "inventory_events[0]" not in src
 
 
-def test_adjust_quantity_resyncs_stock_only_when_fulfilled():
+def test_adjust_quantity_posts_adjustment_events_without_touching_the_sale():
+    """A fulfilled line's stock is corrected by a compensating ADJUSTMENT event
+    on BOTH ledgers — the original sale event is the audit record and must not
+    be edited or deleted. An unfulfilled line just sets the column."""
     from app.domains.customer_order_item import domain as mod
 
     src = inspect.getsource(mod.CustomerOrderItemDomain.adjust_quantity)
-    # the stock cascade runs behind `was_fulfilled` — an unfulfilled line moves
-    # no stock and just sets the column
-    assert "was_fulfilled = coi.is_fulfilled" in src
     assert "coi.quantity = new_quantity" in src
-    # fulfilled: reverse (unfulfil) then re-fulfil at the new quantity
-    assert "unfulfill_items" in src
-    assert "fulfill_items" in src
-    # the re-fulfilment must preserve the vehicle attribution (same trip stop)
-    assert "trip_stop_uuid" in src
+    # posts adjustments, never reverses/re-fulfils the sale
+    assert "InventoryEventType.ADJUSTMENT" in src
+    assert "VehicleInventoryEventType.ADJUSTMENT" in src
+    assert "unfulfill_items" not in src
+    assert "delete_inventory_event" not in src
+    # both ledgers: warehouse lot(s) and the vehicle
+    assert "inventory_events" in src and "vehicle_inventory_events" in src
 
 
-def test_adjust_quantity_preserves_the_original_fulfilment_dates():
-    """Re-fulfilment stamps now(); a quantity fix must NOT re-date an
-    already-delivered line — the delivery timestamp and the sale's dashboard
-    period (inventory-event created_at) stay put, only the amount changes."""
+def test_adjust_total_is_the_delta_positive_when_quantity_falls():
+    """The adjustment total is exactly old - new (+ returns goods on a
+    decrease, - takes more on an increase) — the delta, NOT a factor of the
+    sale event's original magnitude, which can differ after a prior edit. It is
+    split across the sale's lots by each lot's share."""
     from app.domains.customer_order_item import domain as mod
 
     src = inspect.getsource(mod.CustomerOrderItemDomain.adjust_quantity)
-    assert "original_fulfilled_at = coi.fulfilled_at" in src
-    assert "coi.fulfilled_at = original_fulfilled_at" in src
-    # the new warehouse + vehicle sale events are re-dated back too
-    assert "e.created_at = original_fulfilled_at" in src
+    assert "delta = old_quantity - new_quantity" in src
+    assert "delta * (abs(e.quantity or 0) / total)" in src
 
 
 def test_quantity_edit_is_gated_to_fully_unpaid_orders():

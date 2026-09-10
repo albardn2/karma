@@ -8,7 +8,6 @@ from models.common import CustomerOrderItem as CustomerOrderItemModel
 from app.entrypoint.routes.common.errors import NotFoundError
 
 from app.dto.customer_order_item import CustomerOrderItemBulkFulfill
-from app.dto.customer_order_item import FulfillItem, UnFulfillItem
 
 from app.dto.customer_order_item import CustomerOrderItemBulkDelete
 from app.domains.inventory_event.domain import InventoryEventDomain
@@ -165,93 +164,88 @@ class CustomerOrderItemDomain:
         derived hybrids off this column, so they recompute for free.
 
         Stock is not: a FULFILLED line has already drawn its quantity out of
-        warehouse (and, on a trip, vehicle) stock as sale events that snapshot
-        the old figure. So for a fulfilled line we reverse those events and
-        re-fulfil at the new quantity — reusing the unfulfil/fulfil machinery so
-        FIFO lot selection and vehicle attribution follow the exact same rules
-        as the original sale. An unfulfilled line has moved no stock, so setting
-        the column is all it takes. Payment state is the caller's gate (this is
-        only reached for a fully unpaid order), so no payment ever moves.
-
-        Only the QUANTITY changes: the re-fulfilment stamps fresh timestamps
-        (fulfilled_at, and each new sale event's created_at) with `now()`, which
-        would re-date an already-delivered line to the edit day — moving its
-        delivery date in the UI and its COGS into the current dashboard period.
-        So the original fulfilment moment is captured up front and stamped back
-        onto the line and its new sale events; a correction changes the amount,
-        never when the goods left.
+        warehouse (and, on a trip, vehicle) stock as sale events. The original
+        sale event is LEFT UNTOUCHED — it is the historical record of what left
+        — and the correction is posted as a compensating ADJUSTMENT event for
+        the delta. Sign follows physical stock: a DECREASE returns goods to
+        stock (positive adjustment), an INCREASE takes more (negative). The
+        adjustment lands on the same warehouse lot(s) the sale drew from (split
+        proportionally across a multi-lot sale) and, on a trip, on the vehicle.
+        An unfulfilled line has moved no stock, so setting the column is all it
+        takes. Payment state is the caller's gate (fully unpaid), so no payment
+        moves.
         """
+        from app.dto.vehicle_inventory_event import (
+            VehicleInventoryEventCreate,
+            VehicleInventoryEventType,
+        )
+
         coi = uow.customer_order_item_repository.find_one(uuid=uuid, is_deleted=False)
         if not coi:
             raise NotFoundError("CustomerOrderItem not found")
 
-        was_fulfilled = coi.is_fulfilled
-        trip_stop_uuid = None
-        original_fulfilled_at = None
-        if was_fulfilled:
-            original_fulfilled_at = coi.fulfilled_at
-            # remember which stop the vehicle sale was attributed to, so the
-            # re-fulfilment lands the new sale on the same trip/vehicle
-            veh_sales = [
-                e for e in coi.vehicle_inventory_events
-                if not e.is_deleted and e.event_type == "sale"
-            ]
-            trip_stop_uuid = veh_sales[0].trip_stop_uuid if veh_sales else None
-            CustomerOrderItemDomain.unfulfill_items(
-                uow=uow,
-                payload=CustomerOrderItemBulkUnFulfill(
-                    items=[UnFulfillItem(customer_order_item_uuid=uuid)]
-                ),
-            )
-
+        old_quantity = coi.quantity
         coi.quantity = new_quantity
         uow.customer_order_item_repository.save(model=coi, commit=False)
-        # flush so the re-fulfilment's FIFO query sees the restored lot balances
-        uow.session.flush()
 
-        if was_fulfilled:
-            CustomerOrderItemDomain.fulfill_items(
-                uow=uow,
-                payload=CustomerOrderItemBulkFulfill(
-                    items=[FulfillItem(customer_order_item_uuid=uuid)],
-                    trip_stop_uuid=trip_stop_uuid,
+        if coi.is_fulfilled and new_quantity != old_quantity and old_quantity:
+            # The invariant we hold is: net stock consumed by this line ==
+            # -quantity. So the adjustment to post is exactly the DELTA,
+            # old - new (+ returns goods, - takes more) — NOT a factor of the
+            # sale event's magnitude, which is the ORIGINAL fulfilment and may
+            # already differ from the current quantity after a prior edit.
+            delta = old_quantity - new_quantity
+
+            def _post_adjustments(sale_events, create):
+                # split the delta across the sale's lots by each lot's share of
+                # the original sale; a single-lot sale gets one clean adjustment
+                total = sum(abs(e.quantity or 0) for e in sale_events)
+                if not total:
+                    return
+                for e in sale_events:
+                    adj = delta * (abs(e.quantity or 0) / total)
+                    if adj:
+                        create(e, adj)
+
+            # snapshot first: creating events would otherwise mutate the
+            # relationship being iterated
+            _post_adjustments(
+                [
+                    e for e in coi.inventory_events
+                    if not e.is_deleted and e.event_type == InventoryEventType.SALE.value
+                ],
+                lambda e, adj: InventoryEventDomain.create_inventory_event(
+                    uow=uow,
+                    payload=InventoryEventCreate(
+                        quantity=adj,  # signed: + adds back to the lot, - removes
+                        event_type=InventoryEventType.ADJUSTMENT,
+                        inventory_uuid=e.inventory_uuid,
+                        customer_order_item_uuid=coi.uuid,
+                        affect_original=False,
+                    ),
                 ),
             )
-            # re-date the fresh line + sale events back to the original
-            # fulfilment moment — a quantity fix must not move the delivery date
-            # or the sale's dashboard period. The re-fulfilment created BRAND NEW
-            # event rows, so query them from the session (the coi relationship
-            # collections are stale and would miss them).
-            if original_fulfilled_at is not None:
-                from models.common import (
-                    InventoryEvent as _InventoryEvent,
-                    VehicleInventoryEvent as _VehicleInventoryEvent,
-                )
+            _post_adjustments(
+                [
+                    e for e in coi.vehicle_inventory_events
+                    if not e.is_deleted and e.event_type == "sale"
+                ],
+                lambda e, adj: VehicleInventoryEventDomain.create_event(
+                    uow=uow,
+                    payload=VehicleInventoryEventCreate(
+                        vehicle_inventory_uuid=e.vehicle_inventory_uuid,
+                        event_type=VehicleInventoryEventType.ADJUSTMENT,
+                        quantity=adj,  # ADJUSTMENT is stored signed-as-given
+                        customer_order_item_uuid=coi.uuid,
+                        trip_stop_uuid=e.trip_stop_uuid,
+                    ),
+                    # an increase removes more from a van that trip sales may
+                    # already have driven negative — never gate that
+                    allow_negative=True,
+                ),
+            )
 
-                coi.fulfilled_at = original_fulfilled_at
-                uow.session.flush()
-                for e in (
-                    uow.session.query(_InventoryEvent)
-                    .filter(
-                        _InventoryEvent.customer_order_item_uuid == uuid,
-                        _InventoryEvent.is_deleted.is_(False),
-                        _InventoryEvent.event_type == InventoryEventType.SALE.value,
-                    )
-                    .all()
-                ):
-                    e.created_at = original_fulfilled_at
-                for e in (
-                    uow.session.query(_VehicleInventoryEvent)
-                    .filter(
-                        _VehicleInventoryEvent.customer_order_item_uuid == uuid,
-                        _VehicleInventoryEvent.is_deleted.is_(False),
-                        _VehicleInventoryEvent.event_type == "sale",
-                    )
-                    .all()
-                ):
-                    e.created_at = original_fulfilled_at
-                uow.session.flush()
-
+        uow.session.flush()
         fresh = uow.customer_order_item_repository.find_one(uuid=uuid, is_deleted=False)
         return CustomerOrderItemRead.from_orm(fresh)
 
