@@ -308,8 +308,18 @@ def get_trip_activity(uuid: str):
                     "is_fulfilled": o.is_fulfilled,
                     "items": items,
                 })
+            # what each line actually delivered off the van: its 'sale' plus any
+            # compensating 'adjustment' a later quantity edit posted for it
+            # (both tagged to this stop). Reporting the sale alone shows the
+            # ORIGINAL quantity and contradicts the Orders tab on this screen.
+            delivered: dict = {}
             for ev in stop.vehicle_inventory_events:
-                if ev.is_deleted or ev.event_type != "sale":
+                if ev.is_deleted:
+                    continue
+                is_sale = ev.event_type == "sale"
+                if not is_sale and not (
+                    ev.event_type == "adjustment" and ev.customer_order_item_uuid
+                ):
                     continue
                 item = ev.customer_order_item
                 order = item.customer_order if item else None
@@ -317,13 +327,22 @@ def get_trip_activity(uuid: str):
                 # leftover sale events must not count as trip activity
                 if (item and item.is_deleted) or (order and order.is_deleted):
                     continue
-                fulfillments.append({
-                    "created_at": ev.created_at.isoformat() if ev.created_at else None,
-                    "material_name": material_name(ev.material_uuid),
-                    "quantity": -ev.quantity,  # stored as negative delta; report as positive
-                    "customer_name": customer_name(order.customer) if order else None,
-                    "customer_order_uuid": order.uuid if order else None,
-                })
+                key = ev.customer_order_item_uuid or ev.uuid
+                row = delivered.get(key)
+                if row is None:
+                    row = delivered[key] = {
+                        "created_at": None,
+                        "material_name": material_name(ev.material_uuid),
+                        "quantity": 0,
+                        "customer_name": customer_name(order.customer) if order else None,
+                        "customer_order_uuid": order.uuid if order else None,
+                    }
+                # the row keeps the SALE's timestamp — that is when it was
+                # delivered; an edit later does not move it on the timeline
+                if is_sale or row["created_at"] is None:
+                    row["created_at"] = ev.created_at.isoformat() if ev.created_at else None
+                row["quantity"] -= ev.quantity  # negative deltas; report the positive net
+            fulfillments.extend(r for r in delivered.values() if r["quantity"] > 0)
             for p in stop.payments:
                 if p.is_deleted:
                     continue

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, apiErrorMessage } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -137,10 +138,27 @@ export default function CustomerOrderDetail() {
   // state: "unpaid" (free), "single_payment" (allowed; the one payment absorbs
   // the delta) or "locked" (partial / several payments / notes)
   const priceEditState: string | undefined = orderData?.price_edit_state;
-  const canEditPrice = priceEditState === "unpaid" || priceEditState === "single_payment";
+  // The enforced gate for a non-admin is the endpoint ACL (PUT -> 'update'),
+  // which /auth/me exposes as effective_permissions.endpoints; the tenant
+  // feature cap (account_permissions) binds admins too. Payment state alone
+  // would show an editor whose save answers 403.
+  const { user: authUser, isAdmin } = useAuth();
+  const grants = (perms: any, resource: string, action: string) =>
+    Array.isArray(perms?.endpoints?.[resource]) && perms.endpoints[resource].includes(action);
+  const canUpdate = (resource: string) => {
+    const userPerms = (authUser as any)?.effective_permissions ?? null;
+    const accountPerms = (authUser as any)?.account_permissions ?? null;
+    return (
+      (isAdmin || (userPerms ? grants(userPerms, resource, "update") : false)) &&
+      (!accountPerms || grants(accountPerms, resource, "update"))
+    );
+  };
+  const canEditPrice =
+    canUpdate("invoice_item") &&
+    (priceEditState === "unpaid" || priceEditState === "single_payment");
   // quantity edits move stock, so they are allowed only when the order is
   // FULLY unpaid (no payment to keep in step) — a stricter gate than price.
-  const canEditQuantity = priceEditState === "unpaid";
+  const canEditQuantity = canUpdate("customer_order_item") && priceEditState === "unpaid";
   const [priceEditUuid, setPriceEditUuid] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState("");
   const [quantityEditUuid, setQuantityEditUuid] = useState<string | null>(null);
@@ -163,7 +181,9 @@ export default function CustomerOrderDetail() {
     onError: (error: any) => {
       toast({
         title: t('common.error'),
-        description: error.message || t('customerOrders.updateFailed'),
+        // the body is JSON ({"code":..,"msg":..} / {"error":..}) — surface
+        // the message, not the raw blob
+        description: apiErrorMessage(error, t('customerOrders.updateFailed')),
         variant: "destructive",
       });
     },
@@ -194,16 +214,25 @@ export default function CustomerOrderDetail() {
     onError: (error: any) => {
       toast({
         title: t('common.error'),
-        description: error.message || t('customerOrders.updateFailed'),
+        description: apiErrorMessage(error, t('customerOrders.updateFailed')),
         variant: "destructive",
       });
     },
   });
 
   const saveQuantity = (coiUuid: string) => {
-    const quantity = parseInt(quantityDraft, 10);
-    if (isNaN(quantity) || quantity <= 0) return;
-    quantityMutation.mutate({ uuid: coiUuid, quantity });
+    // whole units only — parseInt would silently save "2.5" as 2 (or "1e2"
+    // as 1) under a success toast, so validate the text, not the number
+    const draft = quantityDraft.trim();
+    if (!/^\d+$/.test(draft) || parseInt(draft, 10) <= 0) {
+      toast({
+        title: t('common.error'),
+        description: t('customerOrders.quantityWholeNumber'),
+        variant: "destructive",
+      });
+      return;
+    }
+    quantityMutation.mutate({ uuid: coiUuid, quantity: parseInt(draft, 10) });
   };
 
   const updateMutation = useMutation({
@@ -857,6 +886,8 @@ export default function CustomerOrderDetail() {
                                       type="number"
                                       min="1"
                                       step="1"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
                                       value={quantityDraft}
                                       onChange={(e) => setQuantityDraft(e.target.value)}
                                       className="h-7 w-20 text-sm"

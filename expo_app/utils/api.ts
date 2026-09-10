@@ -185,3 +185,22 @@ export const apiCall = async <T = any>(
 };
 
 export { API_BASE_URL };
+
+/**
+ * Human-readable text from an apiCall error body. Domain errors come back as
+ * `{"error": ...}`, auth/ACL and gates as `{"msg": ...}` (often with a `code`)
+ * — handing the raw body to an Alert shows the user JSON. Falls back to the
+ * raw text (trimmed), then to `fallback`.
+ */
+export function apiErrorText(error: unknown, fallback = ''): string {
+  const raw = typeof error === 'string' ? error : error == null ? '' : String(error);
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    const msg = parsed?.error || parsed?.msg || parsed?.message;
+    if (typeof msg === 'string' && msg) return msg;
+  } catch {
+    // not JSON — a plain-text body
+  }
+  return raw.slice(0, 300) || fallback;
+}

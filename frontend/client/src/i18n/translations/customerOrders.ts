@@ -172,6 +172,7 @@ export const en: Record<string, string> = {
   'customerOrders.priceUpdated': 'Price updated',
   'customerOrders.editQuantity': 'Edit quantity',
   'customerOrders.quantityUpdated': 'Quantity updated',
+  'customerOrders.quantityWholeNumber': 'Quantity must be a whole number greater than zero',
   'customerOrders.priceEditPaymentNote':
     'This order is settled by a single payment — changing a price also adjusts that payment by the same amount.',
   'customerOrders.orderItemDetails': 'Order Item Details',
@@ -366,6 +367,7 @@ export const ar: Record<string, string> = {
   'customerOrders.priceUpdated': 'تم تحديث السعر',
   'customerOrders.editQuantity': 'تعديل الكمية',
   'customerOrders.quantityUpdated': 'تم تحديث الكمية',
+  'customerOrders.quantityWholeNumber': 'يجب أن تكون الكمية عددًا صحيحًا أكبر من صفر',
   'customerOrders.priceEditPaymentNote':
     'هذا الطلب مسدَّد بدفعة واحدة — تغيير السعر سيعدِّل تلك الدفعة بالمقدار نفسه.',
   'customerOrders.orderItemDetails': 'تفاصيل صنف الطلب',

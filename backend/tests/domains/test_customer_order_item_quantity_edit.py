@@ -53,16 +53,66 @@ def test_adjust_quantity_posts_adjustment_events_without_touching_the_sale():
     assert "inventory_events" in src and "vehicle_inventory_events" in src
 
 
-def test_adjust_total_is_the_delta_positive_when_quantity_falls():
+def test_adjust_total_is_the_delta_apportioned_exactly_not_proportionally():
     """The adjustment total is exactly old - new (+ returns goods on a
     decrease, - takes more on an increase) — the delta, NOT a factor of the
     sale event's original magnitude, which can differ after a prior edit. It is
-    split across the sale's lots by each lot's share."""
+    apportioned EXACTLY along lots: a decrease returns units to the lots the
+    line holds them from (newest draw first, never more than a lot holds), an
+    increase draws FIFO like a fresh fulfilment. A proportional split invents
+    fractional stock on discrete (`pcs`) goods for a multi-lot line."""
     from app.domains.customer_order_item import domain as mod
 
     src = inspect.getsource(mod.CustomerOrderItemDomain.adjust_quantity)
     assert "delta = old_quantity - new_quantity" in src
-    assert "delta * (abs(e.quantity or 0) / total)" in src
+    assert "/ total" not in src  # no proportional share
+    assert "min(remaining, held)" in src
+    assert "get_fifo_inventories_for_material" in src
+
+
+def test_unfulfill_reverses_vehicle_events_past_the_load_guard():
+    """Sale (-q) and its compensating adjustment (+d) reversed together net
+    +new_quantity — they can only RAISE the van's balance. Judged on its own,
+    the +d event trips delete_event's positive-delta 'load' guard on any
+    overdrawn van (routine after trip sales) and rolls the whole unfulfil back,
+    in an iteration order the ORM does not fix."""
+    from app.domains.customer_order_item import domain as mod
+    from app.domains.vehicle_inventory_event import domain as vmod
+
+    src = inspect.getsource(mod.CustomerOrderItemDomain.unfulfill_items)
+    assert "allow_negative=True" in src
+    params = inspect.signature(vmod.VehicleInventoryEventDomain.delete_event).parameters
+    assert "allow_negative" in params and params["allow_negative"].default is False
+
+
+def test_trip_delivered_quantities_net_the_compensating_adjustments():
+    """Trip 'sold' (reconciliation) and the activity 'Fulfilled' rows derive
+    delivered quantity from vehicle events. The sale alone is the ORIGINAL
+    quantity — after an edit it contradicts the order on the same screen and
+    flags a phantom variance — so both must net the coi-tied adjustments in."""
+    from models import common as m
+    from app.entrypoint.routes.trip import routes as troutes
+
+    needle = 'ev.event_type == "adjustment" and ev.customer_order_item_uuid'
+    assert needle in inspect.getsource(m.Trip.sold_inventory_map.fget)
+    assert needle in inspect.getsource(troutes)
+
+
+def test_role_presets_grant_update_on_order_and_invoice_lines():
+    """For a non-admin the PRESET is the runtime gate (before_request), not
+    the route decorator. Both line edits are PUT -> 'update'; without the
+    grant every sales/driver/accountant got 403 while both clients showed
+    the editor."""
+    import json
+    import pathlib
+    from app.entrypoint.routes.common import permissions as pmod
+
+    presets = json.loads(
+        (pathlib.Path(pmod.__file__).parent / "role_presets.json").read_text()
+    )
+    for role in ("sales", "driver", "accountant", "sales_associate", "sales_manager"):
+        assert "update" in presets[role]["endpoints"]["customer_order_item"], role
+        assert "update" in presets[role]["endpoints"]["invoice_item"], role
 
 
 def test_quantity_edit_is_gated_to_fully_unpaid_orders():
