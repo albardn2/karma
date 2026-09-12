@@ -128,6 +128,49 @@ def unfulfill_order_items():
     return jsonify(bulk_read.model_dump(mode='json')), 200
 
 
+@customer_order_item_blueprint.route('/<string:uuid>/quantity', methods=['PUT'])
+@jwt_required()
+@scopes_required(PermissionScope.ADMIN.value,
+                 PermissionScope.SUPER_ADMIN.value,
+                 PermissionScope.ACCOUNTANT.value,
+                 PermissionScope.SALES.value,
+                 PermissionScope.DRIVER.value)
+def update_customer_order_item_quantity(uuid: str):
+    """Change one line's ordered quantity while the order is fully UNPAID.
+
+    The invoice total and customer-order total recompute automatically (both
+    are derived from this quantity), and if the line was already fulfilled its
+    warehouse + vehicle stock is re-synced to the new quantity. Any payment on
+    the order locks the edit (409 "quantity_locked") — the same gate the price
+    edit uses, but restricted to fully unpaid since quantity moves no payment.
+    """
+    from app.dto.customer_order_item import CustomerOrderItemQuantityUpdate
+    from app.entrypoint.routes.invoice_item.routes import order_price_edit_state
+
+    payload = CustomerOrderItemQuantityUpdate(**request.json)
+    with SqlAlchemyUnitOfWork() as uow:
+        item = uow.customer_order_item_repository.find_one(uuid=uuid, is_deleted=False)
+        if not item:
+            raise NotFoundError('CustomerOrderItem not found')
+        order = item.customer_order
+        if not order or order.is_deleted:
+            raise NotFoundError('Customer order not found')
+
+        state, _payment = order_price_edit_state(order)
+        if state != "unpaid":
+            return jsonify({
+                "code": "quantity_locked",
+                "msg": "Quantity can only be edited while the order is fully "
+                       "unpaid. Settle or reverse the payment first.",
+            }), 409
+
+        read = CustomerOrderItemDomain.adjust_quantity(
+            uow=uow, uuid=uuid, new_quantity=payload.quantity
+        )
+        uow.commit()
+    return jsonify(read.model_dump(mode='json')), 200
+
+
 @customer_order_item_blueprint.route('/bulk-delete', methods=['DELETE'])
 @jwt_required()
 @scopes_required(PermissionScope.ADMIN.value,

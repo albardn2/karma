@@ -12,7 +12,8 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiCall, isOk } from '@/utils/api';
+import { useHasEndpoint } from '@/hooks/useModuleAccess';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 import { money } from '@/utils/money';
 
@@ -28,6 +29,7 @@ interface OrderItem {
 
 interface InvoiceItem {
   uuid: string;
+  customer_order_item_uuid?: string | null;
   material_name?: string | null;
   quantity?: number | null;
   price_per_unit?: number | null;
@@ -91,18 +93,23 @@ interface OrderPayload {
  * recorded payments, stock movements — even on settled orders. Its confirm spells
  * that out, because the web version hides the same power behind a bare confirm().
  *
- * Items are mostly immutable after creation — quantities and materials stay the
- * billing contract, fixed by void-and-recreate. The ONE in-place edit is price per
- * unit, and only when the server says the order's payment state allows it
- * (price_edit_state): freely while nothing is paid, or on a fully-paid order
- * settled by a single payment — in which case that payment absorbs the delta so
- * the order stays exactly paid. Everything else is locked server-side.
+ * Items are mostly immutable after creation — materials stay the billing
+ * contract, fixed by void-and-recreate. Two in-place edits exist, both gated by
+ * the server's payment state (price_edit_state) AND the caller's endpoint grant:
+ * price per unit — freely while nothing is paid, or on a fully-paid order settled
+ * by a single payment (that payment absorbs the delta so the order stays exactly
+ * paid) — and quantity, only while FULLY unpaid, because on a fulfilled line it
+ * also re-syncs warehouse and vehicle stock. Everything else is locked server-side.
  */
 export default function CustomerOrderDetailScreen() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
   const router = useRouter();
   const { t, tef } = useLanguage();
   const { isAdmin } = useAuth();
+  // the server's gate for a non-admin is the endpoint grant (PUT -> 'update'),
+  // not the payment state alone — don't show an editor that will answer 403
+  const canUpdateLine = useHasEndpoint('customer_order_item', 'update');
+  const canUpdatePrice = useHasEndpoint('invoice_item', 'update');
   const [reloadKey, setReloadKey] = useState(0);
 
   // notes editor state — the draft is seeded from the fetched record when opened
@@ -129,10 +136,38 @@ export default function CustomerOrderDetailScreen() {
       setPriceItem(null);
       setReloadKey((k) => k + 1);
     } else {
-      Alert.alert(
-        t('customerOrders.editPrice'),
-        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
-      );
+      Alert.alert(t('customerOrders.editPrice'), apiErrorText(res.error, t('form.tryAgain')));
+    }
+  };
+
+  // quantity editor — targets the customer_order_item (where quantity lives);
+  // totals recompute server-side and, if the line was fulfilled, stock re-syncs
+  const [quantityItem, setQuantityItem] = useState<InvoiceItem | null>(null);
+  const [quantityDraft, setQuantityDraft] = useState('');
+  const [quantitySaving, setQuantitySaving] = useState(false);
+
+  const saveQuantity = async () => {
+    const coiUuid = quantityItem?.customer_order_item_uuid;
+    if (!coiUuid) return;
+    // whole units only — parseInt would silently save "2.5" as 2 and close the
+    // sheet as if it worked, so validate the text, not the number
+    const draft = quantityDraft.trim();
+    if (!/^\d+$/.test(draft) || parseInt(draft, 10) <= 0) {
+      Alert.alert(t('customerOrders.editQuantity'), t('customerOrders.quantityWholeNumber'));
+      return;
+    }
+    setQuantitySaving(true);
+    const res = await apiCall(`/customer-order-item/${coiUuid}/quantity`, {
+      method: 'PUT',
+      body: JSON.stringify({ quantity: parseInt(draft, 10) }),
+    });
+    setQuantitySaving(false);
+    if (isOk(res.status)) {
+      setQuantityItem(null);
+      setReloadKey((k) => k + 1);
+    } else {
+      // the body is JSON ({"code","msg"} / {"error"}) — show the message, not the blob
+      Alert.alert(t('customerOrders.editQuantity'), apiErrorText(res.error, t('form.tryAgain')));
     }
   };
 
@@ -330,10 +365,11 @@ export default function CustomerOrderDetailScreen() {
                               {li.quantity ?? '—'} × {money(li.price_per_unit, null)} ={' '}
                               {money(li.total_price, inv.currency)}
                             </ThemedText>
-                            {/* price is the one editable line field, and only when
-                                the ORDER's payment state allows (server-decided) */}
-                            {(d.price_edit_state === 'unpaid' ||
-                              d.price_edit_state === 'single_payment') && (
+                            {/* price edit: only when the ORDER's payment state allows
+                                (server-decided) and the caller holds the update grant */}
+                            {canUpdatePrice &&
+                              (d.price_edit_state === 'unpaid' ||
+                                d.price_edit_state === 'single_payment') && (
                               <TouchableOpacity
                                 onPress={() => {
                                   setPriceDraft(String(li.price_per_unit ?? ''));
@@ -344,6 +380,22 @@ export default function CustomerOrderDetailScreen() {
                               >
                                 <ThemedText style={styles.editPrice}>
                                   {t('customerOrders.editPrice')}
+                                </ThemedText>
+                              </TouchableOpacity>
+                            )}
+                            {/* quantity edit needs a FULLY unpaid order (it can
+                                move stock); a stricter gate than price */}
+                            {canUpdateLine && d.price_edit_state === 'unpaid' && li.customer_order_item_uuid && (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setQuantityDraft(String(li.quantity ?? ''));
+                                  setQuantityItem(li);
+                                }}
+                                hitSlop={8}
+                                testID={`edit-quantity-${li.uuid}`}
+                              >
+                                <ThemedText style={styles.editPrice}>
+                                  {t('customerOrders.editQuantity')}
                                 </ThemedText>
                               </TouchableOpacity>
                             )}
@@ -497,6 +549,51 @@ export default function CustomerOrderDetailScreen() {
               >
                 <ThemedText style={styles.modalSaveText}>
                   {priceSaving ? t('custdetail.saving') : t('form.save')}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={!!quantityItem}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setQuantityItem(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <ThemedText style={styles.modalTitle}>
+              {t('customerOrders.editQuantity')}
+              {quantityItem?.material_name ? ` — ${quantityItem.material_name}` : ''}
+            </ThemedText>
+            <TextInput
+              style={styles.priceInput}
+              value={quantityDraft}
+              onChangeText={setQuantityDraft}
+              keyboardType="number-pad"
+              placeholder={t('customerOrders.newQuantity')}
+              placeholderTextColor="#9ca3af"
+              autoFocus
+              testID="order-quantity-input"
+            />
+            <View style={styles.modalRow}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setQuantityItem(null)}
+                disabled={quantitySaving}
+              >
+                <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSave, quantitySaving && styles.modalSaveOff]}
+                onPress={saveQuantity}
+                disabled={quantitySaving}
+                testID="order-quantity-save"
+              >
+                <ThemedText style={styles.modalSaveText}>
+                  {quantitySaving ? t('custdetail.saving') : t('form.save')}
                 </ThemedText>
               </TouchableOpacity>
             </View>

@@ -55,6 +55,15 @@ class CustomerOrderItemBulkFulfill(BaseModel):
     # orders handed off during a trip). Falls back to the order's stop if unset.
     trip_stop_uuid: Optional[str] = None
 
+class CustomerOrderItemQuantityUpdate(BaseModel):
+    """Change one line's ordered quantity — the payment-gated edit that
+    cascades to the invoice and order totals (and re-syncs stock if fulfilled).
+    gt=0: a zero/negative-quantity line is not an edit, it is a deletion, which
+    is the bulk-delete route's job."""
+    model_config = ConfigDict(extra="forbid")
+    quantity: int = Field(gt=0)
+
+
 class CustomerOrderItemBulkUnFulfill(BaseModel):
     """Schema for bulk unfulfilling customer order items by UUID."""
     model_config = ConfigDict(extra="forbid")

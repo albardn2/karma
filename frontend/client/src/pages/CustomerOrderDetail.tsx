@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, apiErrorMessage } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -137,9 +138,31 @@ export default function CustomerOrderDetail() {
   // state: "unpaid" (free), "single_payment" (allowed; the one payment absorbs
   // the delta) or "locked" (partial / several payments / notes)
   const priceEditState: string | undefined = orderData?.price_edit_state;
-  const canEditPrice = priceEditState === "unpaid" || priceEditState === "single_payment";
+  // The enforced gate for a non-admin is the endpoint ACL (PUT -> 'update'),
+  // which /auth/me exposes as effective_permissions.endpoints; the tenant
+  // feature cap (account_permissions) binds admins too. Payment state alone
+  // would show an editor whose save answers 403.
+  const { user: authUser, isAdmin } = useAuth();
+  const grants = (perms: any, resource: string, action: string) =>
+    Array.isArray(perms?.endpoints?.[resource]) && perms.endpoints[resource].includes(action);
+  const canUpdate = (resource: string) => {
+    const userPerms = (authUser as any)?.effective_permissions ?? null;
+    const accountPerms = (authUser as any)?.account_permissions ?? null;
+    return (
+      (isAdmin || (userPerms ? grants(userPerms, resource, "update") : false)) &&
+      (!accountPerms || grants(accountPerms, resource, "update"))
+    );
+  };
+  const canEditPrice =
+    canUpdate("invoice_item") &&
+    (priceEditState === "unpaid" || priceEditState === "single_payment");
+  // quantity edits move stock, so they are allowed only when the order is
+  // FULLY unpaid (no payment to keep in step) — a stricter gate than price.
+  const canEditQuantity = canUpdate("customer_order_item") && priceEditState === "unpaid";
   const [priceEditUuid, setPriceEditUuid] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState("");
+  const [quantityEditUuid, setQuantityEditUuid] = useState<string | null>(null);
+  const [quantityDraft, setQuantityDraft] = useState("");
 
   const priceMutation = useMutation({
     mutationFn: ({ uuid, price }: { uuid: string; price: number }) =>
@@ -158,7 +181,9 @@ export default function CustomerOrderDetail() {
     onError: (error: any) => {
       toast({
         title: t('common.error'),
-        description: error.message || t('customerOrders.updateFailed'),
+        // the body is JSON ({"code":..,"msg":..} / {"error":..}) — surface
+        // the message, not the raw blob
+        description: apiErrorMessage(error, t('customerOrders.updateFailed')),
         variant: "destructive",
       });
     },
@@ -168,6 +193,46 @@ export default function CustomerOrderDetail() {
     const price = parseFloat(priceDraft);
     if (isNaN(price) || price < 0) return;
     priceMutation.mutate({ uuid, price });
+  };
+
+  // quantity lives on the customer_order_item, so this PUT targets that uuid
+  // (not the invoice item); totals recompute server-side and we re-fetch
+  const quantityMutation = useMutation({
+    mutationFn: ({ uuid, quantity }: { uuid: string; quantity: number }) =>
+      apiRequest(`/customer-order-item/${uuid}/quantity`, {
+        method: "PUT",
+        body: { quantity },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/customer-order/with-items-and-invoice", params?.id] });
+      setQuantityEditUuid(null);
+      toast({
+        title: t('common.success'),
+        description: t('customerOrders.quantityUpdated'),
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('common.error'),
+        description: apiErrorMessage(error, t('customerOrders.updateFailed')),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveQuantity = (coiUuid: string) => {
+    // whole units only — parseInt would silently save "2.5" as 2 (or "1e2"
+    // as 1) under a success toast, so validate the text, not the number
+    const draft = quantityDraft.trim();
+    if (!/^\d+$/.test(draft) || parseInt(draft, 10) <= 0) {
+      toast({
+        title: t('common.error'),
+        description: t('customerOrders.quantityWholeNumber'),
+        variant: "destructive",
+      });
+      return;
+    }
+    quantityMutation.mutate({ uuid: coiUuid, quantity: parseInt(draft, 10) });
   };
 
   const updateMutation = useMutation({
@@ -813,8 +878,62 @@ export default function CustomerOrderDetail() {
                         <div className="space-y-2">
                           {invoice.invoice_items.map((item: InvoiceItem) => (
                             <div key={item.uuid} className="flex items-center justify-between gap-3 text-sm">
-                              <span className="text-gray-600 dark:text-gray-400">
-                                {item.material_name} ({item.quantity} {item.unit} × {formatCurrency(item.price_per_unit, item.currency)})
+                              <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1 flex-wrap">
+                                <span>{item.material_name} (</span>
+                                {quantityEditUuid === item.customer_order_item_uuid ? (
+                                  <>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      value={quantityDraft}
+                                      onChange={(e) => setQuantityDraft(e.target.value)}
+                                      className="h-7 w-20 text-sm"
+                                      data-testid={`quantity-input-${item.uuid}`}
+                                      autoFocus
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0"
+                                      onClick={() => saveQuantity(item.customer_order_item_uuid)}
+                                      disabled={quantityMutation.isPending}
+                                      data-testid={`quantity-save-${item.uuid}`}
+                                    >
+                                      <Save className="h-4 w-4 text-green-700" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0"
+                                      onClick={() => setQuantityEditUuid(null)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>{item.quantity}</span>
+                                    {canEditQuantity && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 w-6 p-0"
+                                        title={t('customerOrders.editQuantity')}
+                                        onClick={() => {
+                                          setQuantityEditUuid(item.customer_order_item_uuid);
+                                          setQuantityDraft(String(item.quantity));
+                                        }}
+                                        data-testid={`quantity-edit-${item.uuid}`}
+                                      >
+                                        <Edit3 className="h-3 w-3 text-gray-400" />
+                                      </Button>
+                                    )}
+                                  </>
+                                )}
+                                <span>{item.unit} × {formatCurrency(item.price_per_unit, item.currency)})</span>
                               </span>
                               {priceEditUuid === item.uuid ? (
                                 <span className="flex items-center gap-1">

@@ -55,7 +55,11 @@ class VehicleInventoryEventDomain:
         return VehicleInventoryEventRead.from_orm(event_model)
 
     @staticmethod
-    def delete_event(uow: SqlAlchemyUnitOfWork, uuid: str) -> VehicleInventoryEventRead:
+    def delete_event(
+        uow: SqlAlchemyUnitOfWork,
+        uuid: str,
+        allow_negative: bool = False,
+    ) -> VehicleInventoryEventRead:
         event_model = uow.vehicle_inventory_event_repository.find_one(uuid=uuid, is_deleted=False)
         if not event_model:
             raise NotFoundError("Vehicle inventory event not found")
@@ -74,8 +78,17 @@ class VehicleInventoryEventDomain:
         # this raising rolled the entire unfulfil back — and with a -70 balance
         # made of a -40 and a -30, every individual reversal was refused, in any
         # order. The admin DELETE endpoint hit the same wall.
+        #
+        # `allow_negative` mirrors create_event's escape hatch for system
+        # reversals: unfulfilling a line whose quantity was later DECREASED
+        # deletes the sale (-q) together with its compensating adjustment (+d).
+        # As a unit that nets +new_quantity — it can only RAISE the balance —
+        # but the +d event judged on its own trips this guard on any overdrawn
+        # van, which trip sales are allowed to produce. The guard is for an
+        # operator deleting a standalone load, not for that.
         if (
-            inventory
+            not allow_negative
+            and inventory
             and event_model.quantity > 0
             and (inventory.current_quantity - event_model.quantity) < 0
         ):

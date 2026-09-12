@@ -2303,7 +2303,16 @@ class Trip(Base):
         sold: dict[str, float] = {}
         for stop in self.stops:
             for ev in stop.vehicle_inventory_events:
-                if ev.is_deleted or ev.event_type != "sale":
+                if ev.is_deleted:
+                    continue
+                # a 'sale', or the compensating 'adjustment' a later quantity
+                # edit posted for it (tied to the same order line) — together
+                # they net to what actually left the van. Counting the sale
+                # alone reports the ORIGINAL quantity and flags a phantom
+                # reconciliation variance after every edit.
+                if ev.event_type != "sale" and not (
+                    ev.event_type == "adjustment" and ev.customer_order_item_uuid
+                ):
                     continue
                 # skip sales of deleted (voided) orders — new voids soft-delete
                 # the event itself, but orders deleted before that cascade
