@@ -295,7 +295,7 @@ function ReferenceOverlays({
     items: ReferenceArea[];
     total_count: number;
   }>({
-    // same: AddServiceAreaDialog / ServiceAreaDetail invalidate ["/service-area/"],
+    // same: ServiceAreaCreate / ServiceAreaDetail invalidate ["/service-area/"],
     // so the area you just created shows up when you reopen to draw its neighbour
     queryKey: ["/service-area/", "draw-overlay", viewport],
     enabled: showAreas && !!viewport,
@@ -565,7 +565,11 @@ export function ServiceAreaDrawMap({
     ].join(" ");
 
   return (
-    <div className="relative h-full w-full">
+    // z-0 makes this a stacking context: the reference-layer column below is a
+    // SIBLING of MapContainer, so MapContainer's own z-0 does not contain it and
+    // its z-[1000] would otherwise paint over the mobile nav drawer (z-50) and
+    // swallow the tap meant to dismiss it. Same idiom as Warehouses/Vendors maps.
+    <div className="relative z-0 h-full w-full">
       <MapContainer
         center={[33.5138, 36.2765]} // Default to Damascus, Syria
         zoom={10}
