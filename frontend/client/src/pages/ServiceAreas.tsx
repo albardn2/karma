@@ -8,9 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Map, MapPin, ArrowRight } from "lucide-react";
+import { Map, MapPin, ArrowRight, Plus } from "lucide-react";
 import { ServiceAreaFilters } from "@/components/service-areas/ServiceAreaFilters";
-import { AddServiceAreaDialog } from "@/components/service-areas/AddServiceAreaDialog";
 import { ServiceAreaMap } from "@/components/service-areas/ServiceAreaMap";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -165,7 +164,12 @@ export default function ServiceAreas() {
               perPage={perPage}
               onPerPageChange={handlePerPageChange}
             />
-            <AddServiceAreaDialog />
+            <Link href="/service-areas/create">
+              <Button className="bg-[#5469D4] hover:bg-[#4356C7] text-white" data-testid="add-service-area">
+                <Plus className="h-4 w-4 me-2" />
+                {t('serviceAreas.addServiceArea')}
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -187,7 +191,12 @@ export default function ServiceAreas() {
                     ? t('serviceAreas.noMatchFilters')
                     : t('serviceAreas.emptyGetStarted')}
                 </p>
-                <AddServiceAreaDialog />
+                <Link href="/service-areas/create">
+              <Button className="bg-[#5469D4] hover:bg-[#4356C7] text-white" data-testid="add-service-area">
+                <Plus className="h-4 w-4 me-2" />
+                {t('serviceAreas.addServiceArea')}
+              </Button>
+            </Link>
               </div>
             ) : (
               <>
