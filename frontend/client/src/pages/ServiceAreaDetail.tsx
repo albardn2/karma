@@ -511,6 +511,7 @@ export default function ServiceAreaDetail() {
                       form.setValue('geometry', geometry, { shouldValidate: true });
                     }}
                     initialGeometry={serviceArea.geometry}
+                    excludeServiceAreaUuid={serviceArea.uuid}
                   />
                 )}
               </div>
