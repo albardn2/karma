@@ -57,6 +57,7 @@ import InventoryEventDetail from "@/pages/InventoryEventDetail";
 import ServiceAreas from "@/pages/ServiceAreas";
 import ServiceAreaDetail from "@/pages/ServiceAreaDetail";
 import ServiceAreaCreate from "@/pages/ServiceAreaCreate";
+import ServiceAreaEdit from "@/pages/ServiceAreaEdit";
 import PurchaseOrders from "@/pages/PurchaseOrders";
 import PurchaseOrderCreate from "@/pages/PurchaseOrderCreate";
 import PurchaseOrderDetail from "@/pages/PurchaseOrderDetail";
@@ -154,6 +155,7 @@ function Router() {
       <Route path="/service-areas" component={() => <ProtectedRoute><ServiceAreas /></ProtectedRoute>} />
       {/* before :uuid — Switch takes the first match, and "create" is a valid :uuid */}
       <Route path="/service-areas/create" component={() => <ProtectedRoute><ServiceAreaCreate /></ProtectedRoute>} />
+      <Route path="/service-areas/:uuid/edit" component={() => <ProtectedRoute><ServiceAreaEdit /></ProtectedRoute>} />
       <Route path="/service-areas/:uuid" component={() => <ProtectedRoute><ServiceAreaDetail /></ProtectedRoute>} />
       <Route path="/purchase-orders" component={() => <ProtectedRoute><PurchaseOrders /></ProtectedRoute>} />
       <Route path="/purchase-orders/create" component={() => <ProtectedRoute><PurchaseOrderCreate /></ProtectedRoute>} />

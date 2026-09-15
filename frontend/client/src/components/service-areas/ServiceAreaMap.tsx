@@ -35,9 +35,11 @@ function parsePolygonWKT(wkt: string): [number, number][] {
     }
     
     // Remove POLYGON(( and )) and split coordinates
-    const coordString = wkt.replace(/POLYGON\(\(|\)\)/g, '');
+    // tolerate shapely's "POLYGON ((" (with a space), which is what the API
+    // returns — otherwise the first vertex is dropped and each load logs an error
+    const coordString = wkt.replace(/POLYGON\s*\(\(|\)\)/gi, '');
     const coords = coordString.split(',').map(coord => {
-      const parts = coord.trim().split(' ');
+      const parts = coord.trim().split(/\s+/);
       if (parts.length !== 2) {
         console.error('Invalid coordinate format:', coord);
         return null;
