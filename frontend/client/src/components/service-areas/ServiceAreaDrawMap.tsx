@@ -81,9 +81,14 @@ function parsePolygonWKT(wkt: string): L.LatLng[] {
       return [];
     }
     
-    const coordString = wkt.replace(/POLYGON\(\(|\)\)/g, '');
+    // shapely emits "POLYGON ((x y, ...))" WITH a space (that is what the API
+    // returns), so the prefix must tolerate it — otherwise the first vertex
+    // fails to parse, gets dropped, and every load logs an error. Harmless for
+    // a closed ring, where the first point repeats at the end, but it would
+    // distort anything else.
+    const coordString = wkt.replace(/POLYGON\s*\(\(|\)\)/gi, '');
     const coords = coordString.split(',').map(coord => {
-      const parts = coord.trim().split(' ');
+      const parts = coord.trim().split(/\s+/);
       if (parts.length !== 2) {
         console.error('Invalid coordinate format:', coord);
         return null;
@@ -504,9 +509,31 @@ function DrawControl({ onGeometryChange, initialGeometry }: ServiceAreaDrawMapPr
         onGeometryChange('');
       };
 
+      // leaflet-draw fires draw:edited ONLY from its own in-map "Save" link, so
+      // dragging a vertex never reached onGeometryChange: the page's Save button
+      // then wrote the ORIGINAL ring and reported success, silently discarding
+      // the reshape. Sync on the live edit events too, so the geometry we hold
+      // always matches the shape on screen no matter how the session ends.
+      const syncFromDrawnItems = () => {
+        const layers = drawnItems.getLayers();
+        if (layers.length === 0) {
+          onGeometryChange('');
+          return;
+        }
+        for (const layer of layers) {
+          if (layer instanceof L.Polygon) {
+            onGeometryChange(polygonToWKT(layer));
+            return;
+          }
+        }
+      };
+      const LIVE_EDIT_EVENTS =
+        'draw:editvertex draw:editmove draw:editresize draw:editstop draw:deletestop';
+
       map.on('draw:created', handleDrawCreated);
       map.on('draw:edited', handleDrawEdited);
       map.on('draw:deleted', handleDrawDeleted);
+      map.on(LIVE_EDIT_EVENTS, syncFromDrawnItems);
 
       return () => {
         if (drawControlRef.current) {
@@ -517,6 +544,7 @@ function DrawControl({ onGeometryChange, initialGeometry }: ServiceAreaDrawMapPr
         map.off('draw:created', handleDrawCreated);
         map.off('draw:edited', handleDrawEdited);
         map.off('draw:deleted', handleDrawDeleted);
+        map.off(LIVE_EDIT_EVENTS, syncFromDrawnItems);
         initializedRef.current = false;
       };
     };

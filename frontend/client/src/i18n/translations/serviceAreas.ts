@@ -33,6 +33,10 @@ export const en: Record<string, string> = {
 
   // Toasts (create / update / delete / copy)
   'serviceAreas.updateSuccess': 'Service area updated successfully',
+  'serviceAreas.updateError': 'Failed to update service area',
+  'serviceAreas.editTitle': 'Edit Service Area',
+  'serviceAreas.refreshFailed': 'Could not refresh — showing the last loaded version',
+  'serviceAreas.redrawPolygonHint': 'Use the edit tool to drag the polygon’s points, or the bin to delete it and draw again',
   'serviceAreas.deleteSuccess': 'Service area deleted successfully',
   'serviceAreas.createSuccess': 'Service area created successfully',
   'serviceAreas.drawPolygonError': 'Please draw a polygon on the map',
@@ -116,6 +120,10 @@ export const ar: Record<string, string> = {
 
   // Toasts (create / update / delete / copy)
   'serviceAreas.updateSuccess': 'تم تحديث منطقة الخدمة بنجاح',
+  'serviceAreas.updateError': 'فشل تحديث منطقة الخدمة',
+  'serviceAreas.editTitle': 'تعديل منطقة الخدمة',
+  'serviceAreas.refreshFailed': 'تعذّر التحديث — يتم عرض آخر نسخة محمَّلة',
+  'serviceAreas.redrawPolygonHint': 'استخدم أداة التعديل لسحب نقاط المضلع، أو أداة الحذف لحذفه ورسمه من جديد',
   'serviceAreas.deleteSuccess': 'تم حذف منطقة الخدمة بنجاح',
   'serviceAreas.createSuccess': 'تم إنشاء منطقة الخدمة بنجاح',
   'serviceAreas.drawPolygonError': 'يرجى رسم مضلع على الخريطة',
