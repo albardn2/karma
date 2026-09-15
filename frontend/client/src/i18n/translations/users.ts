@@ -2,6 +2,12 @@
 // Keys used via t('users.xxx'); enum.* entries cover permission scopes via te().
 
 export const en: Record<string, string> = {
+  'users.materialProfitability': 'Profitability per Material',
+  'users.materialProfitabilityHint': 'Revenue and gross margin per material, for orders this user created.',
+  'users.materialProfitabilityGross': 'Gross = revenue − cost of the stock those sales consumed, before expenses and salaries (neither is attributable to a material).',
+  'users.materialProfitabilityOmitted': '{count} more material(s) outside the top 12 by revenue.',
+  'users.materialCost': 'Cost',
+  'users.materialMargin': 'Margin',
   // list page (Users.tsx)
   'users.loadingUsers': 'Loading users...',
   'users.unableToLoad': 'Unable to load users - backend endpoint not available',
@@ -184,6 +190,12 @@ export const en: Record<string, string> = {
 };
 
 export const ar: Record<string, string> = {
+  'users.materialProfitability': 'الربحية لكل مادة',
+  'users.materialProfitabilityHint': 'الإيرادات والهامش الإجمالي لكل مادة، للطلبات التي أنشأها هذا المستخدم.',
+  'users.materialProfitabilityGross': 'الإجمالي = الإيرادات − كلفة المخزون المُستهلك في هذه المبيعات، قبل المصاريف والرواتب (ولا يمكن نسب أيٍّ منهما إلى مادة).',
+  'users.materialProfitabilityOmitted': '{count} مادة إضافية خارج أعلى 12 بحسب الإيرادات.',
+  'users.materialCost': 'الكلفة',
+  'users.materialMargin': 'الهامش',
   // list page (Users.tsx)
   'users.loadingUsers': 'جارٍ تحميل المستخدمين...',
   'users.unableToLoad': 'تعذّر تحميل المستخدمين — نقطة النهاية غير متوفرة في الخادم',
