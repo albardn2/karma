@@ -41,10 +41,23 @@ def test_net_excludes_salaries_and_uses_vehicle_expenses():
 
 
 def test_revenue_and_cogs_share_the_order_trip_stop_basis():
-    """gross = revenue − COGS only means anything if both count the SAME sales:
-    revenue off the order and COGS off that order's items, both joined to the
-    order's trip stop."""
+    """gross = revenue − COGS only means anything if both count the SAME sales,
+    on the SAME clock: revenue off the order and COGS off that order's items,
+    both joined to the order's trip stop and both bucketed by the ORDER's date.
+
+    COGS follows the line's whole stock movement, not its sale event alone — a
+    quantity edit leaves the sale untouched and posts a compensating adjustment
+    — and the sign is kept rather than abs()'d, so a decrease credits cost
+    instead of adding to it."""
     src = _src()
     assert "TripStopModel.uuid == CustomerOrderModel.trip_stop_uuid" in src
     assert "CustomerOrderModel.uuid == CustomerOrderItemModel.customer_order_uuid" in src
-    assert 'InventoryEventModel.event_type == "sale"' in src
+    assert 'InventoryEventModel.event_type.in_(("sale", "adjustment"))' in src
+    assert "InventoryEventModel.affect_original.isnot(True)" in src
+    # one clock for both legs: the order's, not the event's
+    assert "s.query(InventoryEventModel, CustomerOrderModel.created_at)" in src
+    assert "k = bucket(order_at)" in src
+    # adjustments are signed, so a return credits rather than charges; a sale
+    # keeps abs() since a fulfilment sale is never legitimately positive
+    assert 'consumed = abs(q) if e.event_type == "sale" else -q' in src
+    assert "cogs[k] += consumed * lot_cost" in src
