@@ -1887,26 +1887,68 @@ def _material_profitability_result(created_by_uuid=None):
             )
         ).all()
 
-        # (line, lot) -> signed movement, so a line whose events cancel out
-        # contributes nothing instead of two offsetting charges
-        movement: dict = {}
+        # Per LINE, not per (line, lot). A FIFO sale can draw from several lots
+        # at different costs, and the honest unit cost of what the line consumed
+        # is the weighted average of the lots it DREW from — weighted by how
+        # much each supplied. Netting per lot instead breaks on returns: a
+        # credit note books its whole inventory_change against ONE lot (the
+        # first sale event's, credit_note_item/domain.py), so on a multi-lot
+        # line the return can exceed what that lot ever gave. That lot then
+        # nets positive and drops out, while the other lots stay fully charged
+        # — measured on the real 2-lot sugar line (989.8 @ 0.69 + 449.2 @ 1.50),
+        # returning 1000 of 1439 units reported 673.80 instead of 413.91, a 63%
+        # overstatement on the biggest loss-making material on the chart.
+        #
+        # Which lot a return happens to be booked against is bookkeeping noise;
+        # how much the line kept is the fact. So: net the quantity over the
+        # line, and price it at the mix the line drew.
+        lines: dict = {}
         for mat_uuid, name, coi_uuid, inventory_uuid, ev_qty in cogs_rows:
-            k = (coi_uuid, inventory_uuid)
-            if k not in movement:
-                movement[k] = [mat_uuid, name, 0.0]
-            movement[k][2] += ev_qty or 0
+            rc = lines.get(coi_uuid)
+            if rc is None:
+                rc = lines[coi_uuid] = {
+                    "material": mat_uuid,
+                    "name": name,
+                    "signed": 0.0,
+                    "drew": {},  # lot -> units taken OUT on this line
+                }
+            q = ev_qty or 0
+            rc["signed"] += q
+            if q < 0:
+                # only draws define the cost mix; a return reduces how much of
+                # that mix was kept, it does not re-price it
+                rc["drew"][inventory_uuid] = rc["drew"].get(inventory_uuid, 0.0) + -q
 
-        for (_coi_uuid, inventory_uuid), (mat_uuid, name, signed) in movement.items():
-            consumed = -signed  # sale is negative; a return gives it back
-            if consumed <= 0:
-                continue
-            lot_cost, _orig = InventoryDomain._lot_cost_and_quantity(
-                uow=uow, inventory_uuid=inventory_uuid, ctx=cost_ctx
-            )
-            if lot_cost is None:
+        for rc in lines.values():
+            consumed = -rc["signed"]  # sale is negative; a return gives it back
+            if consumed <= 1e-9:
+                continue  # nothing kept — the whole line came back
+            drew_known = 0.0
+            drew_unknown = 0.0
+            cost_known = 0.0
+            for lot_uuid, drew in rc["drew"].items():
+                lot_cost, _orig = InventoryDomain._lot_cost_and_quantity(
+                    uow=uow, inventory_uuid=lot_uuid, ctx=cost_ctx
+                )
+                if lot_cost is None:
+                    drew_unknown += drew
+                else:
+                    drew_known += drew
+                    cost_known += drew * lot_cost
+            drew_total = drew_known + drew_unknown
+            if drew_total <= 0:
+                # movement with no draw to price it against
                 uncosted_qty += consumed
                 continue
-            rec(mat_uuid, name)["cogs"] += consumed * lot_cost
+            # a partly-uncosted mix is disclosed in proportion rather than
+            # being priced at the known lots' average, which would quietly
+            # charge unknown stock at a knowable rate
+            costable = consumed * (drew_known / drew_total)
+            uncosted_qty += consumed - costable
+            if costable > 0:
+                rec(rc["material"], rc["name"])["cogs"] += costable * (
+                    cost_known / drew_known
+                )
 
     ranked = sorted(
         (
