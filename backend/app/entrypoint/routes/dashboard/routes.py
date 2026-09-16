@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from flask import request, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.domains.exchange_rate.converter import CurrencyConverter
@@ -438,12 +438,32 @@ def profitability():
                 continue
             revenue[k] += c
 
-        # ---- COGS: cost basis of stock consumed by 'sale' events ----
+        # ---- COGS: cost basis of the stock sales consumed ----
+        # Not the 'sale' event alone. Editing a fulfilled line's quantity leaves
+        # the sale untouched as the record of what first left, and posts a
+        # compensating ADJUSTMENT for the delta tied to the same line
+        # (CustomerOrderItemDomain.adjust_quantity); a note with an
+        # inventory_change does the same when goods come back. Revenue here
+        # follows the order's CURRENT total, so ignoring those corrections left
+        # cost frozen at the original fulfilment while revenue moved.
+        #
+        # Only LINE-tied adjustments qualify. A warehouse adjustment with no
+        # order behind it is a recount or a write-off, not a sale correction,
+        # and folding those into cost of goods would be a worse error than the
+        # one this fixes. affect_original rows restate a lot's opening quantity
+        # rather than consuming any of it, so they are out too.
         for e in (
             s.query(InventoryEventModel)
             .filter(
                 InventoryEventModel.is_deleted.is_(False),
-                InventoryEventModel.event_type == "sale",
+                or_(
+                    InventoryEventModel.event_type == "sale",
+                    and_(
+                        InventoryEventModel.event_type == "adjustment",
+                        InventoryEventModel.customer_order_item_uuid.isnot(None),
+                    ),
+                ),
+                InventoryEventModel.affect_original.is_(False),
                 InventoryEventModel.created_at >= start,
                 InventoryEventModel.account_uuid == uow.account_uuid,
             )
@@ -452,8 +472,12 @@ def profitability():
             k = bucket(e.created_at)
             if not k:
                 continue
-            qty = abs(e.quantity or 0)
-            if not qty:
+            # signed: a sale is negative, a return is positive, so consumption
+            # is the negation — and a return CREDITS the period it lands in
+            # rather than retroactively reducing the one the sale was in, which
+            # is the right answer for an x-axis that is time.
+            consumed = -(e.quantity or 0)
+            if not consumed:
                 continue
             # lot cost already in target currency (converted at receipt date
             # inside the costing engine); None = unknowable, so bank the quantity
@@ -461,9 +485,9 @@ def profitability():
                 uow=uow, inventory_uuid=e.inventory_uuid, ctx=cost_ctx
             )
             if lot_cost is None:
-                uncosted_qty += qty
+                uncosted_qty += abs(consumed)
                 continue
-            cogs[k] += qty * lot_cost
+            cogs[k] += consumed * lot_cost
 
         # ---- expenses: Expense.amount at created_at ----
         for x in (
@@ -659,7 +683,11 @@ def vehicle_profitability():
             .join(TripModel, TripModel.uuid == TripStopModel.trip_uuid)
             .filter(
                 InventoryEventModel.is_deleted.is_(False),
-                InventoryEventModel.event_type == "sale",
+                # sale + the line-tied corrections that follow it; this query
+                # already joins through the order line, so a warehouse recount
+                # cannot reach it. See /profitability for the full reasoning.
+                InventoryEventModel.event_type.in_(("sale", "adjustment")),
+                InventoryEventModel.affect_original.is_(False),
                 InventoryEventModel.created_at >= start,
                 InventoryEventModel.account_uuid == uow.account_uuid,
                 TripModel.vehicle_uuid == vehicle_uuid,
@@ -669,16 +697,17 @@ def vehicle_profitability():
             k = bucket(e.created_at)
             if not k:
                 continue
-            qty = abs(e.quantity or 0)
-            if not qty:
+            # signed, so a quantity decrease or a return credits the period
+            consumed = -(e.quantity or 0)
+            if not consumed:
                 continue
             lot_cost, _orig = InventoryDomain._lot_cost_and_quantity(
                 uow=uow, inventory_uuid=e.inventory_uuid, ctx=cost_ctx
             )
             if lot_cost is None:
-                uncosted_qty += qty
+                uncosted_qty += abs(consumed)
                 continue
-            cogs[k] += qty * lot_cost
+            cogs[k] += consumed * lot_cost
 
         # ---- expenses: those tied to this vehicle ----
         for x in (
