@@ -6,7 +6,7 @@ export const en: Record<string, string> = {
   'users.pricePoints': 'Price Points',
   'users.pricePointsHint': 'Units sold at each price, grouped by product and price \u2014 each price is shown in the currency it was invoiced in.',
   'users.pricePointsOmitted': '{count} more price point(s) not shown.',
-  'users.attributionBasis': 'Revenue, collections and order counts are for orders this user created. Trip stops count rounds this user drove.',
+  'users.attributionBasis': 'Revenue, collections and order counts are for orders this user created. Trip stops are for trips this user drove.',
   'users.pricePointsAllMaterials': 'All materials',
   'users.pricePointsFreeMaterials': '{count} material(s) sold only at no charge are not listed.',
   'users.materialProfitabilityHint': 'Revenue and gross margin per material, for orders this user created.',
@@ -192,7 +192,7 @@ export const en: Record<string, string> = {
   'users.salesOverTime': 'Sales Over Time',
   'users.stopsOverTime': 'Trip Stops Over Time',
   'users.stopSalesTable': 'Orders Created',
-  'users.noStopSales': 'No sales at this user\u2019s trip stops for this period',
+  'users.noStopSales': 'This user created no orders in this period',
   'users.notInvoiced': 'Not invoiced',
 };
 
@@ -387,6 +387,6 @@ export const ar: Record<string, string> = {
   'users.salesOverTime': 'المبيعات عبر الزمن',
   'users.stopsOverTime': 'محطات الرحلات عبر الزمن',
   'users.stopSalesTable': 'الطلبات المُنشأة',
-  'users.noStopSales': 'لا توجد مبيعات في محطات هذا المستخدم لهذه الفترة',
+  'users.noStopSales': 'لم يُنشئ هذا المستخدم أي طلبات في هذه الفترة',
   'users.notInvoiced': 'بدون فاتورة',
 };

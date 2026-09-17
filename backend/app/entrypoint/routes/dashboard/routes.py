@@ -1721,8 +1721,9 @@ def my_new_customers():
 def _material_profitability_result(created_by_uuid=None):
     """Revenue, COGS and gross per material for one period, in one currency.
 
-    Attribution is the ORDER's creator, matching /materials-sold rather than
-    the trip-assignee basis of /trip-stop/analytics/user-*: this answers "what
+    Attribution is the ORDER's creator, matching /materials-sold and the
+    order/revenue side of /trip-stop/analytics/user-* (whose stop counts stay
+    on trip-assignee basis, since a stop has no author): this answers "what
     did the orders this person wrote earn", and it is the basis of the
     materials chart these bars sit next to.
 

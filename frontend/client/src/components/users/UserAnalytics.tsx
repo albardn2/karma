@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import MaterialsSoldDashboard from "@/pages/MaterialsSoldDashboard";
-import { UserMaterialProfitabilityChart } from "@/components/users/UserMaterialProfitabilityChart";
+import MaterialProfitabilityDashboard from "@/pages/MaterialProfitabilityDashboard";
 import {
   ResponsiveContainer,
   BarChart,
@@ -549,7 +549,7 @@ export function UserAnalytics({ userUuid }: { userUuid: string }) {
 
       {/* the money behind those quantities: margin per material, on the same
           created-by basis and with the same kind of window navigator */}
-      <UserMaterialProfitabilityChart userUuid={userUuid} />
+      <MaterialProfitabilityDashboard embedded userUuid={userUuid} />
     </div>
   );
 }

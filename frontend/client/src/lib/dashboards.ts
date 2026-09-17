@@ -45,6 +45,15 @@ export const IMPLEMENTED_DASHBOARDS: DashboardEntry[] = [
     descKey: "dashboards.profitabilityDesc",
   },
   {
+    // sits next to profitability: same cost-bearing grants, and a reader
+    // comparing margin by period against margin by material wants both
+    id: "material-profitability",
+    href: "/dashboards/material-profitability",
+    icon: BarChart3,
+    titleKey: "dashboards.materialProfitability",
+    descKey: "dashboards.materialProfitabilityDesc",
+  },
+  {
     id: "revenue-over-time",
     href: "/dashboards/revenue-over-time",
     icon: TrendingUp,
