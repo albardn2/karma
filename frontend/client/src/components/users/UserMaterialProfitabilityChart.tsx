@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ResponsiveContainer,
@@ -14,11 +14,22 @@ import {
 import { ChevronLeft, ChevronRight, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 // Deliberately NOT the green/amber of the materials-sold chart this sits next
 // to: the two share an x-axis, so same colours would read as the same measure.
 const COLOURS = { revenue: "#5469D4", gross: "#0891b2" } as const;
+
+// Radix Select treats "" as "no value" and would show the placeholder instead
+// of this option, so the all-materials choice needs a real value.
+const ALL = "__all__";
 
 type Gran = "day" | "week" | "month" | "quarter" | "year";
 type Ccy = "USD" | "SYP";
@@ -48,6 +59,7 @@ interface Payload {
   disclosure: {
     materials_omitted: number;
     price_points_omitted: number;
+    price_points_free_materials: number;
     uncosted_quantity: number;
     unconverted_amount: number;
     unconverted_count: number;
@@ -82,6 +94,10 @@ export function UserMaterialProfitabilityChart({ userUuid }: { userUuid: string 
   const [gran, setGranRaw] = useState<Gran>("month");
   const [offset, setOffset] = useState(0);
   const [ccy, setCcy] = useState<Ccy>("USD");
+  // price-points material filter. Kept as the uuid rather than an index so a
+  // selection survives changing the period, and comes back if the material
+  // does — see effectiveMat for the window where it does not.
+  const [ppMat, setPpMat] = useState<string>(ALL);
 
   // changing the window size makes the old step meaningless — 3 months back is
   // not 3 years back, so the navigator returns to the current period
@@ -114,6 +130,31 @@ export function UserMaterialProfitabilityChart({ userUuid }: { userUuid: string 
   }));
   const hasAny = rows.length > 0;
   const d = data?.disclosure;
+
+  // The filter's options come from the rows themselves, not from /material/:
+  // the question is "which products did this person actually sell", so the
+  // catalogue — mostly materials they never touched — is the wrong list. The
+  // backend has already dropped anything sold only at price 0, so everything
+  // offered here has revenue behind it.
+  const ppMaterials = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { uuid: string; name: string }[] = [];
+    for (const r of data?.price_points ?? []) {
+      if (seen.has(r.material_uuid)) continue;
+      seen.add(r.material_uuid);
+      out.push({ uuid: r.material_uuid, name: r.name });
+    }
+    return out.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  }, [data?.price_points]);
+
+  // Stepping to a period where the chosen material was not sold must not show
+  // an empty table with a stale name in the trigger. Falling back on read
+  // (rather than resetting the state) means the choice reapplies by itself
+  // when you step back to a period that has it.
+  const effectiveMat = ppMaterials.some((m) => m.uuid === ppMat) ? ppMat : ALL;
+  const ppRows = (data?.price_points ?? []).filter(
+    (r) => effectiveMat === ALL || r.material_uuid === effectiveMat,
+  );
 
   const GRANS: { key: Gran; label: string }[] = [
     { key: "day", label: t("dashboards.gDay") },
@@ -319,12 +360,33 @@ export function UserMaterialProfitabilityChart({ userUuid }: { userUuid: string 
             className="mt-6 border-t border-gray-100 dark:border-gray-800 pt-4"
             data-testid="ump-price-points"
           >
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {t("users.pricePoints")}
-            </h4>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-3">
-              {t("users.pricePointsHint")}
-            </p>
+            <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {t("users.pricePoints")}
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {t("users.pricePointsHint")}
+                </p>
+              </div>
+              {/* one material is not worth a filter, and the control would
+                  read as a promise of choices that are not there */}
+              {ppMaterials.length > 1 && (
+                <Select value={effectiveMat} onValueChange={setPpMat}>
+                  <SelectTrigger className="w-48 h-8 text-xs" data-testid="ump-pp-material">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>{t("users.pricePointsAllMaterials")}</SelectItem>
+                    {ppMaterials.map((m) => (
+                      <SelectItem key={m.uuid} value={m.uuid}>
+                        {m.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -335,7 +397,7 @@ export function UserMaterialProfitabilityChart({ userUuid }: { userUuid: string 
                   </tr>
                 </thead>
                 <tbody>
-                  {data!.price_points.map((r) => (
+                  {ppRows.map((r) => (
                     <tr
                       key={`${r.material_uuid}-${r.price_per_unit}-${r.currency}`}
                       className="border-t border-gray-100 dark:border-gray-800"
@@ -356,9 +418,18 @@ export function UserMaterialProfitabilityChart({ userUuid }: { userUuid: string 
                 </tbody>
               </table>
             </div>
-            {(d?.price_points_omitted ?? 0) > 0 && (
+            {/* both notes count across ALL materials, so they would misread
+                under a single-material filter */}
+            {effectiveMat === ALL && (d?.price_points_omitted ?? 0) > 0 && (
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 {t("users.pricePointsOmitted", { count: d!.price_points_omitted })}
+              </p>
+            )}
+            {effectiveMat === ALL && (d?.price_points_free_materials ?? 0) > 0 && (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                {t("users.pricePointsFreeMaterials", {
+                  count: d!.price_points_free_materials,
+                })}
               </p>
             )}
           </div>

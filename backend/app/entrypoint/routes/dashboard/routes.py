@@ -1981,6 +1981,14 @@ def _material_profitability_result(created_by_uuid=None):
         key=lambda m: -m["revenue"],
     )
 
+    # A material earns its place here by having been sold FOR something: if
+    # every price point it has is 0 it produced no revenue, and it is dropped
+    # whole — rows and all — so the table and the material filter built from it
+    # describe the same set. Its 0-price rows are still shown for materials
+    # that DO charge, which is where a giveaway is worth seeing.
+    paid_materials = {mu for (mu, pr, _cur) in price_points if pr > 0}
+    free_materials = {mu for (mu, _pr, _cur) in price_points} - paid_materials
+
     # Cap by units so the biggest movers survive, then display grouped by
     # product and ascending price, which is what makes a product's price spread
     # legible at a glance.
@@ -1994,6 +2002,7 @@ def _material_profitability_result(created_by_uuid=None):
                 "units": round(rec[1], 2),
             }
             for (mu, pr, cur), rec in price_points.items()
+            if mu in paid_materials
         ),
         key=lambda r: -r["units"],
     )
@@ -2014,6 +2023,8 @@ def _material_profitability_result(created_by_uuid=None):
             # bars beyond the top N by revenue — reported, never silent
             "materials_omitted": max(0, len(ranked) - _MATERIALS_TOP_N),
             "price_points_omitted": max(0, len(pp_ranked) - _PRICE_POINTS_TOP_N),
+            # materials sold only at price 0 — excluded above, counted here
+            "price_points_free_materials": len(free_materials),
             "uncosted_quantity": round(uncosted_qty, 2),
             "unconverted_amount": round(unconv_amt, 2),
             "unconverted_count": unconv_count,
