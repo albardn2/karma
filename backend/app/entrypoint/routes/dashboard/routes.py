@@ -1770,6 +1770,8 @@ def _material_profitability_result(created_by_uuid=None):
     # into many values and dissolve the grouping this table exists for.
     price_points: dict = {}
     uncosted_qty = 0.0
+    # consumption charged to COGS whose line carries no live invoice yet
+    uninvoiced_qty = 0.0
     unconv_amt = 0.0
     unconv_count = 0
 
@@ -1810,6 +1812,7 @@ def _material_profitability_result(created_by_uuid=None):
                 ItemModel.material_uuid,
                 MaterialModel.name,
                 InvoiceItemModel.uuid,
+                ItemModel.uuid,
                 InvoiceItemModel.price_per_unit,
                 ItemModel.quantity,
                 InvoiceModel.currency,
@@ -1833,7 +1836,24 @@ def _material_profitability_result(created_by_uuid=None):
             )
         ).all()
 
-        for mat_uuid, name, inv_item_uuid, price, qty, currency, placed_at in rev_rows:
+        # coi lines that reached an invoice. The revenue leg reads THROUGH
+        # invoice_item, so a line fulfilled but not yet invoiced contributes no
+        # revenue — while the COGS leg, which reads the stock ledger, still
+        # charges what it consumed. That is the right way round (the stock
+        # really did leave), but it makes the material read as a pure loss, so
+        # the quantity is banked and disclosed rather than silently charged.
+        invoiced_cois = set()
+        for (
+            mat_uuid,
+            name,
+            inv_item_uuid,
+            coi_uuid,
+            price,
+            qty,
+            currency,
+            placed_at,
+        ) in rev_rows:
+            invoiced_cois.add(coi_uuid)
             # before any skip: a line priced at 0, or one whose currency has no
             # rate, is still a real sale at a real price point
             pk = (mat_uuid, float(price or 0), currency or "")
@@ -1897,8 +1917,14 @@ def _material_profitability_result(created_by_uuid=None):
                 InventoryEventModel.event_type.in_(("sale", "adjustment")),
                 # only events that actually moved sellable stock: an
                 # affect_original row restates the lot's opening quantity
-                # rather than consuming any of it
-                InventoryEventModel.affect_original.is_(False),
+                # rather than consuming any of it.
+                #
+                # isnot(True) rather than is_(False): the column is nullable
+                # with no backfill and PUT /inventory-event/<uuid> accepts an
+                # explicit null, and NULL IS FALSE is false — so is_(False)
+                # would drop a row the warehouse still counts as having moved
+                # stock, understating cost. Same invariant as /profitability.
+                InventoryEventModel.affect_original.isnot(True),
                 InventoryEventModel.account_uuid == uow.account_uuid,
                 ItemModel.is_deleted.is_(False),
             )
@@ -1936,10 +1962,15 @@ def _material_profitability_result(created_by_uuid=None):
                 # that mix was kept, it does not re-price it
                 rc["drew"][inventory_uuid] = rc["drew"].get(inventory_uuid, 0.0) + -q
 
-        for rc in lines.values():
+        for coi_uuid, rc in lines.items():
             consumed = -rc["signed"]  # sale is negative; a return gives it back
             if consumed <= 1e-9:
                 continue  # nothing kept — the whole line came back
+            if coi_uuid not in invoiced_cois:
+                # cost is still charged below — the stock left the building —
+                # but the reader is told how much of it has no revenue beside
+                # it yet, so a fulfil-before-invoice does not read as a loss
+                uninvoiced_qty += consumed
             drew_known = 0.0
             drew_unknown = 0.0
             cost_known = 0.0
@@ -2026,6 +2057,9 @@ def _material_profitability_result(created_by_uuid=None):
             # materials sold only at price 0 — excluded above, counted here
             "price_points_free_materials": len(free_materials),
             "uncosted_quantity": round(uncosted_qty, 2),
+            # cost charged for lines not yet invoiced: real consumption whose
+            # revenue has not been raised, so its material reads as a loss
+            "uninvoiced_quantity": round(uninvoiced_qty, 2),
             "unconverted_amount": round(unconv_amt, 2),
             "unconverted_count": unconv_count,
         },

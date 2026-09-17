@@ -61,6 +61,7 @@ interface Payload {
     price_points_omitted: number;
     price_points_free_materials: number;
     uncosted_quantity: number;
+    uninvoiced_quantity: number;
     unconverted_amount: number;
     unconverted_count: number;
   };
@@ -300,6 +301,13 @@ export function UserMaterialProfitabilityChart({ userUuid }: { userUuid: string 
           {d && d.uncosted_quantity > 0 && (
             <p className="text-amber-600 dark:text-amber-500">
               {t("dashboards.uncosted", { qty: fmtMoney(d.uncosted_quantity) })}
+            </p>
+          )}
+          {/* cost with no revenue beside it yet — without this the material
+              reads as a loss rather than as an invoice not raised */}
+          {d && d.uninvoiced_quantity > 0 && (
+            <p className="text-amber-600 dark:text-amber-500">
+              {t("users.materialUninvoiced", { qty: fmtMoney(d.uninvoiced_quantity) })}
             </p>
           )}
           {d && d.unconverted_count > 0 && (
