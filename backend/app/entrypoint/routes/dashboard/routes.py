@@ -407,6 +407,8 @@ def profitability():
 
     with SqlAlchemyUnitOfWork() as uow:
         s = uow.session
+        from models.common import CustomerOrderItem as CustomerOrderItemModel
+
         conv = CurrencyConverter(uow, target)
         # one cost context for every lot this request touches: caches each lot's
         # cost and each rate day once, and holds the single backfill latch
@@ -438,22 +440,65 @@ def profitability():
                 continue
             revenue[k] += c
 
-        # ---- COGS: cost basis of stock consumed by 'sale' events ----
-        for e in (
-            s.query(InventoryEventModel)
+        # ---- COGS: cost basis of the stock those orders' sales consumed ----
+        # Two corrections to what this used to do, both needed for `gross` to
+        # mean anything per period.
+        #
+        # 1. Not the 'sale' event alone. Editing a fulfilled line's quantity
+        #    leaves the sale untouched as the record of what first left and
+        #    posts a compensating ADJUSTMENT for the delta tied to the same line
+        #    (CustomerOrderItemDomain.adjust_quantity); a note with an
+        #    inventory_change does the same when goods come back. Revenue
+        #    follows the order's CURRENT total, so ignoring those corrections
+        #    froze cost at the original fulfilment while revenue moved.
+        #
+        # 2. Bucketed by the ORDER's created_at, the same clock the revenue
+        #    above uses — not by the event's own date. Revenue is already
+        #    restated in the order's period when a line is edited, so cost has
+        #    to follow it there. Costing by event date instead put the extra
+        #    revenue in July and its cost in September: July's margin inflated,
+        #    September carrying a cost against no sale. Joining through the
+        #    order line also makes "is this a sale?" structural rather than a
+        #    filter — a warehouse recount or write-off has no order behind it
+        #    and can no longer reach cost of goods at all.
+        #
+        # affect_original rows restate a lot's opening quantity rather than
+        # consuming any of it, so they stay out.
+        for e, order_at in (
+            s.query(InventoryEventModel, CustomerOrderModel.created_at)
+            .join(
+                CustomerOrderItemModel,
+                CustomerOrderItemModel.uuid == InventoryEventModel.customer_order_item_uuid,
+            )
+            .join(
+                CustomerOrderModel,
+                CustomerOrderModel.uuid == CustomerOrderItemModel.customer_order_uuid,
+            )
             .filter(
                 InventoryEventModel.is_deleted.is_(False),
-                InventoryEventModel.event_type == "sale",
-                InventoryEventModel.created_at >= start,
+                InventoryEventModel.event_type.in_(("sale", "adjustment")),
+                InventoryEventModel.affect_original.isnot(True),
+                CustomerOrderItemModel.is_deleted.is_(False),
+                CustomerOrderModel.is_deleted.is_(False),
+                CustomerOrderModel.created_at >= start,
                 InventoryEventModel.account_uuid == uow.account_uuid,
             )
             .all()
         ):
-            k = bucket(e.created_at)
+            k = bucket(order_at)
             if not k:
                 continue
-            qty = abs(e.quantity or 0)
-            if not qty:
+            # signed: a sale is negative, a return positive, so consumption is
+            # the negation and a decrease CREDITS cost instead of adding to it
+            q = e.quantity or 0
+            # Adjustments are signed by design (a decrease returns goods, so
+            # positive; an increase takes more, so negative) and that sign is
+            # the whole point here. A fulfilment sale is never legitimately
+            # positive — fulfill_items writes -abs(...) — so keep main's
+            # immunity for sale rows rather than letting one corrupt row swing
+            # cost by twice its value.
+            consumed = abs(q) if e.event_type == "sale" else -q
+            if not consumed:
                 continue
             # lot cost already in target currency (converted at receipt date
             # inside the costing engine); None = unknowable, so bank the quantity
@@ -461,9 +506,11 @@ def profitability():
                 uow=uow, inventory_uuid=e.inventory_uuid, ctx=cost_ctx
             )
             if lot_cost is None:
-                uncosted_qty += qty
+                # signed too, so returning uncostable stock nets it back out
+                # instead of ratcheting the disclosure up on every edit
+                uncosted_qty += consumed
                 continue
-            cogs[k] += qty * lot_cost
+            cogs[k] += consumed * lot_cost
 
         # ---- expenses: Expense.amount at created_at ----
         for x in (
@@ -645,8 +692,8 @@ def vehicle_profitability():
             revenue[k] += c
 
         # ---- COGS: cost basis of the SAME orders' warehouse 'sale' events ----
-        for e in (
-            s.query(InventoryEventModel)
+        for e, order_at in (
+            s.query(InventoryEventModel, CustomerOrderModel.created_at)
             .join(
                 CustomerOrderItemModel,
                 CustomerOrderItemModel.uuid == InventoryEventModel.customer_order_item_uuid,
@@ -659,26 +706,41 @@ def vehicle_profitability():
             .join(TripModel, TripModel.uuid == TripStopModel.trip_uuid)
             .filter(
                 InventoryEventModel.is_deleted.is_(False),
-                InventoryEventModel.event_type == "sale",
-                InventoryEventModel.created_at >= start,
+                # sale + the line-tied corrections that follow it; this query
+                # already joins through the order line, so a warehouse recount
+                # cannot reach it. See /profitability for the full reasoning.
+                InventoryEventModel.event_type.in_(("sale", "adjustment")),
+                InventoryEventModel.affect_original.isnot(True),
+                CustomerOrderModel.created_at >= start,
                 InventoryEventModel.account_uuid == uow.account_uuid,
                 TripModel.vehicle_uuid == vehicle_uuid,
             )
             .all()
         ):
-            k = bucket(e.created_at)
+            # the ORDER's clock, the one the revenue leg above uses — see
+            # /profitability for why a correction must land with its revenue
+            k = bucket(order_at)
             if not k:
                 continue
-            qty = abs(e.quantity or 0)
-            if not qty:
+            # signed, so a quantity decrease or a return credits the period
+            q = e.quantity or 0
+            # Adjustments are signed by design (a decrease returns goods, so
+            # positive; an increase takes more, so negative) and that sign is
+            # the whole point here. A fulfilment sale is never legitimately
+            # positive — fulfill_items writes -abs(...) — so keep main's
+            # immunity for sale rows rather than letting one corrupt row swing
+            # cost by twice its value.
+            consumed = abs(q) if e.event_type == "sale" else -q
+            if not consumed:
                 continue
             lot_cost, _orig = InventoryDomain._lot_cost_and_quantity(
                 uow=uow, inventory_uuid=e.inventory_uuid, ctx=cost_ctx
             )
             if lot_cost is None:
-                uncosted_qty += qty
+                # signed, so returning uncostable stock nets back out
+                uncosted_qty += consumed
                 continue
-            cogs[k] += qty * lot_cost
+            cogs[k] += consumed * lot_cost
 
         # ---- expenses: those tied to this vehicle ----
         for x in (
