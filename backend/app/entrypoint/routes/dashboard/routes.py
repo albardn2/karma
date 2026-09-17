@@ -1436,6 +1436,10 @@ def my_trip_stops():
 # and reports how many it left out.
 _MATERIALS_TOP_N = 12
 _MATERIALS_MAX_OFFSET = 120
+# One product can carry several price points, so this table is naturally longer
+# than the twelve-material chart; it is a table rather than bars, so rows are
+# cheap to read and the cap only exists to stop an unbounded response.
+_PRICE_POINTS_TOP_N = 60
 
 
 def _materials_sold_result(created_by_uuid=None):
@@ -1760,6 +1764,11 @@ def _material_profitability_result(created_by_uuid=None):
     # quantities in different units must never be summed, but money is money in
     # any unit, so splitting here would fragment one material's margin.
     agg: dict = {}
+    # (material, price, currency) -> [name, units]. The price keeps its OWN
+    # currency and is never converted: 10 SYP and 10 USD are different price
+    # points, and converting at each order's date would turn one nominal price
+    # into many values and dissolve the grouping this table exists for.
+    price_points: dict = {}
     uncosted_qty = 0.0
     unconv_amt = 0.0
     unconv_count = 0
@@ -1825,6 +1834,14 @@ def _material_profitability_result(created_by_uuid=None):
         ).all()
 
         for mat_uuid, name, inv_item_uuid, price, qty, currency, placed_at in rev_rows:
+            # before any skip: a line priced at 0, or one whose currency has no
+            # rate, is still a real sale at a real price point
+            pk = (mat_uuid, float(price or 0), currency or "")
+            prec = price_points.get(pk)
+            if prec is None:
+                prec = price_points[pk] = [name, 0.0]
+            prec[1] += qty or 0
+
             amt = (price or 0) * (qty or 0)
             # the line's own notes: customer-side notes hang off an invoice_item,
             # so this is the whole adjustment, not an apportioned share
@@ -1964,6 +1981,27 @@ def _material_profitability_result(created_by_uuid=None):
         key=lambda m: -m["revenue"],
     )
 
+    # Cap by units so the biggest movers survive, then display grouped by
+    # product and ascending price, which is what makes a product's price spread
+    # legible at a glance.
+    pp_ranked = sorted(
+        (
+            {
+                "material_uuid": mu,
+                "name": rec[0],
+                "price_per_unit": round(pr, 2),
+                "currency": cur,
+                "units": round(rec[1], 2),
+            }
+            for (mu, pr, cur), rec in price_points.items()
+        ),
+        key=lambda r: -r["units"],
+    )
+    pp_shown = sorted(
+        pp_ranked[:_PRICE_POINTS_TOP_N],
+        key=lambda r: (r["name"].lower(), r["price_per_unit"], r["currency"]),
+    )
+
     return {
         "target_currency": target.value,
         "granularity": gran,
@@ -1971,9 +2009,11 @@ def _material_profitability_result(created_by_uuid=None):
         "period_label": _period_key(start, gran),
         "period_start": start.strftime("%Y-%m-%d"),
         "materials": ranked[:_MATERIALS_TOP_N],
+        "price_points": pp_shown,
         "disclosure": {
             # bars beyond the top N by revenue — reported, never silent
             "materials_omitted": max(0, len(ranked) - _MATERIALS_TOP_N),
+            "price_points_omitted": max(0, len(pp_ranked) - _PRICE_POINTS_TOP_N),
             "uncosted_quantity": round(uncosted_qty, 2),
             "unconverted_amount": round(unconv_amt, 2),
             "unconverted_count": unconv_count,

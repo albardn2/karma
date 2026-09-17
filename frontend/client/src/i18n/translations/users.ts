@@ -3,6 +3,9 @@
 
 export const en: Record<string, string> = {
   'users.materialProfitability': 'Profitability per Material',
+  'users.pricePoints': 'Price Points',
+  'users.pricePointsHint': 'Units sold at each price, grouped by product and price \u2014 each price is shown in the currency it was invoiced in.',
+  'users.pricePointsOmitted': '{count} more price point(s) not shown.',
   'users.materialProfitabilityHint': 'Revenue and gross margin per material, for orders this user created.',
   'users.materialProfitabilityGross': 'Gross = revenue − cost of the stock those sales consumed, before expenses and salaries (neither is attributable to a material).',
   'users.materialProfitabilityOmitted': '{count} more material(s) outside the top 12 by revenue.',
@@ -191,6 +194,9 @@ export const en: Record<string, string> = {
 
 export const ar: Record<string, string> = {
   'users.materialProfitability': 'الربحية لكل مادة',
+  'users.pricePoints': 'نقاط السعر',
+  'users.pricePointsHint': 'الكميات المبيعة عند كل سعر، مجمَّعة حسب المادة والسعر \u2014 ويظهر كل سعر بالعملة التي صدرت بها الفاتورة.',
+  'users.pricePointsOmitted': '{count} نقطة سعر إضافية غير معروضة.',
   'users.materialProfitabilityHint': 'الإيرادات والهامش الإجمالي لكل مادة، للطلبات التي أنشأها هذا المستخدم.',
   'users.materialProfitabilityGross': 'الإجمالي = الإيرادات − كلفة المخزون المُستهلك في هذه المبيعات، قبل المصاريف والرواتب (ولا يمكن نسب أيٍّ منهما إلى مادة).',
   'users.materialProfitabilityOmitted': '{count} مادة إضافية خارج أعلى 12 بحسب الإيرادات.',

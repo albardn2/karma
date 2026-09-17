@@ -30,6 +30,13 @@ interface Row {
   cogs: number;
   gross: number;
 }
+interface PricePoint {
+  material_uuid: string;
+  name: string;
+  price_per_unit: number;
+  currency: string;
+  units: number;
+}
 interface Payload {
   target_currency: string;
   granularity: string;
@@ -37,8 +44,10 @@ interface Payload {
   period_label: string;
   period_start: string;
   materials: Row[];
+  price_points: PricePoint[];
   disclosure: {
     materials_omitted: number;
+    price_points_omitted: number;
     uncosted_quantity: number;
     unconverted_amount: number;
     unconverted_count: number;
@@ -298,6 +307,60 @@ export function UserMaterialProfitabilityChart({ userUuid }: { userUuid: string 
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* What each product actually went out at. Grouped by product AND
+            price, so one product selling at several prices becomes several
+            rows — which is the whole point: it makes a discount or a mis-keyed
+            price visible instead of averaging it away. */}
+        {(data?.price_points?.length ?? 0) > 0 && (
+          <div
+            className="mt-6 border-t border-gray-100 dark:border-gray-800 pt-4"
+            data-testid="ump-price-points"
+          >
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {t("users.pricePoints")}
+            </h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-3">
+              {t("users.pricePointsHint")}
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
+                    <th className="pb-2 pe-4">{t("inventory.material")}</th>
+                    <th className="pb-2 pe-4 text-end">{t("common.quantity")}</th>
+                    <th className="pb-2 text-end">{t("customerOrders.pricePerUnit")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data!.price_points.map((r) => (
+                    <tr
+                      key={`${r.material_uuid}-${r.price_per_unit}-${r.currency}`}
+                      className="border-t border-gray-100 dark:border-gray-800"
+                    >
+                      <td className="py-2 pe-4 font-medium text-gray-900 dark:text-gray-100">
+                        {r.name}
+                      </td>
+                      <td className="py-2 pe-4 text-end tabular-nums">{fmtMoney(r.units)}</td>
+                      {/* the price keeps the currency it was invoiced in — the
+                          card's USD/SYP toggle converts the money above, but a
+                          price point converted would no longer be one price */}
+                      <td className="py-2 text-end tabular-nums whitespace-nowrap">
+                        {fmtMoney(r.price_per_unit)}{" "}
+                        <span className="text-gray-500">{te(r.currency)}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {(d?.price_points_omitted ?? 0) > 0 && (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                {t("users.pricePointsOmitted", { count: d!.price_points_omitted })}
+              </p>
+            )}
           </div>
         )}
       </CardContent>
