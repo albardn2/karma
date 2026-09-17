@@ -381,24 +381,34 @@ def _user_stops_query(uow, user, start, end):
 
 
 def _user_orders_query(uow, user, start, end, material_uuids=None):
-    """Customer orders placed at this user's trip stops, within the window."""
+    """Customer orders this user CREATED, within the window.
+
+    Attribution is CustomerOrder.created_by_uuid — whoever raised the order —
+    NOT the operator assigned to the trip it was placed on. The two are
+    different populations (100% disjoint in this data), and the per-material
+    profitability card on the same page reads created_by_uuid, so the page was
+    putting one person's revenue next to another person's margin.
+
+    Two consequences of dropping the trip join, both intended:
+      * an order no longer has to hang off a trip stop to count, so orders
+        raised in the office are included. The join was doing double duty as
+        the attribution mechanism AND an implicit "sold on a round" filter,
+        and only the first was wanted here.
+      * orders with no created_by_uuid belong to nobody and appear on no user's
+        page. They are still in the business-wide dashboards.
+
+    Stops stay on trip-assignee basis — see _user_stops_query — because a stop
+    is somewhere a person drove, which has no "creator" to speak of.
+    """
     from sqlalchemy import select
     from models.common import (
-        Trip as TripModel,
         CustomerOrder as CO,
         CustomerOrderItem as COI,
     )
-    q = (
-        uow.session.query(CO)
-        .join(TripStopModel, TripStopModel.uuid == CO.trip_stop_uuid)
-        .join(TripModel, TripModel.uuid == TripStopModel.trip_uuid)
-        .filter(
-            CO.account_uuid == uow.account_uuid,
-            CO.is_deleted.is_(False),
-            TripModel.account_uuid == uow.account_uuid,
-            TripModel.is_deleted.is_(False),
-            _assigned_user_exists(uow, user),
-        )
+    q = uow.session.query(CO).filter(
+        CO.account_uuid == uow.account_uuid,
+        CO.is_deleted.is_(False),
+        CO.created_by_uuid == user.uuid,
     )
     if start:
         q = q.filter(CO.created_at >= start)
@@ -456,7 +466,12 @@ def _bucket_key(dt, bucket):
 @jwt_required()
 @scopes_required(*_USER_ANALYTICS_SCOPES)
 def analytics_user_summary():
-    """Totals for one user: stops, orders, revenue/paid/unpaid per currency."""
+    """Totals for one user: stops, orders, revenue/paid/unpaid per currency.
+
+    Note the deliberate split in basis: `stops`/`stops_with_sale` count trips
+    this user DROVE, while `orders` and all the money count orders this user
+    CREATED. A stop has no author, so there is no one basis that covers both.
+    """
     user_uuid = request.args.get("user_uuid")
     if not user_uuid:
         raise BadRequestError("user_uuid is required")
@@ -593,7 +608,11 @@ def analytics_user_stops_over_time():
 @jwt_required()
 @scopes_required(*_USER_ANALYTICS_SCOPES)
 def analytics_user_sales():
-    """Paginated table of every customer sale made at this user's trip stops."""
+    """Paginated table of every order this user created.
+
+    Rows keep their trip-stop date when the order was placed on a round; an
+    order raised outside one simply has no stop date.
+    """
     from math import ceil
     from models.common import Customer as CustomerModel, CustomerOrder as CO
     user_uuid = request.args.get("user_uuid")

@@ -6,6 +6,7 @@ export const en: Record<string, string> = {
   'users.pricePoints': 'Price Points',
   'users.pricePointsHint': 'Units sold at each price, grouped by product and price \u2014 each price is shown in the currency it was invoiced in.',
   'users.pricePointsOmitted': '{count} more price point(s) not shown.',
+  'users.attributionBasis': 'Revenue, collections and order counts are for orders this user created. Trip stops count rounds this user drove.',
   'users.pricePointsAllMaterials': 'All materials',
   'users.pricePointsFreeMaterials': '{count} material(s) sold only at no charge are not listed.',
   'users.materialProfitabilityHint': 'Revenue and gross margin per material, for orders this user created.',
@@ -189,7 +190,7 @@ export const en: Record<string, string> = {
   'users.ordersUninvoiced': '{count} not invoiced',
   'users.salesOverTime': 'Sales Over Time',
   'users.stopsOverTime': 'Trip Stops Over Time',
-  'users.stopSalesTable': 'Sales at Trip Stops',
+  'users.stopSalesTable': 'Orders Created',
   'users.noStopSales': 'No sales at this user\u2019s trip stops for this period',
   'users.notInvoiced': 'Not invoiced',
 };
@@ -199,6 +200,7 @@ export const ar: Record<string, string> = {
   'users.pricePoints': 'نقاط السعر',
   'users.pricePointsHint': 'الكميات المبيعة عند كل سعر، مجمَّعة حسب المادة والسعر \u2014 ويظهر كل سعر بالعملة التي صدرت بها الفاتورة.',
   'users.pricePointsOmitted': '{count} نقطة سعر إضافية غير معروضة.',
+  'users.attributionBasis': 'الإيرادات والتحصيلات وعدد الطلبات تخص الطلبات التي أنشأها هذا المستخدم. أما محطات الرحلات فتخص الرحلات التي قادها.',
   'users.pricePointsAllMaterials': 'جميع المواد',
   'users.pricePointsFreeMaterials': '{count} مادة بُعت بدون مقابل فقط غير مدرجة.',
   'users.materialProfitabilityHint': 'الإيرادات والهامش الإجمالي لكل مادة، للطلبات التي أنشأها هذا المستخدم.',
@@ -382,7 +384,7 @@ export const ar: Record<string, string> = {
   'users.ordersUninvoiced': '{count} بدون فاتورة',
   'users.salesOverTime': 'المبيعات عبر الزمن',
   'users.stopsOverTime': 'محطات الرحلات عبر الزمن',
-  'users.stopSalesTable': 'المبيعات في محطات الرحلات',
+  'users.stopSalesTable': 'الطلبات المُنشأة',
   'users.noStopSales': 'لا توجد مبيعات في محطات هذا المستخدم لهذه الفترة',
   'users.notInvoiced': 'بدون فاتورة',
 };
