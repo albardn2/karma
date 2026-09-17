@@ -17,6 +17,7 @@ import RevenueOverTimeDashboard from "@/pages/RevenueOverTimeDashboard";
 import SpendDashboard from "@/pages/SpendDashboard";
 import CustomerOrdersDashboard from "@/pages/CustomerOrdersDashboard";
 import MaterialsSoldDashboard from "@/pages/MaterialsSoldDashboard";
+import MaterialProfitabilityDashboard from "@/pages/MaterialProfitabilityDashboard";
 import NewCustomersDashboard from "@/pages/NewCustomersDashboard";
 import TripStopsDashboard from "@/pages/TripStopsDashboard";
 import MyTripStopsDashboard from "@/pages/MyTripStopsDashboard";
@@ -126,6 +127,7 @@ function Router() {
       <Route path="/dashboards/spend" component={() => <ProtectedRoute><SpendDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/customer-orders" component={() => <ProtectedRoute><CustomerOrdersDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/materials-sold" component={() => <ProtectedRoute><MaterialsSoldDashboard /></ProtectedRoute>} />
+      <Route path="/dashboards/material-profitability" component={() => <ProtectedRoute><MaterialProfitabilityDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/new-customers" component={() => <ProtectedRoute><NewCustomersDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/trip-stops" component={() => <ProtectedRoute><TripStopsDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/my-revenue" component={() => <ProtectedRoute><RevenueOverTimeDashboard mine /></ProtectedRoute>} />

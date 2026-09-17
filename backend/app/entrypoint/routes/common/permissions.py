@@ -201,6 +201,10 @@ DASHBOARD_CATALOG = [
     {"id": "field-ops", "title_key": "dashboards.fieldOps", "order": 13},
     {"id": "spend", "title_key": "dashboards.spend", "order": 14},
     {"id": "inventory-health", "title_key": "dashboards.inventoryHealth", "order": 15},
+    # business-wide margin per material. Cost-bearing, so it carries the same
+    # grants as `profitability` — and deliberately has no `my-` twin, for the
+    # reason spelled out above /material-profitability in dashboard/routes.py.
+    {"id": "material-profitability", "title_key": "dashboards.materialProfitability", "order": 16},
 ]
 DASHBOARD_IDS = {d["id"] for d in DASHBOARD_CATALOG}
 _DASHBOARD_ORDER = {d["id"]: d["order"] for d in DASHBOARD_CATALOG}
@@ -211,8 +215,8 @@ _DASHBOARD_ORDER = {d["id"]: d["order"] for d in DASHBOARD_CATALOG}
 # today that is accountant + operation_manager; granting a dashboard to another
 # role presupposes granting it the module too.
 DASHBOARD_DEFAULTS = {
-    "operation_manager": ["business-overview", "profitability", "revenue-over-time", "customer-orders", "new-customers", "materials-sold", "trip-stops", "sales-performance", "field-ops", "spend", "inventory-health"],
-    "accountant": ["business-overview", "profitability", "revenue-over-time", "customer-orders", "new-customers", "materials-sold", "spend"],
+    "operation_manager": ["business-overview", "profitability", "material-profitability", "revenue-over-time", "customer-orders", "new-customers", "materials-sold", "trip-stops", "sales-performance", "field-ops", "spend", "inventory-health"],
+    "accountant": ["business-overview", "profitability", "material-profitability", "revenue-over-time", "customer-orders", "new-customers", "materials-sold", "spend"],
     "sales_manager": ["business-overview", "revenue-over-time", "customer-orders", "new-customers", "materials-sold", "trip-stops", "my-revenue", "my-materials-sold", "my-new-customers", "my-trip-stops", "sales-performance", "field-ops"],
     "sales": ["my-revenue", "my-materials-sold", "my-new-customers", "my-trip-stops", "sales-performance", "field-ops"],
     "sales_associate": ["my-revenue", "my-materials-sold", "my-new-customers", "my-trip-stops", "sales-performance", "field-ops"],

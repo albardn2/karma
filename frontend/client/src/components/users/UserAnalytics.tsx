@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import MaterialsSoldDashboard from "@/pages/MaterialsSoldDashboard";
+import MaterialProfitabilityDashboard from "@/pages/MaterialProfitabilityDashboard";
 import {
   ResponsiveContainer,
   BarChart,
@@ -183,6 +184,14 @@ export function UserAnalytics({ userUuid }: { userUuid: string }) {
           testId="user-analytics-materials"
         />
       </div>
+
+      {/* The basis is worth stating outright: money and order counts follow
+          whoever CREATED the order, while the trip-stop count follows whoever
+          drove the round. Those are different people on the same row, and the
+          two numbers looked interchangeable without a word of explanation. */}
+      <p className="text-xs text-gray-500 dark:text-gray-400" data-testid="user-analytics-basis">
+        {t("users.attributionBasis")}
+      </p>
 
       {/* summary: revenue / collected / outstanding + activity counts */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -537,6 +546,10 @@ export function UserAnalytics({ userUuid }: { userUuid: string }) {
       <div data-testid="user-materials-sold">
         <MaterialsSoldDashboard userUuid={userUuid} embedded />
       </div>
+
+      {/* the money behind those quantities: margin per material, on the same
+          created-by basis and with the same kind of window navigator */}
+      <MaterialProfitabilityDashboard embedded userUuid={userUuid} />
     </div>
   );
 }

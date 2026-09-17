@@ -1436,6 +1436,10 @@ def my_trip_stops():
 # and reports how many it left out.
 _MATERIALS_TOP_N = 12
 _MATERIALS_MAX_OFFSET = 120
+# One product can carry several price points, so this table is naturally longer
+# than the twelve-material chart; it is a table rather than bars, so rows are
+# cheap to read and the cap only exists to stop an unbounded response.
+_PRICE_POINTS_TOP_N = 60
 
 
 def _materials_sold_result(created_by_uuid=None):
@@ -1696,3 +1700,434 @@ def my_new_customers():
     """Customers the caller created. Self-scoped, so no role gate — same
     reasoning as /my-revenue-over-time."""
     return jsonify(_new_customers_result(created_by_uuid=get_jwt_identity())), 200
+
+
+# ---------------------------------------------------------------------------
+# Material profitability — for ONE period, a bar per MATERIAL: revenue, the
+# cost of the stock those sales consumed, and the gross margin between them.
+#
+# Bars are materials, so the time dimension collapses to one window and
+# `offset` steps it back, exactly like /materials-sold — the two charts sit
+# side by side on the user page and their navigators must move in lockstep.
+#
+# There is deliberately NO `net`. /profitability's net subtracts expenses and
+# salaries, and neither carries a material: an expense row has a vehicle_uuid
+# (which is why /vehicle-profitability CAN report net) but never a material.
+# Splitting a wage across materials would be an invented allocation, so the
+# key is absent rather than fabricated.
+# ---------------------------------------------------------------------------
+
+
+def _material_profitability_result(created_by_uuid=None):
+    """Revenue, COGS and gross per material for one period, in one currency.
+
+    Attribution is the ORDER's creator, matching /materials-sold and the
+    order/revenue side of /trip-stop/analytics/user-* (whose stop counts stay
+    on trip-assignee basis, since a stop has no author): this answers "what
+    did the orders this person wrote earn", and it is the basis of the
+    materials chart these bars sit next to.
+
+    BOTH legs are bucketed by the ORDER's created_at — the sale happens when
+    the order is placed. /profitability and /vehicle-profitability bucket COGS
+    by the inventory event's own date because their x-axis IS time, so an event
+    landing in a later period is a real fact there. Here the x-axis is the
+    material, so using two different clocks would subtract a cost from a
+    revenue that belongs to another window and quietly distort the margin.
+
+    Revenue is taken at the LINE, not the order: invoice_item.total_price plus
+    that line's own debit notes minus its credit notes. Customer-side notes can
+    only be raised against an invoice_item, so summing the lines reconstructs
+    the order-level total_adjusted_amount the rest of the app reports.
+
+    COGS is the cost basis of the stock each sale drew, at its lot's
+    weighted-average cost. A sale from a lot of unknown cost is never counted
+    as free: its quantity goes to `uncosted_quantity` and gross is reported as
+    excluding it. An amount whose currency has no rate for its date goes to
+    `unconverted_amount` rather than into a figure.
+    """
+    from app.domains.inventory.domain import InventoryDomain
+
+    gran = (request.args.get("granularity") or "month").strip().lower()
+    if gran not in _ORDERS_CAPS:
+        gran = "month"
+    try:
+        offset = max(0, min(_MATERIALS_MAX_OFFSET, int(request.args.get("offset", 0))))
+    except ValueError:
+        offset = 0
+    target = _target_currency()
+
+    now = datetime.utcnow()
+    start = _step_back(now, gran, offset)
+    end = _step_back(now, gran, offset - 1)  # next period's start
+
+    # material_uuid -> {name, revenue, cogs}. Keyed on the material ALONE, not
+    # on (material, unit) the way /materials-sold is: that split exists because
+    # quantities in different units must never be summed, but money is money in
+    # any unit, so splitting here would fragment one material's margin.
+    agg: dict = {}
+    # (material, price, currency) -> [name, units]. The price keeps its OWN
+    # currency and is never converted: 10 SYP and 10 USD are different price
+    # points, and converting at each order's date would turn one nominal price
+    # into many values and dissolve the grouping this table exists for.
+    price_points: dict = {}
+    uncosted_qty = 0.0
+    # consumption charged to COGS whose line carries no live invoice yet
+    uninvoiced_qty = 0.0
+    unconv_amt = 0.0
+    unconv_count = 0
+
+    def rec(material_uuid, name):
+        r = agg.get(material_uuid)
+        if r is None:
+            r = agg[material_uuid] = {"name": name, "revenue": 0.0, "cogs": 0.0}
+        return r
+
+    with SqlAlchemyUnitOfWork() as uow:
+        s = uow.session
+        from models.common import (
+            CreditNoteItem as CreditNoteItemModel,
+            CustomerOrderItem as ItemModel,
+            DebitNoteItem as DebitNoteItemModel,
+            InvoiceItem as InvoiceItemModel,
+            Material as MaterialModel,
+        )
+
+        conv = CurrencyConverter(uow, target)
+        cost_ctx = InventoryDomain.new_cost_context(currency=target)
+
+        def in_window(q):
+            """The one clock both legs are read against."""
+            q = q.filter(
+                CustomerOrderModel.is_deleted.is_(False),
+                CustomerOrderModel.created_at >= start,
+                CustomerOrderModel.created_at < end,
+                CustomerOrderModel.account_uuid == uow.account_uuid,
+            )
+            if created_by_uuid:
+                q = q.filter(CustomerOrderModel.created_by_uuid == created_by_uuid)
+            return q
+
+        # ---- revenue: the line's own money, note-adjusted ----
+        rev_rows = in_window(
+            s.query(
+                ItemModel.material_uuid,
+                MaterialModel.name,
+                InvoiceItemModel.uuid,
+                ItemModel.uuid,
+                InvoiceItemModel.price_per_unit,
+                ItemModel.quantity,
+                InvoiceModel.currency,
+                CustomerOrderModel.created_at,
+            )
+            .join(ItemModel, InvoiceItemModel.customer_order_item_uuid == ItemModel.uuid)
+            .join(
+                CustomerOrderModel,
+                ItemModel.customer_order_uuid == CustomerOrderModel.uuid,
+            )
+            .join(InvoiceModel, InvoiceItemModel.invoice_uuid == InvoiceModel.uuid)
+            # a retired material's history is still history, and its name is
+            # still the honest label — so no is_deleted filter on Material
+            .join(MaterialModel, ItemModel.material_uuid == MaterialModel.uuid)
+            .filter(
+                InvoiceItemModel.is_deleted.is_(False),
+                # soft-deleting an invoice does NOT cascade to its items, so the
+                # invoice's own flag has to be checked or voided money returns
+                InvoiceModel.is_deleted.is_(False),
+                ItemModel.is_deleted.is_(False),
+            )
+        ).all()
+
+        # coi lines that reached an invoice. The revenue leg reads THROUGH
+        # invoice_item, so a line fulfilled but not yet invoiced contributes no
+        # revenue — while the COGS leg, which reads the stock ledger, still
+        # charges what it consumed. That is the right way round (the stock
+        # really did leave), but it makes the material read as a pure loss, so
+        # the quantity is banked and disclosed rather than silently charged.
+        invoiced_cois = set()
+        for (
+            mat_uuid,
+            name,
+            inv_item_uuid,
+            coi_uuid,
+            price,
+            qty,
+            currency,
+            placed_at,
+        ) in rev_rows:
+            invoiced_cois.add(coi_uuid)
+            # before any skip: a line priced at 0, or one whose currency has no
+            # rate, is still a real sale at a real price point
+            pk = (mat_uuid, float(price or 0), currency or "")
+            prec = price_points.get(pk)
+            if prec is None:
+                prec = price_points[pk] = [name, 0.0]
+            prec[1] += qty or 0
+
+            amt = (price or 0) * (qty or 0)
+            # the line's own notes: customer-side notes hang off an invoice_item,
+            # so this is the whole adjustment, not an apportioned share
+            for note_model, sign in ((DebitNoteItemModel, 1), (CreditNoteItemModel, -1)):
+                for (note_amt,) in (
+                    s.query(note_model.amount)
+                    .filter(
+                        note_model.invoice_item_uuid == inv_item_uuid,
+                        note_model.is_deleted.is_(False),
+                        note_model.account_uuid == uow.account_uuid,
+                    )
+                    .all()
+                ):
+                    amt += sign * (note_amt or 0)
+            if not amt:
+                continue
+            c = conv.convert(amt, currency, placed_at)
+            if c is None:
+                unconv_amt += amt
+                unconv_count += 1
+                continue
+            rec(mat_uuid, name)["revenue"] += c
+
+        # ---- COGS: the NET stock these orders consumed ----
+        # Not the 'sale' event alone. A quantity edit leaves the sale untouched
+        # on purpose — it is the historical record of what left — and posts a
+        # compensating ADJUSTMENT for the delta tied to the same line
+        # (CustomerOrderItemDomain.adjust_quantity). A credit note with an
+        # inventory_change does the same when goods come back. Revenue here is
+        # read from the line's CURRENT quantity, so costing the original sale
+        # would price an edited line against the quantity it no longer has.
+        # Sign is therefore load-bearing: a sale is negative, a return is
+        # positive, and consumption is the negation of their sum.
+        cogs_rows = in_window(
+            s.query(
+                ItemModel.material_uuid,
+                MaterialModel.name,
+                InventoryEventModel.customer_order_item_uuid,
+                InventoryEventModel.inventory_uuid,
+                InventoryEventModel.quantity,
+            )
+            .join(
+                ItemModel,
+                ItemModel.uuid == InventoryEventModel.customer_order_item_uuid,
+            )
+            .join(
+                CustomerOrderModel,
+                ItemModel.customer_order_uuid == CustomerOrderModel.uuid,
+            )
+            .join(MaterialModel, ItemModel.material_uuid == MaterialModel.uuid)
+            .filter(
+                InventoryEventModel.is_deleted.is_(False),
+                InventoryEventModel.event_type.in_(("sale", "adjustment")),
+                # only events that actually moved sellable stock: an
+                # affect_original row restates the lot's opening quantity
+                # rather than consuming any of it.
+                #
+                # isnot(True) rather than is_(False): the column is nullable
+                # with no backfill and PUT /inventory-event/<uuid> accepts an
+                # explicit null, and NULL IS FALSE is false — so is_(False)
+                # would drop a row the warehouse still counts as having moved
+                # stock, understating cost. Same invariant as /profitability.
+                InventoryEventModel.affect_original.isnot(True),
+                InventoryEventModel.account_uuid == uow.account_uuid,
+                ItemModel.is_deleted.is_(False),
+            )
+        ).all()
+
+        # Per LINE, not per (line, lot). A FIFO sale can draw from several lots
+        # at different costs, and the honest unit cost of what the line consumed
+        # is the weighted average of the lots it DREW from — weighted by how
+        # much each supplied. Netting per lot instead breaks on returns: a
+        # credit note books its whole inventory_change against ONE lot (the
+        # first sale event's, credit_note_item/domain.py), so on a multi-lot
+        # line the return can exceed what that lot ever gave. That lot then
+        # nets positive and drops out, while the other lots stay fully charged
+        # — measured on the real 2-lot sugar line (989.8 @ 0.69 + 449.2 @ 1.50),
+        # returning 1000 of 1439 units reported 673.80 instead of 413.91, a 63%
+        # overstatement on the biggest loss-making material on the chart.
+        #
+        # Which lot a return happens to be booked against is bookkeeping noise;
+        # how much the line kept is the fact. So: net the quantity over the
+        # line, and price it at the mix the line drew.
+        lines: dict = {}
+        for mat_uuid, name, coi_uuid, inventory_uuid, ev_qty in cogs_rows:
+            rc = lines.get(coi_uuid)
+            if rc is None:
+                rc = lines[coi_uuid] = {
+                    "material": mat_uuid,
+                    "name": name,
+                    "signed": 0.0,
+                    "drew": {},  # lot -> units taken OUT on this line
+                }
+            q = ev_qty or 0
+            rc["signed"] += q
+            if q < 0:
+                # only draws define the cost mix; a return reduces how much of
+                # that mix was kept, it does not re-price it
+                rc["drew"][inventory_uuid] = rc["drew"].get(inventory_uuid, 0.0) + -q
+
+        for coi_uuid, rc in lines.items():
+            consumed = -rc["signed"]  # sale is negative; a return gives it back
+            if consumed <= 1e-9:
+                continue  # nothing kept — the whole line came back
+            if coi_uuid not in invoiced_cois:
+                # cost is still charged below — the stock left the building —
+                # but the reader is told how much of it has no revenue beside
+                # it yet, so a fulfil-before-invoice does not read as a loss
+                uninvoiced_qty += consumed
+            drew_known = 0.0
+            drew_unknown = 0.0
+            cost_known = 0.0
+            for lot_uuid, drew in rc["drew"].items():
+                lot_cost, _orig = InventoryDomain._lot_cost_and_quantity(
+                    uow=uow, inventory_uuid=lot_uuid, ctx=cost_ctx
+                )
+                if lot_cost is None:
+                    drew_unknown += drew
+                else:
+                    drew_known += drew
+                    cost_known += drew * lot_cost
+            drew_total = drew_known + drew_unknown
+            if drew_total <= 0:
+                # movement with no draw to price it against
+                uncosted_qty += consumed
+                continue
+            # a partly-uncosted mix is disclosed in proportion rather than
+            # being priced at the known lots' average, which would quietly
+            # charge unknown stock at a knowable rate
+            costable = consumed * (drew_known / drew_total)
+            uncosted_qty += consumed - costable
+            if costable > 0:
+                rec(rc["material"], rc["name"])["cogs"] += costable * (
+                    cost_known / drew_known
+                )
+
+    ranked = sorted(
+        (
+            {
+                "material_uuid": mu,
+                "name": r["name"],
+                "revenue": round(r["revenue"], 2),
+                "cogs": round(r["cogs"], 2),
+                "gross": round(r["revenue"] - r["cogs"], 2),
+            }
+            for mu, r in agg.items()
+        ),
+        key=lambda m: -m["revenue"],
+    )
+
+    # A material earns its place here by having been sold FOR something: if
+    # every price point it has is 0 it produced no revenue, and it is dropped
+    # whole — rows and all — so the table and the material filter built from it
+    # describe the same set. Its 0-price rows are still shown for materials
+    # that DO charge, which is where a giveaway is worth seeing.
+    paid_materials = {mu for (mu, pr, _cur) in price_points if pr > 0}
+    free_materials = {mu for (mu, _pr, _cur) in price_points} - paid_materials
+
+    # Cap by units so the biggest movers survive, then display grouped by
+    # product and ascending price, which is what makes a product's price spread
+    # legible at a glance.
+    pp_ranked = sorted(
+        (
+            {
+                "material_uuid": mu,
+                "name": rec[0],
+                "price_per_unit": round(pr, 2),
+                "currency": cur,
+                "units": round(rec[1], 2),
+            }
+            for (mu, pr, cur), rec in price_points.items()
+            if mu in paid_materials
+        ),
+        key=lambda r: -r["units"],
+    )
+    pp_shown = sorted(
+        pp_ranked[:_PRICE_POINTS_TOP_N],
+        key=lambda r: (r["name"].lower(), r["price_per_unit"], r["currency"]),
+    )
+
+    return {
+        "target_currency": target.value,
+        "granularity": gran,
+        "offset": offset,
+        "period_label": _period_key(start, gran),
+        "period_start": start.strftime("%Y-%m-%d"),
+        "materials": ranked[:_MATERIALS_TOP_N],
+        "price_points": pp_shown,
+        "disclosure": {
+            # bars beyond the top N by revenue — reported, never silent
+            "materials_omitted": max(0, len(ranked) - _MATERIALS_TOP_N),
+            "price_points_omitted": max(0, len(pp_ranked) - _PRICE_POINTS_TOP_N),
+            # materials sold only at price 0 — excluded above, counted here
+            "price_points_free_materials": len(free_materials),
+            "uncosted_quantity": round(uncosted_qty, 2),
+            # cost charged for lines not yet invoiced: real consumption whose
+            # revenue has not been raised, so its material reads as a loss
+            "uninvoiced_quantity": round(uninvoiced_qty, 2),
+            "unconverted_amount": round(unconv_amt, 2),
+            "unconverted_count": unconv_count,
+        },
+    }
+
+
+@dashboard_blueprint.route("/material-profitability", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def material_profitability():
+    """Business-wide margin per material — the management view."""
+    return jsonify(_material_profitability_result()), 200
+
+
+# There is deliberately NO /my-material-profitability. The other /my-* cards
+# expose a rep's own revenue and quantities; this one would expose the WAREHOUSE
+# LOT COST behind every material they sell, which is not theirs to see. Adding
+# it to SELF_SCOPED_DASHBOARD_ENDPOINTS would be the only way to make it answer
+# at all, and that is exactly the grant that should not be widened for a cost
+# figure. A rep who needs their margin should be shown it by a supervisor.
+
+
+@dashboard_blueprint.route("/user-material-profitability", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+)
+def user_material_profitability():
+    """One USER's margin per material, for the user-analytics page.
+
+    Gated exactly like /user-materials-sold, and for the same reason: the
+    decorator alone does not hold it, because scopes_required waves a
+    fine-grained caller through whenever the required scopes are not strictly
+    admin-only, leaving the blueprint ACL — dashboard:read, which the
+    accountant preset grants — as the real gate. So the supervisory check is
+    REPEATED in the handler, or an accountant could read any colleague's
+    per-user margins. The 404 on a foreign uuid matters for the same reason it
+    does there: without it the page would quietly render an all-zero period,
+    which reads as "this user sold nothing" rather than "wrong id".
+    """
+    from flask import g
+
+    from app.entrypoint.routes.common.errors import ApiError, BadRequestError, NotFoundError
+
+    if not getattr(g, "is_admin", False):
+        scopes = set(getattr(g, "user_scopes", set()) or set())
+        allowed = {
+            PermissionScope.ADMIN.value,
+            PermissionScope.SUPER_ADMIN.value,
+            PermissionScope.OPERATION_MANAGER.value,
+        }
+        if not (scopes & allowed):
+            raise ApiError(
+                "Per-user analytics are for supervisory roles", status_code=403
+            )
+
+    user_uuid = request.args.get("user_uuid")
+    if not user_uuid:
+        raise BadRequestError("user_uuid is required")
+    with SqlAlchemyUnitOfWork() as uow:
+        if not uow.user_repository.find_one(uuid=user_uuid, is_deleted=False):
+            raise NotFoundError("User not found")
+    return jsonify(_material_profitability_result(created_by_uuid=user_uuid)), 200

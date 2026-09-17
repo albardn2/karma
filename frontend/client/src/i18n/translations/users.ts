@@ -2,6 +2,19 @@
 // Keys used via t('users.xxx'); enum.* entries cover permission scopes via te().
 
 export const en: Record<string, string> = {
+  'users.materialProfitability': 'Profitability per Material',
+  'users.pricePoints': 'Price Points',
+  'users.pricePointsHint': 'Units sold at each price, grouped by product and price \u2014 each price is shown in the currency it was invoiced in.',
+  'users.pricePointsOmitted': '{count} more price point(s) not shown.',
+  'users.attributionBasis': 'Revenue, collections and order counts are for orders this user created. Trip stops are for trips this user drove.',
+  'users.pricePointsAllMaterials': 'All materials',
+  'users.pricePointsFreeMaterials': '{count} material(s) sold only at no charge are not listed.',
+  'users.materialProfitabilityHint': 'Revenue and gross margin per material, for orders this user created.',
+  'users.materialProfitabilityGross': 'Gross = revenue − cost of the stock those sales consumed, before expenses and salaries (neither is attributable to a material).',
+  'users.materialProfitabilityOmitted': '{count} more material(s) outside the top 12 by revenue.',
+  'users.materialUninvoiced': '{qty} unit(s) of cost belong to lines that are fulfilled but not yet invoiced, so their revenue is not counted here.',
+  'users.materialCost': 'Cost',
+  'users.materialMargin': 'Margin',
   // list page (Users.tsx)
   'users.loadingUsers': 'Loading users...',
   'users.unableToLoad': 'Unable to load users - backend endpoint not available',
@@ -178,12 +191,25 @@ export const en: Record<string, string> = {
   'users.ordersUninvoiced': '{count} not invoiced',
   'users.salesOverTime': 'Sales Over Time',
   'users.stopsOverTime': 'Trip Stops Over Time',
-  'users.stopSalesTable': 'Sales at Trip Stops',
-  'users.noStopSales': 'No sales at this user\u2019s trip stops for this period',
+  'users.stopSalesTable': 'Orders Created',
+  'users.noStopSales': 'This user created no orders in this period',
   'users.notInvoiced': 'Not invoiced',
 };
 
 export const ar: Record<string, string> = {
+  'users.materialProfitability': 'الربحية لكل مادة',
+  'users.pricePoints': 'نقاط السعر',
+  'users.pricePointsHint': 'الكميات المبيعة عند كل سعر، مجمَّعة حسب المادة والسعر \u2014 ويظهر كل سعر بالعملة التي صدرت بها الفاتورة.',
+  'users.pricePointsOmitted': '{count} نقطة سعر إضافية غير معروضة.',
+  'users.attributionBasis': 'الإيرادات والتحصيلات وعدد الطلبات تخص الطلبات التي أنشأها هذا المستخدم. أما محطات الرحلات فتخص الرحلات التي قادها.',
+  'users.pricePointsAllMaterials': 'جميع المواد',
+  'users.pricePointsFreeMaterials': '{count} مادة مبيعة بدون مقابل فقط غير مدرجة.',
+  'users.materialProfitabilityHint': 'الإيرادات والهامش الإجمالي لكل مادة، للطلبات التي أنشأها هذا المستخدم.',
+  'users.materialProfitabilityGross': 'الإجمالي = الإيرادات − كلفة المخزون المُستهلك في هذه المبيعات، قبل المصاريف والرواتب (ولا يمكن نسب أيٍّ منهما إلى مادة).',
+  'users.materialProfitabilityOmitted': '{count} مادة إضافية خارج أعلى 12 بحسب الإيرادات.',
+  'users.materialUninvoiced': '{qty} وحدة من التكلفة تخص بنوداً تم تجهيزها ولم تُفتَر بعد، لذلك لا تُحتسب إيراداتها هنا.',
+  'users.materialCost': 'الكلفة',
+  'users.materialMargin': 'الهامش',
   // list page (Users.tsx)
   'users.loadingUsers': 'جارٍ تحميل المستخدمين...',
   'users.unableToLoad': 'تعذّر تحميل المستخدمين — نقطة النهاية غير متوفرة في الخادم',
@@ -360,7 +386,7 @@ export const ar: Record<string, string> = {
   'users.ordersUninvoiced': '{count} بدون فاتورة',
   'users.salesOverTime': 'المبيعات عبر الزمن',
   'users.stopsOverTime': 'محطات الرحلات عبر الزمن',
-  'users.stopSalesTable': 'المبيعات في محطات الرحلات',
-  'users.noStopSales': 'لا توجد مبيعات في محطات هذا المستخدم لهذه الفترة',
+  'users.stopSalesTable': 'الطلبات المُنشأة',
+  'users.noStopSales': 'لم يُنشئ هذا المستخدم أي طلبات في هذه الفترة',
   'users.notInvoiced': 'بدون فاتورة',
 };
