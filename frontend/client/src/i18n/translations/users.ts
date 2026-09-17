@@ -202,7 +202,7 @@ export const ar: Record<string, string> = {
   'users.pricePointsOmitted': '{count} نقطة سعر إضافية غير معروضة.',
   'users.attributionBasis': 'الإيرادات والتحصيلات وعدد الطلبات تخص الطلبات التي أنشأها هذا المستخدم. أما محطات الرحلات فتخص الرحلات التي قادها.',
   'users.pricePointsAllMaterials': 'جميع المواد',
-  'users.pricePointsFreeMaterials': '{count} مادة بُعت بدون مقابل فقط غير مدرجة.',
+  'users.pricePointsFreeMaterials': '{count} مادة مبيعة بدون مقابل فقط غير مدرجة.',
   'users.materialProfitabilityHint': 'الإيرادات والهامش الإجمالي لكل مادة، للطلبات التي أنشأها هذا المستخدم.',
   'users.materialProfitabilityGross': 'الإجمالي = الإيرادات − كلفة المخزون المُستهلك في هذه المبيعات، قبل المصاريف والرواتب (ولا يمكن نسب أيٍّ منهما إلى مادة).',
   'users.materialProfitabilityOmitted': '{count} مادة إضافية خارج أعلى 12 بحسب الإيرادات.',

@@ -116,6 +116,26 @@ export function UserMaterialProfitabilityChart({ userUuid }: { userUuid: string 
     retry: false,
   });
 
+  // The filter's options come from the rows themselves, not from /material/:
+  // the question is "which products did this person actually sell", so the
+  // catalogue — mostly materials they never touched — is the wrong list. The
+  // backend has already dropped anything sold only at price 0, so everything
+  // offered here has revenue behind it.
+  //
+  // Declared ABOVE the forbidden early return: a hook after a conditional
+  // return changes the hook count between renders, and React throws rather
+  // than rendering, so a 403 here would take the whole page down.
+  const ppMaterials = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { uuid: string; name: string }[] = [];
+    for (const r of data?.price_points ?? []) {
+      if (seen.has(r.material_uuid)) continue;
+      seen.add(r.material_uuid);
+      out.push({ uuid: r.material_uuid, name: r.name });
+    }
+    return out.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  }, [data?.price_points]);
+
   // Per-user analytics are supervisory-only and the money needs financial
   // access; a role without either 403s. Hide the card rather than show it
   // broken — same idiom as VehicleProfitabilityChart.
@@ -131,27 +151,17 @@ export function UserMaterialProfitabilityChart({ userUuid }: { userUuid: string 
   const hasAny = rows.length > 0;
   const d = data?.disclosure;
 
-  // The filter's options come from the rows themselves, not from /material/:
-  // the question is "which products did this person actually sell", so the
-  // catalogue — mostly materials they never touched — is the wrong list. The
-  // backend has already dropped anything sold only at price 0, so everything
-  // offered here has revenue behind it.
-  const ppMaterials = useMemo(() => {
-    const seen = new Set<string>();
-    const out: { uuid: string; name: string }[] = [];
-    for (const r of data?.price_points ?? []) {
-      if (seen.has(r.material_uuid)) continue;
-      seen.add(r.material_uuid);
-      out.push({ uuid: r.material_uuid, name: r.name });
-    }
-    return out.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-  }, [data?.price_points]);
-
   // Stepping to a period where the chosen material was not sold must not show
   // an empty table with a stale name in the trigger. Falling back on read
   // (rather than resetting the state) means the choice reapplies by itself
   // when you step back to a period that has it.
-  const effectiveMat = ppMaterials.some((m) => m.uuid === ppMat) ? ppMat : ALL;
+  // The length > 1 term keeps "no visible control" and "no filter in effect"
+  // from diverging: with a single material the Select is not rendered, so a
+  // selection held from an earlier window would silently suppress the
+  // all-materials disclosures below with no way for the reader to clear it.
+  // Filtering to the only material is the same row set anyway.
+  const effectiveMat =
+    ppMaterials.length > 1 && ppMaterials.some((m) => m.uuid === ppMat) ? ppMat : ALL;
   const ppRows = (data?.price_points ?? []).filter(
     (r) => effectiveMat === ALL || r.material_uuid === effectiveMat,
   );
@@ -355,7 +365,8 @@ export function UserMaterialProfitabilityChart({ userUuid }: { userUuid: string 
             price, so one product selling at several prices becomes several
             rows — which is the whole point: it makes a discount or a mis-keyed
             price visible instead of averaging it away. */}
-        {(data?.price_points?.length ?? 0) > 0 && (
+        {((data?.price_points?.length ?? 0) > 0 ||
+          (d?.price_points_free_materials ?? 0) > 0) && (
           <div
             className="mt-6 border-t border-gray-100 dark:border-gray-800 pt-4"
             data-testid="ump-price-points"
@@ -387,37 +398,42 @@ export function UserMaterialProfitabilityChart({ userUuid }: { userUuid: string 
                 </Select>
               )}
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
-                    <th className="pb-2 pe-4">{t("inventory.material")}</th>
-                    <th className="pb-2 pe-4 text-end">{t("common.quantity")}</th>
-                    <th className="pb-2 text-end">{t("customerOrders.pricePerUnit")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ppRows.map((r) => (
-                    <tr
-                      key={`${r.material_uuid}-${r.price_per_unit}-${r.currency}`}
-                      className="border-t border-gray-100 dark:border-gray-800"
-                    >
-                      <td className="py-2 pe-4 font-medium text-gray-900 dark:text-gray-100">
-                        {r.name}
-                      </td>
-                      <td className="py-2 pe-4 text-end tabular-nums">{fmtMoney(r.units)}</td>
-                      {/* the price keeps the currency it was invoiced in — the
-                          card's USD/SYP toggle converts the money above, but a
-                          price point converted would no longer be one price */}
-                      <td className="py-2 text-end tabular-nums whitespace-nowrap">
-                        {fmtMoney(r.price_per_unit)}{" "}
-                        <span className="text-gray-500">{te(r.currency)}</span>
-                      </td>
+            {/* an all-free window opens this section for the disclosure
+                alone, and a header row with no body under it reads as a
+                loading failure rather than as "nothing priced" */}
+            {ppRows.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
+                      <th className="pb-2 pe-4">{t("inventory.material")}</th>
+                      <th className="pb-2 pe-4 text-end">{t("common.quantity")}</th>
+                      <th className="pb-2 text-end">{t("customerOrders.pricePerUnit")}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {ppRows.map((r) => (
+                      <tr
+                        key={`${r.material_uuid}-${r.price_per_unit}-${r.currency}`}
+                        className="border-t border-gray-100 dark:border-gray-800"
+                      >
+                        <td className="py-2 pe-4 font-medium text-gray-900 dark:text-gray-100">
+                          {r.name}
+                        </td>
+                        <td className="py-2 pe-4 text-end tabular-nums">{fmtMoney(r.units)}</td>
+                        {/* the price keeps the currency it was invoiced in — the
+                            card's USD/SYP toggle converts the money above, but a
+                            price point converted would no longer be one price */}
+                        <td className="py-2 text-end tabular-nums whitespace-nowrap">
+                          {fmtMoney(r.price_per_unit)}{" "}
+                          <span className="text-gray-500">{te(r.currency)}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             {/* both notes count across ALL materials, so they would misread
                 under a single-material filter */}
             {effectiveMat === ALL && (d?.price_points_omitted ?? 0) > 0 && (
