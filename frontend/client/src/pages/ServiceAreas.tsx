@@ -132,6 +132,13 @@ export default function ServiceAreas() {
   const totalCount = serviceAreaData?.total_count || 0;
   const totalPages = Math.ceil(totalCount / perPage);
 
+  // `?.items || []` minted a fresh array on every render while data was
+  // undefined, re-running the map's layer effects for no reason
+  const mapServiceAreas = useMemo(
+    () => mapServiceAreaData?.items ?? [],
+    [mapServiceAreaData],
+  );
+
   if (isLoading && selectedTab === "list") {
     return (
       <AppLayout>
@@ -151,12 +158,6 @@ export default function ServiceAreas() {
   }
 
   const serviceAreas = serviceAreaData?.items || [];
-  // `?.items || []` minted a fresh array on every render while data was
-  // undefined, re-running the map's layer effects for no reason
-  const mapServiceAreas = useMemo(
-    () => mapServiceAreaData?.items ?? [],
-    [mapServiceAreaData],
-  );
 
   return (
     <AppLayout>
