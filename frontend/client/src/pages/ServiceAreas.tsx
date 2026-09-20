@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Map, MapPin, ArrowRight, Plus } from "lucide-react";
+import { Map, MapPin, ArrowRight, Plus, Loader2 } from "lucide-react";
 import { ServiceAreaFilters } from "@/components/service-areas/ServiceAreaFilters";
 import { ServiceAreaMap } from "@/components/service-areas/ServiceAreaMap";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -72,10 +72,15 @@ export default function ServiceAreas() {
   });
 
   // Fetch service areas data for map view with current filters
+  // Keyed ["/service-area/", "map", filters] rather than ["/service-area/map",
+  // filters]: react-query matches prefixes element by element, so the old single
+  // "/service-area/map" string was NOT matched by the ["/service-area/"]
+  // invalidations that create, edit and delete already fire — this map never
+  // refreshed after a change made anywhere else.
   const { data: mapServiceAreaData, isLoading: isMapLoading } = useQuery<ServiceAreaPage>({
-    queryKey: ["/service-area/map", filters],
+    queryKey: ["/service-area/", "map", filters],
     queryFn: async ({ queryKey }) => {
-      const [, currentFilters] = queryKey;
+      const [, , currentFilters] = queryKey;
       const params = new URLSearchParams({
         page: "1",
         per_page: "100", // Get items for map display
@@ -93,6 +98,11 @@ export default function ServiceAreas() {
     },
     enabled: selectedTab === "map",
     staleTime: 0,
+    // Panning remints the key. Without this the map goes data-less for a beat,
+    // isMapLoading flips, and the map UNMOUNTS mid-gesture — which would throw
+    // away an in-progress boundary edit. Serve the previous viewport's areas
+    // until the new ones land.
+    placeholderData: (prev) => prev,
   });
 
   const handleFilterChange = (newFilters: typeof filters) => {
@@ -141,7 +151,12 @@ export default function ServiceAreas() {
   }
 
   const serviceAreas = serviceAreaData?.items || [];
-  const mapServiceAreas = mapServiceAreaData?.items || [];
+  // `?.items || []` minted a fresh array on every render while data was
+  // undefined, re-running the map's layer effects for no reason
+  const mapServiceAreas = useMemo(
+    () => mapServiceAreaData?.items ?? [],
+    [mapServiceAreaData],
+  );
 
   return (
     <AppLayout>
@@ -297,18 +312,24 @@ export default function ServiceAreas() {
           </TabsContent>
 
           <TabsContent value="map" className="space-y-4">
-            <div dir="ltr" className="h-[600px] rounded-lg border overflow-hidden">
-              {isMapLoading ? (
-                <div className="h-full flex items-center justify-center">
-                  <Skeleton className="h-full w-full" />
+            {/* relative z-0 gives the box its own stacking context: Leaflet's
+                own controls carry z-index 1000 and would otherwise paint over
+                the mobile nav drawer and swallow the tap that dismisses it.
+                Every other map box in the app already does this. */}
+            <div dir="ltr" className="relative z-0 h-[600px] rounded-lg border overflow-hidden">
+              <ServiceAreaMap
+                key={`service-area-map-${mapKey}`}
+                serviceAreas={mapServiceAreas}
+                filters={filters}
+                onFiltersChange={handleFilterChange}
+              />
+              {/* An overlay, NOT a swap: replacing the map with a skeleton
+                  unmounted it on every pan, which destroys any state it holds
+                  — including a boundary edit in progress. */}
+              {isMapLoading && (
+                <div className="absolute inset-0 z-[1100] flex items-center justify-center bg-white/60 dark:bg-gray-900/60 pointer-events-none">
+                  <Loader2 className="h-6 w-6 animate-spin text-[#5469D4]" />
                 </div>
-              ) : (
-                <ServiceAreaMap
-                  key={`service-area-map-${mapKey}`}
-                  serviceAreas={mapServiceAreas}
-                  filters={filters}
-                  onFiltersChange={handleFilterChange}
-                />
               )}
             </div>
           </TabsContent>
