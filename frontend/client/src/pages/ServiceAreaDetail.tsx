@@ -58,7 +58,10 @@ export default function ServiceAreaDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/service-area/"] });
-      queryClient.refetchQueries({ queryKey: ["/service-area/"] });
+      // scoped to `active`: the invalidate above already marks every cached
+      // viewport stale, and since the re-key the unfiltered form would also
+      // force-refetch every panned map viewport that is not even mounted
+      queryClient.refetchQueries({ queryKey: ["/service-area/"], type: "active" });
       queryClient.removeQueries({ queryKey: ["/service-area/", params?.uuid] });
       
       toast({

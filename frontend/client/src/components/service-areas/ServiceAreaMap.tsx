@@ -42,6 +42,13 @@ interface ServiceAreaMapProps {
   serviceAreas: ServiceArea[];
   filters: any;
   onFiltersChange: (filters: any) => void;
+  /**
+   * Reports an unsaved boundary edit so the page can guard the exits it owns.
+   * beforeunload covers closing the browser; leaving the map TAB is an in-app
+   * unmount that fires no such event, and this feature is what put unsaved work
+   * behind it.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const PALETTE = [
@@ -89,7 +96,14 @@ function BoundsWatcher({
       // A refetch swaps the area list, which would tear the polygon being
       // edited out from under the user's cursor — and Leaflet fires `remove`
       // on it, which is how leaflet-draw silently strips vertex handles.
-      if (suspended.current) return;
+      if (suspended.current) {
+        // paused, not dropped: re-arm, so the viewport the session ends on is
+        // the one the area list gets keyed to. Ending an edit only clears the
+        // ref — nothing else re-schedules, since this fires from moveend and
+        // zoomend alone, and the user may not pan again.
+        schedule();
+        return;
+      }
       try {
         onBounds(viewportToWKT(map.getBounds()));
       } catch {
@@ -114,11 +128,12 @@ function MapRef({ onMap }: { onMap: (m: L.Map) => void }) {
 interface EditSession {
   uuid: string;
   name: string;
-  /** the stored ring, for a local revert with no round trip */
-  originalWkt: string;
   dirty: boolean;
   error: string | null;
 }
+// No originalWkt: cancelling drops the editable layer and the area re-enters the
+// read-only set straight from the `serviceAreas` prop, which is the stored ring.
+// Holding a second copy only invited the two to disagree.
 
 /**
  * All service areas on one map, with customer pins and in-place boundary editing.
@@ -127,7 +142,12 @@ interface EditSession {
  * /service-areas/<uuid>/edit, and the PUT sends `geometry` alone so reshaping a
  * boundary here can never revert a rename someone made meanwhile.
  */
-export function ServiceAreaMap({ serviceAreas, filters, onFiltersChange }: ServiceAreaMapProps) {
+export function ServiceAreaMap({
+  serviceAreas,
+  filters,
+  onFiltersChange,
+  onDirtyChange,
+}: ServiceAreaMapProps) {
   const { t } = useLanguage();
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
@@ -147,6 +167,10 @@ export function ServiceAreaMap({ serviceAreas, filters, onFiltersChange }: Servi
   // the one captured when the timer was scheduled.
   const editingRef = useRef(false);
   const editPolyRef = useRef<L.Polygon | null>(null);
+  // Mirrors `session` for the mutation callbacks, which resolve after a round
+  // trip and must not read a stale closure.
+  const sessionRef = useRef<EditSession | null>(null);
+  sessionRef.current = session;
 
   // MapContainer treats these as initial-only; freezing them documents that.
   const initialCenter = useMemo<[number, number]>(() => [33.5138, 36.2765], []);
@@ -258,7 +282,13 @@ export function ServiceAreaMap({ serviceAreas, filters, onFiltersChange }: Servi
 
       if (isEditable(poly)) {
         poly.editing.enable();
-        const markDirty = () => setSession((s) => (s && !s.dirty ? { ...s, dirty: true } : s));
+        // clears a previous rejection too: once the ring is being repaired the
+        // old error is stale, and it would otherwise sit under the panel through
+        // the retry and beyond
+        const markDirty = () =>
+          setSession((s) =>
+            s && (!s.dirty || s.error) ? { ...s, dirty: true, error: null } : s,
+          );
         poly.on(POLY_EDIT_EVENT, markDirty);
         poly.on(POLY_EDIT_DRAG_EVENT, markDirty);
       }
@@ -269,13 +299,7 @@ export function ServiceAreaMap({ serviceAreas, filters, onFiltersChange }: Servi
       } catch {
         /* degenerate ring */
       }
-      setSession({
-        uuid: area.uuid,
-        name: area.name,
-        originalWkt: area.geometry,
-        dirty: false,
-        error: null,
-      });
+      setSession({ uuid: area.uuid, name: area.name, dirty: false, error: null });
     },
     [map, canEditShape, teardownEdit, toast, t],
   );
@@ -287,13 +311,18 @@ export function ServiceAreaMap({ serviceAreas, filters, onFiltersChange }: Servi
   }, [teardownEdit]);
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
+    // The uuid travels WITH the save. A PUT in flight outlives the session that
+    // started it — the user can discard and begin editing another area before
+    // it lands — so neither callback may assume the open session is the one it
+    // saved. Without this, area B's in-progress reshape was destroyed (with a
+    // success toast) when area A's save returned.
+    mutationFn: async (uuid: string) => {
       const poly = editPolyRef.current;
       if (!poly) throw new Error("no shape");
       // Read the geometry off the LAYER at save time, never off cached state:
       // an event we failed to bind then cannot cause a stale write.
       const geometry = polygonToWKT(poly);
-      return apiRequest(`/service-area/${session!.uuid}`, {
+      return apiRequest(`/service-area/${uuid}`, {
         method: "PUT",
         // geometry ALONE, deliberately unlike /service-areas/<uuid>/edit, which
         // owns all three fields and sends all three. ServiceAreaUpdate has every
@@ -303,25 +332,26 @@ export function ServiceAreaMap({ serviceAreas, filters, onFiltersChange }: Servi
         body: { geometry },
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, uuid) => {
       // The server has accepted it, so nothing after this point may present
       // itself as a save failure: react-query routes a throw from onSuccess to
       // onError, which would show an error for a change that persisted.
       try {
-        // end the session FIRST, so editingRef is false and the refetch this
-        // invalidation triggers is allowed through
-        endEdit();
+        // only the session this save belongs to — see mutationFn. end it FIRST,
+        // so editingRef is false and the refetch below is allowed through
+        if (sessionRef.current?.uuid === uuid) endEdit();
       } catch {
         /* teardown is best-effort; the save stands either way */
       }
       queryClient.invalidateQueries({ queryKey: ["/service-area/"] });
       toast({ title: t("common.success"), description: t("serviceAreas.saveShapeSuccess") });
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown, uuid) => {
       // Keep the session and the user's shape. A rejected save must never
-      // discard the work that caused it.
+      // discard the work that caused it — and the error belongs to the session
+      // that produced it, not to whichever one happens to be open now.
       const msg = apiErrorMessage(error, t("serviceAreas.saveShapeError"));
-      setSession((s) => (s ? { ...s, error: msg } : s));
+      setSession((s) => (s && s.uuid === uuid ? { ...s, error: msg } : s));
     },
   });
 
@@ -333,15 +363,27 @@ export function ServiceAreaMap({ serviceAreas, filters, onFiltersChange }: Servi
     endEdit();
   }, [session?.dirty, endEdit]);
 
-  // Escape cancels, matching every other editor in the app.
+  // Escape cancels, matching every other editor in the app — with two guards.
+  // While the discard dialog is open Escape belongs to the DIALOG: Radix
+  // dismisses it from a document capture-phase listener without stopping
+  // propagation, so this bubble listener would re-open it in the same React
+  // batch and the dialog could never be dismissed by keyboard. And while a save
+  // is in flight Escape must be as inert as the Cancel button already is, or it
+  // reopens the discard path for a session the server is still writing.
   useEffect(() => {
-    if (!session) return;
+    if (!session || confirmDiscard || saveMutation.isPending) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") requestCancel();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [session, requestCancel]);
+  }, [session, confirmDiscard, saveMutation.isPending, requestCancel]);
+
+  useEffect(() => {
+    onDirtyChange?.(!!session?.dirty);
+    // also clears on unmount, so a guard cannot latch on after the map is gone
+    return () => onDirtyChange?.(false);
+  }, [session?.dirty, onDirtyChange]);
 
   // A reshape lives only in the browser until saved.
   useEffect(() => {
@@ -359,6 +401,15 @@ export function ServiceAreaMap({ serviceAreas, filters, onFiltersChange }: Servi
     if (!map) return;
     setPaneInert(map, "overlayPane", !!session);
   }, [map, session]);
+
+  // Freeze the handles while a save is in flight. mutationFn reads the ring at
+  // CLICK time and success tears the session down, so a vertex moved during the
+  // round trip would be discarded under a success toast with no cue — markDirty
+  // is already a no-op once dirty, so nothing would even look different.
+  useEffect(() => {
+    if (!map) return;
+    setPaneInert(map, "markerPane", saveMutation.isPending);
+  }, [map, saveMutation.isPending]);
 
   const pinLabels = useMemo(
     () => ({
@@ -503,7 +554,7 @@ export function ServiceAreaMap({ serviceAreas, filters, onFiltersChange }: Servi
                 size="sm"
                 className="bg-[#5469D4] hover:bg-[#4356C7] text-white"
                 disabled={!session.dirty || saveMutation.isPending || !canEditShape}
-                onClick={() => saveMutation.mutate()}
+                onClick={() => saveMutation.mutate(session.uuid)}
                 data-testid="save-area-shape"
               >
                 {saveMutation.isPending ? (
