@@ -14,7 +14,9 @@ whose dollars are worth more than that once converted. (This differs from the
 routing strategies' per-currency debt filter, which stays per-currency by
 design — a route is worked in one currency's terms.)
 """
-from datetime import datetime
+import functools
+import operator
+from datetime import datetime, timedelta
 from typing import List
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
@@ -22,10 +24,17 @@ from app.domains.exchange_rate.converter import CurrencyConverter
 from app.domains.trip.priority_router import (
     _norm,
     category_filter_matches,
+    last_effective_stop_passes,
     tag_filter_matches,
 )
 from app.dto.common_enums import Currency
-from app.dto.customer_query import CustomerQuery, QueryConnector, QueryField, QueryRow
+from app.dto.customer_query import (
+    CustomerQuery,
+    QueryConnector,
+    QueryField,
+    QueryRow,
+    iter_leaves,
+)
 from app.dto.routing_strategy import CategoryFilterOp, TagFilterOp
 from app.entrypoint.routes.common.errors import BadRequestError
 
@@ -91,10 +100,16 @@ def run_customer_query(uow: SqlAlchemyUnitOfWork, query: CustomerQuery) -> List:
     # Debt: pull EVERY currency's raw balance (a converted total needs them
     # all), then convert per row into that row's chosen currency. One converter
     # per target currency caches its day's rate across all customers.
-    uses_debt = any(row.field == QueryField.DEBT for row in query.rows)
+    leaves = list(iter_leaves(query.expression))
+    uses_debt = any(row.field == QueryField.DEBT for row in leaves)
     raw_balances: dict = {}
     converters: dict = {}
-    today = datetime.utcnow().date()
+    # ONE clock for the whole request, and naive to match the column: a request
+    # straddling midnight must not convert debt at one day's rate while
+    # measuring recency against the next. Naive because last_effective_stop is
+    # a DateTime with no timezone — an aware `now` raises at comparison time.
+    now = datetime.utcnow()
+    today = now.date()
     if uses_debt:
         raw_balances = {
             currency: uow.customer_repository.fetch_outstanding_balances(
@@ -104,7 +119,7 @@ def run_customer_query(uow: SqlAlchemyUnitOfWork, query: CustomerQuery) -> List:
         }
         converters = {
             row.currency: CurrencyConverter(uow, row.currency)
-            for row in query.rows
+            for row in leaves
             if row.field == QueryField.DEBT
         }
 
@@ -127,7 +142,7 @@ def run_customer_query(uow: SqlAlchemyUnitOfWork, query: CustomerQuery) -> List:
     positionable = {u for u, c in by_uuid.items() if c.coordinates is not None}
 
     area_members: dict = {}
-    for row in query.rows:
+    for row in leaves:
         if row.field != QueryField.SERVICE_AREA:
             continue
         for ref in row.value if isinstance(row.value, list) else [row.value]:
@@ -137,7 +152,7 @@ def run_customer_query(uow: SqlAlchemyUnitOfWork, query: CustomerQuery) -> List:
                     uow.customer_repository.fetch_uuids_within_geometry(area.geometry)
                 )
 
-    def row_set(row: QueryRow) -> set:
+    def _compute_row_set(row: QueryRow) -> set:
         if row.field == QueryField.TAGS:
             op = TagFilterOp(row.op)
             return {u for u, c in by_uuid.items() if tag_filter_matches(c.tags, op, row.value)}
@@ -170,23 +185,61 @@ def run_customer_query(uow: SqlAlchemyUnitOfWork, query: CustomerQuery) -> List:
             # outside, so subtract `inside` from the positionable set, not the
             # whole pool, or they'd all read as "outside" every area.
             return positionable - inside if row.op == "NOT_EQUAL" else inside
+        if row.field == QueryField.LAST_EFFECTIVE_VISIT:
+            if row.op == "NEVER":
+                return {u for u, c in by_uuid.items() if c.last_effective_stop is None}
+            if row.op == "EVER":
+                return {u for u, c in by_uuid.items() if c.last_effective_stop is not None}
+            if row.op == "OLDER_THAN_DAYS":
+                # the router's own predicate, so the map is a truthful preview
+                # of who a routing strategy would pick — including its rule that
+                # a NEVER-visited customer always passes
+                return {
+                    u for u, c in by_uuid.items()
+                    if last_effective_stop_passes(c.last_effective_stop, row.days, now)
+                }
+            if row.op == "WITHIN_DAYS":
+                # spelled out rather than `not last_effective_stop_passes(...)`:
+                # that negation is exact today, but it would tie this filter's
+                # NULL rule to a routing decision. Never-visited FAILS here —
+                # "visited in the last 7 days" is simply false of someone who
+                # has never been visited. The two ops partition the pool.
+                cutoff = now - timedelta(days=row.days)
+                return {
+                    u for u, c in by_uuid.items()
+                    if c.last_effective_stop is not None and c.last_effective_stop > cutoff
+                }
+            raise BadRequestError(f"Unknown last_effective_visit op '{row.op}'")
         raise BadRequestError(f"Unknown query field '{row.field}'")
 
-    # AND binds tighter than OR: intersect within a group, union the groups
-    groups: List[set] = []
-    current: set = set()
-    for i, row in enumerate(query.rows):
-        matched = row_set(row)
-        if i == 0:
-            current = matched
-        elif row.connector == QueryConnector.OR:
-            groups.append(current)
-            current = matched
-        else:
-            current &= matched
-    groups.append(current)
+    # Leaf sets are CONTEXT-FREE: every one is computed from the same global
+    # pool, never from its enclosing group. So identical leaves in different
+    # branches are the same set, and grouping can never reach a result its
+    # DNF-flattened equivalent could not. That is what licenses this memo —
+    # and it matters, because grouping actively invites repeating a leaf, and
+    # DEBT costs a converted balance per customer every time it runs. (Service
+    # areas were already deduplicated by ref in the prescan above.)
+    memo: dict = {}
 
-    result = set().union(*groups)
+    def row_set(row: QueryRow) -> set:
+        value = tuple(sorted(row.value)) if isinstance(row.value, list) else row.value
+        key = (row.field, row.op, value, row.amount, row.currency, row.days)
+        if key not in memo:
+            memo[key] = _compute_row_set(row)
+        return memo[key]
+
+    def evaluate(node) -> set:
+        if isinstance(node, QueryRow):
+            return row_set(node)
+        sets = [evaluate(child) for child in node.children]
+        if node.op == QueryConnector.OR:
+            return set().union(*sets)
+        return functools.reduce(operator.and_, sets)
+
+    # `children` has min_length 1, so neither reduce nor union ever sees an
+    # empty sequence — an empty group cannot exist, which matters because an
+    # empty AND is the identity (it would match everyone).
+    result = evaluate(query.expression)
     return sorted(
         (by_uuid[u] for u in result),
         key=lambda c: (_norm(c.company_name or ""), c.uuid),

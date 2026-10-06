@@ -10,7 +10,12 @@ import { AddCustomerDialog } from "@/components/customers/AddCustomerDialog";
 import { CustomerFiltersComponent, type CustomerFilters } from "@/components/customers/CustomerFilters";
 import { CustomersAnalytics } from "@/components/customers/CustomersAnalytics";
 import { CustomerMap } from "@/components/map/CustomerMap";
-import { CustomerQueryToolbar, blankQueryRow, type QueryRowDraft, type QueryRowPayload } from "@/components/customers/CustomerQueryToolbar";
+import {
+  CustomerQueryToolbar,
+  blankQueryRoot,
+  type QueryGroupDraft,
+  type QueryNodePayload,
+} from "@/components/customers/CustomerQueryToolbar";
 import { useToast } from "@/hooks/use-toast";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -53,10 +58,10 @@ export default function Customers() {
   // honoured by whichever view is active: while it is set it OWNS the surface —
   // the list's paginated GET and the map's bounds fetch both stand down and the
   // results become the answer instead.
-  const [customerQuery, setCustomerQuery] = useState<QueryRowPayload[] | null>(null);
+  const [customerQuery, setCustomerQuery] = useState<QueryNodePayload | null>(null);
   // the drafted rows live here, not in the toolbar: the toolbar unmounts on
   // every view switch, and the applied query must stay visible and editable
-  const [queryRows, setQueryRows] = useState<QueryRowDraft[]>(() => [blankQueryRow()]);
+  const [queryRoot, setQueryRoot] = useState<QueryGroupDraft>(() => blankQueryRoot());
 
   // Fetch customers for list view with filters - ONLY when in list mode
   const { data: customersData, isLoading } = useQuery<CustomerPage>({
@@ -102,7 +107,7 @@ export default function Customers() {
     // switching views re-runs against the right pool)
     queryFn: () => apiRequest("/customer/query", {
       method: "POST",
-      body: { rows: customerQuery, require_coordinates: viewMode === 'map' },
+      body: { expression: customerQuery, require_coordinates: viewMode === 'map' },
     }),
     enabled: viewMode !== 'analytics' && !!customerQuery,
     staleTime: 0,
@@ -382,9 +387,9 @@ export default function Customers() {
               active={!!customerQuery}
               matchCount={customerQuery ? displayCount : null}
               loading={isQueryLoading}
-              rows={queryRows}
-              onRowsChange={setQueryRows}
-              onApply={(rows) => setCustomerQuery(rows)}
+              root={queryRoot}
+              onRootChange={setQueryRoot}
+              onApply={(expression) => setCustomerQuery(expression)}
               onClear={() => setCustomerQuery(null)}
             />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -452,9 +457,9 @@ export default function Customers() {
               active={!!customerQuery}
               matchCount={customerQuery ? displayCount : null}
               loading={isQueryLoading}
-              rows={queryRows}
-              onRowsChange={setQueryRows}
-              onApply={(rows) => setCustomerQuery(rows)}
+              root={queryRoot}
+              onRootChange={setQueryRoot}
+              onApply={(expression) => setCustomerQuery(expression)}
               onClear={() => setCustomerQuery(null)}
             />
           <div className="h-[600px] rounded-lg overflow-hidden border relative z-0" dir="ltr">
