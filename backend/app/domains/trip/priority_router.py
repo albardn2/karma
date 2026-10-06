@@ -161,6 +161,46 @@ def customer_matches_priority(customer, priority: StrategyPriority, now: datetim
     return True
 
 
+def candidates_for_priority(
+    uow,
+    pool: list,
+    priority: StrategyPriority,
+    now: datetime,
+    exclude_ids: frozenset = frozenset(),
+) -> list:
+    """Everyone in `pool` this priority would CONSIDER — the whole of the
+    router's filtering stage and none of its selection stage.
+
+    The ONE definition of "matches this priority". run() calls it per priority
+    with the ids already picked; the setup form's pool preview calls it with
+    none, because at preview time nothing has been picked yet.
+
+    Adding a filter HERE reaches both. Adding one to run()'s loop instead is
+    what tests/domains/test_strategy_pool_preview.py exists to fail on — a
+    preview that quietly stops agreeing with the router is worse than no
+    preview, because the dispatcher has no way to tell.
+    """
+    candidates = [
+        c for c in pool
+        if c.uuid not in exclude_ids and customer_matches_priority(c, priority, now)
+    ]
+    if candidates and priority.debt_filter is not None:
+        # one set-based aggregation for the narrowed candidates — never
+        # a per-customer lazy walk of the invoice graph
+        f = priority.debt_filter
+        balances = uow.customer_repository.fetch_outstanding_balances(
+            [c.uuid for c in candidates], f.currency.value,
+        )
+        candidates = [
+            c for c in candidates
+            if debt_filter_matches(
+                {f.currency.value: balances.get(c.uuid, 0.0)},
+                f.op, f.amount, f.currency.value,
+            )
+        ]
+    return candidates
+
+
 def _xy(customer) -> Tuple[float, float]:
     point = to_shape(customer.coordinates)
     return _TO_METERS.transform(point.x, point.y)
@@ -263,6 +303,7 @@ class PriorityRouter:
         config: RoutingStrategyConfig,
         desired_stops: int,
         polygon: Optional[Union[Polygon, MultiPolygon]] = None,
+        now: Optional[datetime] = None,
     ) -> Tuple[list, List[Tuple[float, float]]]:
         """Returns (ordered customers, [(lat, lon)] waypoints)."""
         if not desired_stops or desired_stops < 1:
@@ -274,7 +315,10 @@ class PriorityRouter:
                 "No customers are available for routing in the selected service areas."
             )
 
-        now = datetime.utcnow()
+        # injectable so a test can hold the clock still: the recency filter
+        # compares against it, and two utcnow() calls microseconds apart make
+        # a customer sitting exactly on the cutoff flip between runs
+        now = now or datetime.utcnow()
         picked: list = []
         picked_ids: set = set()
         for priority in config.priorities:
@@ -282,24 +326,9 @@ class PriorityRouter:
             if remaining <= 0:
                 break
             cap = min(priority.max_stops or remaining, remaining)
-            candidates = [
-                c for c in pool
-                if c.uuid not in picked_ids and customer_matches_priority(c, priority, now)
-            ]
-            if candidates and priority.debt_filter is not None:
-                # one set-based aggregation for the narrowed candidates — never
-                # a per-customer lazy walk of the invoice graph
-                f = priority.debt_filter
-                balances = self._uow.customer_repository.fetch_outstanding_balances(
-                    [c.uuid for c in candidates], f.currency.value,
-                )
-                candidates = [
-                    c for c in candidates
-                    if debt_filter_matches(
-                        {f.currency.value: balances.get(c.uuid, 0.0)},
-                        f.op, f.amount, f.currency.value,
-                    )
-                ]
+            candidates = candidates_for_priority(
+                self._uow, pool, priority, now, frozenset(picked_ids),
+            )
             if not candidates:
                 continue
             if picked:

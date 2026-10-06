@@ -50,6 +50,7 @@ import { CustomerLocationMap } from "@/components/map/CustomerLocationMap";
 import { CreateOrderDialog } from "@/components/customer-orders/CreateOrderDialog";
 import { AddStopDialog } from "@/components/trips/AddStopDialog";
 import { CreateRoutingStrategyDialog, type EditableStrategy } from "@/components/trips/CreateRoutingStrategyDialog";
+import { StrategyPoolPreview } from "@/components/trips/StrategyPoolPreview";
 import { CreateTripExpenseDialog } from "@/components/expenses/CreateTripExpenseDialog";
 import { CustomerRecentOrders } from "@/components/customer-orders/CustomerRecentOrders";
 import { TripStopVisitHistory } from "@/components/trips/TripStopVisitHistory";
@@ -908,6 +909,14 @@ export default function WorkflowExecutionTaskDetail() {
     "customer_categories", "last_visit_threshold_days", "max_stops", "min_stops",
   ]);
   const manualStopsValue = form.watch("manual_stops" as any);
+  // Top level deliberately: a FormField is a Controller and subscribes only
+  // to its own name, so the strategy field would never re-render when a
+  // service-area checkbox is ticked and the pool count would freeze.
+  // `strategy` itself is NOT watched here — inside its own FormField
+  // `formField.value` is already live, and a second subscription would
+  // re-render this whole page on every strategy change for nothing.
+  const serviceAreasValue = form.watch("service_areas" as any);
+  const desiredStopsValue = form.watch("desired_stops" as any);
   const manualStopsChecked =
     task?.operator === "start_trip_operator" &&
     Array.isArray(manualStopsValue) && manualStopsValue.length > 0;
@@ -1005,6 +1014,14 @@ export default function WorkflowExecutionTaskDetail() {
                   </Button>
                 )}
                 </div>
+                {isStrategyField && (
+                  <StrategyPoolPreview
+                    strategy={String(formField.value ?? "")}
+                    serviceAreas={Array.isArray(serviceAreasValue) ? serviceAreasValue : []}
+                    desiredStops={desiredStopsValue}
+                    taskCompleted={selectedTaskExecution?.status === "completed"}
+                  />
+                )}
                 <FormMessage />
               </FormItem>
               );
