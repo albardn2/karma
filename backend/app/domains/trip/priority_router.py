@@ -41,7 +41,9 @@ from app.dto.routing_strategy import (
     DebtFilterOp,
     RoutingStrategyConfig,
     StrategyPriority,
+    TagConnector,
     TagFilterOp,
+    TagGroup,
 )
 from app.entrypoint.routes.common.errors import BadRequestError
 
@@ -52,10 +54,51 @@ def _norm(value) -> str:
     return str(value).strip().lower()
 
 
+def tag_expression_of(priority):
+    """The priority's tag constraint as ONE tree, so the evaluator has one path.
+
+    The legacy flat list is an n-way AND. An EMPTY list is no constraint at all
+    — identical to today's zero-iteration loop — and must lower to None rather
+    than to an empty AND group, which would be the identity and match everyone
+    only by accident. model_construct because the children are already
+    validated and this runs per customer.
+    """
+    if priority.tag_expression is not None:
+        return priority.tag_expression
+    if not priority.tag_filters:
+        return None
+    return TagGroup.model_construct(
+        kind="group", op=TagConnector.AND, children=list(priority.tag_filters),
+    )
+
+
+def tag_expression_matches(tags, node) -> bool:
+    """Walk one tag tree against a customer's tags.
+
+    Normalised once for the whole tree rather than per leaf: a tag list is
+    re-lowercased for every filter otherwise, and a priority may now hold ten.
+    """
+    if node is None:
+        return True
+    return _node_matches([_norm(t) for t in (tags or [])], node)
+
+
+def _node_matches(normalized, node) -> bool:
+    children = getattr(node, "children", None)
+    if children is None:
+        return _matches_normalized(normalized, node.op, node.value)
+    if node.op == TagConnector.OR:
+        return any(_node_matches(normalized, c) for c in children)
+    return all(_node_matches(normalized, c) for c in children)
+
+
 def tag_filter_matches(tags, op: TagFilterOp, value) -> bool:
     """Tags are stored as 'key' or 'key:value' strings; compare whole tags
     case-insensitively (machine tags are lowercase, typed ones may not be)."""
-    normalized = [_norm(t) for t in (tags or [])]
+    return _matches_normalized([_norm(t) for t in (tags or [])], op, value)
+
+
+def _matches_normalized(normalized, op: TagFilterOp, value) -> bool:
     if op == TagFilterOp.EQUAL:
         return _norm(value) in normalized
     if op == TagFilterOp.NOT_EQUAL:
@@ -105,9 +148,8 @@ def customer_matches_priority(customer, priority: StrategyPriority, now: datetim
     invoice aggregation, so the router batch-loads balances for the already-
     narrowed candidates (fetch_outstanding_balances) instead of walking each
     customer's invoice graph through lazy loads."""
-    for f in priority.tag_filters:
-        if not tag_filter_matches(customer.tags, f.op, f.value):
-            return False
+    if not tag_expression_matches(customer.tags, tag_expression_of(priority)):
+        return False
     if priority.category_filter is not None:
         f = priority.category_filter
         if not category_filter_matches(customer.category, f.op, f.value):
