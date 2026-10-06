@@ -162,12 +162,18 @@ def test_every_priority_field_is_covered_by_the_drift_matrix():
     has to say which side it falls on, which is exactly the question that
     keeps the preview truthful.
     """
-    selection_only = {"max_stops"}
-    covered_by_matrix = {
-        "tag_filters", "tag_expression", "category_filter",
-        "debt_filter", "last_effective_stop_days",
-    }
-    assert set(StrategyPriority.model_fields) == selection_only | covered_by_matrix
+    selection_only = {"max_stops"}      # consumed only by run()'s cap
+    # DERIVED from the matrix, not hand-written: a hand-written set is
+    # satisfied by adding one string, which is exactly the omission this
+    # test exists to catch.
+    covered_by_matrix = set()
+    for case in FILTER_MATRIX:
+        covered_by_matrix |= case.values[0].model_fields_set
+
+    assert covered_by_matrix == set(StrategyPriority.model_fields) - selection_only, (
+        "a filter field exists that no FILTER_MATRIX case sets — add a case "
+        "that exercises it, or declare it selection-only"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -417,6 +423,32 @@ def test_a_deleted_strategy_is_a_clear_error_not_a_zero():
     with pytest.raises(BadRequestError) as e:
         preview_strategy_pool(uow, "gone", [], now=NOW)
     assert "no longer exists" in str(e.value)
+
+
+def test_picked_areas_narrow_the_pool_and_report_what_did_not_resolve():
+    """The ticked areas must reach the pool query AS A POLYGON.
+
+    Without this, the one line that connects the form's areas to the counted
+    pool can be reduced to polygon=None with the whole suite still green —
+    and the preview then counts the entire tenant for a dispatcher who
+    narrowed the form to one area. That is the silent-wrong-number failure
+    this module exists to prevent, so it gets its own assertion.
+    """
+    from geoalchemy2.shape import from_shape
+    from shapely.geometry import MultiPolygon, Polygon
+
+    north = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+    uow = fake_uow(
+        config=cfg(StrategyPriority()),
+        areas=[SimpleNamespace(name="north", geometry=from_shape(north, srid=4326))],
+    )
+    out = preview_strategy_pool(uow, "s", ["north", "ghost"], now=NOW)
+
+    polygon = uow.customer_repository.fetch_priority_routing_pool.call_args.kwargs["polygon"]
+    assert isinstance(polygon, MultiPolygon), "the picked areas must narrow the pool"
+    assert polygon.equals(MultiPolygon([north]))
+    # a name that resolved to nothing must reach the response, not vanish
+    assert out.unmatched_service_areas == ["ghost"]
 
 
 def test_no_areas_picked_means_everywhere():
