@@ -68,7 +68,8 @@ export function StrategyPoolPreview({
   // retick one area and an unsorted key mints a second cache entry for an
   // identical answer. JSON rather than a comma join, because a service area
   // name has no validator and may legally contain a comma.
-  const areasKey = useDebounced(JSON.stringify([...serviceAreas].sort()), 350);
+  const liveAreasKey = JSON.stringify([...serviceAreas].sort());
+  const areasKey = useDebounced(liveAreasKey, 350);
   const strat = useDebounced(strategy, 350);
 
   // '' is the untouched default — the field's "manual" is only placeholder
@@ -81,7 +82,13 @@ export function StrategyPoolPreview({
     normalized !== LEGACY_CLUSTER &&
     strat !== CREATE_STRATEGY_SENTINEL;
 
-  const { data, isFetching, isError, refetch } = useQuery<PoolPreview>({
+  // TRUE while the debounced inputs still lag the live ones. `isFetching`
+  // alone is false during the 350ms window, so without this the previous
+  // strategy's numbers render fully opaque under the NEW strategy's name —
+  // a wrong number on screen, which is the one thing this must never do.
+  const pending = strat !== strategy || areasKey !== liveAreasKey;
+
+  const { data, isFetching, isError, error, refetch } = useQuery<PoolPreview>({
     queryKey: ["/task-execution/strategy-pool-preview", strat, areasKey],
     queryFn: () =>
       apiRequest("/task-execution/strategy-pool-preview", {
@@ -99,11 +106,40 @@ export function StrategyPoolPreview({
     placeholderData: (prev) => prev,
   });
 
-  if (!enabled || data?.applicable === false) return null;
+  // A 403 means this caller may submit the form but not read the count
+  // (a create-without-read grant). Hide the block rather than offer a
+  // Retry that can never succeed.
+  const forbidden = /\b403\b/.test(String((error as any)?.message ?? ""));
+  if (!enabled || forbidden || data?.applicable === false) return null;
+
+  // the areas the NUMBERS describe, which is not necessarily what is ticked
+  // right now — see `pending`
+  const countedAreas: string[] = (() => {
+    try {
+      return JSON.parse(areasKey);
+    } catch {
+      return [];
+    }
+  })();
 
   const desired = Number(desiredStops);
+  // run() walks each priority ONCE and clamps it to min(max_stops, remaining),
+  // so a priority contributes at most min(its cap, its own count). That sum is
+  // a hard ceiling alongside the union total: without it a strategy whose caps
+  // all add up to less than desired_stops shows no warning at all.
+  const ceiling = !data
+    ? 0
+    : data.priorities.length === 0
+      ? data.total
+      : Math.min(
+          data.total,
+          data.priorities.reduce(
+            (sum, p) => sum + Math.min(p.max_stops ?? p.count, p.count),
+            0,
+          ),
+        );
   const shortfall =
-    !!data && Number.isFinite(desired) && desired > 0 && data.total < desired;
+    !!data && !pending && Number.isFinite(desired) && desired > 0 && ceiling < desired;
 
   const Num = ({ children }: { children: React.ReactNode }) => (
     <span dir="ltr" className="tabular-nums font-medium text-foreground">
@@ -134,10 +170,14 @@ export function StrategyPoolPreview({
       ) : !data ? (
         <p data-testid="strategy-pool-loading">{t("workflows.poolPreviewLoading")}</p>
       ) : (
-        <div className={isFetching ? "opacity-60 space-y-1" : "space-y-1"}>
+        <div className={isFetching || pending ? "opacity-60 space-y-1" : "space-y-1"}>
           <p data-testid="strategy-pool-total">
             {data.eligible_pool === 0 ? (
-              t("workflows.poolPreviewNoPool")
+              // "in the selected service areas" is a lie when none are
+              // ticked — that case means EVERYWHERE
+              countedAreas.length === 0
+                ? t("workflows.poolPreviewNoPoolAnywhere")
+                : t("workflows.poolPreviewNoPool")
             ) : data.total === 0 ? (
               t("workflows.poolPreviewNoMatch")
             ) : (
@@ -150,7 +190,9 @@ export function StrategyPoolPreview({
             )}
           </p>
 
-          {serviceAreas.length === 0 && (
+          {/* from the DEBOUNCED areas, not the live prop: this caption labels
+              the scope of the number beside it, and the two must not disagree */}
+          {countedAreas.length === 0 && data.eligible_pool > 0 && (
             <p className="text-xs" data-testid="strategy-pool-all-areas">
               {t("workflows.poolPreviewAllAreas")}
             </p>

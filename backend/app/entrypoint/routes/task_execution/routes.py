@@ -120,12 +120,20 @@ def strategy_pool_preview():
     Comma-joining is out too: a service area name has no validator, so commas
     and spaces are legal in one.
 
-    The scope tuple is copied verbatim from /complete above: anyone who can
-    submit this form must be able to see the number printed on it. Note that
-    scopes_required is not the runtime gate — endpoint_allowed on
-    (blueprint, method) is — which is why this route lives on
-    task_execution and not on routing_strategy, a resource five of those
-    roles hold no grant for.
+    The scope tuple is copied verbatim from /complete above. scopes_required
+    is NOT the runtime gate though — endpoint_allowed on (blueprint, method)
+    is — which is why this route lives on task_execution rather than
+    routing_strategy, a resource five of the roles that can complete this
+    task hold no grant for at all.
+
+    One asymmetry, stated rather than glossed: READ_SHAPED_POST_ENDPOINTS
+    makes the chokepoint check this as a READ while /complete is checked as
+    a CREATE. Every shipped role preset holds both actions on
+    task_execution, so the two audiences are identical today — but the
+    permission editors write the four CRUD boxes independently, so a
+    hand-made create-without-read grant could submit this form and be
+    refused the number printed on it. The client hides the block on 403
+    rather than offering a Retry that cannot succeed.
     """
     from app.domains.trip.strategy_preview import preview_strategy_pool
     from app.dto.task_execution import StrategyPoolPreviewRequest
@@ -133,7 +141,12 @@ def strategy_pool_preview():
     # get_json(silent=True) rather than request.json: Flask 3 raises 415 when
     # the client omits Content-Type, and a preview must never be the thing
     # that breaks the form
-    payload = StrategyPoolPreviewRequest(**(request.get_json(silent=True) or {}))
+    body = request.get_json(silent=True) or {}
+    # a JSON array, string or number body is truthy and non-mapping, so **
+    # would raise TypeError and answer 500 for a plainly bad request
+    if not isinstance(body, dict):
+        raise BadRequestError("Request body must be a JSON object")
+    payload = StrategyPoolPreviewRequest(**body)
     with SqlAlchemyUnitOfWork() as uow:
         dto = preview_strategy_pool(uow, payload.strategy, payload.service_areas)
     return jsonify(dto.model_dump(mode="json")), 200
