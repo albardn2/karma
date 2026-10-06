@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTagCatalog } from "@/lib/tagCatalog";
+import { countLeaves, everyLeaf, newId, pathKey, updateAt } from "@/lib/filterTree";
 
 // Builder for a saved priority-routing strategy (the setup form's dropdown
 // offers it next to the built-in "manual"). A strategy is an ORDERED list of
@@ -42,13 +43,50 @@ const NONE = "__none__";
 // so skipping recent visits is opt-OUT: clear the box to route regardless.
 const DEFAULT_RECENCY_DAYS = "7";
 
-interface TagFilterDraft {
+interface TagLeafFields {
   op: (typeof TAG_OPS)[number];
   value: string; // IS_IN: comma-separated (the backend splits; commas can't occur inside tags)
 }
+type TagLeafDraft = TagLeafFields & { kind: "row"; id: string };
+type TagGroupDraft = {
+  kind: "group";
+  id: string;
+  op: "AND" | "OR";
+  children: TagNodeDraft[];
+};
+type TagNodeDraft = TagLeafDraft | TagGroupDraft;
+
+// Mirror dto/routing_strategy's MAX_TAG_* exactly. #155's review found that
+// rewrite had dropped a bound the flat UI enforced, and the 422 that produced
+// named no group — so every DTO bound is mirrored here from the start.
+const MAX_TAG_DEPTH = 3;
+const MAX_TAG_LEAVES = 10;
+const MAX_TAG_CHILDREN = 8;
+
+const blankTagLeaf = (): TagLeafDraft => ({
+  kind: "row",
+  id: newId(),
+  op: "EQUAL",
+  value: "",
+});
+const blankTagGroup = (op: "AND" | "OR"): TagGroupDraft => ({
+  kind: "group",
+  id: newId(),
+  op,
+  children: [blankTagLeaf()],
+});
+/** The root starts EMPTY, unlike the query builder's. A priority with no tag
+ *  filters is a documented catch-all band and the state of most stored
+ *  strategies — seeding a blank row would make every new priority invalid. */
+const emptyTagRoot = (): TagGroupDraft => ({
+  kind: "group",
+  id: newId(),
+  op: "AND",
+  children: [],
+});
 
 interface PriorityDraft {
-  tagFilters: TagFilterDraft[];
+  tagRoot: TagGroupDraft;
   categoryOp: string; // NONE = no category filter
   categoryValue: string; // EQUAL / NOT_EQUAL
   categoryValues: string[]; // IS_IN
@@ -59,8 +97,13 @@ interface PriorityDraft {
   maxStops: string; // '' = no per-priority cap
 }
 
+const tagNodeToPayload = (n: TagNodeDraft): any =>
+  n.kind === "group"
+    ? { kind: "group", op: n.op, children: n.children.map(tagNodeToPayload) }
+    : { op: n.op, value: n.value.trim() };
+
 const emptyPriority = (): PriorityDraft => ({
-  tagFilters: [],
+  tagRoot: emptyTagRoot(),
   categoryOp: NONE,
   categoryValue: "",
   categoryValues: [],
@@ -77,6 +120,42 @@ export interface EditableStrategy {
   config: any;
 }
 
+const tagLeafFromStored = (f: any): TagLeafDraft => ({
+  kind: "row",
+  id: newId(),
+  op: f?.op ?? "EQUAL",
+  // IS_IN round-trips through the comma-joined text input
+  value: Array.isArray(f?.value) ? f.value.join(", ") : String(f?.value ?? ""),
+});
+
+const tagNodeFromStored = (n: any): TagNodeDraft =>
+  Array.isArray(n?.children)
+    ? {
+        kind: "group",
+        id: newId(),
+        op: n?.op === "OR" ? "OR" : "AND",
+        children: n.children.map(tagNodeFromStored),
+      }
+    : tagLeafFromStored(n);
+
+/** A stored priority's tag constraint, in whichever shape it was saved.
+ *  A legacy flat list is an n-way AND, so it loads as one implicit AND root —
+ *  lossless, and it keeps the builder to a single code path. */
+const tagRootFromConfig = (p: any): TagGroupDraft => {
+  if (p?.tag_expression) {
+    const node = tagNodeFromStored(p.tag_expression);
+    if (node.kind === "group") return node;
+    return { kind: "group", id: newId(), op: "AND", children: [node] };
+  }
+  const filters = Array.isArray(p?.tag_filters) ? p.tag_filters : [];
+  return {
+    kind: "group",
+    id: newId(),
+    op: "AND",
+    children: filters.map(tagLeafFromStored),
+  };
+};
+
 /** A stored config back into builder fields — the inverse of buildConfig.
  *  Editing must show exactly what is saved, so an absent recency value stays
  *  BLANK here rather than picking up DEFAULT_RECENCY_DAYS. */
@@ -84,11 +163,7 @@ const configToDrafts = (config: any): PriorityDraft[] => {
   const priorities = Array.isArray(config?.priorities) ? config.priorities : [];
   if (!priorities.length) return [emptyPriority()];
   return priorities.map((p: any) => ({
-    tagFilters: (p?.tag_filters ?? []).map((f: any) => ({
-      op: f?.op ?? "EQUAL",
-      // IS_IN round-trips through the comma-joined text input
-      value: Array.isArray(f?.value) ? f.value.join(", ") : String(f?.value ?? ""),
-    })),
+    tagRoot: tagRootFromConfig(p),
     categoryOp: p?.category_filter?.op ?? NONE,
     categoryValue: Array.isArray(p?.category_filter?.value)
       ? ""
@@ -148,11 +223,235 @@ export function CreateRoutingStrategyDialog({
     setPriorities((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
 
+  /** Mutate one node of a priority's tag tree, addressed by child-index path. */
+  const mutateTag = (
+    pi: number,
+    path: number[],
+    fn: (n: TagNodeDraft) => TagNodeDraft | null,
+  ) => {
+    const current = priorities[pi].tagRoot;
+    const next = updateAt<TagNodeDraft>(current, path, fn);
+    // Unlike the query builder, an EMPTY root is legitimate here — a priority
+    // with no tag filters is a catch-all band. So restore an empty root rather
+    // than one seeded with a blank row, and keep its deliberate ALL/ANY.
+    patchPriority(pi, {
+      tagRoot:
+        next && next.kind === "group"
+          ? next
+          : { ...emptyTagRoot(), op: current.op },
+    });
+  };
+
+  const renderTagLeaf = (pi: number, leaf: TagLeafDraft, path: number[]) => {
+    const key = `${pi}-${pathKey(path)}`;
+    return (
+      <div className="flex gap-2 items-center">
+        <Select
+          value={leaf.op}
+          onValueChange={(op) =>
+            mutateTag(pi, path, (n) => ({ ...(n as TagLeafDraft), op: op as TagLeafFields["op"] }))
+          }
+        >
+          <SelectTrigger className="w-40" data-testid={`tag-op-${key}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TAG_OPS.map((op) => (
+              <SelectItem key={op} value={op}>
+                {t(`workflows.op${op}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          className="flex-1"
+          list="strategy-tag-suggestions"
+          value={leaf.value}
+          placeholder={
+            leaf.op === "IS_IN"
+              ? t("workflows.strategyTagListPlaceholder")
+              : t("workflows.strategyTagPlaceholder")
+          }
+          onChange={(e) =>
+            mutateTag(pi, path, (n) => ({ ...(n as TagLeafDraft), value: e.target.value }))
+          }
+          data-testid={`tag-value-${key}`}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => mutateTag(pi, path, () => null)}
+          data-testid={`tag-remove-${key}`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+  };
+
+  const renderTagGroup = (
+    pi: number,
+    group: TagGroupDraft,
+    path: number[],
+    depth: number,
+  ) => {
+    const key = `${pi}-${pathKey(path)}`;
+    const isRoot = path.length === 0;
+    const leaves = countLeaves(priorities[pi].tagRoot);
+    const budgetFull = leaves >= MAX_TAG_LEAVES;
+    const groupFull = group.children.length >= MAX_TAG_CHILDREN;
+    const canNest = depth < MAX_TAG_DEPTH;
+    // An OR holding a NOT_EQUAL is almost never meant: "not blacklisted OR not
+    // skipped" is true for anyone missing either tag, and an untagged customer
+    // satisfies every NOT_EQUAL on its own. Over-ANDing shows up as an empty
+    // route; this over-matches silently, and the builder has no match count.
+    const orWithNegation =
+      group.op === "OR" &&
+      group.children.some((c) => c.kind === "row" && c.op === "NOT_EQUAL");
+
+    return (
+      <div
+        className={
+          isRoot
+            ? "space-y-2"
+            : "space-y-2 rounded-md border-s-2 border-[#5469D4]/40 bg-gray-50/60 dark:bg-gray-800/40 ps-2 sm:ps-3 py-2"
+        }
+        data-testid={isRoot ? `tag-group-${pi}` : `tag-group-${key}`}
+      >
+        <div className="flex items-center gap-2 flex-wrap">
+          {isRoot && <Label className="me-1">{t("workflows.strategyTagFilters")}</Label>}
+          <div className="flex items-center gap-1" data-testid={`tag-group-op-${key}`}>
+            <Button
+              type="button"
+              variant={group.op === "AND" ? "default" : "outline"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => mutateTag(pi, path, (n) => ({ ...(n as TagGroupDraft), op: "AND" }))}
+            >
+              {t("workflows.strategyTagAll")}
+            </Button>
+            <Button
+              type="button"
+              variant={group.op === "OR" ? "default" : "outline"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => mutateTag(pi, path, (n) => ({ ...(n as TagGroupDraft), op: "OR" }))}
+            >
+              {t("workflows.strategyTagAny")}
+            </Button>
+          </div>
+          {!isRoot && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => mutateTag(pi, path, () => null)}
+              data-testid={`tag-group-remove-${key}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        {orWithNegation && (
+          <p className="text-xs text-amber-700 dark:text-amber-500" data-testid={`tag-or-not-warning-${key}`}>
+            {t("workflows.strategyTagOrNotWarning")}
+          </p>
+        )}
+
+        {group.children.length === 0 && (
+          <p className="text-xs text-gray-500">{t("workflows.strategyTagNone")}</p>
+        )}
+
+        {group.children.map((child, i) => {
+          const childPath = [...path, i];
+          return (
+            <div key={child.id} className="space-y-2">
+              {i > 0 && (
+                <p aria-hidden className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  {group.op === "AND" ? t("common.and") : t("common.or")}
+                </p>
+              )}
+              {child.kind === "row"
+                ? renderTagLeaf(pi, child, childPath)
+                : renderTagGroup(pi, child, childPath, depth + 1)}
+            </div>
+          );
+        })}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={budgetFull || groupFull}
+            title={groupFull ? t("workflows.strategyTagMaxChildren") : undefined}
+            onClick={() =>
+              mutateTag(pi, path, (n) => ({
+                ...(n as TagGroupDraft),
+                children: [...(n as TagGroupDraft).children, blankTagLeaf()],
+              }))
+            }
+            data-testid={isRoot ? `add-tag-filter-${pi}` : `add-tag-filter-${key}`}
+          >
+            <Plus className="h-4 w-4 me-1" />
+            {t("workflows.strategyAddTagFilter")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={budgetFull || groupFull || !canNest}
+            title={
+              !canNest
+                ? t("workflows.strategyTagMaxDepth")
+                : groupFull
+                  ? t("workflows.strategyTagMaxChildren")
+                  : undefined
+            }
+            onClick={() =>
+              mutateTag(pi, path, (n) => {
+                const g = n as TagGroupDraft;
+                // the opposite op by default: a same-op nested group is a no-op
+                return { ...g, children: [...g.children, blankTagGroup(g.op === "AND" ? "OR" : "AND")] };
+              })
+            }
+            data-testid={isRoot ? `add-tag-group-${pi}` : `add-tag-group-${key}`}
+          >
+            <Plus className="h-4 w-4 me-1" />
+            {t("workflows.strategyAddTagGroup")}
+          </Button>
+          {isRoot && leaves > 0 && (
+            <span className="text-xs text-gray-500" data-testid={`tag-budget-${pi}`}>
+              {t("workflows.strategyTagBudget", { used: String(leaves), max: String(MAX_TAG_LEAVES) })}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const buildConfig = () => ({
     priorities: priorities.map((p) => {
       const priority: Record<string, unknown> = {};
-      if (p.tagFilters.length) {
-        priority.tag_filters = p.tagFilters.map((f) => ({ op: f.op, value: f.value.trim() }));
+      // The narrowest shape that expresses the tree. A flat AND of leaves goes
+      // back as `tag_filters`, so opening any existing strategy and re-saving
+      // it produces a byte-identical config and the legacy path keeps a live
+      // producer. Only a genuine OR or nesting writes `tag_expression`.
+      const leaves = countLeaves(p.tagRoot);
+      if (leaves > 0) {
+        const flatAnd =
+          p.tagRoot.op === "AND" && p.tagRoot.children.every((c) => c.kind === "row");
+        if (flatAnd) {
+          priority.tag_filters = (p.tagRoot.children as TagLeafDraft[]).map((f) => ({
+            op: f.op,
+            value: f.value.trim(),
+          }));
+        } else {
+          priority.tag_expression = tagNodeToPayload(p.tagRoot);
+        }
       }
       if (p.categoryOp !== NONE) {
         priority.category_filter = {
@@ -192,8 +491,10 @@ export function CreateRoutingStrategyDialog({
     for (let i = 0; i < priorities.length; i++) {
       const p = priorities[i];
       const where = String(i + 1);
-      for (const f of p.tagFilters) {
-        if (!f.value.trim()) return t("workflows.strategyTagValueRequired");
+      // everyLeaf types its callback with the whole node union; narrow rather
+      // than cast, since a group genuinely has no `value`
+      if (!everyLeaf<TagNodeDraft>(p.tagRoot, (f) => f.kind !== "row" || f.value.trim() !== "")) {
+        return t("workflows.strategyTagValueRequired");
       }
       if (p.categoryOp !== NONE) {
         const has = p.categoryOp === "IS_IN" ? p.categoryValues.length > 0 : !!p.categoryValue;
@@ -296,78 +597,12 @@ export function CreateRoutingStrategyDialog({
                 )}
               </div>
 
-              {/* tag filters */}
+              {/* tag filters — a tree, so a band can say
+                  (one_time OR repeat) AND NOT blacklist. The root's ALL/ANY
+                  sits on the label row rather than a line of its own: with up
+                  to 10 priorities in one modal, a row per priority matters. */}
               <div className="space-y-2">
-                <Label>{t("workflows.strategyTagFilters")}</Label>
-                {priority.tagFilters.map((f, fi) => (
-                  <div key={fi} className="flex gap-2 items-center">
-                    <Select
-                      value={f.op}
-                      onValueChange={(op) =>
-                        patchPriority(pi, {
-                          tagFilters: priority.tagFilters.map((x, i) =>
-                            i === fi ? { ...x, op: op as TagFilterDraft["op"] } : x
-                          ),
-                        })
-                      }
-                    >
-                      <SelectTrigger className="w-40" data-testid={`tag-op-${pi}-${fi}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TAG_OPS.map((op) => (
-                          <SelectItem key={op} value={op}>
-                            {t(`workflows.op${op}`)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      className="flex-1"
-                      list="strategy-tag-suggestions"
-                      value={f.value}
-                      placeholder={
-                        f.op === "IS_IN"
-                          ? t("workflows.strategyTagListPlaceholder")
-                          : t("workflows.strategyTagPlaceholder")
-                      }
-                      onChange={(e) =>
-                        patchPriority(pi, {
-                          tagFilters: priority.tagFilters.map((x, i) =>
-                            i === fi ? { ...x, value: e.target.value } : x
-                          ),
-                        })
-                      }
-                      data-testid={`tag-value-${pi}-${fi}`}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        patchPriority(pi, {
-                          tagFilters: priority.tagFilters.filter((_, i) => i !== fi),
-                        })
-                      }
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    patchPriority(pi, {
-                      tagFilters: [...priority.tagFilters, { op: "EQUAL", value: "" }],
-                    })
-                  }
-                  data-testid={`add-tag-filter-${pi}`}
-                >
-                  <Plus className="h-4 w-4 me-1" />
-                  {t("workflows.strategyAddTagFilter")}
-                </Button>
+                {renderTagGroup(pi, priority.tagRoot, [], 1)}
               </div>
 
               {/* category filter */}

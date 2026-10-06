@@ -5,6 +5,8 @@ export const en: Record<string, string> = {
   // actions
   'common.save': 'Save',
   'common.cancel': 'Cancel',
+  'common.and': 'AND',
+  'common.or': 'OR',
   'common.delete': 'Delete',
   'common.edit': 'Edit',
   'common.create': 'Create',
@@ -123,6 +125,8 @@ export const ar: Record<string, string> = {
   // actions
   'common.save': 'حفظ',
   'common.cancel': 'إلغاء',
+  'common.and': 'و',
+  'common.or': 'أو',
   'common.delete': 'حذف',
   'common.edit': 'تعديل',
   'common.create': 'إنشاء',
