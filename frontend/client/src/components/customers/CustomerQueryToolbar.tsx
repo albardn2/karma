@@ -9,6 +9,7 @@ import { Filter, FolderPlus, Plus, Search, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTagCatalog } from "@/lib/tagCatalog";
+import { countLeaves, newId, pathKey, updateAt } from "@/lib/filterTree";
 
 /**
  * The map query builder: a TREE of groups, each joining its children with one
@@ -104,11 +105,6 @@ export const MAX_LEAVES = 20;
 // reachable by nesting.
 export const MAX_CHILDREN = 12;
 
-const newId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `n${Math.random().toString(36).slice(2)}`;
-
 export const blankQueryRow = (): QueryRowDraft => ({
   kind: "row",
   id: newId(),
@@ -145,9 +141,6 @@ const rowComplete = (r: QueryRowDraft): boolean => {
 export const nodeComplete = (n: QueryNodeDraft): boolean =>
   n.kind === "row" ? rowComplete(n) : n.children.length > 0 && n.children.every(nodeComplete);
 
-export const countLeaves = (n: QueryNodeDraft): number =>
-  n.kind === "row" ? 1 : n.children.reduce((sum, c) => sum + countLeaves(c), 0);
-
 export function buildQueryPayload(node: QueryNodeDraft): QueryNodePayload {
   if (node.kind === "group") {
     return { kind: "group", op: node.op, children: node.children.map(buildQueryPayload) };
@@ -167,30 +160,6 @@ export function buildQueryPayload(node: QueryNodeDraft): QueryNodePayload {
   return out;
 }
 
-/** Replace the node at `path` (child indexes from the root) via `fn`. */
-function updateAt(
-  node: QueryNodeDraft,
-  path: number[],
-  fn: (n: QueryNodeDraft) => QueryNodeDraft | null,
-): QueryNodeDraft | null {
-  if (path.length === 0) return fn(node);
-  if (node.kind !== "group") return node;
-  const [head, ...rest] = path;
-  const next: QueryNodeDraft[] = [];
-  node.children.forEach((child, i) => {
-    if (i !== head) {
-      next.push(child);
-      return;
-    }
-    const replaced = updateAt(child, rest, fn);
-    if (replaced !== null) next.push(replaced);
-  });
-  // A group that lost its last child goes with it, cascading upward, so an
-  // empty group — which the backend refuses, and which would mean "match
-  // everyone" under AND — is never reachable from the UI.
-  if (next.length === 0) return null;
-  return { ...node, children: next };
-}
 
 interface CustomerQueryToolbarProps {
   categories: string[];
@@ -222,8 +191,12 @@ export function CustomerQueryToolbar({
 
   // areas are the one picker source the page does not already fetch
   const { data: areasData } = useQuery<{ items: Array<{ uuid: string; name: string }> }>({
-    queryKey: ["/service_area/"],
-    queryFn: () => apiRequest("/service_area/?per_page=100"),
+    // the blueprint is /service-area/ with a HYPHEN. The underscore spelling
+    // 404s, so `areas` was always empty and every service-area row silently
+    // fell back to free text instead of the picker below. Pre-dates the group
+    // builder — the bug is as old as the toolbar.
+    queryKey: ["/service-area/", "query-toolbar"],
+    queryFn: () => apiRequest("/service-area/?per_page=100"),
     staleTime: 5 * 60 * 1000,
     enabled: open,
   });
@@ -268,7 +241,6 @@ export function CustomerQueryToolbar({
   const complete = useMemo(() => nodeComplete(root), [root]);
   const budgetFull = leaves >= MAX_LEAVES;
 
-  const pathKey = (path: number[]) => path.join(".");
 
   const valueControl = (row: QueryRowDraft, path: number[]) => {
     const key = pathKey(path);
