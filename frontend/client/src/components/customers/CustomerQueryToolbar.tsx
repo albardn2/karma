@@ -89,10 +89,20 @@ const FIELDS: readonly QueryField[] = [
 /** The two visit operators that take a window; the other two take nothing. */
 const WINDOWED = new Set(["OLDER_THAN_DAYS", "WITHIN_DAYS"]);
 
+/** dto/customer_query: days is Field(None, ge=1, le=3650). */
+const MAX_DAYS = 3650;
+
 // Kept in step with dto/customer_query: depth 3 means the root plus two nested
 // levels, which is all an AND-of-ORs-of-ANDs needs.
 export const MAX_DEPTH = 3;
 export const MAX_LEAVES = 20;
+// Per GROUP, mirroring dto/customer_query.MAX_CHILDREN. The flat toolbar this
+// replaced guarded `rows.length >= 12`; the rewrite swapped that for a
+// tree-wide leaf budget and dropped the per-group bound entirely, so a 13th
+// condition in one group was buildable and 422'd on Apply with a message that
+// names no group. Note MAX_LEAVES > MAX_CHILDREN by design: 20 leaves are only
+// reachable by nesting.
+export const MAX_CHILDREN = 12;
 
 const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -125,7 +135,9 @@ const rowComplete = (r: QueryRowDraft): boolean => {
     // NEVER / EVER are complete with nothing typed
     if (!WINDOWED.has(r.op)) return true;
     const n = Number(r.days);
-    return r.days.trim() !== "" && Number.isInteger(n) && n >= 1;
+    // the same window the DTO accepts (ge=1, le=3650) — a larger number would
+    // otherwise pass here and come back as a 422 naming no row
+    return r.days.trim() !== "" && Number.isInteger(n) && n >= 1 && n <= MAX_DAYS;
   }
   return r.value.trim() !== "";
 };
@@ -219,8 +231,15 @@ export function CustomerQueryToolbar({
 
   const mutate = (path: number[], fn: (n: QueryNodeDraft) => QueryNodeDraft | null) => {
     const next = updateAt(root, path, fn);
-    // the root itself can never vanish — emptying it returns a fresh blank
-    onRootChange(next && next.kind === "group" ? next : blankQueryRoot());
+    // The root itself can never vanish — emptying it returns a fresh blank row.
+    // Keep the root's own ALL/ANY though: deleting the last condition is not a
+    // statement about how the next ones should combine, and silently flipping
+    // a deliberate "Match ANY" back to ALL changes what the next query means.
+    onRootChange(
+      next && next.kind === "group"
+        ? next
+        : { ...blankQueryRoot(), op: root.op },
+    );
   };
 
   const patchRow = (path: number[], changes: Partial<QueryRowDraft>) =>
@@ -287,6 +306,7 @@ export function CustomerQueryToolbar({
         <Input
           type="number"
           min={1}
+          max={MAX_DAYS}
           className="w-28"
           value={row.days}
           placeholder={t("customers.queryDays")}
@@ -407,6 +427,8 @@ export function CustomerQueryToolbar({
     const key = pathKey(path);
     const isRoot = path.length === 0;
     const canNest = depth < MAX_DEPTH;
+    // a nested group counts against the same cap as a condition — both are children
+    const groupFull = group.children.length >= MAX_CHILDREN;
     return (
       <div
         className={
@@ -476,7 +498,8 @@ export function CustomerQueryToolbar({
             variant="outline"
             size="sm"
             className="h-7 text-xs"
-            disabled={budgetFull}
+            disabled={budgetFull || groupFull}
+            title={groupFull ? t("customers.queryMaxChildren") : undefined}
             onClick={() =>
               mutate(path, (n) => ({
                 ...(n as QueryGroupDraft),
@@ -492,8 +515,14 @@ export function CustomerQueryToolbar({
             variant="outline"
             size="sm"
             className="h-7 text-xs"
-            disabled={budgetFull || !canNest}
-            title={canNest ? undefined : t("customers.queryMaxDepth")}
+            disabled={budgetFull || !canNest || groupFull}
+            title={
+              !canNest
+                ? t("customers.queryMaxDepth")
+                : groupFull
+                  ? t("customers.queryMaxChildren")
+                  : undefined
+            }
             onClick={() =>
               mutate(path, (n) => {
                 const g = n as QueryGroupDraft;
