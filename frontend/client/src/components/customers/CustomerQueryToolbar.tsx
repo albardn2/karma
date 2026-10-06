@@ -190,17 +190,31 @@ export function CustomerQueryToolbar({
   const [open, setOpen] = useState(false);
 
   // areas are the one picker source the page does not already fetch
-  const { data: areasData } = useQuery<{ items: Array<{ uuid: string; name: string }> }>({
+  const { data: areas = [], isPending: areasPending } = useQuery<
+    Array<{ uuid: string; name: string }>
+  >({
     // the blueprint is /service-area/ with a HYPHEN. The underscore spelling
     // 404s, so `areas` was always empty and every service-area row silently
     // fell back to free text instead of the picker below. Pre-dates the group
     // builder — the bug is as old as the toolbar.
     queryKey: ["/service-area/", "query-toolbar"],
-    queryFn: () => apiRequest("/service-area/?per_page=100"),
+    // Every page, not just the first. `per_page` is capped at 100 server-side
+    // (above it the request 422s), and the picker is the ONLY way to choose an
+    // area for EQUAL / NOT_EQUAL — so a tenant past 100 areas would simply be
+    // unable to select the rest. The page cap is a stop against a runaway
+    // loop, not a real limit: nothing here is near it.
+    queryFn: async () => {
+      const all: Array<{ uuid: string; name: string }> = [];
+      for (let page = 1; page <= 20; page++) {
+        const res = await apiRequest(`/service-area/?page=${page}&per_page=100`);
+        all.push(...(res?.items ?? []));
+        if (page >= (res?.pages ?? 1)) break;
+      }
+      return all;
+    },
     staleTime: 5 * 60 * 1000,
     enabled: open,
   });
-  const areas = areasData?.items ?? [];
 
   const mutate = (path: number[], fn: (n: QueryNodeDraft) => QueryNodeDraft | null) => {
     const next = updateAt(root, path, fn);
@@ -306,13 +320,29 @@ export function CustomerQueryToolbar({
         </Select>
       );
     }
-    if (row.op !== "IS_IN" && row.field === "service_area" && areas.length > 0) {
+    // The control must not depend on whether the fetch has landed yet: it
+    // used to render free text while the request was in flight and then swap
+    // to a Select, so anything typed in that window vanished from view while
+    // still being submitted. Pending shows the picker, disabled.
+    if (row.op !== "IS_IN" && row.field === "service_area" && (areasPending || areas.length > 0)) {
+      // keep a value the list does not contain selectable and VISIBLE rather
+      // than letting Radix fall back to the placeholder and hide it
+      const unlisted = row.value && !areas.some((a) => a.uuid === row.value);
       return (
-        <Select value={row.value} onValueChange={(value) => patchRow(path, { value })}>
+        <Select
+          value={row.value}
+          onValueChange={(value) => patchRow(path, { value })}
+          disabled={areasPending}
+        >
           <SelectTrigger className="flex-1 min-w-32" data-testid={`query-value-${key}`}>
             <SelectValue placeholder={t("customers.queryPickValue")} />
           </SelectTrigger>
           <SelectContent>
+            {unlisted && (
+              <SelectItem key={row.value} value={row.value}>
+                {row.value}
+              </SelectItem>
+            )}
             {areas.map((a) => (
               <SelectItem key={a.uuid} value={a.uuid}>
                 {a.name}

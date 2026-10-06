@@ -83,12 +83,25 @@ export function everyLeaf<N extends TreeNodeLike>(node: N, ok: (leaf: N) => bool
 }
 
 /**
+ * Most children held by any one group — the companion to `measureDepth`.
+ *
+ * Both exist for the same reason: a builder's `disabled=` gates a tree being
+ * BUILT, and says nothing about one ARRIVING. A strategy loads stored trees,
+ * including ones written before the bound existed, so it has to measure what
+ * it was handed before it offers to send it back.
+ */
+export function widestGroup<N extends TreeNodeLike>(node: N): number {
+  const children = childrenOf(node);
+  if (node.kind !== "group" || !children) return 0;
+  return children.reduce(
+    (widest, c) => Math.max(widest, widestGroup(c)),
+    children.length,
+  );
+}
+
+/**
  * Deepest GROUP level in the tree, matching the backend's convention exactly:
  * a leaf adds NO level.
- *
- * The query toolbar tracks depth as a render parameter, which bounds a tree
- * being BUILT but not one ARRIVING. A strategy loads stored trees, so it needs
- * to measure what it was handed.
  */
 export function measureDepth<N extends TreeNodeLike>(node: N, depth = 1): number {
   const children = childrenOf(node);

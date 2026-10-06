@@ -15,7 +15,6 @@ garbage).
 import re
 from datetime import datetime
 from enum import Enum
-from enum import Enum
 from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import (
@@ -25,6 +24,7 @@ from pydantic import (
     Field,
     Tag,
     field_validator,
+    model_serializer,
     model_validator,
 )
 
@@ -203,6 +203,27 @@ class StrategyPriority(BaseModel):
     # cap on how many stops THIS priority may contribute; the remaining
     # desired_stops budget always caps it too
     max_stops: Optional[int] = Field(None, ge=1, le=200)
+
+    @model_serializer(mode="wrap")
+    def _drop_absent_tag_expression(self, handler):
+        """Omit `tag_expression` entirely when it is None, rather than dumping null.
+
+        This dump goes straight into the JSONB column. Writing an explicit
+        `"tag_expression": null` onto every priority would rewrite every
+        strategy stored before grouping existed the first time anyone renamed
+        one — so re-saving an untouched legacy config would NOT be the
+        byte-identical no-op the builder promises.
+
+        It also keeps a rollback survivable: the pre-grouping StrategyPriority
+        is extra="forbid", so a row carrying the key would be refused by the
+        very code that is being rolled back to, at route time, with a raw
+        ValidationError. Absent and null mean the same thing to every reader
+        of this field, and absent is the one both versions accept.
+        """
+        data = handler(self)
+        if data.get("tag_expression") is None:
+            data.pop("tag_expression", None)
+        return data
 
     @model_validator(mode="after")
     def one_tag_shape(self):

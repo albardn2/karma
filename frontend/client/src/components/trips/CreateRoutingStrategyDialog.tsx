@@ -23,7 +23,15 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTagCatalog } from "@/lib/tagCatalog";
-import { countLeaves, everyLeaf, newId, pathKey, updateAt } from "@/lib/filterTree";
+import {
+  countLeaves,
+  everyLeaf,
+  measureDepth,
+  newId,
+  pathKey,
+  updateAt,
+  widestGroup,
+} from "@/lib/filterTree";
 
 // Builder for a saved priority-routing strategy (the setup form's dropdown
 // offers it next to the built-in "manual"). A strategy is an ORDERED list of
@@ -62,6 +70,12 @@ type TagNodeDraft = TagLeafDraft | TagGroupDraft;
 const MAX_TAG_DEPTH = 3;
 const MAX_TAG_LEAVES = 10;
 const MAX_TAG_CHILDREN = 8;
+
+/** True when the tree is exactly the legacy shape: one AND of plain rows.
+ *  Such a tree saves as `tag_filters`, which the DTO does NOT bound — which is
+ *  why the group bounds below apply only once this stops being true. */
+const isFlatAnd = (root: TagGroupDraft) =>
+  root.op === "AND" && root.children.every((c) => c.kind === "row");
 
 const blankTagLeaf = (): TagLeafDraft => ({
   kind: "row",
@@ -302,6 +316,11 @@ export function CreateRoutingStrategyDialog({
     const budgetFull = leaves >= MAX_TAG_LEAVES;
     const groupFull = group.children.length >= MAX_TAG_CHILDREN;
     const canNest = depth < MAX_TAG_DEPTH;
+    // Only reachable for a tree that ARRIVED: `tag_filters` is unbounded in
+    // the DTO and the flat builder never capped it, so a priority stored
+    // before grouping existed may hold more rows than a GROUP may. It saves
+    // fine as-is; it cannot be regrouped until it is trimmed.
+    const overCap = group.children.length > MAX_TAG_CHILDREN;
     // An OR holding a NOT_EQUAL is almost never meant: "not blacklisted OR not
     // skipped" is true for anyone missing either tag, and an untagged customer
     // satisfies every NOT_EQUAL on its own. Over-ANDing shows up as an empty
@@ -355,6 +374,15 @@ export function CreateRoutingStrategyDialog({
           )}
         </div>
 
+        {overCap && (
+          <p className="text-xs text-amber-700 dark:text-amber-500" data-testid={`tag-over-cap-${key}`}>
+            {t("workflows.strategyTagGroupOverCap", {
+              n: String(group.children.length),
+              max: String(MAX_TAG_CHILDREN),
+            })}
+          </p>
+        )}
+
         {orWithNegation && (
           <p className="text-xs text-amber-700 dark:text-amber-500" data-testid={`tag-or-not-warning-${key}`}>
             {t("workflows.strategyTagOrNotWarning")}
@@ -387,7 +415,6 @@ export function CreateRoutingStrategyDialog({
             variant="outline"
             size="sm"
             disabled={budgetFull || groupFull}
-            title={groupFull ? t("workflows.strategyTagMaxChildren") : undefined}
             onClick={() =>
               mutateTag(pi, path, (n) => ({
                 ...(n as TagGroupDraft),
@@ -404,13 +431,6 @@ export function CreateRoutingStrategyDialog({
             variant="outline"
             size="sm"
             disabled={budgetFull || groupFull || !canNest}
-            title={
-              !canNest
-                ? t("workflows.strategyTagMaxDepth")
-                : groupFull
-                  ? t("workflows.strategyTagMaxChildren")
-                  : undefined
-            }
             onClick={() =>
               mutateTag(pi, path, (n) => {
                 const g = n as TagGroupDraft;
@@ -428,6 +448,18 @@ export function CreateRoutingStrategyDialog({
               {t("workflows.strategyTagBudget", { used: String(leaves), max: String(MAX_TAG_LEAVES) })}
             </span>
           )}
+          {/* Why the add buttons are greyed out, as TEXT. It was a `title` on
+              the buttons themselves until the review pointed out that the
+              shared Button is `disabled:pointer-events-none`, so the browser
+              never fires the hover and the tooltip could not render at all.
+              The budget counter already explains `budgetFull`. */}
+          {!budgetFull && (groupFull || !canNest) && (
+            <span className="text-xs text-gray-500" data-testid={`tag-bound-hint-${key}`}>
+              {groupFull
+                ? t("workflows.strategyTagMaxChildren", { max: String(MAX_TAG_CHILDREN) })
+                : t("workflows.strategyTagMaxDepth", { max: String(MAX_TAG_DEPTH - 1) })}
+            </span>
+          )}
         </div>
       </div>
     );
@@ -442,9 +474,7 @@ export function CreateRoutingStrategyDialog({
       // producer. Only a genuine OR or nesting writes `tag_expression`.
       const leaves = countLeaves(p.tagRoot);
       if (leaves > 0) {
-        const flatAnd =
-          p.tagRoot.op === "AND" && p.tagRoot.children.every((c) => c.kind === "row");
-        if (flatAnd) {
+        if (isFlatAnd(p.tagRoot)) {
           priority.tag_filters = (p.tagRoot.children as TagLeafDraft[]).map((f) => ({
             op: f.op,
             value: f.value.trim(),
@@ -495,6 +525,23 @@ export function CreateRoutingStrategyDialog({
       // than cast, since a group genuinely has no `value`
       if (!everyLeaf<TagNodeDraft>(p.tagRoot, (f) => f.kind !== "row" || f.value.trim() !== "")) {
         return t("workflows.strategyTagValueRequired");
+      }
+      // The MAX_TAG_* bounds hold for `tag_expression` and not for the legacy
+      // `tag_filters`, so they are checked against the shape this priority is
+      // about to be SENT as. Gating the add buttons is not enough: a tree
+      // loaded from storage was never gated by them, and one click on ALL/ANY
+      // turns an over-wide legacy list into an over-wide group. Without this
+      // the server answers a bare "Validation error (422)" naming no priority.
+      if (countLeaves(p.tagRoot) > 0 && !isFlatAnd(p.tagRoot)) {
+        if (measureDepth(p.tagRoot) > MAX_TAG_DEPTH) {
+          return t("workflows.strategyTagTooDeep", { n: where, max: String(MAX_TAG_DEPTH - 1) });
+        }
+        if (countLeaves(p.tagRoot) > MAX_TAG_LEAVES) {
+          return t("workflows.strategyTagTooMany", { n: where, max: String(MAX_TAG_LEAVES) });
+        }
+        if (widestGroup(p.tagRoot) > MAX_TAG_CHILDREN) {
+          return t("workflows.strategyTagGroupTooWide", { n: where, max: String(MAX_TAG_CHILDREN) });
+        }
       }
       if (p.categoryOp !== NONE) {
         const has = p.categoryOp === "IS_IN" ? p.categoryValues.length > 0 : !!p.categoryValue;
