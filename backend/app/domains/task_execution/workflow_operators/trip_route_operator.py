@@ -13,6 +13,7 @@ from app.dto.workflow_execution import (
 from geoalchemy2.shape import to_shape, from_shape
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+from app.domains.service_area.geometry import parts as _parts, service_area_coverage
 from app.domains.trip.distribution_algo import DistributionAlgorithm
 from models.common import ServiceArea as ServiceAreaModel
 from shapely import MultiPolygon
@@ -24,9 +25,6 @@ class TripRouteOperatorSchema(BaseModel):
     waypoints: Optional[list[tuple[float, float]]] = None
     route_coordinates: Optional[list[tuple[float, float]]] = None
 
-
-def _parts(g):
-    return list(g.geoms) if g.geom_type == "MultiPolygon" else [g]
 
 class TripRouteOperator(OperatorInterface):
 
@@ -47,6 +45,7 @@ class TripRouteOperator(OperatorInterface):
         from app.domains.task_execution.workflow_operators.trip_setup import (
             LEGACY_CLUSTER,
             MANUAL,
+            load_strategy_config,
             resolve_strategy,
         )
 
@@ -67,30 +66,12 @@ class TripRouteOperator(OperatorInterface):
         # saved priority strategy (anything that isn't a built-in)
         if strategy != LEGACY_CLUSTER:
             from app.domains.trip.priority_router import PriorityRouter
-            from app.dto.routing_strategy import RoutingStrategyConfig
 
-            strategy_row = uow.routing_strategy_repository.find_by_name_ci(strategy)
-            if not strategy_row:
-                raise BadRequestError(
-                    f"Routing strategy '{strategy}' no longer exists. "
-                    "Re-run the setup step with an available strategy."
-                )
-            # the row is data — validate the stored shape loudly rather than
-            # routing garbage from a hand-edited or stale config
-            config = RoutingStrategyConfig(**(strategy_row.config or {}))
-
-            polygon = None
-            service_area_names = self.get_service_areas()
-            if service_area_names:
-                service_areas = uow.service_area_repository._find_all_by_filters(
-                    filters=[ServiceAreaModel.name.in_(service_area_names)]
-                )
-                polys = [p for sa in service_areas for p in _parts(to_shape(sa.geometry))]
-                if not polys:
-                    raise BadRequestError(
-                        f"None of the service areas {service_area_names} were found"
-                    )
-                polygon = MultiPolygon(polys)
+            # both resolved through the helpers the pool preview also calls,
+            # so the preview cannot be computed over a different strategy or
+            # a different shape than the run it is previewing
+            config = load_strategy_config(uow, strategy)
+            polygon = service_area_coverage(uow, self.get_service_areas()).polygon
 
             ordered_customers, waypoints = PriorityRouter(uow).run(
                 config=config,
