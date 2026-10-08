@@ -9,6 +9,7 @@ import { Filter, FolderPlus, Plus, Search, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTagCatalog } from "@/lib/tagCatalog";
+import { countLeaves, newId, pathKey, updateAt } from "@/lib/filterTree";
 
 /**
  * The map query builder: a TREE of groups, each joining its children with one
@@ -104,11 +105,6 @@ export const MAX_LEAVES = 20;
 // reachable by nesting.
 export const MAX_CHILDREN = 12;
 
-const newId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `n${Math.random().toString(36).slice(2)}`;
-
 export const blankQueryRow = (): QueryRowDraft => ({
   kind: "row",
   id: newId(),
@@ -145,9 +141,6 @@ const rowComplete = (r: QueryRowDraft): boolean => {
 export const nodeComplete = (n: QueryNodeDraft): boolean =>
   n.kind === "row" ? rowComplete(n) : n.children.length > 0 && n.children.every(nodeComplete);
 
-export const countLeaves = (n: QueryNodeDraft): number =>
-  n.kind === "row" ? 1 : n.children.reduce((sum, c) => sum + countLeaves(c), 0);
-
 export function buildQueryPayload(node: QueryNodeDraft): QueryNodePayload {
   if (node.kind === "group") {
     return { kind: "group", op: node.op, children: node.children.map(buildQueryPayload) };
@@ -167,30 +160,6 @@ export function buildQueryPayload(node: QueryNodeDraft): QueryNodePayload {
   return out;
 }
 
-/** Replace the node at `path` (child indexes from the root) via `fn`. */
-function updateAt(
-  node: QueryNodeDraft,
-  path: number[],
-  fn: (n: QueryNodeDraft) => QueryNodeDraft | null,
-): QueryNodeDraft | null {
-  if (path.length === 0) return fn(node);
-  if (node.kind !== "group") return node;
-  const [head, ...rest] = path;
-  const next: QueryNodeDraft[] = [];
-  node.children.forEach((child, i) => {
-    if (i !== head) {
-      next.push(child);
-      return;
-    }
-    const replaced = updateAt(child, rest, fn);
-    if (replaced !== null) next.push(replaced);
-  });
-  // A group that lost its last child goes with it, cascading upward, so an
-  // empty group — which the backend refuses, and which would mean "match
-  // everyone" under AND — is never reachable from the UI.
-  if (next.length === 0) return null;
-  return { ...node, children: next };
-}
 
 interface CustomerQueryToolbarProps {
   categories: string[];
@@ -221,13 +190,31 @@ export function CustomerQueryToolbar({
   const [open, setOpen] = useState(false);
 
   // areas are the one picker source the page does not already fetch
-  const { data: areasData } = useQuery<{ items: Array<{ uuid: string; name: string }> }>({
-    queryKey: ["/service_area/"],
-    queryFn: () => apiRequest("/service_area/?per_page=100"),
+  const { data: areas = [], isPending: areasPending } = useQuery<
+    Array<{ uuid: string; name: string }>
+  >({
+    // the blueprint is /service-area/ with a HYPHEN. The underscore spelling
+    // 404s, so `areas` was always empty and every service-area row silently
+    // fell back to free text instead of the picker below. Pre-dates the group
+    // builder — the bug is as old as the toolbar.
+    queryKey: ["/service-area/", "query-toolbar"],
+    // Every page, not just the first. `per_page` is capped at 100 server-side
+    // (above it the request 422s), and the picker is the ONLY way to choose an
+    // area for EQUAL / NOT_EQUAL — so a tenant past 100 areas would simply be
+    // unable to select the rest. The page cap is a stop against a runaway
+    // loop, not a real limit: nothing here is near it.
+    queryFn: async () => {
+      const all: Array<{ uuid: string; name: string }> = [];
+      for (let page = 1; page <= 20; page++) {
+        const res = await apiRequest(`/service-area/?page=${page}&per_page=100`);
+        all.push(...(res?.items ?? []));
+        if (page >= (res?.pages ?? 1)) break;
+      }
+      return all;
+    },
     staleTime: 5 * 60 * 1000,
     enabled: open,
   });
-  const areas = areasData?.items ?? [];
 
   const mutate = (path: number[], fn: (n: QueryNodeDraft) => QueryNodeDraft | null) => {
     const next = updateAt(root, path, fn);
@@ -268,7 +255,6 @@ export function CustomerQueryToolbar({
   const complete = useMemo(() => nodeComplete(root), [root]);
   const budgetFull = leaves >= MAX_LEAVES;
 
-  const pathKey = (path: number[]) => path.join(".");
 
   const valueControl = (row: QueryRowDraft, path: number[]) => {
     const key = pathKey(path);
@@ -334,13 +320,29 @@ export function CustomerQueryToolbar({
         </Select>
       );
     }
-    if (row.op !== "IS_IN" && row.field === "service_area" && areas.length > 0) {
+    // The control must not depend on whether the fetch has landed yet: it
+    // used to render free text while the request was in flight and then swap
+    // to a Select, so anything typed in that window vanished from view while
+    // still being submitted. Pending shows the picker, disabled.
+    if (row.op !== "IS_IN" && row.field === "service_area" && (areasPending || areas.length > 0)) {
+      // keep a value the list does not contain selectable and VISIBLE rather
+      // than letting Radix fall back to the placeholder and hide it
+      const unlisted = row.value && !areas.some((a) => a.uuid === row.value);
       return (
-        <Select value={row.value} onValueChange={(value) => patchRow(path, { value })}>
+        <Select
+          value={row.value}
+          onValueChange={(value) => patchRow(path, { value })}
+          disabled={areasPending}
+        >
           <SelectTrigger className="flex-1 min-w-32" data-testid={`query-value-${key}`}>
             <SelectValue placeholder={t("customers.queryPickValue")} />
           </SelectTrigger>
           <SelectContent>
+            {unlisted && (
+              <SelectItem key={row.value} value={row.value}>
+                {row.value}
+              </SelectItem>
+            )}
             {areas.map((a) => (
               <SelectItem key={a.uuid} value={a.uuid}>
                 {a.name}

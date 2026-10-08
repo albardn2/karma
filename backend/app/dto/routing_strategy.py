@@ -15,10 +15,20 @@ garbage).
 import re
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Discriminator,
+    Field,
+    Tag,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
+from app.dto._boolean_tree import measure, node_tag
 from app.dto.common_enums import Currency
 
 
@@ -125,11 +135,66 @@ class DebtFilter(BaseModel):
     currency: Currency = Currency.SYP
 
 
-class StrategyPriority(BaseModel):
+# Bounds on ONE priority's tag expression. Halved from the customer query's
+# 20/12 because this is a single field with four operators, not seven fields.
+# No config-wide cap: 10 priorities x 10 leaves is 100 string-membership tests
+# per customer over a pool the router has already narrowed, which is noise
+# beside the KMeans fit in the same loop.
+MAX_TAG_DEPTH = 3      # root group + 2 nested levels
+MAX_TAG_LEAVES = 10    # tag filters in one priority's whole tree
+MAX_TAG_CHILDREN = 8   # per group
+MAX_TAG_NODES = 32
+
+
+class TagConnector(str, Enum):
+    AND = "AND"
+    OR = "OR"
+
+
+class TagGroup(BaseModel):
+    """A parenthesised sub-expression over tags: `op` joins THIS group's children."""
+
     model_config = ConfigDict(extra="forbid")
 
-    # every tag filter must hold (AND) for a customer to match
+    kind: Literal["group"] = "group"
+    op: TagConnector = TagConnector.AND
+    children: List["TagNode"] = Field(..., min_length=1, max_length=MAX_TAG_CHILDREN)
+
+
+# TagFilter deliberately gains NO `kind` field. QueryRow declares one because
+# it is never persisted; a tag filter IS persisted inside routing_strategy.config,
+# and adding a key would rewrite every future dump of every stored strategy.
+# node_tag discriminates on the presence of `children` instead.
+TagNode = Annotated[
+    Union[Annotated[TagGroup, Tag("group")], Annotated[TagFilter, Tag("row")]],
+    Discriminator(node_tag),
+]
+TagGroup.model_rebuild()
+
+
+class StrategyPriority(BaseModel):
+    """One band of a routing strategy. Every filter on it must hold (AND).
+
+    The tag constraint may be either shape, never both:
+      * tag_filters    — LEGACY and permanent, an n-way AND. Every config
+        stored before grouping existed carries this literal key, so removing
+        it would turn extra="forbid" into a ValidationError on every stored
+        strategy the moment the route step re-validates one.
+      * tag_expression — the grouped form, for anything with an OR in it.
+    Neither present means no tag constraint at all, which is a legitimate
+    catch-all band and the state of most stored strategies.
+
+    The two are reconciled at EVALUATION time, not here — see
+    priority_router.tag_expression_of. This model must not rewrite what it was
+    given: its dump goes straight into a JSON column, so a validator that
+    derived one field from the other would persist both and then refuse the
+    row it just wrote.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
     tag_filters: List[TagFilter] = Field(default_factory=list)
+    tag_expression: Optional[TagGroup] = None
     category_filter: Optional[CategoryFilter] = None
     debt_filter: Optional[DebtFilter] = None
     # skip customers effectively visited more recently than this many days ago
@@ -138,6 +203,49 @@ class StrategyPriority(BaseModel):
     # cap on how many stops THIS priority may contribute; the remaining
     # desired_stops budget always caps it too
     max_stops: Optional[int] = Field(None, ge=1, le=200)
+
+    @model_serializer(mode="wrap")
+    def _drop_absent_tag_expression(self, handler):
+        """Omit `tag_expression` entirely when it is None, rather than dumping null.
+
+        This dump goes straight into the JSONB column. Writing an explicit
+        `"tag_expression": null` onto every priority would rewrite every
+        strategy stored before grouping existed the first time anyone renamed
+        one — so re-saving an untouched legacy config would NOT be the
+        byte-identical no-op the builder promises.
+
+        It also keeps a rollback survivable: the pre-grouping StrategyPriority
+        is extra="forbid", so a row carrying the key would be refused by the
+        very code that is being rolled back to, at route time, with a raw
+        ValidationError. Absent and null mean the same thing to every reader
+        of this field, and absent is the one both versions accept.
+        """
+        data = handler(self)
+        if data.get("tag_expression") is None:
+            data.pop("tag_expression", None)
+        return data
+
+    @model_validator(mode="after")
+    def one_tag_shape(self):
+        if self.tag_filters and self.tag_expression is not None:
+            raise ValueError(
+                "send either `tag_filters` (legacy) or `tag_expression`, not both"
+            )
+        if self.tag_expression is not None:
+            depth, leaves, nodes = measure(self.tag_expression)
+            if depth > MAX_TAG_DEPTH:
+                raise ValueError(
+                    f"tag groups may nest {MAX_TAG_DEPTH - 1} levels below the "
+                    f"outermost one; this nests {depth - 1}"
+                )
+            if leaves > MAX_TAG_LEAVES:
+                raise ValueError(
+                    f"a priority may hold at most {MAX_TAG_LEAVES} tag filters; "
+                    f"this has {leaves}"
+                )
+            if nodes > MAX_TAG_NODES:
+                raise ValueError("tag expression is too large")
+        return self
 
 
 class RoutingStrategyConfig(BaseModel):

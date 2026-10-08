@@ -36,6 +36,7 @@ from pydantic import (
     model_validator,
 )
 
+from app.dto._boolean_tree import iter_leaves, measure, node_tag
 from app.dto.common_enums import Currency
 from app.dto.routing_strategy import _clean_values, canonical_tag_value
 
@@ -179,52 +180,11 @@ class QueryGroup(BaseModel):
         return self
 
 
-def _node_tag(v):
-    """A node with `children` is a group; anything else is a row.
-
-    A callable discriminator rather than Field(discriminator="kind"): with a
-    Literal discriminator pydantic REQUIRES `kind` in the input even though it
-    defaults, which would 422 every hand-written client. Tagging by shape keeps
-    `kind` optional while still collapsing a typo deep in the tree to a couple
-    of errors instead of one per union member per level.
-    """
-    if isinstance(v, dict):
-        return v.get("kind") or ("group" if "children" in v else "row")
-    return getattr(v, "kind", None)
-
-
 QueryNode = Annotated[
     Union[Annotated[QueryGroup, Tag("group")], Annotated[QueryRow, Tag("row")]],
-    Discriminator(_node_tag),
+    Discriminator(node_tag),
 ]
 QueryGroup.model_rebuild()
-
-
-def iter_leaves(node):
-    """Every condition row in the tree, in order."""
-    if isinstance(node, QueryRow):
-        yield node
-        return
-    for child in node.children:
-        yield from iter_leaves(child)
-
-
-def _measure(node, depth=1):
-    """(deepest GROUP level, leaves, nodes) for one subtree.
-
-    A row adds no level — it lives at its parent group's depth. Counting rows
-    as a level would make the root's own conditions look one deeper than they
-    are and refuse a tree the UI is allowed to build.
-    """
-    if isinstance(node, QueryRow):
-        return depth - 1, 1, 1
-    deepest, leaves, nodes = depth, 0, 1
-    for child in node.children:
-        d, l, n = _measure(child, depth + 1)
-        deepest = max(deepest, d)
-        leaves += l
-        nodes += n
-    return deepest, leaves, nodes
 
 
 class CustomerQuery(BaseModel):
@@ -249,7 +209,7 @@ class CustomerQuery(BaseModel):
         if self.rows is not None:
             self.expression = _lower_rows(self.rows)
 
-        depth, leaves, nodes = _measure(self.expression)
+        depth, leaves, nodes = measure(self.expression)
         if depth > MAX_DEPTH:
             raise ValueError(
                 f"groups may nest {MAX_DEPTH - 1} levels below the outermost one; "
