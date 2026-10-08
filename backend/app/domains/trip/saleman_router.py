@@ -2,6 +2,8 @@ import math
 from typing import List, Tuple
 from shapely.geometry import MultiPoint, Point
 from shapely.wkb import loads as to_shape  # adjust if you actually use to_shape from shapely.ops
+import os
+
 import requests
 from models.common import Customer
 from app.utils.geom_utils import wkt_or_wkb_to_shape
@@ -24,7 +26,33 @@ class SalesmanRouterMixin:
     Assumes each `Customer` has a `.coordinates` geometry (lon/lat WGS84).
     """
 
-    OSRM_BASE = "https://router.project-osrm.org"  # replace with your own OSRM server for reliability
+    # The PUBLIC OSRM demo server, called synchronously from inside a request.
+    # Point OSRM_BASE_URL at a self-hosted instance and this stops being a
+    # third party's rate limit on your API.
+    OSRM_BASE = os.getenv("OSRM_BASE_URL", "https://router.project-osrm.org")
+
+    # Road geometry for the drawn polyline is a NICE-TO-HAVE: when a leg is
+    # not fetched the path falls back to a straight segment, which the map
+    # already renders. It is not worth holding a worker — and, because the
+    # caller passes its open UnitOfWork down, a Postgres transaction — on a
+    # free public server.
+    #
+    # THESE NUMBERS ARE SIZED TO FIT INSIDE idle_in_transaction_session_timeout,
+    # which docker-compose.prod.yaml sets to 60s for the web service. The
+    # routing path holds a transaction open across every one of these calls,
+    # so if the worst case exceeded that, Postgres would terminate the
+    # connection mid-route and a degraded OSRM would turn into a hard failure
+    # instead of a rougher polyline. Worst case here:
+    #
+    #     20 legs x 2s  +  8s table  =  48s   <  60s
+    #
+    # Measured against router.project-osrm.org: a leg answers in 0.39-0.77s,
+    # so a 2s cap is ~2.5x the slowest observed and only bites when that
+    # server is actually struggling — which is exactly when the leash
+    # matters. Change either constant and re-check the arithmetic above.
+    LEG_TIMEOUT_SECONDS = 2
+    TABLE_TIMEOUT_SECONDS = 8
+    MAX_ROUTED_LEGS = 20
 
     def _osrm_table(self, coords: List[Tuple[float, float]]) -> List[List[float]]:
         """
@@ -36,7 +64,7 @@ class SalesmanRouterMixin:
         params = {
             "annotations": "duration"
         }
-        r = requests.get(url, params=params, timeout=20)
+        r = requests.get(url, params=params, timeout=self.TABLE_TIMEOUT_SECONDS)
         if r.status_code != 200:
             raise OSRMRoutingError(f"OSRM table error: HTTP {r.status_code} - {r.text[:200]}")
         data = r.json()
@@ -56,7 +84,7 @@ class SalesmanRouterMixin:
             "steps": "false",
             "alternatives": "false"
         }
-        r = requests.get(url, params=params, timeout=20)
+        r = requests.get(url, params=params, timeout=self.LEG_TIMEOUT_SECONDS)
         if r.status_code != 200:
             raise OSRMRoutingError(f"OSRM route error: HTTP {r.status_code} - {r.text[:200]}")
         data = r.json()
@@ -142,12 +170,20 @@ class SalesmanRouterMixin:
 
         # Fetch and stitch the polyline for each leg using OSRM /route
         route_coords_ll: List[Tuple[float, float]] = []
-        for a, b in zip(route_indices[:-1], route_indices[1:]):
-            try:
-                leg_coords = self._osrm_route_coords(all_coords[a], all_coords[b])
-            except Exception:
-                # Fallback to a straight segment if OSRM routing fails
+        legs = list(zip(route_indices[:-1], route_indices[1:]))
+        for leg_number, (a, b) in enumerate(legs):
+            # Past the cap, stop asking and draw straight lines. The worst
+            # case is now MAX_ROUTED_LEGS x LEG_TIMEOUT_SECONDS rather than
+            # unbounded, and a trip with more stops than that degrades to a
+            # rougher polyline instead of a frozen API.
+            if leg_number >= self.MAX_ROUTED_LEGS:
                 leg_coords = [lonlat_to_latlon(all_coords[a]), lonlat_to_latlon(all_coords[b])]
+            else:
+                try:
+                    leg_coords = self._osrm_route_coords(all_coords[a], all_coords[b])
+                except Exception:
+                    # Fallback to a straight segment if OSRM routing fails
+                    leg_coords = [lonlat_to_latlon(all_coords[a]), lonlat_to_latlon(all_coords[b])]
             if route_coords_ll and leg_coords:
                 # avoid duplicating the connecting point
                 if leg_coords[0] == route_coords_ll[-1]:

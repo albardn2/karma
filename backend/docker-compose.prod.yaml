@@ -2,6 +2,18 @@ version: '3.8'
 services:
   db:
     image: postgis/postgis:13-3.1-alpine
+    # Cap the json-file log. Docker's default driver grows without bound, and
+    # this droplet's known failure mode is filling up — a full disk makes
+    # `compose pull` fail and `up` silently re-run the stale image. The
+    # gunicorn access log this change switches on writes a line per request,
+    # which is exactly the kind of steady drip that gets there.
+    # 30 MB per service, measured against 1.7 MB of total container logs and
+    # 50 GB free today, so this is a ceiling rather than a constraint.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
     environment:
       POSTGRES_USER: local
@@ -12,7 +24,23 @@ services:
       interval: 5s
       timeout: 2s
       retries: 5
-    command: postgres -c listen_addresses='*'
+    # Observability only — NO statement/lock timeouts here. Those are set
+    # per-session by the web service (PG_SESSION_OPTIONS below) so that
+    # alembic during a deploy, the hourly location purge and the nightly
+    # tasks are not killed mid-flight by a limit meant for API requests.
+    #
+    # pg_stat_statements is the one that ends the guessing: without it there
+    # is no record anywhere of which query was slow, when, or how often.
+    # After the first deploy that picks this up, run once:
+    #   CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+    command: >
+      postgres
+      -c listen_addresses='*'
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c log_min_duration_statement=500
+      -c log_lock_waits=on
+      -c log_checkpoints=on
     # 127.0.0.1 ONLY. Published as "5432:5432" this was reachable from the
     # public internet, and the credentials are three lines below in this same
     # committed file. Docker publishes ports by writing iptables rules that
@@ -33,6 +61,18 @@ services:
 
   migrate:
     image: ghcr.io/albardn2/karma-backend:latest-prod
+    # Cap the json-file log. Docker's default driver grows without bound, and
+    # this droplet's known failure mode is filling up — a full disk makes
+    # `compose pull` fail and `up` silently re-run the stale image. The
+    # gunicorn access log this change switches on writes a line per request,
+    # which is exactly the kind of steady drip that gets there.
+    # 30 MB per service, measured against 1.7 MB of total container logs and
+    # 50 GB free today, so this is a ceiling rather than a constraint.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       db:
         condition: service_healthy
@@ -47,6 +87,18 @@ services:
 
   web:
     image: ghcr.io/albardn2/karma-backend:latest-prod
+    # Cap the json-file log. Docker's default driver grows without bound, and
+    # this droplet's known failure mode is filling up — a full disk makes
+    # `compose pull` fail and `up` silently re-run the stale image. The
+    # gunicorn access log this change switches on writes a line per request,
+    # which is exactly the kind of steady drip that gets there.
+    # 30 MB per service, measured against 1.7 MB of total container logs and
+    # 50 GB free today, so this is a ceiling rather than a constraint.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
     depends_on:
       - db
@@ -62,6 +114,18 @@ services:
       - "127.0.0.1:5000:5000"
     environment:
       SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+      # Applied to API sessions ONLY — this service, not the workers and not
+      # alembic. Nothing in the database could previously self-heal: a stuck
+      # query or a lock wait blocked a request forever, and an API request
+      # that has run for 30s has already lost the user.
+      PG_SESSION_OPTIONS: "-c statement_timeout=30000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=60000"
+      # Abort a worker whose request has wedged. Under gthread gunicorn's
+      # --timeout only notices a dead WORKER, not a stuck request, so a pure
+      # CPU loop would hold its thread forever. 120s sits above the slowest
+      # legitimate request (trip routing against a degraded OSRM: 48s of
+      # outbound calls, plus clustering and the database) — raise
+      # saleman_router's budget and this must move with it.
+      REQUEST_WATCHDOG_SECONDS: "120"
       # JWT signing secret; comes from the droplet-side .env written by the
       # deploy workflow (sourced from GitHub secrets)
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
@@ -78,6 +142,18 @@ services:
 
   location-ingest:
     image: ghcr.io/albardn2/karma-backend:latest-prod
+    # Cap the json-file log. Docker's default driver grows without bound, and
+    # this droplet's known failure mode is filling up — a full disk makes
+    # `compose pull` fail and `up` silently re-run the stale image. The
+    # gunicorn access log this change switches on writes a line per request,
+    # which is exactly the kind of steady drip that gets there.
+    # 30 MB per service, measured against 1.7 MB of total container logs and
+    # 50 GB free today, so this is a ceiling rather than a constraint.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
     depends_on:
       - db
@@ -96,6 +172,18 @@ services:
   # idempotent, so `restart: always` re-running a day is harmless.
   daily-tasks:
     image: ghcr.io/albardn2/karma-backend:latest-prod
+    # Cap the json-file log. Docker's default driver grows without bound, and
+    # this droplet's known failure mode is filling up — a full disk makes
+    # `compose pull` fail and `up` silently re-run the stale image. The
+    # gunicorn access log this change switches on writes a line per request,
+    # which is exactly the kind of steady drip that gets there.
+    # 30 MB per service, measured against 1.7 MB of total container logs and
+    # 50 GB free today, so this is a ceiling rather than a constraint.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
     depends_on:
       - db
@@ -108,6 +196,18 @@ services:
 
   nginx-proxy:
     image: jwilder/nginx-proxy
+    # Cap the json-file log. Docker's default driver grows without bound, and
+    # this droplet's known failure mode is filling up — a full disk makes
+    # `compose pull` fail and `up` silently re-run the stale image. The
+    # gunicorn access log this change switches on writes a line per request,
+    # which is exactly the kind of steady drip that gets there.
+    # 30 MB per service, measured against 1.7 MB of total container logs and
+    # 50 GB free today, so this is a ceiling rather than a constraint.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
     container_name: nginx-proxy  # Optional, for easier reference
     ports:
@@ -123,6 +223,18 @@ services:
 
   letsencrypt:
     image: jrcs/letsencrypt-nginx-proxy-companion
+    # Cap the json-file log. Docker's default driver grows without bound, and
+    # this droplet's known failure mode is filling up — a full disk makes
+    # `compose pull` fail and `up` silently re-run the stale image. The
+    # gunicorn access log this change switches on writes a line per request,
+    # which is exactly the kind of steady drip that gets there.
+    # 30 MB per service, measured against 1.7 MB of total container logs and
+    # 50 GB free today, so this is a ceiling rather than a constraint.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
     depends_on:
       - nginx-proxy

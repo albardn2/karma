@@ -45,7 +45,35 @@ from app.adapters.repositories.vehicle_inventory_repository import VehicleInvent
 from app.adapters.repositories.vehicle_inventory_event_repository import VehicleInventoryEventRepository
 
 SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")  # type: ignore
-DEFAULT_SESSION_FACTORY = sessionmaker(autocommit=False, autoflush=True, bind=create_engine(SQLALCHEMY_DATABASE_URI))
+
+# Per-session Postgres settings, supplied PER SERVICE by the compose file.
+# Deliberately not set server-side: the API wants a statement timeout, but the
+# same engine is imported by location_ingest (whose hourly purge bulk-deletes
+# from the largest table) and by daily_tasks, and a server-wide timeout would
+# also apply to alembic during a deploy. Empty here means "no timeouts", which
+# is what every non-web service gets.
+_PG_SESSION_OPTIONS = os.getenv("PG_SESSION_OPTIONS", "").strip()
+
+# Sized against max_connections=100. Each gunicorn WORKER is its own process
+# with its own pool, so the API's ceiling is workers x (pool_size +
+# max_overflow) = 3 x 8 = 24, plus location_ingest and daily_tasks.
+# pool_pre_ping is the one that shows up as a user-visible bug without it: a
+# connection the database has already closed (every deploy restarts Postgres)
+# is handed to the next request, which 500s in ~5ms and succeeds on retry —
+# the "it broke, I refreshed, it was fine" report.
+# pool_timeout is 10 rather than the default 30 because a caller blocking half
+# a minute on an exhausted pool is indistinguishable from the hang this whole
+# change exists to remove.
+DEFAULT_ENGINE = create_engine(
+    SQLALCHEMY_DATABASE_URI,
+    pool_pre_ping=True,
+    pool_recycle=1800,
+    pool_size=4,
+    max_overflow=4,
+    pool_timeout=10,
+    connect_args={"options": _PG_SESSION_OPTIONS} if _PG_SESSION_OPTIONS else {},
+)
+DEFAULT_SESSION_FACTORY = sessionmaker(autocommit=False, autoflush=True, bind=DEFAULT_ENGINE)
 
 
 _UNSET = object()

@@ -318,6 +318,13 @@ def create_app(config_object=Config):
     jwt.init_app(app)
 
     app.before_request(_load_request_identity)
+
+    # Restores what moving to threads took away: gunicorn's --timeout is a
+    # worker-LIVENESS timeout, so under gthread a request stuck in a pure CPU
+    # loop occupies its thread forever and nothing recovers. Measured. See
+    # app/request_watchdog.py for why the other hang sources do not need it.
+    from app.request_watchdog import install as _install_watchdog
+    _install_watchdog(app)
     app.after_request(_emit_perms_version)
 
     # Register blueprints
