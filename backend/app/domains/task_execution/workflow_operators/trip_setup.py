@@ -14,6 +14,8 @@ Strategies:
                    the form; it exists so old routed executions resolve to the
                    path that can actually read their stored inputs.
 """
+from app.entrypoint.routes.common.errors import BadRequestError
+
 MANUAL = "manual"
 LEGACY_CLUSTER = "legacy_cluster"
 
@@ -49,6 +51,29 @@ def resolve_strategy(result) -> str:
     if "start_warehouse_name" in result:
         return LEGACY_CLUSTER
     return MANUAL
+
+
+def load_strategy_config(uow, name: str):
+    """The saved strategy's validated config, by the name the form stored.
+
+    Lifted out of trip_route_operator so the pool preview and the route step
+    cannot resolve a name differently. find_by_name_ci is the ONLY
+    case-folding authority — never pre-lower the name here (see
+    resolve_strategy above on why Python's lower() and SQL's disagree).
+
+    Re-validating is not paranoia: the row is JSONB data, so a hand-edited or
+    stale config must fail loudly here rather than be counted against in a
+    preview and then 400 when someone actually runs it.
+    """
+    from app.dto.routing_strategy import RoutingStrategyConfig
+
+    row = uow.routing_strategy_repository.find_by_name_ci(name)
+    if not row:
+        raise BadRequestError(
+            f"Routing strategy '{name}' no longer exists. "
+            "Re-run the setup step with an available strategy."
+        )
+    return RoutingStrategyConfig(**(row.config or {}))
 
 
 def resolve_assignee(uow, raw):

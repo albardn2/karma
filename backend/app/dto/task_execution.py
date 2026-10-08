@@ -99,3 +99,49 @@ class TaskExecutionComplete(BaseModel):
     completed_by_uuid: Optional[str] = None  # UUID of the user completing the task execution
     uuid: str  # UUID of the task execution to complete
     result: Optional[Dict[str, Any]] = {}  # Result data to store
+
+# --------------------------------------------------------------------------
+# The setup form's strategy pool preview: how many customers each of the
+# picked strategy's priorities matches RIGHT NOW, for the service areas
+# ticked on the form. Counts only — deliberately NOT the <Resource>Page
+# shape, because there is no items array and nothing to paginate.
+
+
+class StrategyPoolPreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # the strategy NAME exactly as the form holds it. Never pre-lowered:
+    # find_by_name_ci is the only case-folding authority.
+    strategy: str = Field(..., min_length=1, max_length=64)
+    # service area NAMES. [] means EVERYWHERE (the whole tenant), matching
+    # the route step's polygon=None — it does not mean "nowhere".
+    service_areas: List[str] = Field(default_factory=list, max_length=500)
+
+
+class StrategyPriorityPoolCount(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # 0-based, == config.priorities[index]; a priority has no name field
+    index: int = Field(..., ge=0)
+    count: int = Field(..., ge=0)
+    # echoed so the row's own cap is visible without the preview simulating
+    # it — simulating would be the selection logic a preview must not run
+    max_stops: Optional[int] = None
+
+
+class StrategyPoolPreviewRead(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # False (with 200, never 400) for manual/legacy_cluster: a debounced
+    # request can land after the dispatcher switches to manual, and a red
+    # error on a correct selection is exactly what this must not add
+    applicable: bool
+    # customers eligible at all in these areas, before any priority filter —
+    # the denominator that separates "empty areas" from "narrow strategy"
+    eligible_pool: int = Field(..., ge=0)
+    # deduped union across priorities: a hard ceiling on what a run can pick
+    total: int = Field(..., ge=0)
+    priorities: List[StrategyPriorityPoolCount] = Field(default_factory=list)
+    # sum(counts) > total; computed here so the copy has one source of truth
+    overlaps: bool = False
+    unmatched_service_areas: List[str] = Field(default_factory=list)

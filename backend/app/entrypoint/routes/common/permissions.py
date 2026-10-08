@@ -160,6 +160,7 @@ SELF_SCOPED_DASHBOARD_ENDPOINTS = {
 # Flask endpoint names: blueprint.function.
 READ_SHAPED_POST_ENDPOINTS = {
     "customer.query_customers",
+    "task_execution.strategy_pool_preview",
 }
 MODULE_SET = set(MODULES)
 ACTION_SET = set(ACTIONS)
