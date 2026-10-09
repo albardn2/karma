@@ -13,8 +13,19 @@ services:
       timeout: 2s
       retries: 5
     command: postgres -c listen_addresses='*'
+    # 127.0.0.1 ONLY. Published as "5432:5432" this was reachable from the
+    # public internet, and the credentials are three lines below in this same
+    # committed file. Docker publishes ports by writing iptables rules that
+    # BYPASS ufw, so a host firewall would not have covered this — the bind
+    # address is the fix.
+    #
+    # Nothing needs the published port: web, migrate, location-ingest and
+    # daily-tasks all reach the database as `db:5432` over the `proxy`
+    # network. Keeping it on loopback rather than deleting it preserves
+    # admin access over an SSH tunnel:
+    #   ssh -L 5432:127.0.0.1:5432 root@<droplet>
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -39,8 +50,16 @@ services:
     restart: always
     depends_on:
       - db
+    # 127.0.0.1 ONLY. Published as "5000:5000" the API answered in PLAIN
+    # HTTP on the droplet's public IP, bypassing nginx-proxy and TLS
+    # entirely — so a JWT sent to it travelled unencrypted.
+    #
+    # nginx-proxy does not use this port: it discovers the container through
+    # docker.sock and connects to VIRTUAL_PORT over the `proxy` network.
+    # docker-compose.dev.yaml proves the pattern — its web service publishes
+    # nothing at all (`expose: "5000"`) and api-dev serves fine.
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     environment:
       SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
       # JWT signing secret; comes from the droplet-side .env written by the
