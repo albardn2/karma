@@ -72,8 +72,15 @@ class _Repo:
         self._trips = trips
         self.calls = []
 
-    def find_all_by_filters_paginated(self, filters, page, per_page):
-        self.calls.append({"filters": filters, "page": page, "per_page": per_page})
+    def find_all_by_filters_paginated(self, filters, page, per_page, ordering=None, options=None):
+        # `options` mirrors the real repository: the summary passes eager
+        # loaders because it walks each trip's stops -> payments and
+        # stops -> inventory events. Recorded rather than ignored so a
+        # caller that stops passing them is visible here too.
+        self.calls.append({
+            "filters": filters, "page": page, "per_page": per_page,
+            "ordering": ordering, "options": options,
+        })
         return _Page(list(self._trips))
 
 

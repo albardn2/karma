@@ -2,6 +2,7 @@
 from flask import Blueprint, g, request, jsonify
 from sqlalchemy import func
 from shapely import wkt as shapely_wkt
+from app.adapters.repositories.trip_repository import TRIP_SERIALIZATION_LOADERS
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.common.errors import ApiError, BadRequestError, NotFoundError
 from app.dto.trip import (
@@ -449,6 +450,10 @@ def list_trips():
             filters=filters,
             page=params.page,
             per_page=params.per_page,
+            # TripRead's derived cash/stock fields walk stops -> payments and
+            # stops -> inventory events while serializing. Without these the
+            # page costs ~9 queries PER TRIP; with them it is a fixed handful.
+            options=TRIP_SERIALIZATION_LOADERS,
         )
 
         # batch-resolve each trip's assignee (start_trip result, stored as
