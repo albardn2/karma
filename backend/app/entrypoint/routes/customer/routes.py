@@ -6,6 +6,7 @@ from geoalchemy2 import WKTElement
 from pydantic import  ValidationError
 from sqlalchemy import func, select
 
+from app.adapters.repositories.customer_repository import CUSTOMER_SERIALIZATION_LOADERS
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.customer import customer_blueprint
 
@@ -326,7 +327,8 @@ def list_customers():
             filters=filters,
             page=params.page,
             per_page=params.per_page,
-            ordering=ordering
+            ordering=ordering,
+            options=CUSTOMER_SERIALIZATION_LOADERS,
         )
         items = [
             CustomerRead.from_orm(c).model_dump(mode='json')

@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
+from app.adapters.repositories.invoice_repository import INVOICE_SERIALIZATION_LOADERS
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.common.errors import NotFoundError
 from app.dto.invoice import (
@@ -100,7 +101,8 @@ def list_invoices():
         page_obj = uow.invoice_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
-            per_page=params.per_page
+            per_page=params.per_page,
+            options=INVOICE_SERIALIZATION_LOADERS,
         )
         items = [InvoiceRead.from_orm(i).model_dump(mode='json') for i in page_obj.items]
         result = InvoicePage(

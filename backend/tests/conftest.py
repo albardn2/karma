@@ -84,9 +84,17 @@ class DummyRepo:
             per_page=per_page
         )
 
-    def find_all_by_filters_paginated(self, filters=None, page: int = 1, per_page: int = 20, ordering=None):
+    def find_all_by_filters_paginated(self, filters=None, page: int = 1, per_page: int = 20,
+                                      ordering=None, options=None):
         # we ignore filters/ordering in the dummy,
-        # but still return a real Pagination
+        # but still return a real Pagination.
+        #
+        # `options` mirrors the real signature: the list routes pass
+        # selectinload chains so their DTOs' derived fields do not each fetch
+        # their own row. A dummy that omits the parameter raises TypeError on
+        # every route that passes it — which is how this was discovered, as a
+        # sudden crop of unrelated-looking failures.
+        self.last_options = options
         return self.find_all_paginated(page, per_page)
 
 class DummySession:

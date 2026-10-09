@@ -7,11 +7,44 @@ from app.adapters.repositories._abstract_repo import AbstractRepository
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Polygon, MultiPolygon
 
+from sqlalchemy.orm import selectinload
+
+from app.adapters.repositories._serialization_loaders import INVOICE_MONEY_LOADERS
 from app.dto.trip_stop import FINISHED_TRIP_STOP_STATUSES
 from models.common import (
+    CreditNoteItem,
     Customer,
+    CustomerOrder,
+    DebitNoteItem,
     TripStop,
 )
+
+
+# Everything CustomerRead's balance_per_currency walks while a customer is
+# serialized. Mirrors models/common.py exactly:
+#
+#   balance_per_currency (292) -> _calculate_balance_per_currency (268), which
+#   runs TWICE, once per currency; the second pass is free only because the
+#   first already loaded the graph.
+#
+#   orders (270) -> invoices (273) -> the invoice money graph, shared from
+#                   _serialization_loaders.INVOICE_MONEY_LOADERS
+#   debit_note_items (279)  -> DebitNoteItem.amount_due (1772)
+#                              -> amount_paid (1755) -> payments (1757)
+#   credit_note_items (284) -> CreditNoteItem.amount_due (1885)
+#                              -> amount_paid (1865) -> payouts (1867)
+#
+# This field is REQUIRED on CustomerRead (dto/customer.py:226), so it runs for
+# every row of every customer list. If one of those properties grows a hop,
+# add it here or the page quietly returns to one query per row — which is why
+# tests/domains/test_list_eager_loading.py asserts the hop set EXACTLY.
+CUSTOMER_SERIALIZATION_LOADERS = [
+    selectinload(Customer.orders)
+    .selectinload(CustomerOrder.invoices)
+    .options(*INVOICE_MONEY_LOADERS),
+    selectinload(Customer.debit_note_items).selectinload(DebitNoteItem.payments),
+    selectinload(Customer.credit_note_items).selectinload(CreditNoteItem.payouts),
+]
 
 
 class CustomerRepository(AbstractRepository[Customer]):
@@ -95,6 +128,10 @@ class CustomerRepository(AbstractRepository[Customer]):
             .filter(*self._scope_filters(None))
             .filter(Customer.is_deleted == False)  # noqa: E712
             .filter(Customer.coordinates.isnot(None))
+            # unpaginated and fully serialized by its one caller, so the whole
+            # balance graph is walked for every matched row — 938 statements
+            # before this line
+            .options(*CUSTOMER_SERIALIZATION_LOADERS)
             .all()
         )
 
@@ -109,6 +146,9 @@ class CustomerRepository(AbstractRepository[Customer]):
             self._session.query(Customer)
             .filter(*self._scope_filters(None))
             .filter(Customer.is_deleted == False)  # noqa: E712
+            # as above: POST /customer/query serializes every match, 1031
+            # statements before this line
+            .options(*CUSTOMER_SERIALIZATION_LOADERS)
             .all()
         )
 

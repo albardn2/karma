@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
+from app.adapters.repositories.customer_order_repository import CUSTOMER_ORDER_SERIALIZATION_LOADERS
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.common.errors import NotFoundError
 from app.dto.customer_order import (
@@ -179,7 +180,8 @@ def list_customer_orders():
         page_obj = uow.customer_order_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
-            per_page=params.per_page
+            per_page=params.per_page,
+            options=CUSTOMER_ORDER_SERIALIZATION_LOADERS,
         )
         # enrich each order with its trip stop's date (if linked)
         from models.common import TripStop as TripStopModel
