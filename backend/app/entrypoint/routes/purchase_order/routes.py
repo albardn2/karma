@@ -1,6 +1,7 @@
 from flask import request, jsonify
 from pydantic import ValidationError
 
+from app.adapters.repositories.purchase_order_repository import PURCHASE_ORDER_SERIALIZATION_LOADERS
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.dto.purchase_order import (
     PurchaseOrderCreate, PurchaseOrderRead,
@@ -149,7 +150,8 @@ def list_orders():
         page_obj = uow.purchase_order_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
-            per_page=params.per_page
+            per_page=params.per_page,
+            options=PURCHASE_ORDER_SERIALIZATION_LOADERS,
         )
         items = [
             PurchaseOrderRead.from_orm(po).model_dump(mode='json')

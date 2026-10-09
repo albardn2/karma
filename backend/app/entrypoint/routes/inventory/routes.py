@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from app.adapters.repositories.inventory_repository import INVENTORY_SERIALIZATION_LOADERS
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.common.errors import NotFoundError, BadRequestError
 from app.dto.inventory import (
@@ -133,7 +134,8 @@ def list_inventories():
         page_obj = uow.inventory_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
-            per_page=params.per_page
+            per_page=params.per_page,
+            options=INVENTORY_SERIALIZATION_LOADERS,
         )
         # enrich items with cost per unit
         items = []
