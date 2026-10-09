@@ -184,9 +184,27 @@ class AbstractRepository(Generic[BASE]):
             page: int,
             per_page: int,
             ordering: Optional[list[Any]] = None,
+            options: Optional[list[Any]] = None,
     ) -> Pagination[BASE]:
         """
         Paginate results of a complex filtered query.
+
+        `options` takes SQLAlchemy loader options (selectinload chains) for a
+        caller whose serialization walks relationships. None of the 122
+        relationships in models/common.py sets `lazy=`, so every one of them
+        is fetched on first access, one query per parent row — a list page
+        that reads them costs hundreds of round trips to render twenty rows.
+
+        Two rules the implementation enforces, both easy to get wrong:
+
+          * The options go on the PAGE query only, never on `total`. A
+            loader option on a COUNT(*) makes the database fetch collections
+            whose rows are then thrown away.
+          * Pass selectinload, not joinedload. joinedload emits a JOIN, so a
+            trip with 15 stops becomes 15 duplicate rows and LIMIT 20 then
+            returns 20 ROWS rather than 20 trips — the wrong page, silently.
+            selectinload issues a second `WHERE parent_id IN (...)` query
+            instead, which leaves the pagination intact.
         """
         query: Query = self._session.query(self._type)
         filters = self._scope_filters(filters)
@@ -199,7 +217,8 @@ class AbstractRepository(Generic[BASE]):
             query = query.order_by(self._type.created_at.desc())
         total = query.count()
         offset = (page - 1) * per_page
-        items = query.offset(offset).limit(per_page).all()
+        page_query = query.options(*options) if options else query
+        items = page_query.offset(offset).limit(per_page).all()
         return Pagination(items, total, page, per_page)
 
     def _find_all_by_filters(

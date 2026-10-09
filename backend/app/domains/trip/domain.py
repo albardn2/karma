@@ -5,6 +5,7 @@ from app.entrypoint.routes.common.errors import NotFoundError,BadRequestError
 from models.common import Trip as TripModel
 from app.dto.trip import TripRead, TripCreate
 from app.dto.trip import TripUpdate
+from app.adapters.repositories.trip_repository import TRIP_SERIALIZATION_LOADERS
 from app.dto.trip import (
     MAX_SUMMARY_TRIPS,
     TripSummary,
@@ -93,6 +94,13 @@ class TripDomain:
             ],
             page=1,
             per_page=MAX_SUMMARY_TRIPS,
+            # This rollup reads the same per-trip properties the list route
+            # does, and reaches deeper into them — measured at ~15 queries
+            # per trip, so a 100-trip selection (the cap) was ~1,500 round
+            # trips in one request. Unlike the list, the summary genuinely
+            # NEEDS these figures, so eager loading is the only fix available
+            # to it.
+            options=TRIP_SERIALIZATION_LOADERS,
         )
         trips = page.items
         found = {t.uuid for t in trips}
