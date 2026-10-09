@@ -14,8 +14,19 @@ services:
       timeout: 2s
       retries: 5
     command: postgres -c listen_addresses='*'
+    # 127.0.0.1 ONLY. Published as "5432:5432" this was reachable from the
+    # public internet, and the credentials are three lines below in this same
+    # committed file. Docker publishes ports by writing iptables rules that
+    # BYPASS ufw, so a host firewall would not have covered this — the bind
+    # address is the fix.
+    #
+    # Nothing needs the published port: web, migrate, location-ingest and
+    # daily-tasks all reach the database as `db:5432` over the `proxy`
+    # network. Keeping it on loopback rather than deleting it preserves
+    # admin access over an SSH tunnel:
+    #   ssh -L 5432:127.0.0.1:5432 root@<droplet>
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
