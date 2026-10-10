@@ -1,0 +1,92 @@
+# Read-only droplet facts, on demand.
+#
+# WHY THIS EXISTS. Sizing decisions keep stalling on two numbers nobody can
+# get: how many vCPUs the droplet has and how much RAM is free. Outbound
+# port 22 is blocked on the maintainer's network, so `ssh root@droplet` is
+# not available to them — but GitHub's runners already SSH in to deploy, so
+# they can read these facts on request.
+#
+# The gunicorn worker count in particular is NOT a matter of taste: measured
+# on this app, 3 workers x 4 threads is +88% throughput at 2 vCPUs and makes
+# the customer list 9x SLOWER at 1 vCPU. Same for adding a self-hosted OSRM
+# container, which needs RAM headroom on a box already running Postgres, the
+# API, the MQTT ingest and the nightly tasks.
+#
+# EVERY COMMAND HERE IS READ-ONLY. Nothing starts, stops, pulls, prunes or
+# writes. Keep it that way: this workflow is meant to be safe to run at any
+# time, including while something is on fire.
+name: OPS – Droplet Diagnostics (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which droplet to inspect'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - dev
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Inspect ${{ inputs.target }} droplet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read droplet facts over SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ inputs.target == 'prod' && secrets.PROD_DROPLET_HOST || secrets.DEV_DROPLET_HOST }}
+          username: root
+          password: ${{ inputs.target == 'prod' && secrets.PROD_DROPLET_PASSWORD || secrets.DEV_DROPLET_PASSWORD }}
+          port: 22
+          script: |
+            echo "=============================================================="
+            echo " CPU  — decides the gunicorn worker/thread count"
+            echo "=============================================================="
+            echo "vCPUs (nproc): $(nproc)"
+            grep -m1 'model name' /proc/cpuinfo || true
+            echo "load average:$(cut -d' ' -f1-3 /proc/loadavg)   (compare to vCPU count)"
+            echo
+            echo "=============================================================="
+            echo " MEMORY — decides whether more workers / an OSRM container fit"
+            echo "=============================================================="
+            free -m
+            echo
+            echo "swap configured?"
+            swapon --show || echo "  NONE — an out-of-memory event kills a process outright"
+            echo
+            echo "=============================================================="
+            echo " DISK — this droplet has filled up before"
+            echo "=============================================================="
+            df -h / /var 2>/dev/null || df -h
+            echo
+            echo "docker space:"
+            docker system df 2>/dev/null || true
+            echo
+            echo "=============================================================="
+            echo " CONTAINERS — what is actually sharing this box"
+            echo "=============================================================="
+            docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null || true
+            echo
+            echo "per-container memory and CPU right now:"
+            docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.CPUPerc}}' 2>/dev/null || true
+            echo
+            echo "=============================================================="
+            echo " GUNICORN — how many workers are actually serving"
+            echo "=============================================================="
+            echo "process list:"
+            docker compose -f /root/app/backend/docker-compose.prod.yaml exec -T web ps -ef 2>/dev/null | grep '[g]unicorn' \
+              || docker compose -f /root/app/backend/docker-compose.dev.yaml exec -T web ps -ef 2>/dev/null | grep '[g]unicorn' \
+              || echo "  (could not read; compose file path differs)"
+            echo
+            echo "=============================================================="
+            echo " LOG GROWTH — unrotated json-file logs are a disk-fill risk"
+            echo "=============================================================="
+            du -sh /var/lib/docker/containers 2>/dev/null || true
+            echo "largest container logs:"
+            du -h /var/lib/docker/containers/*/*-json.log 2>/dev/null | sort -rh | head -5 || true
