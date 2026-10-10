@@ -4,6 +4,7 @@ from dotenv import load_dotenv, dotenv_values
 from flask import Flask
 from app.config import Config
 from flask_jwt_extended import JWTManager
+from flask_compress import Compress
 from flask_cors import CORS
 
 from app.entrypoint.routes.common.errors import register_error_handlers
@@ -270,6 +271,30 @@ def create_app(config_object=Config):
     # exactly the sort of asymmetry that would have looked like "works on mobile,
     # broken on web" instead of a missing config line.
     CORS(app, expose_headers=[PERMS_VERSION_HEADER])
+
+    # Compress responses. The API was shipping JSON uncompressed: a page of
+    # 100 customers is 75,611 bytes on the wire and 7,334 gzipped — 90% of
+    # every list response was redundant, on an app whose users are on mobile
+    # networks in Syria.
+    #
+    # It looked solved and was not. backend/Caddyfile carries `encode gzip`
+    # and backend/nginx/conf.d/default.conf sets gzip on, but production runs
+    # jwilder/nginx-proxy and mounts NEITHER file — so both are dead config
+    # describing a deployment that does not exist. Verified against the live
+    # API before writing this: no Content-Encoding on any response.
+    #
+    # Doing it in Flask rather than at the proxy keeps it true regardless of
+    # which proxy is in front, which is the thing that went wrong before.
+    #
+    # gzip only, deliberately. flask-compress would otherwise prefer brotli,
+    # which compresses a little better for noticeably more CPU — and CPU is
+    # the scarce resource here, with one gunicorn worker on a shared droplet.
+    # gzip already removes ~90%; the rest is not worth the cycles.
+    app.config.setdefault("COMPRESS_ALGORITHM", ["gzip"])
+    # below this, framing overhead outweighs the saving
+    app.config.setdefault("COMPRESS_MIN_SIZE", 500)
+    app.config.setdefault("COMPRESS_LEVEL", 6)
+    Compress(app)
 
     # load configs from .env
     app.config.from_object(Config)
