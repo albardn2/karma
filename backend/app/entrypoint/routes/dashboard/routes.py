@@ -6,6 +6,12 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import func, or_
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+from app.domains.customer.auto_tags import INTEREST_KEY, SALE_KEY
+from app.domains.customer.tag_funnels import (
+    FUNNEL_TAGS,
+    build_payload as build_tag_funnels,
+    resolve_window,
+)
 from app.domains.exchange_rate.converter import CurrencyConverter
 from app.dto.auth import PermissionScope
 from app.dto.trip import TripStatus
@@ -14,6 +20,7 @@ from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.dashboard import dashboard_blueprint
 from models.common import (
     Customer as CustomerModel,
+    CustomerTagEvent as CustomerTagEventModel,
     CustomerOrder as CustomerOrderModel,
     Expense as ExpenseModel,
     Invoice as InvoiceModel,
@@ -2193,3 +2200,74 @@ def user_material_profitability():
         if not uow.user_repository.find_one(uuid=user_uuid, is_deleted=False):
             raise NotFoundError("User not found")
     return jsonify(_material_profitability_result(created_by_uuid=user_uuid)), 200
+
+
+# ---------------------------------------------------------------------------
+# Tag funnels — where every live customer stands on the sale ladder
+# (no_sale -> one_time_sale -> repeated_sale) and the interest ladder
+# (unknown -> not_interested -> interested), and how the last
+# week/month/quarter/year moved them. The arithmetic and its reasoning live in
+# app/domains/customer/tag_funnels.py; this is only the fetch.
+#
+# Current counts are read from customer.tags, change from customer_tag_event,
+# and BOTH are restricted to live customers — the event join below is what
+# keeps the two halves of the card describing the same people.
+
+
+@dashboard_blueprint.route("/tag-funnels", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    # the same roles as /new-customers: this is the customer book seen from
+    # another angle. Roles reach it only if they also hold the `dashboard`
+    # module (role_presets) — see the DASHBOARD_DEFAULTS note in permissions.py
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.ACCOUNTANT.value,
+)
+def tag_funnels():
+    """?window=week|month|quarter|year (rolling, default month)."""
+    window, days = resolve_window(request.args.get("window"))
+    until = datetime.utcnow()
+    since = until - timedelta(days=days)
+
+    with SqlAlchemyUnitOfWork() as uow:
+        s = uow.session
+        live = (
+            CustomerModel.account_uuid == uow.account_uuid,
+            CustomerModel.is_deleted.is_(False),
+        )
+        total = s.query(func.count(CustomerModel.uuid)).filter(*live).scalar() or 0
+        # only the customers standing on some step need to leave the database;
+        # everyone else is "no tag" and the total accounts for them. Counted in
+        # Python so the same arithmetic serves the tests without a Postgres.
+        tag_lists = [
+            tags for (tags,) in
+            s.query(CustomerModel.tags)
+            .filter(*live, CustomerModel.tags.overlap(list(FUNNEL_TAGS)))
+            .all()
+        ]
+        created = (
+            s.query(func.count(CustomerModel.uuid))
+            .filter(*live, CustomerModel.created_at >= since)
+            .scalar()
+            or 0
+        )
+        E = CustomerTagEventModel
+        moves = (
+            s.query(E.key, E.old_value, E.new_value, func.count(E.uuid))
+            .join(CustomerModel, CustomerModel.uuid == E.customer_uuid)
+            .filter(
+                E.account_uuid == uow.account_uuid,
+                E.key.in_([SALE_KEY, INTEREST_KEY]),
+                E.created_at >= since,
+                *live,
+            )
+            .group_by(E.key, E.old_value, E.new_value)
+            .all()
+        )
+
+    return jsonify(build_tag_funnels(
+        window=window, days=days, since=since, until=until,
+        total=total, tag_lists=tag_lists, moves=moves, created=created,
+    )), 200

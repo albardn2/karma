@@ -19,6 +19,7 @@ import CustomerOrdersDashboard from "@/pages/CustomerOrdersDashboard";
 import MaterialsSoldDashboard from "@/pages/MaterialsSoldDashboard";
 import MaterialProfitabilityDashboard from "@/pages/MaterialProfitabilityDashboard";
 import NewCustomersDashboard from "@/pages/NewCustomersDashboard";
+import TagFunnelsDashboard from "@/pages/TagFunnelsDashboard";
 import TripStopsDashboard from "@/pages/TripStopsDashboard";
 import MyTripStopsDashboard from "@/pages/MyTripStopsDashboard";
 import Customers from "@/pages/Customers";
@@ -129,6 +130,7 @@ function Router() {
       <Route path="/dashboards/materials-sold" component={() => <ProtectedRoute><MaterialsSoldDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/material-profitability" component={() => <ProtectedRoute><MaterialProfitabilityDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/new-customers" component={() => <ProtectedRoute><NewCustomersDashboard /></ProtectedRoute>} />
+      <Route path="/dashboards/tag-funnels" component={() => <ProtectedRoute><TagFunnelsDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/trip-stops" component={() => <ProtectedRoute><TripStopsDashboard /></ProtectedRoute>} />
       <Route path="/dashboards/my-revenue" component={() => <ProtectedRoute><RevenueOverTimeDashboard mine /></ProtectedRoute>} />
       <Route path="/dashboards/my-materials-sold" component={() => <ProtectedRoute><MaterialsSoldDashboard mine /></ProtectedRoute>} />
