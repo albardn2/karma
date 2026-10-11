@@ -3,6 +3,8 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   ArrowDown,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Minus,
   TrendingDown,
   TrendingUp,
@@ -16,7 +18,10 @@ import { useLanguage } from "@/contexts/LanguageContext";
 interface Step {
   /** the tag's value half; null = carries no tag for the key */
   value: string | null;
+  /** customers on the step today */
   current: number;
+  /** customers on the step when the period ended — equals `current` for the current period */
+  at_period_end: number;
   net_change: number;
   entered: number;
   left: number;
@@ -30,73 +35,176 @@ interface Funnel {
   key: string;
   steps: Step[];
   transitions: Move[];
+  /** live customers the funnel cannot place, today */
   outside: number;
+  /** the same at the period's end — equals `outside` for the current period */
+  outside_at_period_end: number;
+}
+interface Period {
+  granularity: Gran;
+  offset: number;
+  label: string;
+  /** first day of the period, YYYY-MM-DD */
+  start: string;
+  /** first day AFTER the period, YYYY-MM-DD */
+  end: string;
+  is_current: boolean;
 }
 interface Payload {
-  window: Win;
-  days: number;
-  since: string;
-  until: string;
+  period: Period;
+  /** when this tenant's tag log begins; null when nothing has been logged yet */
+  history_from: string | null;
   total_customers: number;
+  /** live customers at the period's end — equals total_customers for the current period */
+  total_at_period_end: number;
   new_customers: number;
   funnels: { sale: Funnel; interest: Funnel };
 }
 
-type Win = "week" | "month" | "quarter" | "year";
+type Gran = "week" | "month" | "quarter" | "year";
 
-// "change": the steps with the window's net change, the arrows labelled with
-// who moved, and the moves table — the view the dashboard was built around,
-// and the default. "current": where every live customer stands right now —
-// counts and each step's share of the funnel, nothing about movement. Two
-// questions, so two views rather than one busy one.
+// "change": the steps as they stood at the end of a calendar period, the
+// period's net change, the arrows labelled with who moved, and the moves
+// table — the view the dashboard was built around, and the default.
+// "current": where every live customer stands right now — counts and each
+// step's share of the funnel, nothing about movement. Two questions, so two
+// views rather than one busy one.
 type Mode = "current" | "change";
 
-// the rolling windows, mirroring WINDOW_DAYS on the server; read from here
-// rather than from the payload so the labels follow the toggle even while
-// the next window is still loading (or failed to)
-const DAYS: Record<Win, number> = { week: 7, month: 30, quarter: 91, year: 365 };
+// how far back ‹ may step, per granularity — mirrors MAX_OFFSET on the server
+// so the button greys out instead of the server silently clamping
+const MAX_OFFSET: Record<Gran, number> = { week: 104, month: 36, quarter: 12, year: 5 };
 
 // null is a legitimate step value (the interest funnel's Unknown), so steps
 // and moves are keyed through this rather than through the value itself
 const k = (v: string | null) => (v === null ? "none" : v);
 
+/** A YYYY-MM-DD string as a local date — `new Date("2026-09-01")` would read
+ * it as UTC midnight and show the previous day anywhere west of Greenwich. */
+function localDate(ymd: string): Date {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+const ymd = (d: Date) =>
+  `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+
 /**
- * The sale and interest funnels: where every live customer stands today, and
- * how the chosen window moved them.
+ * The period the navigator is pointing at, worked out on the client the same
+ * way the server does (UTC calendar, Monday weeks), so its name can follow
+ * the ‹ › clicks immediately — while the payload is still loading, and even
+ * if it fails — instead of lagging behind the last successful fetch. The
+ * server's own `period` is still what the numbers describe.
+ */
+function expectedPeriod(gran: Gran, offset: number): Period {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  let start: Date;
+  let end: Date;
+  if (gran === "year") {
+    start = new Date(Date.UTC(y - offset, 0, 1));
+    end = new Date(Date.UTC(y - offset + 1, 0, 1));
+  } else if (gran === "quarter") {
+    const q0 = Math.floor(m / 3) * 3 - 3 * offset;
+    start = new Date(Date.UTC(y, q0, 1));
+    end = new Date(Date.UTC(y, q0 + 3, 1));
+  } else if (gran === "month") {
+    start = new Date(Date.UTC(y, m - offset, 1));
+    end = new Date(Date.UTC(y, m - offset + 1, 1));
+  } else {
+    const monday = new Date(Date.UTC(y, m, now.getUTCDate() - ((now.getUTCDay() + 6) % 7) - 7 * offset));
+    start = monday;
+    end = new Date(Date.UTC(y, m, monday.getUTCDate() + 7));
+  }
+  return { granularity: gran, offset, label: "", start: ymd(start), end: ymd(end), is_current: offset === 0 };
+}
+
+/**
+ * The sale and interest funnels: where every live customer stands, and how a
+ * calendar week, month, quarter or year moved them.
  *
- * Each step shows the customers on it NOW (from their tags), a badge with the
- * net change over the window (moves in minus moves out, from the tag event
- * log), and — for the first step — how many newcomers arrived. The arrow
- * between two steps carries the number who moved forward in the window; a
- * small undo mark under it counts those who moved back (a voided order).
+ * In the change view each step shows the customers on it at the END of the
+ * chosen period (today, for the current one), a badge with the period's net
+ * change (moves in minus moves out, from the tag event log), and — for the
+ * first step — how many newcomers arrived. The arrow between two steps
+ * carries the number who moved forward in the period; a small undo mark
+ * under it counts those who moved back (a voided order). ‹ › walk through
+ * past periods, the way the materials-sold navigator does.
  */
 export default function TagFunnelsDashboard({ embedded = false }: { embedded?: boolean }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [mode, setMode] = useState<Mode>("change");
-  const [win, setWin] = useState<Win>("month");
+  const [gran, setGranState] = useState<Gran>("month");
+  const [offset, setOffset] = useState(0);
+  // switching granularity re-anchors to the current period — an offset of 3
+  // means something different in weeks than in years
+  const setGran = (g: Gran) => {
+    setGranState(g);
+    setOffset(0);
+  };
 
-  // the current view shows nothing window-dependent, so it always reads the
-  // default window: switching to it never waits on (or fails with) whichever
-  // window was last picked in the change view
-  const effectiveWin: Win = mode === "change" ? win : "month";
+  // the current view shows nothing period-dependent, so it always reads this
+  // month: switching to it never waits on (or fails with) whichever period
+  // the change view was last on
+  const q = mode === "change" ? { gran, offset } : { gran: "month" as Gran, offset: 0 };
   const { data, isLoading, isPlaceholderData, error } = useQuery<Payload>({
-    queryKey: ["/dashboard/tag-funnels", effectiveWin],
-    queryFn: () => apiRequest(`/dashboard/tag-funnels?window=${effectiveWin}`),
+    queryKey: ["/dashboard/tag-funnels", q.gran, q.offset],
+    queryFn: () => apiRequest(`/dashboard/tag-funnels?granularity=${q.gran}&offset=${q.offset}`),
     retry: false,
-    // keep the previous window's numbers on screen (dimmed) while the next
-    // one loads, so switching the toggle updates the cards instead of
+    // keep the previous period's numbers on screen (dimmed) while the next
+    // one loads, so stepping the navigator updates the cards instead of
     // blanking them
     placeholderData: keepPreviousData,
   });
 
   const forbidden = error && /^403/.test((error as Error).message || "");
-  const days = DAYS[win];
+
+  // Western digits in both languages, as the rest of the client formats
+  // numbers; Levantine month names for Arabic
+  const locale = lang === "ar" ? "ar-SY-u-nu-latn" : "en-US";
+  const fmt = (d: Date, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale, opts).format(d);
+
+  // the period as a reader would name it: "September 2026", "Q3 2026",
+  // "2026", "Sep 7 – Sep 13, 2026" — and "(to date)" while it is still running
+  const periodName = (p: Period): string => {
+    const start = localDate(p.start);
+    let name: string;
+    if (p.granularity === "year") {
+      name = String(start.getFullYear());
+    } else if (p.granularity === "quarter") {
+      name = t("dashboards.tfQuarterLabel", { q: Math.floor(start.getMonth() / 3) + 1, year: start.getFullYear() });
+    } else if (p.granularity === "month") {
+      name = fmt(start, { month: "long", year: "numeric" });
+    } else {
+      const last = localDate(p.end);
+      last.setDate(last.getDate() - 1);
+      name = t("dashboards.tfWeekLabel", {
+        from: fmt(start, { day: "numeric", month: "short" }),
+        to: fmt(last, { day: "numeric", month: "short", year: "numeric" }),
+      });
+    }
+    return p.is_current ? t("dashboards.tfPeriodToDate", { period: name }) : name;
+  };
+  // the server's period once it has answered for THIS selection; until then
+  // (and if it never does) the one the navigator is pointing at
+  const periodLabel = periodName(data && !isPlaceholderData ? data.period : expectedPeriod(q.gran, q.offset));
+
+  // a period that began before the tag log did cannot show all of its moves.
+  // Both sides are UTC calendar dates, so compare them as such — parsing
+  // history_from as a local instant would misfire in the hours around midnight
+  const historyNote =
+    mode === "change" && data?.history_from && data.period.start < data.history_from.slice(0, 10)
+      ? t("dashboards.tfHistoryNote", {
+          date: fmt(localDate(data.history_from.slice(0, 10)), { day: "numeric", month: "long", year: "numeric" }),
+        })
+      : null;
 
   const MODES: { key: Mode; label: string }[] = [
     { key: "current", label: t("dashboards.tfModeCurrent") },
     { key: "change", label: t("dashboards.tfModeChange") },
   ];
-  const WINDOWS: { key: Win; label: string }[] = [
+  const GRANS: { key: Gran; label: string }[] = [
     { key: "week", label: t("dashboards.tfWinWeek") },
     { key: "month", label: t("dashboards.tfWinMonth") },
     { key: "quarter", label: t("dashboards.tfWinQuarter") },
@@ -106,6 +214,7 @@ export default function TagFunnelsDashboard({ embedded = false }: { embedded?: b
     `px-3 py-1 rounded-md text-xs font-medium transition-colors ${
       active ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-900"
     }`;
+  const pill = "inline-flex items-center gap-1 p-1 rounded-lg bg-gray-100 border border-gray-200";
 
   return (
     <DashboardShell embedded={embedded}>
@@ -116,11 +225,7 @@ export default function TagFunnelsDashboard({ embedded = false }: { embedded?: b
         </div>
         {!forbidden && (
           <div className="flex items-center flex-wrap gap-2">
-            <div
-              role="group"
-              aria-label={t("dashboards.tfModeGroup")}
-              className="inline-flex items-center gap-1 p-1 rounded-lg bg-gray-100 border border-gray-200"
-            >
+            <div role="group" aria-label={t("dashboards.tfModeGroup")} className={pill}>
               {MODES.map((m) => (
                 <button
                   key={m.key}
@@ -133,25 +238,50 @@ export default function TagFunnelsDashboard({ embedded = false }: { embedded?: b
                 </button>
               ))}
             </div>
-            {/* the window only means something when movement is shown */}
+            {/* the period only means something when movement is shown */}
             {mode === "change" && (
-              <div
-                role="group"
-                aria-label={t("dashboards.tfWindowGroup")}
-                className="inline-flex items-center gap-1 p-1 rounded-lg bg-gray-100 border border-gray-200"
-              >
-                {WINDOWS.map((w) => (
+              <>
+                {/* period navigator: ‹ steps back one period, › returns toward now */}
+                <div role="group" aria-label={t("dashboards.tfWindowGroup")} className={pill}>
                   <button
-                    key={w.key}
-                    onClick={() => setWin(w.key)}
-                    aria-pressed={win === w.key}
-                    data-testid={`tf-window-${w.key}`}
-                    className={toggle(win === w.key)}
+                    onClick={() => setOffset(Math.min(MAX_OFFSET[gran], offset + 1))}
+                    disabled={offset >= MAX_OFFSET[gran]}
+                    data-testid="tf-prev"
+                    aria-label={t("dashboards.tfPrevPeriod")}
+                    className="px-2 py-1 rounded-md text-gray-500 hover:text-gray-900 disabled:opacity-30"
                   >
-                    {w.label}
+                    <ChevronLeft className="w-4 h-4 rtl:rotate-180" aria-hidden="true" />
                   </button>
-                ))}
-              </div>
+                  <span
+                    className={`px-2 text-xs font-medium text-gray-900 tabular-nums whitespace-nowrap ${isPlaceholderData ? "opacity-50" : ""}`}
+                    data-testid="tf-period"
+                  >
+                    {periodLabel}
+                  </span>
+                  <button
+                    onClick={() => setOffset(Math.max(0, offset - 1))}
+                    disabled={offset === 0}
+                    data-testid="tf-next"
+                    aria-label={t("dashboards.tfNextPeriod")}
+                    className="px-2 py-1 rounded-md text-gray-500 hover:text-gray-900 disabled:opacity-30"
+                  >
+                    <ChevronRight className="w-4 h-4 rtl:rotate-180" aria-hidden="true" />
+                  </button>
+                </div>
+                <div role="group" aria-label={t("dashboards.tfGranGroup")} className={pill}>
+                  {GRANS.map((g) => (
+                    <button
+                      key={g.key}
+                      onClick={() => setGran(g.key)}
+                      aria-pressed={gran === g.key}
+                      data-testid={`tf-gran-${g.key}`}
+                      className={toggle(gran === g.key)}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -167,8 +297,8 @@ export default function TagFunnelsDashboard({ embedded = false }: { embedded?: b
           <div className="h-48 rounded-lg bg-gray-50 animate-pulse" />
         </div>
       ) : error ? (
-        // a window that failed to load — first load or a later toggle — says
-        // so, rather than sitting on a skeleton or on another window's numbers
+        // a period that failed to load — first load or a later step — says
+        // so, rather than sitting on a skeleton or on another period's numbers
         <Card>
           <CardContent className="pt-6 text-sm text-red-700" data-testid="tf-error">
             {apiErrorMessage(error, t("dashboards.noData"))}
@@ -187,9 +317,10 @@ export default function TagFunnelsDashboard({ embedded = false }: { embedded?: b
             {mode === "current"
               ? t("dashboards.tfSummaryCurrent", { total: data.total_customers.toLocaleString() })
               : t("dashboards.tfSummary", {
-                  total: data.total_customers.toLocaleString(),
+                  // the period's own total, like the steps — not today's
+                  total: data.total_at_period_end.toLocaleString(),
                   created: data.new_customers.toLocaleString(),
-                  days,
+                  period: periodLabel,
                 })}
           </p>
 
@@ -198,7 +329,7 @@ export default function TagFunnelsDashboard({ embedded = false }: { embedded?: b
             testId="tf-sale"
             funnel={data.funnels.sale}
             mode={mode}
-            days={days}
+            periodLabel={periodLabel}
             labels={{
               none: t("dashboards.tfNoTag"),
               no_sale: t("dashboards.tfNoSale"),
@@ -206,7 +337,7 @@ export default function TagFunnelsDashboard({ embedded = false }: { embedded?: b
               repeated_sale: t("dashboards.tfRepeated"),
             }}
             colors={["bg-slate-400", "bg-blue-500", "bg-green-600"]}
-            outsideText={t("dashboards.tfOutsideSale", { n: data.funnels.sale.outside.toLocaleString() })}
+            outsideText={(n) => t("dashboards.tfOutsideSale", { n: n.toLocaleString() })}
           />
 
           <FunnelCard
@@ -214,20 +345,23 @@ export default function TagFunnelsDashboard({ embedded = false }: { embedded?: b
             testId="tf-interest"
             funnel={data.funnels.interest}
             mode={mode}
-            days={days}
+            periodLabel={periodLabel}
             labels={{
               none: t("dashboards.tfUnknown"),
               not_interested: t("dashboards.tfNotInterested"),
               interested: t("dashboards.tfInterested"),
             }}
             colors={["bg-slate-400", "bg-rose-500", "bg-green-600"]}
-            outsideText={t("dashboards.tfOutsideInterest", {
-              n: data.funnels.interest.outside.toLocaleString(),
-            })}
+            outsideText={(n) => t("dashboards.tfOutsideInterest", { n: n.toLocaleString() })}
           />
 
+          {historyNote && (
+            <p className="text-xs text-amber-700" data-testid="tf-history-note">
+              {historyNote}
+            </p>
+          )}
           <p className="text-xs text-gray-500">
-            {mode === "current" ? t("dashboards.tfCurrentHint") : t("dashboards.tfChangeHint", { days })}
+            {mode === "current" ? t("dashboards.tfCurrentHint") : t("dashboards.tfChangeHint", { period: periodLabel })}
           </p>
         </div>
       )}
@@ -240,7 +374,7 @@ function FunnelCard({
   testId,
   funnel,
   mode,
-  days,
+  periodLabel,
   labels,
   colors,
   outsideText,
@@ -249,16 +383,22 @@ function FunnelCard({
   testId: string;
   funnel: Funnel;
   mode: Mode;
-  days: number;
+  periodLabel: string;
   labels: Record<string, string>;
   colors: string[];
-  outsideText: string;
+  /** the footnote for `n` customers the funnel cannot place */
+  outsideText: (n: number) => string;
 }) {
   const { t } = useLanguage();
   const name = (v: string | null) => labels[k(v)] ?? (v as string);
-  const max = Math.max(1, ...funnel.steps.map((s) => s.current));
-  // the funnel's population: everyone standing on some step (the `outside`
-  // customers are not on it, so they are not in anyone's share)
+  // the number a step shows: today's count, or where it stood when the
+  // period closed (the same thing for the current period) — and the footnote
+  // speaks of the same moment
+  const shown = (s: Step) => (mode === "change" ? s.at_period_end : s.current);
+  const outside = mode === "change" ? funnel.outside_at_period_end : funnel.outside;
+  const max = Math.max(1, ...funnel.steps.map(shown));
+  // the funnel's population today: everyone standing on some step (the
+  // `outside` customers are not on it, so they are not in anyone's share)
   const placed = funnel.steps.reduce((sum, s) => sum + s.current, 0);
 
   // the count moving between two ADJACENT steps, each way
@@ -282,6 +422,7 @@ function FunnelCard({
             <Fragment key={k(s.value)}>
               <StepBox
                 step={s}
+                count={shown(s)}
                 label={name(s.value)}
                 color={colors[i] ?? "bg-gray-400"}
                 max={max}
@@ -301,45 +442,45 @@ function FunnelCard({
         </div>
 
         {mode === "change" && (
-        <div>
-          <div className="text-xs uppercase tracking-wider text-gray-500 mb-2">
-            {t("dashboards.tfMoves", { days })}
-          </div>
-          {funnel.transitions.length === 0 ? (
-            <p className="text-sm text-gray-500">{t("dashboards.tfNoMoves")}</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-start text-xs uppercase tracking-wider text-gray-500">
-                  <th className="pb-1 text-start">{t("dashboards.tfFrom")}</th>
-                  <th className="pb-1 text-start">{t("dashboards.tfTo")}</th>
-                  <th className="pb-1 text-end">{t("dashboards.tfCustomers")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {funnel.transitions.map((m) => (
-                  <tr key={`${k(m.from)}>${k(m.to)}`} className="border-t border-gray-100">
-                    <td className="py-1.5 text-gray-700">{name(m.from)}</td>
-                    <td className="py-1.5 text-gray-700">
-                      <span className="inline-flex items-center gap-1">
-                        <ArrowRight className="h-3.5 w-3.5 text-gray-400 rtl:-scale-x-100" aria-hidden="true" />
-                        {name(m.to)}
-                      </span>
-                    </td>
-                    <td className="py-1.5 text-end tabular-nums font-medium text-gray-900">
-                      {m.count.toLocaleString()}
-                    </td>
+          <div>
+            <div className="text-xs uppercase tracking-wider text-gray-500 mb-2">
+              {t("dashboards.tfMoves", { period: periodLabel })}
+            </div>
+            {funnel.transitions.length === 0 ? (
+              <p className="text-sm text-gray-500">{t("dashboards.tfNoMoves")}</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-start text-xs uppercase tracking-wider text-gray-500">
+                    <th className="pb-1 text-start">{t("dashboards.tfFrom")}</th>
+                    <th className="pb-1 text-start">{t("dashboards.tfTo")}</th>
+                    <th className="pb-1 text-end">{t("dashboards.tfCustomers")}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                </thead>
+                <tbody>
+                  {funnel.transitions.map((m) => (
+                    <tr key={`${k(m.from)}>${k(m.to)}`} className="border-t border-gray-100">
+                      <td className="py-1.5 text-gray-700">{name(m.from)}</td>
+                      <td className="py-1.5 text-gray-700">
+                        <span className="inline-flex items-center gap-1">
+                          <ArrowRight className="h-3.5 w-3.5 text-gray-400 rtl:-scale-x-100" aria-hidden="true" />
+                          {name(m.to)}
+                        </span>
+                      </td>
+                      <td className="py-1.5 text-end tabular-nums font-medium text-gray-900">
+                        {m.count.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         )}
 
-        {funnel.outside > 0 && (
+        {outside > 0 && (
           <p className="text-xs text-amber-700" data-testid={`${testId}-outside`}>
-            {outsideText}
+            {outsideText(outside)}
           </p>
         )}
       </CardContent>
@@ -349,6 +490,7 @@ function FunnelCard({
 
 function StepBox({
   step,
+  count,
   label,
   color,
   max,
@@ -357,11 +499,13 @@ function StepBox({
   testId,
 }: {
   step: Step;
+  /** the number to show — see FunnelCard's `shown` */
+  count: number;
   label: string;
   color: string;
   max: number;
   mode: Mode;
-  /** this step's percentage of everyone standing on the funnel, unrounded */
+  /** this step's percentage of everyone standing on the funnel today, unrounded */
   share: number;
   testId: string;
 }) {
@@ -372,7 +516,7 @@ function StepBox({
     <div className="flex-1 min-w-0 rounded-lg border border-gray-200 p-3" data-testid={testId}>
       <div className="text-xs uppercase tracking-wider text-gray-500 truncate">{label}</div>
       <div className="mt-1 flex items-baseline justify-between gap-2">
-        <span className="text-2xl font-bold tabular-nums text-gray-900">{step.current.toLocaleString()}</span>
+        <span className="text-2xl font-bold tabular-nums text-gray-900">{count.toLocaleString()}</span>
         {mode === "change" ? (
           <Delta n={step.net_change} />
         ) : (
@@ -383,7 +527,7 @@ function StepBox({
       </div>
       {/* the bar is the funnel: each step's width relative to the fullest step */}
       <div className="mt-2 h-2 rounded bg-gray-100">
-        <div className={`h-2 rounded ${color}`} style={{ width: `${Math.round((100 * step.current) / max)}%` }} />
+        <div className={`h-2 rounded ${color}`} style={{ width: `${Math.round((100 * count) / max)}%` }} />
       </div>
       {mode === "change" && (step.entered > 0 || step.left > 0) && (
         <div className="mt-2 flex flex-wrap gap-x-3 text-[11px] text-gray-500 tabular-nums">

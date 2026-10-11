@@ -17,13 +17,14 @@ import pytest
 from app.domains.customer.auto_tags import INTEREST_KEY, SALE_KEY
 from app.domains.customer.tag_funnels import (
     FUNNEL_TAGS,
+    GRANULARITIES,
     INTEREST_STEPS,
+    MAX_OFFSET,
     SALE_STEPS,
-    WINDOW_DAYS,
     build_funnel,
     build_payload,
     current_values,
-    resolve_window,
+    resolve_period_params,
 )
 from app.dto.customer import PREDEFINED_CUSTOMER_TAGS
 
@@ -208,32 +209,91 @@ def test_every_step_is_a_predefined_catalog_tag():
     assert set(FUNNEL_TAGS) <= catalog
 
 
-# --- the window and the whole payload ----------------------------------------
+# --- a finished period: counts at its END, not today ------------------------
 
 
-@pytest.mark.parametrize("raw,expected", [
-    ("week", ("week", 7)), ("MONTH", ("month", 30)), (" quarter ", ("quarter", 91)),
-    ("year", ("year", 365)), (None, ("month", 30)), ("fortnight", ("month", 30)),
+def test_a_finished_period_shows_the_counts_at_its_end_not_todays():
+    """September's card, read in October: 18 customers sit on no_sale today,
+    but 5 of them only arrived in October and 4 others left it in October —
+    at September's close there were 18 - 5 + 4 = 17."""
+    tags = [["customer_sale:no_sale"]] * 18 + [["customer_sale:one_time_sale"]] * 8
+    f = build_funnel(
+        SALE_STEPS, current=current_values(tags, SALE_KEY, len(tags)),
+        moves=[("no_sale", "one_time_sale", 3)],                       # September
+        moves_after=[(None, "no_sale", 5), ("no_sale", "one_time_sale", 4)],  # October
+    )
+    s = _steps(f)
+    assert s["no_sale"]["current"] == 18
+    assert s["no_sale"]["at_period_end"] == 17
+    assert s["one_time_sale"]["at_period_end"] == 8 - 4
+    # September's own movement is untouched by what came after it
+    assert s["no_sale"]["net_change"] == -3
+    assert f["transitions"] == [{"from": "no_sale", "to": "one_time_sale", "count": 3}]
+
+
+def test_the_current_period_ends_now_so_its_counts_are_todays():
+    tags = [["customer_sale:no_sale"]] * 3
+    f = build_funnel(SALE_STEPS, current=current_values(tags, SALE_KEY, 3), moves=[(None, "no_sale", 3)])
+    assert all(s["at_period_end"] == s["current"] for s in f["steps"])
+
+
+def test_customers_created_after_the_period_did_not_exist_at_its_end():
+    """Unknown today includes everyone created since; rewinding to the
+    period's end removes them (and returns the two who left Unknown since)."""
+    tags = [["customer_interest:interested"]] * 2       # 52 live, 50 unknown today
+    f = build_funnel(
+        INTEREST_STEPS, current=current_values(tags, INTEREST_KEY, 52), moves=[],
+        moves_after=[(None, "interested", 2)], created_after=10,
+    )
+    s = _steps(f)
+    assert s[None]["current"] == 50
+    assert s[None]["at_period_end"] == 50 - 10 + 2
+    assert s["interested"]["at_period_end"] == 0
+
+
+def test_a_log_that_contradicts_the_tags_never_shows_a_negative_count():
+    f = build_funnel(SALE_STEPS, current=current_values([], SALE_KEY, 0), moves=[],
+                     moves_after=[(None, "no_sale", 3)])
+    assert _steps(f)["no_sale"]["at_period_end"] == 0
+
+
+# --- the period parameters and the whole payload -----------------------------
+
+
+@pytest.mark.parametrize("raw_gran,raw_offset,expected", [
+    ("month", "2", ("month", 2)),
+    (" QUARTER ", "4", ("quarter", 4)),
+    ("week", "0", ("week", 0)),
+    (None, None, ("month", 0)),            # defaults: this month
+    ("fortnight", "x", ("month", 0)),      # garbage falls back, never 4xx
+    ("week", "-3", ("week", 0)),           # the future is not a period
+    ("year", "99", ("year", MAX_OFFSET["year"])),
 ])
-def test_resolve_window(raw, expected):
-    assert resolve_window(raw) == expected
-    assert set(WINDOW_DAYS) == {"week", "month", "quarter", "year"}
+def test_resolve_period_params(raw_gran, raw_offset, expected):
+    assert resolve_period_params(raw_gran, raw_offset) == expected
+    assert set(GRANULARITIES) == {"week", "month", "quarter", "year"} == set(MAX_OFFSET)
 
 
-def test_payload_routes_each_key_to_its_funnel_and_reports_the_window():
-    since, until = datetime(2026, 9, 11), datetime(2026, 10, 11)
+def test_payload_routes_each_key_to_its_funnel_and_describes_the_period():
+    period = {"granularity": "month", "offset": 1, "label": "2026-09",
+              "start": "2026-09-01", "end": "2026-10-01", "is_current": False}
     p = build_payload(
-        window="month", days=30, since=since, until=until, total=2,
+        period=period, history_from=datetime(2026, 8, 15), total=2,
         tag_lists=[["customer_sale:no_sale"], ["customer_interest:interested"]],
         moves=[
             (SALE_KEY, None, "no_sale", 1),
             (INTEREST_KEY, None, "interested", 1),
             ("blacklist", None, "", 5),        # other keys are not this dashboard's business
         ],
-        created=2,
+        moves_after=[], created=2, created_after=0,
     )
-    assert (p["window"], p["days"], p["since"], p["until"]) == ("month", 30, since.isoformat(), until.isoformat())
+    assert p["period"] == period
+    assert p["history_from"] == "2026-08-15T00:00:00"
     assert p["total_customers"] == 2 and p["new_customers"] == 2
+    # nothing happened after the period, so its end looks like today
+    assert p["total_at_period_end"] == 2
+    assert p["funnels"]["sale"]["outside_at_period_end"] == 1      # the interested-only customer
+    assert p["funnels"]["interest"]["outside_at_period_end"] == 0
     sale, interest = p["funnels"]["sale"], p["funnels"]["interest"]
     assert sale["key"] == SALE_KEY and interest["key"] == INTEREST_KEY
     assert _steps(sale)["no_sale"]["net_change"] == 1
@@ -243,3 +303,31 @@ def test_payload_routes_each_key_to_its_funnel_and_reports_the_window():
     # the sale funnel never sees `created`, the interest funnel does
     assert _steps(sale)["no_sale"]["entered"] == 1
     assert _steps(interest)[None]["entered"] == 2
+
+
+def test_the_footnote_and_total_rewind_with_the_steps():
+    """September read in October: 10 live customers today, 3 of them created
+    in October (and tagged no_sale on creation). At September's end there were
+    7, all on no_sale — nobody outside."""
+    period = {"granularity": "month", "offset": 1, "label": "2026-09",
+              "start": "2026-09-01", "end": "2026-10-01", "is_current": False}
+    p = build_payload(
+        period=period, history_from=datetime(2026, 1, 1), total=10,
+        tag_lists=[["customer_sale:no_sale"]] * 10,
+        moves=[], moves_after=[(SALE_KEY, None, "no_sale", 3)], created=0, created_after=3,
+    )
+    sale = p["funnels"]["sale"]
+    assert p["total_customers"] == 10 and p["total_at_period_end"] == 7
+    assert _steps(sale)["no_sale"]["at_period_end"] == 7
+    assert sale["outside"] == 0 and sale["outside_at_period_end"] == 0
+    # the interest funnel: 10 unknown today, 7 at September's end
+    assert _steps(p["funnels"]["interest"])[None]["at_period_end"] == 7
+
+
+def test_an_empty_log_reports_no_history_start():
+    period = {"granularity": "week", "offset": 0, "label": "2026-W41",
+              "start": "2026-10-05", "end": "2026-10-12", "is_current": True}
+    p = build_payload(period=period, history_from=None, total=0, tag_lists=[],
+                      moves=[], moves_after=[], created=0, created_after=0)
+    assert p["history_from"] is None
+    assert p["total_customers"] == 0

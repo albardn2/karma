@@ -10,7 +10,7 @@ from app.domains.customer.auto_tags import INTEREST_KEY, SALE_KEY
 from app.domains.customer.tag_funnels import (
     FUNNEL_TAGS,
     build_payload as build_tag_funnels,
-    resolve_window,
+    resolve_period_params,
 )
 from app.domains.exchange_rate.converter import CurrencyConverter
 from app.dto.auth import PermissionScope
@@ -2205,13 +2205,15 @@ def user_material_profitability():
 # ---------------------------------------------------------------------------
 # Tag funnels — where every live customer stands on the sale ladder
 # (no_sale -> one_time_sale -> repeated_sale) and the interest ladder
-# (unknown -> not_interested -> interested), and how the last
+# (unknown -> not_interested -> interested), and how a calendar
 # week/month/quarter/year moved them. The arithmetic and its reasoning live in
 # app/domains/customer/tag_funnels.py; this is only the fetch.
 #
 # Current counts are read from customer.tags, change from customer_tag_event,
 # and BOTH are restricted to live customers — the event join below is what
-# keeps the two halves of the card describing the same people.
+# keeps the two halves of the card describing the same people. Periods and
+# the ‹ › navigator (`granularity` + `offset`) cut time exactly as
+# /materials-sold does, so the two pages' navigators move in lockstep.
 
 
 @dashboard_blueprint.route("/tag-funnels", methods=["GET"])
@@ -2226,10 +2228,15 @@ def user_material_profitability():
     PermissionScope.ACCOUNTANT.value,
 )
 def tag_funnels():
-    """?window=week|month|quarter|year (rolling, default month)."""
-    window, days = resolve_window(request.args.get("window"))
-    until = datetime.utcnow()
-    since = until - timedelta(days=days)
+    """?granularity=week|month|quarter|year&offset=N — the calendar period
+    `offset` periods before the one containing today (0 = the current one, to
+    date). Default: this month."""
+    gran, offset = resolve_period_params(
+        request.args.get("granularity"), request.args.get("offset")
+    )
+    now = datetime.utcnow()
+    since = _step_back(now, gran, offset)
+    period_end = _step_back(now, gran, offset - 1)  # next period's start
 
     with SqlAlchemyUnitOfWork() as uow:
         s = uow.session
@@ -2247,27 +2254,48 @@ def tag_funnels():
             .filter(*live, CustomerModel.tags.overlap(list(FUNNEL_TAGS)))
             .all()
         ]
-        created = (
-            s.query(func.count(CustomerModel.uuid))
-            .filter(*live, CustomerModel.created_at >= since)
-            .scalar()
-            or 0
-        )
         E = CustomerTagEventModel
-        moves = (
-            s.query(E.key, E.old_value, E.new_value, func.count(E.uuid))
-            .join(CustomerModel, CustomerModel.uuid == E.customer_uuid)
-            .filter(
-                E.account_uuid == uow.account_uuid,
-                E.key.in_([SALE_KEY, INTEREST_KEY]),
-                E.created_at >= since,
-                *live,
+
+        def created_between(lo, hi=None):
+            q = s.query(func.count(CustomerModel.uuid)).filter(*live, CustomerModel.created_at >= lo)
+            if hi is not None:
+                q = q.filter(CustomerModel.created_at < hi)
+            return q.scalar() or 0
+
+        def moves_between(lo, hi=None):
+            q = (
+                s.query(E.key, E.old_value, E.new_value, func.count(E.uuid))
+                .join(CustomerModel, CustomerModel.uuid == E.customer_uuid)
+                .filter(
+                    E.account_uuid == uow.account_uuid,
+                    E.key.in_([SALE_KEY, INTEREST_KEY]),
+                    E.created_at >= lo,
+                    *live,
+                )
             )
-            .group_by(E.key, E.old_value, E.new_value)
-            .all()
+            if hi is not None:
+                q = q.filter(E.created_at < hi)
+            return q.group_by(E.key, E.old_value, E.new_value).all()
+
+        created = created_between(since, period_end)
+        moves = moves_between(since, period_end)
+        # a finished period: everything logged after it turns today's counts
+        # into the counts at its end. The current period ends now — nothing after.
+        created_after = created_between(period_end) if offset else 0
+        moves_after = moves_between(period_end) if offset else []
+        history_from = (
+            s.query(func.min(E.created_at)).filter(E.account_uuid == uow.account_uuid).scalar()
         )
 
+    period = {
+        "granularity": gran,
+        "offset": offset,
+        "label": _period_key(since, gran),
+        "start": since.strftime("%Y-%m-%d"),
+        "end": period_end.strftime("%Y-%m-%d"),
+        "is_current": offset == 0,
+    }
     return jsonify(build_tag_funnels(
-        window=window, days=days, since=since, until=until,
-        total=total, tag_lists=tag_lists, moves=moves, created=created,
+        period=period, history_from=history_from, total=total, tag_lists=tag_lists,
+        moves=moves, moves_after=moves_after, created=created, created_after=created_after,
     )), 200
