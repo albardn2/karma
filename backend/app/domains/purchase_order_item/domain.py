@@ -12,9 +12,82 @@ from app.dto.purchase_order_item import PurchaseOrderItemBulkUnFulfill
 from app.domains.inventory.domain import InventoryDomain
 from app.domains.inventory_event.domain import InventoryEventDomain
 from app.dto.inventory_event import InventoryEventType
+from app.dto.purchase_order_item import PurchaseOrderItemEdit
+from models.common import MONEY_TOLERANCE
 
 
 class PurchaseOrderItemDomain:
+
+    @staticmethod
+    def edit_item(uow: SqlAlchemyUnitOfWork, po_item: PurchaseOrderItemModel, edit: PurchaseOrderItemEdit) -> None:
+        """Correct what a line ordered, or what it cost, after the fact.
+
+        The price needs nothing beyond its column: a lot's cost per unit is
+        computed on read from its PO item's adjusted price, so every lot this
+        line stocked re-costs itself.
+
+        The quantity is also what fulfillment received, so the receipt follows
+        it: quantity_received, and the line's one PURCHASE_ORDER inventory
+        event, are edited IN PLACE. Not a compensating adjustment — the receipt
+        itself was wrong, and one PO event per line is what unfulfill (and the
+        credit/debit notes, which look up "the" event) rely on. Lowering it
+        below what the lot has already given out takes the lot negative, the
+        same as an oversale does.
+
+        A fixed asset bought on this line copied its price and quantity when it
+        was created. Each figure follows the edit only while it still equals
+        the line's old value, so a hand edit on the asset survives.
+        """
+        old_quantity = po_item.quantity
+        old_price = po_item.price_per_unit
+        adjusted_quantity_before = po_item.adjusted_quantity
+        adjusted_total_before = po_item.adjusted_total_price
+
+        if edit.price_per_unit is not None:
+            po_item.price_per_unit = edit.price_per_unit
+
+        if edit.quantity is not None and edit.quantity != old_quantity:
+            po_item.quantity = edit.quantity
+            if po_item.is_fulfilled:
+                # fulfilment is all-or-nothing, so a fulfilled line received
+                # exactly what it ordered
+                po_item.quantity_received = edit.quantity
+            receipts = [
+                event for event in po_item.inventory_events
+                if not event.is_deleted and event.event_type == InventoryEventType.PURCHASE_ORDER.value
+            ]
+            if len(receipts) > 1:
+                raise BadRequestError("PO inventory event count is not 1")
+            for event in receipts:
+                event.quantity = edit.quantity
+                uow.inventory_event_repository.save(model=event, commit=False)
+
+        # credit/debit notes adjust the line on top of these figures; a
+        # correction may not leave it returning more than it ordered, or
+        # credited for more than it cost — unless it was already, and the
+        # correction does not make it worse
+        notes_quantity = po_item.adjusted_quantity - po_item.quantity
+        if po_item.adjusted_quantity < 0 and po_item.adjusted_quantity < adjusted_quantity_before:
+            raise BadRequestError(
+                f"Quantity can't go below {-notes_quantity:g}: that much has "
+                f"already been returned on this line's credit/debit notes"
+            )
+        if po_item.adjusted_total_price < -MONEY_TOLERANCE and po_item.adjusted_total_price < adjusted_total_before:
+            raise BadRequestError(
+                f"The line's new total ({po_item.total_price:g} {po_item.currency}) "
+                f"is less than the {po_item.total_price - po_item.adjusted_total_price:g} "
+                f"its credit/debit notes already take off it"
+            )
+
+        fixed_assets = uow.fixed_asset_repository.find_all(purchase_order_item_uuid=po_item.uuid, is_deleted=False)
+        for fixed_asset in fixed_assets:
+            if fixed_asset.price_per_unit == old_price:
+                fixed_asset.price_per_unit = po_item.price_per_unit
+            if fixed_asset.quantity == old_quantity:
+                fixed_asset.quantity = po_item.quantity
+            uow.fixed_asset_repository.save(model=fixed_asset, commit=False)
+
+        uow.purchase_order_item_repository.save(model=po_item, commit=False)
 
     @staticmethod
     def fulfill_items(uow: SqlAlchemyUnitOfWork, payload: PurchaseOrderItemBulkFulfill) -> list[PurchaseOrderItemRead]:
