@@ -224,8 +224,6 @@ export default function PurchaseOrderEdit() {
                             size="sm"
                             onClick={() => {
                               setUseManualVendorUuid(false);
-                              setVendorOpen(false);
-                              setVendorValue("");
                               field.onChange("");
                             }}
                           >
@@ -237,8 +235,6 @@ export default function PurchaseOrderEdit() {
                             size="sm"
                             onClick={() => {
                               setUseManualVendorUuid(true);
-                              setVendorOpen(false);
-                              setVendorValue("");
                               field.onChange("");
                             }}
                           >
