@@ -112,7 +112,8 @@ class TripDomain:
         def _cash_row(currency: str) -> dict[str, float]:
             return cash.setdefault(
                 currency,
-                {"collected": 0.0, "expenses": 0.0, "paid": 0.0, "unpaid": 0.0},
+                {"collected": 0.0, "sales": 0.0, "debt": 0.0,
+                 "expenses": 0.0, "paid": 0.0, "unpaid": 0.0},
             )
 
         materials: dict[str, dict] = {}
@@ -127,6 +128,12 @@ class TripDomain:
         for trip in trips:
             for currency, amount in (trip.expected_cash or {}).items():
                 _cash_row(currency)["collected"] += amount or 0
+            # the same split each trip's own Expected Cash card shows, summed:
+            # cash from what the trips sold or delivered, and old debt collected
+            for currency, amount in (trip.cash_from_trip_sales or {}).items():
+                _cash_row(currency)["sales"] += amount or 0
+            for currency, amount in (trip.cash_from_debt or {}).items():
+                _cash_row(currency)["debt"] += amount or 0
             for currency, amount in (trip.trip_expenses or {}).items():
                 # a currency that was only spent in still needs a row
                 _cash_row(currency)["expenses"] += amount or 0
@@ -161,6 +168,8 @@ class TripDomain:
                 TripSummaryCash(
                     currency=currency,
                     collected=round(row["collected"], 2),
+                    revenue_collected=round(row["sales"], 2),
+                    debt_collected=round(row["debt"], 2),
                     expenses=round(row["expenses"], 2),
                     expenses_paid=round(row["paid"], 2),
                     expenses_unpaid=round(row["unpaid"], 2),

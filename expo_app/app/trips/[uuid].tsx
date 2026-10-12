@@ -43,6 +43,9 @@ interface Trip {
   audited_at?: string | null;
   audited_by_username?: string | null;
   expected_cash?: Record<string, number> | null;
+  // expected_cash in two parts, same currencies, always adding up to it
+  cash_from_trip_sales?: Record<string, number> | null;
+  cash_from_debt?: Record<string, number> | null;
   // booked costs, then split by whether the cash actually left: only the paid
   // part comes off net_expected_cash
   trip_expenses?: Record<string, number> | null;
@@ -85,6 +88,8 @@ interface TripActivity {
   orders?: ActivityOrder[];
   fulfillments?: ActivityRow[];
   payments?: ActivityRow[];
+  // payments for orders NOT sold on this trip: old debt collected at its stops
+  debt_collected?: (ActivityRow & { order_created_at?: string | null })[];
 }
 
 const toDate = (s?: string | null) => {
@@ -121,7 +126,9 @@ export default function TripDetailScreen() {
   const [materials, setMaterials] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activityTab, setActivityTab] = useState<'orders' | 'fulfillments' | 'payments'>('orders');
+  const [activityTab, setActivityTab] = useState<'orders' | 'fulfillments' | 'payments' | 'debt'>(
+    'orders'
+  );
   const [trackingOn, setTrackingOn] = useState(false);
   const [tripExpenses, setTripExpenses] = useState<any[]>([]);
   const [savingAudit, setSavingAudit] = useState(false);
@@ -252,7 +259,19 @@ export default function TripDetailScreen() {
       ? activity?.orders || []
       : activityTab === 'fulfillments'
       ? activity?.fulfillments || []
+      : activityTab === 'debt'
+      ? activity?.debt_collected || []
       : activity?.payments || [];
+  // the debt tab's total per currency: the same figure as the Expected cash
+  // card's "Debt collected" line, so the two can be checked against each other
+  const debtTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const r of activity?.debt_collected || []) {
+      const cur = r.currency || '?';
+      totals[cur] = (totals[cur] || 0) + (r.amount || 0);
+    }
+    return totals;
+  }, [activity]);
 
   if (!isAdmin) {
     return (
@@ -372,6 +391,64 @@ export default function TripDetailScreen() {
           </ThemedText>
         </View>
 
+        {/* cash reconciliation, first after the summary because it is what the
+            trip is checked against. Read top to bottom per currency: cash from this
+            trip's sales, plus old debt collected at its stops, less what was
+            actually paid out on the road, giving what should come back. A cost
+            booked but still unpaid took nothing off the van, so it is listed
+            under the total rather than deducted */}
+        {cashCurrencies.length > 0 && (
+          <View style={styles.card}>
+            <ThemedText style={styles.cardTitle}>{t('trips.expectedCash')}</ThemedText>
+            {cashCurrencies.map((cur) => {
+              const collected = Number((trip?.expected_cash || {})[cur] || 0);
+              const sales = Number((trip?.cash_from_trip_sales || {})[cur] || 0);
+              const debt = Number((trip?.cash_from_debt || {})[cur] || 0);
+              const paid = Number((trip?.trip_expenses_paid || {})[cur] || 0);
+              const unpaid = Number((trip?.trip_expenses_unpaid || {})[cur] || 0);
+              const net = Number((trip?.net_expected_cash || {})[cur] ?? collected - paid);
+              return (
+                <View key={cur} style={styles.cashBlock} testID={`trip-cash-${cur}`}>
+                  <ThemedText style={styles.cashCurrency}>{te(cur)}</ThemedText>
+                  <CashRow label={t('trips.cashTripRevenue')} amount={sales} testID={`trip-cash-revenue-${cur}`} />
+                  <CashRow
+                    label={t('trips.cashDebtCollected')}
+                    amount={debt}
+                    sign="+"
+                    testID={`trip-cash-debt-${cur}`}
+                  />
+                  <CashRow
+                    label={t('trips.tripSpend')}
+                    amount={paid}
+                    sign="-"
+                    tone="spend"
+                    testID={`trip-cash-spend-${cur}`}
+                  />
+                  <View style={styles.cashTotal}>
+                    <CashRow
+                      label={t('trips.shouldReturn')}
+                      amount={net}
+                      tone={net < 0 ? 'negative' : 'total'}
+                      showZero
+                      testID={`trip-cash-net-${cur}`}
+                    />
+                  </View>
+                  {unpaid > 0 && (
+                    <CashRow
+                      label={t('trips.unpaidSpendNotDeducted')}
+                      amount={unpaid}
+                      tone="muted"
+                      testID={`trip-cash-unpaid-${cur}`}
+                    />
+                  )}
+                </View>
+              );
+            })}
+            {/* once for the card, not per currency: what the two income lines mean */}
+            <ThemedText style={styles.cashNote}>{t('trips.cashBreakdownNote')}</ThemedText>
+          </View>
+        )}
+
         {/* money totals */}
         <View style={styles.card}>
           <ThemedText style={styles.cardTitle}>{t('trips.money')}</ThemedText>
@@ -382,33 +459,6 @@ export default function TripDetailScreen() {
 
         {/* analytics */}
         <TripAnalyticsCard activity={activity} />
-
-        {/* cash reconciliation: collected at the stops, less what was actually
-            paid out on the road, giving what should come back. A cost booked but
-            still unpaid took nothing off the van, so it is listed apart rather
-            than deducted */}
-        {cashCurrencies.length > 0 && (
-          <View style={styles.card}>
-            <ThemedText style={styles.cardTitle}>{t('trips.expectedCash')}</ThemedText>
-            {cashCurrencies.map((cur) => {
-              const collected = Number((trip?.expected_cash || {})[cur] || 0);
-              const paid = Number((trip?.trip_expenses_paid || {})[cur] || 0);
-              const unpaid = Number((trip?.trip_expenses_unpaid || {})[cur] || 0);
-              const net = Number((trip?.net_expected_cash || {})[cur] ?? collected - paid);
-              return (
-                <View key={cur} style={styles.cashBlock} testID={`trip-cash-${cur}`}>
-                  <ThemedText style={styles.cashCurrency}>{te(cur)}</ThemedText>
-                  <Row label={t('trips.cashCollected')} value={fmtNum(collected)} />
-                  {paid > 0 && <Row label={t('trips.tripSpend')} value={`- ${fmtNum(paid)}`} />}
-                  {unpaid > 0 && (
-                    <Row label={t('trips.unpaidSpend')} value={fmtNum(unpaid)} />
-                  )}
-                  <Row label={t('trips.shouldReturn')} value={fmtNum(net)} />
-                </View>
-              );
-            })}
-          </View>
-        )}
 
         {/* costs booked to this trip */}
         {tripExpenses.length > 0 && (
@@ -453,7 +503,7 @@ export default function TripDetailScreen() {
         <View style={styles.card}>
           <ThemedText style={styles.cardTitle}>{t('trips.activity')}</ThemedText>
           <View style={styles.tabRow}>
-            {(['orders', 'fulfillments', 'payments'] as const).map((tab) => (
+            {(['orders', 'fulfillments', 'payments', 'debt'] as const).map((tab) => (
               <TouchableOpacity
                 key={tab}
                 style={[styles.tabChip, activityTab === tab && styles.tabChipActive]}
@@ -469,7 +519,9 @@ export default function TripDetailScreen() {
           {activityRows.length === 0 ? (
             <ThemedText style={styles.muted}>{t('trips.nothingHere')}</ThemedText>
           ) : (
-            activityRows.slice(0, 25).map((r: any, i: number) => (
+            // every debt row, uncut: the total printed under the list covers
+            // all of them, so the rows must add up to it
+            (activityTab === 'debt' ? activityRows : activityRows.slice(0, 25)).map((r: any, i: number) => (
               <View key={i} style={styles.activityRow}>
                 <View style={{ flex: 1 }}>
                   <ThemedText style={styles.activityName} numberOfLines={1}>
@@ -477,7 +529,15 @@ export default function TripDetailScreen() {
                       ? r.material_name || '—'
                       : r.customer_name || '—'}
                   </ThemedText>
-                  <ThemedText style={styles.activityMeta}>{fmt(r.created_at)}</ThemedText>
+                  <ThemedText style={styles.activityMeta}>
+                    {/* for debt, also when it was run up: the order being paid off */}
+                    {activityTab === 'debt' && r.order_created_at
+                      ? t('trips.debtPaidForOrder', {
+                          paid: fmt(r.created_at),
+                          ordered: fmt(r.order_created_at),
+                        })
+                      : fmt(r.created_at)}
+                  </ThemedText>
                 </View>
                 <ThemedText style={styles.activityValue}>
                   {activityTab === 'orders'
@@ -488,6 +548,17 @@ export default function TripDetailScreen() {
                 </ThemedText>
               </View>
             ))
+          )}
+          {activityTab === 'debt' && Object.keys(debtTotals).length > 0 && (
+            <View style={styles.debtTotal} testID="trip-debt-total">
+              <ThemedText style={styles.debtTotalLabel}>{t('trips.debtCollectedTotal')}</ThemedText>
+              <ThemedText style={styles.debtTotalValue}>
+                {Object.entries(debtTotals)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([cur, v]) => `${fmtNum(v)} ${cur}`)
+                  .join(' · ')}
+              </ThemedText>
+            </View>
           )}
         </View>
 
@@ -543,6 +614,54 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** One line of the expected-cash statement. `sign` prefixes a non-zero amount
+ *  so the arithmetic reads off the screen (revenue, + debt, - spend); a zero
+ *  line shows a dash instead of disappearing, so the breakdown is always all
+ *  three parts. */
+function CashRow({
+  label,
+  amount,
+  sign,
+  tone = 'plain',
+  showZero = false,
+  testID,
+}: {
+  label: string;
+  amount: number;
+  sign?: '+' | '-';
+  tone?: 'plain' | 'spend' | 'total' | 'negative' | 'muted';
+  showZero?: boolean;
+  testID?: string;
+}) {
+  const empty = !amount && !showZero;
+  return (
+    <View style={styles.rowBetween}>
+      <ThemedText
+        style={[
+          styles.rowLabel,
+          (tone === 'total' || tone === 'negative') && styles.cashTotalLabel,
+          tone === 'muted' && styles.cashMuted,
+        ]}
+      >
+        {label}
+      </ThemedText>
+      <ThemedText
+        style={[
+          styles.rowValue,
+          empty && styles.cashEmpty,
+          !empty && tone === 'spend' && styles.cashSpend,
+          tone === 'total' && styles.cashTotalValue,
+          tone === 'negative' && [styles.cashTotalValue, styles.cashNegative],
+          tone === 'muted' && styles.cashMuted,
+        ]}
+        testID={testID}
+      >
+        {empty ? '—' : `${sign ? `${sign} ` : ''}${fmtNum(amount)}`}
+      </ThemedText>
+    </View>
+  );
+}
+
 function MoneyRow({
   label,
   totals,
@@ -572,8 +691,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingBottom: 40, gap: 12 },
-  cashBlock: { marginBottom: 10 },
+  cashBlock: { marginBottom: 14 },
   cashCurrency: { fontSize: 13, fontWeight: '700', opacity: 0.6, marginBottom: 2 },
+  cashTotal: {
+    marginTop: 6, paddingTop: 2, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.08)',
+  },
+  cashTotalLabel: { color: '#111827', fontWeight: '700' },
+  cashTotalValue: { fontSize: 14, fontWeight: '800' },
+  cashNegative: { color: '#DC2626' },
+  cashSpend: { color: '#B45309' },
+  cashEmpty: { color: '#9CA3AF', fontWeight: '400' },
+  cashMuted: { color: '#9CA3AF' },
+  cashNote: { fontSize: 11, lineHeight: 15, color: '#9CA3AF', marginTop: 2 },
   card: {
     backgroundColor: '#fff', borderRadius: 14, padding: 14,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
@@ -603,7 +732,14 @@ const styles = StyleSheet.create({
   },
   stopName: { fontSize: 13, fontWeight: '600', color: '#111827', flex: 1, marginRight: 10 },
   stopOutcome: { fontSize: 12, color: '#6B7280', maxWidth: '45%' },
-  tabRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  // wraps: four chips do not fit one phone-width line, least of all in Arabic
+  tabRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  debtTotal: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 10, marginTop: 2,
+  },
+  debtTotalLabel: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  debtTotalValue: { fontSize: 13, fontWeight: '800', color: '#111827', flexShrink: 1, textAlign: 'right' },
   tabChip: {
     borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6,
     backgroundColor: '#F3F4F6',
