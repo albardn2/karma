@@ -11,6 +11,7 @@ import { MaterialsSoldScreenImpl } from '@/app/dashboards/materials-sold';
 import { TripStopsScreenImpl } from '@/app/dashboards/trip-stops';
 import { MyTripStopsScreenImpl } from '@/app/dashboards/my-trip-stops';
 import { SpendScreenImpl } from '@/app/dashboards/spend';
+import { TagFunnelsScreenImpl } from '@/app/dashboards/tag-funnels';
 
 // dashboard id -> its embedded panel. The personal trio reuses the global
 // screens with `mine`; every panel brings its own section title (the
@@ -28,6 +29,7 @@ const PANELS: Record<string, () => React.ReactElement> = {
   'my-materials-sold': () => <MaterialsSoldScreenImpl mine embedded />,
   'my-new-customers': () => <NewCustomersScreenImpl mine embedded />,
   'my-trip-stops': () => <MyTripStopsScreenImpl embedded />,
+  'tag-funnels': () => <TagFunnelsScreenImpl embedded />,
 };
 
 // implemented dashboards in catalog order — an assigned id without a screen
@@ -45,6 +47,7 @@ const ORDER = [
   'my-new-customers',
   'my-trip-stops',
   'spend',
+  'tag-funnels',
 ];
 
 /**
