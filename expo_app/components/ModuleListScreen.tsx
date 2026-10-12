@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
@@ -16,6 +16,7 @@ import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
+import { takeListStale } from '@/utils/listRefresh';
 
 export const PER_PAGE = 20;
 
@@ -158,8 +159,19 @@ export function ModuleListScreen<T>({
         }
         const res = await apiCall<any>(`${endpoint}?${query.toString()}`);
         if (isOk(res.status) && res.data) {
-          setItems(res.data[itemsKey] ?? []);
-          setTotalPages(res.data[pagesKey] ?? 1);
+          const rows = res.data[itemsKey] ?? [];
+          const pages = res.data[pagesKey] ?? 1;
+          // The page went past the end: its last row was deleted (on a detail
+          // screen, or elsewhere) and the server answers an out-of-range page
+          // with no rows rather than an error. Rendering that would show
+          // "Nothing here" under a non-zero total with no pager to get back,
+          // so move to the real last page; the [page] effect fetches it.
+          if (rows.length === 0 && targetPage > 1 && targetPage > pages) {
+            setPage(Math.max(1, pages));
+            return;
+          }
+          setItems(rows);
+          setTotalPages(pages);
           setTotalCount(res.data.total_count ?? 0);
         } else {
           // 403 included on purpose: the server is the authority, and a role
@@ -184,6 +196,16 @@ export function ModuleListScreen<T>({
   useEffect(() => {
     load(page);
   }, [page, appliedSearch, load]);
+
+  // Back from a detail screen that changed records behind this list (a delete,
+  // say): the list is still mounted and would not refetch on its own. Quietly,
+  // without the full-screen spinner, so the rows the user was looking at stay
+  // put while the change lands.
+  useFocusEffect(
+    useCallback(() => {
+      if (takeListStale(endpoint)) load(page, true);
+    }, [endpoint, load, page]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
