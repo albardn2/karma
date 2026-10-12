@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -20,6 +20,16 @@ export default function EmployeesDetailScreen() {
   const router = useRouter();
   const [reloadKey, setReloadKey] = useState(0);
 
+  // focus, not push: edit opens a screen that writes, and a stack pop does not remount
+  // this one. A bump before the push refetched while that screen was opening, before
+  // the write, so coming back showed the old record. One bump per focus event; setState
+  // does not re-trigger focus, so this cannot loop.
+  useFocusEffect(
+    useCallback(() => {
+      setReloadKey((k) => k + 1);
+    }, []),
+  );
+
   return (
     <ModuleDetailScreen<Employee>
       module="employees"
@@ -39,7 +49,6 @@ export default function EmployeesDetailScreen() {
           label: t('detail.edit'),
           testID: 'employee-edit',
           onPress: (x) => {
-            setReloadKey((k) => k + 1);
             router.push({
               pathname: '/employees/create',
               params: {

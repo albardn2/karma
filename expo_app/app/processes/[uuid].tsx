@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/ModuleDetailScreen';
@@ -80,6 +80,16 @@ export default function ProcessDetailScreen() {
   const canUpdate = useHasEndpoint('process', 'update');
   const canDelete = useHasEndpoint('process', 'delete');
 
+  // focus, not push: edit opens a screen that writes, and a stack pop does not remount
+  // this one. A bump before the push refetched while that screen was opening, before
+  // the write, so coming back showed the old notes. One bump per focus event; setState
+  // does not re-trigger focus, so this cannot loop.
+  useFocusEffect(
+    useCallback(() => {
+      setReloadKey((k) => k + 1);
+    }, []),
+  );
+
   const loadMaterials = useCallback(async () => {
     const res = await apiCall<{ materials: Material[] }>(`/material/?per_page=${PER_PAGE}`);
     if (!isOk(res.status)) return;
@@ -147,7 +157,6 @@ export default function ProcessDetailScreen() {
       testID: 'process-edit',
       visible: () => canUpdate,
       onPress: (p) => {
-        setReloadKey((k) => k + 1);
         router.push({
           pathname: '/processes/edit',
           params: { uuid: p.uuid, notes: p.notes ?? '' },

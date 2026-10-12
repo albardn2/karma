@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { ChartLegend, GroupedBarChart, LineChart } from '@/components/Chart';
@@ -167,6 +167,17 @@ export default function VehiclesDetailScreen() {
     loadStock();
     loadTripCount();
   }, [loadStock, loadTripCount, reloadKey]);
+
+  // focus, not push: add material, edit and a stock line's load/unload all open screens
+  // that write, and a stack pop does not remount this one. A bump before the push
+  // refetched while that screen was opening, before the write (and the stock line
+  // pushed with no bump at all), so coming back showed the old stock and profit. One
+  // bump per focus event; setState does not re-trigger focus, so this cannot loop.
+  useFocusEffect(
+    useCallback(() => {
+      setReloadKey((k) => k + 1);
+    }, []),
+  );
 
   const loadMovements = useCallback(async () => {
     setMovesFailed(false);
@@ -508,7 +519,6 @@ export default function VehiclesDetailScreen() {
           label: t('vehicles.addMaterial'),
           testID: 'vehicle-add-material',
           onPress: (x) => {
-            setReloadKey((k) => k + 1);
             router.push({
               pathname: '/vehicles/add-material',
               params: { vehicle_uuid: x.uuid, plate_number: x.plate_number ?? '' },
@@ -519,8 +529,6 @@ export default function VehiclesDetailScreen() {
           label: t('detail.edit'),
           testID: 'vehicle-edit',
           onPress: (x) => {
-            // bump on return so the record reflects the edit without a manual pull
-            setReloadKey((k) => k + 1);
             router.push({
               pathname: '/vehicles/create',
               params: {

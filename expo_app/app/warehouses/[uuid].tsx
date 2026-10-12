@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { ChartLegend, LineChart } from '@/components/Chart';
@@ -118,6 +118,17 @@ export default function WarehousesDetailScreen() {
     // reloadKey so stock and the chart reflect a lot added moments ago, not just the
     // warehouse record itself
   }, [loadAnalytics, reloadKey]);
+
+  // focus, not push: edit and add-stock both open screens that write, and a stack pop
+  // does not remount this one. A bump before the push refetched the record, stock and
+  // chart while that screen was opening, before the write, so coming back showed the
+  // old numbers. One bump per focus event; setState does not re-trigger focus, so this
+  // cannot loop.
+  useFocusEffect(
+    useCallback(() => {
+      setReloadKey((k) => k + 1);
+    }, []),
+  );
 
   // whatever the server returned for the current selection: one material when the
   // filter is set, its top TOP_N holders otherwise
@@ -271,7 +282,6 @@ export default function WarehousesDetailScreen() {
           label: t('detail.edit'),
           testID: 'warehouse-edit',
           onPress: (x) => {
-            setReloadKey((k) => k + 1);
             router.push({
               pathname: '/warehouses/create',
               params: {
@@ -289,7 +299,6 @@ export default function WarehousesDetailScreen() {
                 label: t('inventory.addStock'),
                 testID: 'warehouse-add-stock',
                 onPress: (x: Warehouse) => {
-                  setReloadKey((k) => k + 1);
                   router.push({
                     pathname: '/warehouses/add-stock',
                     params: { warehouse_uuid: x.uuid, warehouse_name: x.name ?? '' },

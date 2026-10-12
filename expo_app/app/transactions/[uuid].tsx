@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ModuleDetailScreen, DetailRow, DetailAction } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
@@ -50,6 +50,16 @@ export default function TransactionDetailScreen() {
   const [accounts, setAccounts] = useState<Record<string, Account>>({});
   const [reloadKey, setReloadKey] = useState(0);
 
+  // focus, not push: edit-note opens a screen that writes, and a stack pop does not
+  // remount this one. A bump before the push refetched while that screen was opening,
+  // before the write, so coming back showed the old note. One bump per focus event;
+  // setState does not re-trigger focus, so this cannot loop.
+  useFocusEffect(
+    useCallback(() => {
+      setReloadKey((k) => k + 1);
+    }, []),
+  );
+
   const loadAccounts = useCallback(async () => {
     const res = await apiCall<{ accounts: Account[] }>(`/financial-account/?per_page=${PER_PAGE}`);
     if (!isOk(res.status)) return;
@@ -74,7 +84,6 @@ export default function TransactionDetailScreen() {
       label: t('transactions.editNote'),
       testID: 'transaction-edit-note',
       onPress: (x) => {
-        setReloadKey((k) => k + 1);
         router.push({
           pathname: '/transactions/note',
           params: { uuid: x.uuid, notes: x.notes ?? '' },

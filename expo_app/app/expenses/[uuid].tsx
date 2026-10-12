@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ModuleDetailScreen, DetailRow, DetailAction } from '@/components/ModuleDetailScreen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -44,6 +44,17 @@ export default function ExpensesDetailScreen() {
   // superuser — a role grant does not reach it), so it is offered to admins only
   const { isAdmin } = useAuth();
 
+  // focus, not push: edit and record-payout both open screens that write (a payout
+  // moves paid and still owed), and a stack pop does not remount this one. A bump
+  // before the push refetched while that screen was opening, before the write, so
+  // coming back showed the old amounts. One bump per focus event; setState does not
+  // re-trigger focus, so this cannot loop.
+  useFocusEffect(
+    useCallback(() => {
+      setReloadKey((k) => k + 1);
+    }, []),
+  );
+
   const remove = async () => {
     // the server deletes the expense's payouts in the same write, and their
     // amounts return to the accounts they were paid from
@@ -66,7 +77,6 @@ export default function ExpensesDetailScreen() {
       label: t('detail.edit'),
       testID: 'expense-edit',
       onPress: (x) => {
-        setReloadKey((k) => k + 1);
         // amount and currency are deliberately not passed: ExpenseUpdate forbids them,
         // so the edit form does not offer them either
         router.push({
@@ -89,7 +99,6 @@ export default function ExpensesDetailScreen() {
       // which shows its button only when !expense.is_paid
       visible: (x) => !x.is_paid && Number(x.amount_due ?? 0) > 0,
       onPress: (x) => {
-        setReloadKey((k) => k + 1);
         router.push({
           pathname: '/payouts/create',
           params: {
