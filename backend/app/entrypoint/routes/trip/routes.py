@@ -12,6 +12,7 @@ from app.dto.trip import (
     TripListParams,
     TripPage,
     TripSummaryParams,
+    TripFilterOptions,
 )
 from models.common import (
     Customer as CustomerModel,
@@ -26,6 +27,12 @@ from app.dto.workflow_execution import WorkflowStatus
 from app.domains.customer.auto_tags import INTEREST_KEY, SALE_KEY
 from app.domains.trip.domain import TripDomain
 from app.domains.trip.tag_funnels import COUNTED_STOP_STATUSES, build_trip_payload, trip_window
+from app.domains.trip.list_filters import (
+    assigned_to_clause,
+    assignee_options,
+    resolve_assignee_filter_user,
+    vehicle_options,
+)
 
 from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required, add_logged_user_to_payload
@@ -200,6 +207,32 @@ def summarize_trips():
     params = TripSummaryParams(**request.args)
     with SqlAlchemyUnitOfWork() as uow:
         dto = TripDomain.summarize(uow=uow, trip_uuids=params.trip_uuids)
+    return jsonify(dto.model_dump(mode="json")), 200
+
+
+@trip_blueprint.route("/filter-options", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATOR.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.DRIVER.value,
+    PermissionScope.SALES.value,
+)
+def get_trip_filter_options():
+    """The choices for the trip list's "assigned to" and vehicle dropdowns.
+
+    Same audience as the list itself, and nothing in it is new to them: every
+    assignee and plate here is already printed on some row of that list. The
+    user list is admin-only, so it could not have fed the dropdown for the other
+    roles. Like `/summary`, a static rule, so it never collides with `/<uuid>`.
+    """
+    with SqlAlchemyUnitOfWork() as uow:
+        dto = TripFilterOptions(
+            assignees=assignee_options(uow.session, uow.account_uuid),
+            vehicles=vehicle_options(uow.session, uow.account_uuid),
+        )
     return jsonify(dto.model_dump(mode="json")), 200
 
 
@@ -457,6 +490,14 @@ def list_trips():
     filters.append(TripModel.is_deleted.is_(False))
 
     with SqlAlchemyUnitOfWork() as uow:
+        if params.assigned_user_uuid:
+            # resolved in this account first: an unknown value matches nothing
+            # instead of being dropped and returning every trip
+            assignee = resolve_assignee_filter_user(
+                uow.session, uow.account_uuid, params.assigned_user_uuid
+            )
+            filters.append(assigned_to_clause(assignee))
+
         page = uow.trip_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,

@@ -107,6 +107,18 @@ export const translations: Record<Lang, Record<string, string>> = {
       'This trip did not record when it set off or when its stops were worked, so its window is estimated (from when it was planned, or its first day if it was closed later).',
     'trips.funnelsFailed': "Couldn't load this trip's funnels.",
     'trips.funnelsEmpty': 'No customers to show: none of this trip’s completed or skipped stops is at a customer that still exists.',
+    // assignee / vehicle dropdowns. They offer only the people and vehicles that
+    // are on at least one trip; same wording as the web filter menu.
+    'trips.filterAssignee': 'Assigned to',
+    'trips.allAssignees': 'Everyone',
+    'trips.filterVehicle': 'Vehicle',
+    'trips.allVehicles': 'All vehicles',
+    'trips.filterOptionsFailed': "Couldn't load the choices",
+    'trips.filterNoOptions': 'No trips yet, so nothing to choose.',
+    // screen-reader only
+    'trips.filterHint': 'Opens a list to choose from',
+    'trips.clearFilter': 'Clear filter: {name}',
+    'trips.filterClose': 'Close',
     // multi-select + aggregate summary. Wording copied from the web summary so
     // the two products say the same thing; 'trips.summary' is already the trip
     // detail card title, hence summaryButton.
@@ -1451,6 +1463,15 @@ export const translations: Record<Lang, Record<string, string>> = {
       'لم تُسجّل هذه الرحلة وقت انطلاقها أو وقت إنجاز محطاتها، لذا نافذتها الزمنية تقديرية (من وقت التخطيط لها، أو يومها الأول إن أُغلقت لاحقاً).',
     'trips.funnelsFailed': 'تعذّر تحميل قمع هذه الرحلة.',
     'trips.funnelsEmpty': 'لا يوجد عملاء لعرضهم: لا تضم هذه الرحلة أي محطة مكتملة أو متخطّاة لعميل لا يزال موجوداً.',
+    'trips.filterAssignee': 'مسندة إلى',
+    'trips.allAssignees': 'الجميع',
+    'trips.filterVehicle': 'المركبة',
+    'trips.allVehicles': 'جميع المركبات',
+    'trips.filterOptionsFailed': 'تعذّر تحميل الخيارات',
+    'trips.filterNoOptions': 'لا توجد رحلات بعد، فلا خيارات.',
+    'trips.filterHint': 'يفتح قائمة للاختيار',
+    'trips.clearFilter': 'إزالة التصفية: {name}',
+    'trips.filterClose': 'إغلاق',
     // التحديد المتعدد وملخص الرحلات المحددة — نفس صياغة الويب
     'trips.selectHint': 'اضغط مطولاً على رحلة لتحديد عدة رحلات.',
     'trips.selectedCount': 'المحدد: {count}',

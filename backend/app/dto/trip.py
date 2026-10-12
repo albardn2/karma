@@ -238,6 +238,9 @@ class TripListParams(BaseModel):
     uuid: Optional[str] = None
     created_by_uuid: Optional[str] = None
     vehicle_uuid: Optional[str] = None
+    # the user the trip's start_trip setup assigned: a uuid or a username, like
+    # the setup itself stores. Not a column on trip; see domains/trip/list_filters.
+    assigned_user_uuid: Optional[str] = None
     service_area_uuid: Optional[str] = None
     workflow_execution_uuid: Optional[str] = None
     status: Optional[TripStatus] = None
@@ -259,6 +262,30 @@ class TripPage(BaseModel):
     page: int = Field(..., description="Current page number")
     per_page: int = Field(..., description="Number of items per page")
     pages: int = Field(..., description="Total number of pages")
+
+
+class TripAssigneeOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    uuid: str
+    username: str
+    name: str  # "First Last", or the username when there is no name on file
+
+
+class TripVehicleOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    uuid: str
+    plate_number: str
+
+
+class TripFilterOptions(BaseModel):
+    """What the trip list's assignee and vehicle dropdowns can offer: only the
+    people and vehicles that appear on at least one live trip."""
+    model_config = ConfigDict(extra="forbid")
+
+    assignees: List[TripAssigneeOption]
+    vehicles: List[TripVehicleOption]
 
 
 # One page of trips is the realistic selection, and the aggregate walks each

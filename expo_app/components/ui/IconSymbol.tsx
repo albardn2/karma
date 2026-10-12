@@ -18,7 +18,22 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  // trip list filter pills
+  'person.fill': 'person',
+  'box.truck.fill': 'local-shipping',
+  'car.fill': 'local-shipping', // the iOS 15 stand-in for box.truck.fill
+  'chevron.down': 'expand-more',
+  'xmark.circle.fill': 'cancel',
 } as IconMapping;
+
+/**
+ * Material glyphs that sit much smaller in their box than the SF Symbol they
+ * stand in for: expand_more is half an em wide, chevron.down nearly a full one.
+ * Scaled so a given `size` looks about the same on both platforms.
+ */
+const OPTICAL_SCALE: Partial<Record<IconSymbolName, number>> = {
+  'chevron.down': 1.55,
+};
 
 /**
  * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
@@ -37,5 +52,12 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
+  return (
+    <MaterialIcons
+      color={color}
+      size={Math.round(size * (OPTICAL_SCALE[name] ?? 1))}
+      name={MAPPING[name]}
+      style={style}
+    />
+  );
 }

@@ -580,6 +580,8 @@ export interface TripFilters {
   uuid?: string;
   created_by_uuid?: string;
   vehicle_uuid?: string;
+  // a user's uuid (or username): the person the trip's setup assigned
+  assigned_user_uuid?: string;
   service_area_uuid?: string;
   status?: TripStatus;
   intersects_area?: string;
@@ -588,6 +590,12 @@ export interface TripFilters {
   is_audited?: boolean;
   page?: number;
   per_page?: number;
+}
+
+// GET /trip/filter-options: the people and vehicles that are on at least one trip
+export interface TripFilterOptions {
+  assignees: { uuid: string; username: string; name: string }[];
+  vehicles: { uuid: string; plate_number: string }[];
 }
 
 export interface TripPage {
