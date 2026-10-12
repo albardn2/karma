@@ -189,6 +189,9 @@ export const en: Record<string, string> = {
   'purchaseOrders.percentReceived': '{percent}% received',
   'purchaseOrders.unfulfill': 'Unfulfill',
   'purchaseOrders.fulfill': 'Fulfill',
+  'purchaseOrders.lineStockFollows': 'Received stock is updated too',
+  'purchaseOrders.lineQuantityInvalid': 'Quantity for {material} must be a whole number of at least 1',
+  'purchaseOrders.linePriceInvalid': 'Unit price for {material} must be 0 or more',
 
   // detail — item detail dialog
   'purchaseOrders.itemDetailsTitle': 'Purchase Order Item Details',
@@ -395,6 +398,9 @@ export const ar: Record<string, string> = {
   'purchaseOrders.percentReceived': '{percent}% مستلَمة',
   'purchaseOrders.unfulfill': 'إلغاء الإنجاز',
   'purchaseOrders.fulfill': 'إنجاز',
+  'purchaseOrders.lineStockFollows': 'يُحدَّث المخزون المستلَم أيضًا',
+  'purchaseOrders.lineQuantityInvalid': 'يجب أن تكون كمية {material} عددًا صحيحًا لا يقل عن 1',
+  'purchaseOrders.linePriceInvalid': 'يجب أن يكون سعر الوحدة لـ {material} صفرًا أو أكثر',
 
   // detail — item detail dialog
   'purchaseOrders.itemDetailsTitle': 'تفاصيل عنصر طلب الشراء',

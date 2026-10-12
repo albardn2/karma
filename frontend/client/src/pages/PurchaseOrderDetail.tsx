@@ -56,6 +56,30 @@ interface PurchaseOrder {
   purchase_order_items: PurchaseOrderItem[];
 }
 
+// A line correction for PUT /purchase-order/<uuid>: only the figures that changed
+interface PurchaseOrderLineEdit {
+  uuid: string;
+  quantity?: number;
+  price_per_unit?: number;
+}
+
+interface PurchaseOrderUpdate {
+  notes?: string | null;
+  payout_due_date?: string;
+  purchase_order_items?: PurchaseOrderLineEdit[];
+}
+
+// Inline-edit values per line, kept as typed so a half-entered number stays editable
+type EditedLines = Record<string, { quantity: string; price_per_unit: string }>;
+
+const linesFrom = (items: PurchaseOrderItem[]): EditedLines =>
+  Object.fromEntries(
+    items.map((item) => [
+      item.uuid,
+      { quantity: String(item.quantity), price_per_unit: String(item.price_per_unit) },
+    ])
+  );
+
 interface FulfillItemModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -232,6 +256,7 @@ export default function PurchaseOrderDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotes, setEditedNotes] = useState("");
   const [editedPayoutDueDate, setEditedPayoutDueDate] = useState("");
+  const [editedLines, setEditedLines] = useState<EditedLines>({});
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<PurchaseOrderItem | null>(null);
   const [itemModalOpen, setItemModalOpen] = useState(false);
@@ -247,7 +272,7 @@ export default function PurchaseOrderDetail() {
   const purchaseOrderItems = purchaseOrder?.purchase_order_items || [];
 
   const updateMutation = useMutation({
-    mutationFn: (data: { notes?: string; payout_due_date?: string }) =>
+    mutationFn: (data: PurchaseOrderUpdate) =>
       apiRequest(`/purchase-order/${params?.id}`, {
         method: "PUT",
         body: data,
@@ -299,6 +324,7 @@ export default function PurchaseOrderDetail() {
           ? format(new Date(purchaseOrder.payout_due_date), "yyyy-MM-dd'T'HH:mm")
           : ""
       );
+      setEditedLines(linesFrom(purchaseOrder.purchase_order_items || []));
     }
   }, [purchaseOrder]);
 
@@ -306,9 +332,44 @@ export default function PurchaseOrderDetail() {
     setIsEditing(true);
   };
 
+  const setEditedLine = (uuid: string, field: "quantity" | "price_per_unit", value: string) => {
+    setEditedLines((lines) => ({ ...lines, [uuid]: { ...lines[uuid], [field]: value } }));
+  };
+
+  // The line's corrected figures, or an error message if they are not valid
+  const parseLine = (item: PurchaseOrderItem) => {
+    const line = editedLines[item.uuid];
+    if (!line) return { quantity: item.quantity, price: item.price_per_unit };
+    const quantity = Number(line.quantity);
+    const price = Number(line.price_per_unit);
+    if (line.quantity.trim() === "" || !Number.isInteger(quantity) || quantity < 1) {
+      return { error: t('purchaseOrders.lineQuantityInvalid', { material: item.material_name }) };
+    }
+    if (line.price_per_unit.trim() === "" || !Number.isFinite(price) || price < 0) {
+      return { error: t('purchaseOrders.linePriceInvalid', { material: item.material_name }) };
+    }
+    return { quantity, price };
+  };
+
   const handleSave = () => {
-    const updateData: { notes?: string; payout_due_date?: string } = {};
-    
+    const updateData: PurchaseOrderUpdate = {};
+
+    const lineEdits: PurchaseOrderLineEdit[] = [];
+    for (const item of purchaseOrderItems) {
+      const parsed = parseLine(item);
+      if ("error" in parsed) {
+        toast({ title: t('common.error'), description: parsed.error, variant: "destructive" });
+        return;
+      }
+      const edit: PurchaseOrderLineEdit = { uuid: item.uuid };
+      if (parsed.quantity !== item.quantity) edit.quantity = parsed.quantity;
+      if (parsed.price !== item.price_per_unit) edit.price_per_unit = parsed.price;
+      if (edit.quantity !== undefined || edit.price_per_unit !== undefined) lineEdits.push(edit);
+    }
+    if (lineEdits.length > 0) {
+      updateData.purchase_order_items = lineEdits;
+    }
+
     if (editedNotes !== purchaseOrder?.notes) {
       updateData.notes = editedNotes || null;
     }
@@ -334,6 +395,7 @@ export default function PurchaseOrderDetail() {
         ? format(new Date(purchaseOrder.payout_due_date), "yyyy-MM-dd'T'HH:mm")
         : ""
     );
+    setEditedLines(linesFrom(purchaseOrderItems));
     setIsEditing(false);
   };
 
@@ -496,7 +558,10 @@ export default function PurchaseOrderDetail() {
 
   return (
     <AppLayout>
-      <div className="p-8 max-w-7xl mx-auto space-y-8">
+      {/* w-full: as a flex-column child with mx-auto it would otherwise shrink to
+          the items table's width and scroll the whole page sideways on a phone,
+          instead of letting the table scroll inside its own overflow box */}
+      <div className="p-8 max-w-7xl mx-auto w-full space-y-8">
         {/* Overdue Banner */}
         {purchaseOrder.is_overdue && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -852,11 +917,16 @@ export default function PurchaseOrderDetail() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {purchaseOrderItems.map((item) => (
-                      <tr 
-                        key={item.uuid} 
-                        className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
-                        onClick={() => handleItemRowClick(item)}
+                    {purchaseOrderItems.map((item) => {
+                      const parsedLine = parseLine(item);
+                      const lineTotal = isEditing && !("error" in parsedLine)
+                        ? parsedLine.quantity * parsedLine.price
+                        : item.total_price;
+                      return (
+                      <tr
+                        key={item.uuid}
+                        className={isEditing ? "" : "hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"}
+                        onClick={() => !isEditing && handleItemRowClick(item)}
                       >
                         <td className="py-4">
                           <div>
@@ -869,18 +939,57 @@ export default function PurchaseOrderDetail() {
                           </div>
                         </td>
                         <td className="py-4">
-                          <div className="text-sm text-gray-900 dark:text-gray-100">
-                            {item.quantity} {item.unit}
-                          </div>
+                          {isEditing ? (
+                            <div className="pe-3">
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  inputMode="numeric"
+                                  aria-label={`${t('common.quantity')} — ${item.material_name}`}
+                                  value={editedLines[item.uuid]?.quantity ?? ""}
+                                  onChange={(e) => setEditedLine(item.uuid, "quantity", e.target.value)}
+                                  className="h-8 w-24"
+                                />
+                                <span className="text-sm text-gray-500 dark:text-gray-400">{item.unit}</span>
+                              </div>
+                              {item.is_fulfilled && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  {t('purchaseOrders.lineStockFollows')}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-900 dark:text-gray-100">
+                              {item.quantity} {item.unit}
+                            </div>
+                          )}
                         </td>
                         <td className="py-4">
-                          <div className="text-sm text-gray-900 dark:text-gray-100">
-                            {formatCurrency(item.price_per_unit, item.currency)}
-                          </div>
+                          {isEditing ? (
+                            <div className="flex items-center gap-2 pe-3">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="any"
+                                inputMode="decimal"
+                                aria-label={`${t('purchaseOrders.unitPrice')} — ${item.material_name}`}
+                                value={editedLines[item.uuid]?.price_per_unit ?? ""}
+                                onChange={(e) => setEditedLine(item.uuid, "price_per_unit", e.target.value)}
+                                className="h-8 w-28"
+                              />
+                              <span className="text-sm text-gray-500 dark:text-gray-400">{item.currency}</span>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-900 dark:text-gray-100">
+                              {formatCurrency(item.price_per_unit, item.currency)}
+                            </div>
+                          )}
                         </td>
                         <td className="py-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {formatCurrency(item.total_price, item.currency)}
+                            {formatCurrency(lineTotal, item.currency)}
                           </div>
                         </td>
                         <td className="py-4">
@@ -914,7 +1023,8 @@ export default function PurchaseOrderDetail() {
                             size="sm"
                             variant={item.is_fulfilled ? "outline" : "default"}
                             onClick={(e) => handleFulfillToggle(item, e)}
-                            disabled={fulfillItemMutation.isPending || unfulfillItemMutation.isPending}
+                            // a fulfil refetches the order, which would reset unsaved line edits
+                            disabled={isEditing || fulfillItemMutation.isPending || unfulfillItemMutation.isPending}
                             className={`text-xs ${
                               item.is_fulfilled 
                                 ? 'hover:bg-orange-50 hover:text-orange-600 hover:border-orange-300 dark:hover:bg-orange-900/20 dark:hover:text-orange-400' 
@@ -925,7 +1035,8 @@ export default function PurchaseOrderDetail() {
                           </Button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
