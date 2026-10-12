@@ -121,9 +121,11 @@ export default function PurchaseOrderEdit() {
         payout_due_date: data.payout_due_date?.toISOString() || null,
         notes: data.notes || null,
       };
+      // apiRequest serializes the body itself — a pre-stringified one arrives
+      // as a JSON string the server cannot unpack
       return apiRequest(`/purchase-order/${id}`, {
         method: "PUT",
-        body: JSON.stringify(payload),
+        body: payload,
       });
     },
     onSuccess: () => {

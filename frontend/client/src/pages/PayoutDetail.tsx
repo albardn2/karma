@@ -45,9 +45,11 @@ export default function PayoutDetail() {
 
   const updateMutation = useMutation({
     mutationFn: (data: { notes?: string }) =>
+      // apiRequest serializes the body itself — a pre-stringified one arrives
+      // as a JSON string the server cannot unpack
       apiRequest(`/payout/${params?.id}`, {
         method: "PUT",
-        body: JSON.stringify(data),
+        body: data,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/payout/"] });
