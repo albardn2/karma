@@ -115,7 +115,8 @@ function expectedPeriod(gran: Gran, offset: number): Period {
   } else {
     const monday = new Date(Date.UTC(y, m, now.getUTCDate() - ((now.getUTCDay() + 6) % 7) - 7 * offset));
     start = monday;
-    end = new Date(Date.UTC(y, m, monday.getUTCDate() + 7));
+    // from the Monday itself — it may sit in an earlier month than today
+    end = new Date(monday.getTime() + 7 * 86400000);
   }
   return { granularity: gran, offset, label: "", start: ymd(start), end: ymd(end), is_current: offset === 0 };
 }
