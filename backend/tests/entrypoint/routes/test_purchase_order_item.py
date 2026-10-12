@@ -8,6 +8,7 @@ from models.common import (
     PurchaseOrder as PurchaseOrderModel
 )
 from app.dto.common_enums import Currency, UnitOfMeasure
+from app.entrypoint.routes.common.errors import register_error_handlers
 
 # --- CREATE ---
 
@@ -164,30 +165,40 @@ def test_update_item_not_found(client):
 
 # --- DELETE (soft) ---
 
-def test_delete_item_marks_deleted(client, return_dicts, dummy_uow_class):
-    return_single, _ = return_dicts
+@pytest.fixture
+def admin_headers(app, admin_token):
+    # the delete route reports the domain's refusals through the app's global
+    # error handlers, which the shared test app does not register
+    register_error_handlers(app)
+    return {"Authorization": f"Bearer {admin_token}"}
 
+
+def _stored_item(return_single, **fields):
     material = MaterialModel(
-        uuid=str(uuid.uuid4()), created_at=datetime.utcnow()
+        uuid=str(uuid.uuid4()), name="raw peanuts", created_at=datetime.utcnow()
     )
-    material.unit = UnitOfMeasure.KG.value
     po = PurchaseOrderModel(
         uuid=str(uuid.uuid4()), created_at=datetime.utcnow(),
-        vendor_uuid=str(uuid.uuid4()), currency=Currency.USD.value, status="pending"
+        vendor_uuid=str(uuid.uuid4()), currency=Currency.USD.value
     )
-
-    item = PurchaseOrderItemModel(
-        uuid=str(uuid.uuid4()), purchase_order_uuid=po.uuid,
-        material_uuid=material.uuid, quantity=1, price_per_unit=1.0,
-        currency=Currency.USD.value, unit=UnitOfMeasure.KG.value,
-        created_at=datetime.utcnow(), is_fulfilled=False,
-        quantity_received=0.0, is_deleted=False
-    )
+    item = PurchaseOrderItemModel(**{
+        "uuid": str(uuid.uuid4()), "purchase_order_uuid": po.uuid,
+        "material_uuid": material.uuid, "quantity": 1, "price_per_unit": 1.0,
+        "currency": Currency.USD.value, "unit": UnitOfMeasure.KG.value,
+        "created_at": datetime.utcnow(), "is_fulfilled": False,
+        "quantity_received": 0.0, "is_deleted": False, **fields,
+    })
     item.material = material
     item.purchase_order = po
     return_single["purchase_order_item"] = item
+    return item
 
-    resp = client.delete(f"/purchase_order_item/{item.uuid}")
+
+def test_delete_item_marks_deleted(client, return_dicts, dummy_uow_class, admin_headers):
+    return_single, _ = return_dicts
+    item = _stored_item(return_single)
+
+    resp = client.delete(f"/purchase_order_item/{item.uuid}", headers=admin_headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["is_deleted"] is True
@@ -195,6 +206,26 @@ def test_delete_item_marks_deleted(client, return_dicts, dummy_uow_class):
     uow = dummy_uow_class.last_instance
     saved: PurchaseOrderItemModel = uow.purchase_order_item_repository.saved_model  # type: ignore
     assert saved.is_deleted is True
+
+
+def test_delete_item_refuses_a_received_line(client, return_dicts, dummy_uow_class, admin_headers):
+    # a received line owns a PURCHASE_ORDER inventory event and its stock;
+    # deleting the line would leave both behind
+    return_single, _ = return_dicts
+    item = _stored_item(return_single, is_fulfilled=True, fulfilled_at=datetime.utcnow(),
+                        quantity_received=1.0)
+
+    resp = client.delete(f"/purchase_order_item/{item.uuid}", headers=admin_headers)
+    assert resp.status_code == 400
+    assert resp.get_json() == {"error": "PurchaseOrderItem already fulfilled"}
+    assert item.is_deleted is False
+    assert dummy_uow_class.last_instance.purchase_order_item_repository.saved_model is None
+
+
+def test_delete_item_not_found(client, admin_headers):
+    resp = client.delete(f"/purchase_order_item/{uuid.uuid4()}", headers=admin_headers)
+    assert resp.status_code == 404
+    assert resp.get_json() == {"error": "PurchaseOrderItem not found"}
 
 # --- LIST (paginated) ---
 

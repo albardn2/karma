@@ -98,7 +98,9 @@ class PurchaseOrderDomain:
             raise NotFoundError("PurchaseOrder not found")
 
         PurchaseOrderDomain.validate_delete_purchase_order(uow=uow, po=po)
-        po_item_uuids = [item.uuid for item in po.purchase_order_items]
+        # a line removed on its own earlier is already gone; delete_item would
+        # report it as not found and refuse the whole order
+        po_item_uuids = [item.uuid for item in po.purchase_order_items if not item.is_deleted]
         PurchaseOrderItemDomain.delete_items(uow=uow, uuids=po_item_uuids)
         po.is_deleted = True
         uow.purchase_order_repository.save(model=po, commit=False)
