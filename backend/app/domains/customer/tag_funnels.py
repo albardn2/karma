@@ -179,20 +179,24 @@ def build_funnel(steps, *, current: Counter, moves, created: int = 0,
     net, entered, left, transitions = _tally(step_set, moves, created)
     net_after, _, _, _ = _tally(step_set, moves_after, created_after)
 
+    def step(v):
+        # never below zero: a log that contradicts the tags (events predating
+        # a manual fix, say) must not render as "-3 customers"
+        end = max(0, current.get(v, 0) - net_after[v])
+        return {
+            "value": v,
+            "current": current.get(v, 0),
+            "at_period_end": end,
+            # where the step stood when the period began: its end minus what
+            # the period did to it — the "before" a trip page shows
+            "at_period_start": max(0, end - net[v]),
+            "net_change": net[v],
+            "entered": entered[v],
+            "left": left[v],
+        }
+
     return {
-        "steps": [
-            {
-                "value": v,
-                "current": current.get(v, 0),
-                # never below zero: a log that contradicts the tags (events
-                # predating a manual fix, say) must not render as "-3 customers"
-                "at_period_end": max(0, current.get(v, 0) - net_after[v]),
-                "net_change": net[v],
-                "entered": entered[v],
-                "left": left[v],
-            }
-            for v in steps
-        ],
+        "steps": [step(v) for v in steps],
         "transitions": [
             {"from": old, "to": new, "count": n}
             for (old, new), n in sorted(transitions.items(), key=lambda kv: -kv[1])

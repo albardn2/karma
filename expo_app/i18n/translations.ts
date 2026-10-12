@@ -87,6 +87,26 @@ export const translations: Record<Lang, Record<string, string>> = {
     'trips.reconSold': 'Sold',
     'trips.reconEnd': 'End',
     'trips.reconVariance': 'Variance',
+    // the dashboard's sales & interest funnels, narrowed to this trip's
+    // customers over the trip's own window. Same wording as the web page; the
+    // funnel and step names reuse the dashboards.tf* keys.
+    'trips.funnelsTitle': 'Sales & interest funnels on this trip',
+    'trips.funnelsDesc':
+      'The {n} customers this trip stopped at — where they stood when it ended, and how the trip moved them.',
+    'trips.funnelsDescOpen':
+      'The {n} customers this trip has stopped at so far — where they stand now, and how the trip has moved them.',
+    'trips.funnelsNew': '{n} of them were added during the trip.',
+    'trips.funnelsBefore': '{n} before the trip',
+    'trips.funnelsMoves': 'Moves during this trip',
+    'trips.funnelsNoMoves': 'No customer changed step during this trip.',
+    'trips.funnelsHint':
+      'Big number: customers on this step when the trip ended (now, while it is still running). Small number: before the trip began. Badge: the change during the trip. Arrows: customers who moved between steps during the trip. Only completed or skipped stops count, and any change to these customers while the trip ran is included — also one made elsewhere.',
+    'trips.funnelsHistoryNote':
+      'This trip started before tag history begins ({date}), so some of its moves were not recorded.',
+    'trips.funnelsEstimated':
+      'This trip did not record when it set off or when its stops were worked, so its window is estimated (from when it was planned, or its first day if it was closed later).',
+    'trips.funnelsFailed': "Couldn't load this trip's funnels.",
+    'trips.funnelsEmpty': 'No customers to show: none of this trip’s completed or skipped stops is at a customer that still exists.',
     // multi-select + aggregate summary. Wording copied from the web summary so
     // the two products say the same thing; 'trips.summary' is already the trip
     // detail card title, hence summaryButton.
@@ -1409,6 +1429,24 @@ export const translations: Record<Lang, Record<string, string>> = {
     'trips.reconSold': 'المُباع',
     'trips.reconEnd': 'النهاية',
     'trips.reconVariance': 'الفرق',
+    // قمعا المبيعات والاهتمام لعملاء هذه الرحلة خلال مدتها — نفس صياغة الويب
+    'trips.funnelsTitle': 'قمع المبيعات والاهتمام في هذه الرحلة',
+    'trips.funnelsDesc':
+      'العملاء الـ{n} الذين توقفت عندهم هذه الرحلة — أين كانوا عند انتهائها، وكيف حرّكتهم الرحلة.',
+    'trips.funnelsDescOpen':
+      'العملاء الـ{n} الذين توقفت عندهم هذه الرحلة حتى الآن — أين هم الآن، وكيف حرّكتهم الرحلة.',
+    'trips.funnelsNew': '{n} منهم أُضيفوا خلال الرحلة.',
+    'trips.funnelsBefore': '{n} قبل الرحلة',
+    'trips.funnelsMoves': 'الانتقالات خلال هذه الرحلة',
+    'trips.funnelsNoMoves': 'لم يغيّر أي عميل مرحلته خلال هذه الرحلة.',
+    'trips.funnelsHint':
+      'الرقم الكبير: عدد العملاء في هذه المرحلة عند انتهاء الرحلة (أو الآن إن كانت لا تزال جارية). الرقم الصغير: قبل بدء الرحلة. الشارة: التغيّر خلال الرحلة. الأسهم: العملاء الذين انتقلوا بين المراحل خلال الرحلة. تُحتسب فقط المحطات المكتملة أو المتخطّاة، ويُضمَّن أي تغيير على هؤلاء العملاء أثناء الرحلة — حتى لو تمّ من مكان آخر.',
+    'trips.funnelsHistoryNote':
+      'بدأت هذه الرحلة قبل بدء سجل الوسوم ({date})، لذا لم تُسجَّل بعض انتقالاتها.',
+    'trips.funnelsEstimated':
+      'لم تُسجّل هذه الرحلة وقت انطلاقها أو وقت إنجاز محطاتها، لذا نافذتها الزمنية تقديرية (من وقت التخطيط لها، أو يومها الأول إن أُغلقت لاحقاً).',
+    'trips.funnelsFailed': 'تعذّر تحميل قمع هذه الرحلة.',
+    'trips.funnelsEmpty': 'لا يوجد عملاء لعرضهم: لا تضم هذه الرحلة أي محطة مكتملة أو متخطّاة لعميل لا يزال موجوداً.',
     // التحديد المتعدد وملخص الرحلات المحددة — نفس صياغة الويب
     'trips.selectHint': 'اضغط مطولاً على رحلة لتحديد عدة رحلات.',
     'trips.selectedCount': 'المحدد: {count}',

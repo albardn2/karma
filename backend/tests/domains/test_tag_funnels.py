@@ -226,6 +226,9 @@ def test_a_finished_period_shows_the_counts_at_its_end_not_todays():
     assert s["no_sale"]["current"] == 18
     assert s["no_sale"]["at_period_end"] == 17
     assert s["one_time_sale"]["at_period_end"] == 8 - 4
+    # and at September's start: its end minus what September did
+    assert s["no_sale"]["at_period_start"] == 17 + 3
+    assert s["one_time_sale"]["at_period_start"] == 4 - 3
     # September's own movement is untouched by what came after it
     assert s["no_sale"]["net_change"] == -3
     assert f["transitions"] == [{"from": "no_sale", "to": "one_time_sale", "count": 3}]

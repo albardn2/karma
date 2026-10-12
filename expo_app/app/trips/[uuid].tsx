@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,18 +12,20 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { NativeHeader } from '@/components/layout/NativeHeader';
-import { apiCall } from '@/utils/api';
+import { apiCall, isOk } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime } from '@/utils/date';
 import { TripTrackingMap } from '@/components/TripTrackingMap';
 import { TripAnalyticsCard } from '@/components/TripAnalyticsCard';
+import { TripTagFunnels, type TripFunnels } from '@/components/TripTagFunnels';
 import type { TripMapStop } from '@/components/TripMap';
 import { STATUS_BADGE } from '../trips';
 
 // Admin-only trip detail — mirrors the web page: summary, money totals,
 // stops with outcomes, activity (orders / fulfilled / paid), inventory
-// reconciliation, expected cash, and the live/playback tracking view.
+// reconciliation, expected cash, the sales & interest funnels of the trip's
+// customers, and the live/playback tracking view.
 
 interface Trip {
   uuid: string;
@@ -123,21 +125,50 @@ export default function TripDetailScreen() {
   const [trackingOn, setTrackingOn] = useState(false);
   const [tripExpenses, setTripExpenses] = useState<any[]>([]);
   const [savingAudit, setSavingAudit] = useState(false);
+  const [funnels, setFunnels] = useState<TripFunnels | null>(null);
+  // its own flag: a funnel error shows in the funnel card, the rest of the
+  // trip still renders
+  const [funnelsFailed, setFunnelsFailed] = useState(false);
+
+  // a Retry and a pull-to-refresh can both be in flight; only the request
+  // started last may land, or an older failure could replace fresh numbers
+  const funnelSeq = useRef(0);
+  const fetchFunnels = async () => {
+    const mine = ++funnelSeq.current;
+    const res = await apiCall<TripFunnels>(`/trip/${uuid}/tag-funnels`);
+    return { res, latest: () => mine === funnelSeq.current };
+  };
+  const takeFunnels = ({ res, latest }: Awaited<ReturnType<typeof fetchFunnels>>) => {
+    if (!latest()) return;
+    if (isOk(res.status) && res.data) {
+      setFunnels(res.data);
+      setFunnelsFailed(false);
+    } else setFunnelsFailed(true);
+  };
 
   const load = async () => {
-    const [tripRes, expRes, actRes, matRes] = await Promise.all([
+    const [tripRes, expRes, actRes, matRes, funnelRes] = await Promise.all([
       apiCall<Trip>(`/trip/${uuid}`),
       apiCall<{ expenses: any[] }>(`/expense/?trip_uuid=${uuid}&per_page=100`),
       apiCall<TripActivity>(`/trip/${uuid}/activity`),
       apiCall<{ materials: { uuid: string; name: string }[] }>('/material/?page=1&per_page=100'),
+      fetchFunnels(),
     ]);
     if (tripRes.data) setTrip(tripRes.data);
     if (expRes.data) setTripExpenses(expRes.data.expenses || []);
     if (actRes.data) setActivity(actRes.data);
     if (matRes.data)
       setMaterials(Object.fromEntries((matRes.data.materials || []).map((m) => [m.uuid, m.name])));
+    takeFunnels(funnelRes);
     setLoading(false);
     setRefreshing(false);
+  };
+
+  // the funnel card's retry: just the funnels, spinner in the card meanwhile
+  const retryFunnels = async () => {
+    setFunnelsFailed(false);
+    setFunnels(null);
+    takeFunnels(await fetchFunnels());
   };
 
   useEffect(() => {
@@ -493,6 +524,9 @@ export default function TripDetailScreen() {
             ))}
           </View>
         )}
+
+        {/* sales & interest funnels of the customers this trip stopped at */}
+        <TripTagFunnels data={funnels} failed={funnelsFailed} onRetry={retryFunnels} />
       </ScrollView>
     </ThemedView>
   );

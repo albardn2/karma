@@ -13,8 +13,19 @@ from app.dto.trip import (
     TripPage,
     TripSummaryParams,
 )
-from models.common import Trip as TripModel
+from models.common import (
+    Customer as CustomerModel,
+    CustomerOrder as CustomerOrderModel,
+    CustomerTagEvent as CustomerTagEventModel,
+    TaskExecution as TaskExecutionModel,
+    Trip as TripModel,
+    TripStop as TripStopModel,
+)
+from app.dto.trip import TripStatus
+from app.dto.workflow_execution import WorkflowStatus
+from app.domains.customer.auto_tags import INTEREST_KEY, SALE_KEY
 from app.domains.trip.domain import TripDomain
+from app.domains.trip.tag_funnels import COUNTED_STOP_STATUSES, build_trip_payload, trip_window
 
 from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required, add_logged_user_to_payload
@@ -565,3 +576,125 @@ def delete_trip(uuid: str):
                 uow.workflow_execution_repository.save(model=wfe, commit=False)
         uow.commit()
     return jsonify({"uuid": uuid, "is_deleted": True}), 200
+
+
+# ---------------------------------------------------------------------------
+# The sales & interest funnels for ONE trip: the customers its worked stops
+# reached, and how the trip's window moved them. Who counts and which window
+# are decided (and tested) in app/domains/trip/tag_funnels.py; the arithmetic
+# is the company-wide dashboard's. On the trip blueprint, not the dashboard
+# one, so it is gated by `trip: read` like the rest of the trip page — drivers
+# and sales see their own trip's funnel without the dashboard module.
+
+
+@trip_blueprint.route("/<string:uuid>/tag-funnels", methods=["GET"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATOR.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.DRIVER.value,
+    PermissionScope.SALES.value,
+)
+def get_trip_tag_funnels(uuid: str):
+    from datetime import datetime
+
+    with SqlAlchemyUnitOfWork() as uow:
+        trip = uow.trip_repository.find_one(uuid=uuid, is_deleted=False)
+        if not trip:
+            raise NotFoundError("Trip not found")
+        s = uow.session
+
+        last_activity_at = None
+        if trip.status == TripStatus.CANCELLED.value or (
+            trip.status == TripStatus.COMPLETED.value and trip.end_time is None
+        ):
+            # when the trip last DID something: a worked stop actually
+            # completed, or an order taken at one of its stops. Not any stop
+            # task's end_time — cancelling stamps one on every stop nobody
+            # reached. Both reach the stops through trip_stop.trip_uuid of a
+            # trip already resolved in this tenant.
+            last_stop = (
+                s.query(func.max(TaskExecutionModel.end_time))
+                .join(TripStopModel, TripStopModel.task_execution_uuid == TaskExecutionModel.uuid)
+                .filter(
+                    TripStopModel.trip_uuid == trip.uuid,
+                    TripStopModel.status.in_(COUNTED_STOP_STATUSES),
+                    TaskExecutionModel.status == WorkflowStatus.COMPLETED.value,
+                )
+                .scalar()
+            )
+            last_order = (
+                s.query(func.max(CustomerOrderModel.created_at))
+                .join(TripStopModel, CustomerOrderModel.trip_stop_uuid == TripStopModel.uuid)
+                .filter(TripStopModel.trip_uuid == trip.uuid, CustomerOrderModel.is_deleted.is_(False))
+                .scalar()
+            )
+            seen = [t for t in (last_stop, last_order) if t is not None]
+            last_activity_at = max(seen) if seen else None
+        start, end, is_open, estimated = trip_window(
+            start_time=trip.start_time, end_time=trip.end_time,
+            created_at=trip.created_at, now=datetime.utcnow(),
+            status=trip.status, last_activity_at=last_activity_at,
+        )
+        # raw queries: the repository chokepoint can't express these, so the
+        # tenant filter is spelled out on every one
+        worked = (
+            s.query(TripStopModel.customer_uuid)
+            .filter(
+                TripStopModel.trip_uuid == trip.uuid,
+                TripStopModel.customer_uuid.isnot(None),
+                TripStopModel.status.in_(COUNTED_STOP_STATUSES),
+            )
+            .all()
+        )
+        stop_customers = {c for (c,) in worked}
+        live = (
+            CustomerModel.account_uuid == uow.account_uuid,
+            CustomerModel.is_deleted.is_(False),
+            CustomerModel.uuid.in_(stop_customers),
+        )
+        # a trip reaches dozens of customers, not thousands: fetch them all
+        rows = (
+            s.query(CustomerModel.uuid, CustomerModel.tags, CustomerModel.created_at)
+            .filter(*live)
+            .all()
+        ) if stop_customers else []
+        customers = [uuid_ for uuid_, _, _ in rows]
+        tag_lists = [tags for _, tags, _ in rows]
+        created = sum(1 for _, _, c in rows if c is not None and start <= c < end)
+        created_after = sum(1 for _, _, c in rows if c is not None and c >= end)
+
+        E = CustomerTagEventModel
+
+        def moves_between(lo, hi=None):
+            if not customers:
+                return []
+            q = s.query(E.key, E.old_value, E.new_value, func.count(E.uuid)).filter(
+                E.account_uuid == uow.account_uuid,
+                E.customer_uuid.in_(customers),
+                E.key.in_([SALE_KEY, INTEREST_KEY]),
+                E.created_at >= lo,
+            )
+            if hi is not None:
+                q = q.filter(E.created_at < hi)
+            return q.group_by(E.key, E.old_value, E.new_value).all()
+
+        moves = moves_between(start, end)
+        # a finished trip: what happened to these customers since turns
+        # today's counts into the counts when it ended
+        moves_after = [] if is_open else moves_between(end)
+        history_from = (
+            s.query(func.min(E.created_at)).filter(E.account_uuid == uow.account_uuid).scalar()
+        )
+
+    counted = set(customers)
+    return jsonify(build_trip_payload(
+        trip_uuid=uuid, start=start, end=end, is_open=is_open, history_from=history_from,
+        # worked stops whose customer still exists, revisits included
+        stops=sum(1 for (c,) in worked if c in counted), total=len(customers), tag_lists=tag_lists,
+        moves=moves, moves_after=moves_after,
+        created=created, created_after=0 if is_open else created_after,
+        estimated=estimated,
+    )), 200
