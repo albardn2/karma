@@ -5,13 +5,16 @@ import {
   I18nManager,
   KeyboardAvoidingView,
   Modal,
+  Platform,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/ThemedText';
+import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
 
@@ -88,9 +91,9 @@ export function TripFilterDropdowns({ assignee, vehicle, onAssigneeChange, onVeh
   );
 
   // a chosen value can outlive its option (its last trip deleted since); name it
-  // by its raw value rather than showing an active filter as "Everyone"
-  const labelFor = (list: Option[], value: string, allLabel: string) =>
-    !value ? allLabel : list.find((o) => o.value === value)?.label ?? value;
+  // by its raw value rather than showing an active filter as if nothing were set
+  const labelFor = (list: Option[], value: string) =>
+    list.find((o) => o.value === value)?.label ?? value;
 
   const openSheet = (sheet: Which) => {
     setWhich(sheet);
@@ -98,21 +101,29 @@ export function TripFilterDropdowns({ assignee, vehicle, onAssigneeChange, onVeh
     load();
   };
   const isVehicle = which === 'vehicle';
+  // With a large system text size, half the screen is too narrow for a label,
+  // so the pills take a row each instead of truncating to one or two letters.
+  const { fontScale } = useWindowDimensions();
+  const stacked = fontScale > 1.3;
 
   return (
-    <View style={styles.row}>
-      <DropdownButton
+    <View style={[styles.row, stacked && styles.rowStacked]}>
+      <FilterPill
+        icon="person.fill"
         title={t('trips.filterAssignee')}
-        value={labelFor(assigneeOptions, assignee, t('trips.allAssignees'))}
-        active={!!assignee}
+        value={assignee ? labelFor(assigneeOptions, assignee) : null}
         onPress={() => openSheet('assignee')}
+        onClear={() => onAssigneeChange('')}
+        stacked={stacked}
         testID="trips-filter-assignee"
       />
-      <DropdownButton
+      <FilterPill
+        icon={VEHICLE_ICON}
         title={t('trips.filterVehicle')}
-        value={labelFor(vehicleOptions, vehicle, t('trips.allVehicles'))}
-        active={!!vehicle}
+        value={vehicle ? labelFor(vehicleOptions, vehicle) : null}
         onPress={() => openSheet('vehicle')}
+        onClear={() => onVehicleChange('')}
+        stacked={stacked}
         testID="trips-filter-vehicle"
       />
 
@@ -139,40 +150,85 @@ export function TripFilterDropdowns({ assignee, vehicle, onAssigneeChange, onVeh
   );
 }
 
-function DropdownButton({
+/**
+ * One filter as a pill, the usual filter-bar pattern: at rest it names the
+ * filter ("Assigned to", "Vehicle") with a chevron; once set it turns indigo,
+ * shows the choice instead, and the chevron becomes a clear button, so undoing
+ * a filter is one tap rather than open, scroll to the top, pick "Everyone".
+ */
+// box.truck.fill only exists from iOS 16 (SF Symbols 4); the app still installs
+// on iOS 15.1, where it would leave the circle empty
+const VEHICLE_ICON: 'box.truck.fill' | 'car.fill' =
+  Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) < 16 ? 'car.fill' : 'box.truck.fill';
+
+function FilterPill({
+  icon,
   title,
   value,
-  active,
   onPress,
+  onClear,
+  stacked,
   testID,
 }: {
+  icon: 'person.fill' | 'box.truck.fill' | 'car.fill';
   title: string;
-  value: string;
-  active: boolean;
+  /** the chosen option's label, or null when the filter is off */
+  value: string | null;
   onPress: () => void;
+  onClear: () => void;
+  /** a row of its own (large text sizes) rather than half of one */
+  stacked: boolean;
   testID: string;
 }) {
+  const { t } = useLanguage();
+  const active = value !== null;
   return (
-    <TouchableOpacity
-      style={[styles.button, active && styles.buttonActive]}
-      onPress={onPress}
-      activeOpacity={0.75}
-      testID={testID}
-    >
-      <View style={styles.buttonText}>
-        <ThemedText style={[styles.buttonTitle, active && styles.buttonTitleActive]} numberOfLines={1}>
-          {title}
-        </ThemedText>
+    <View style={[styles.pill, stacked && styles.pillStacked, active && styles.pillActive]}>
+      <TouchableOpacity
+        style={[styles.pillMain, active && styles.pillMainActive]}
+        onPress={onPress}
+        activeOpacity={0.7}
+        // the row's top padding and the gap to the chips below take the target
+        // past 44pt without making the pill itself any taller
+        hitSlop={{ top: 8, bottom: 2 }}
+        accessibilityRole="button"
+        accessibilityLabel={active ? `${title}: ${value}` : title}
+        accessibilityHint={t('trips.filterHint')}
+        testID={testID}
+      >
+        <View style={[styles.pillIcon, active && styles.pillIconActive]}>
+          <IconSymbol name={icon} size={15} color={active ? '#FFFFFF' : '#5469D4'} />
+        </View>
+        {/* Truncates rather than shrinking to fit: under the new architecture
+            minimumFontScale is ignored on both platforms, so a long name would
+            shrink to a 4pt floor. A size cap keeps the label inside the pill at
+            the largest accessibility sizes. */}
         <ThemedText
-          style={[styles.buttonValue, active && styles.buttonValueActive]}
+          style={[styles.pillLabel, active && styles.pillLabelActive]}
           numberOfLines={1}
+          maxFontSizeMultiplier={1.6}
           testID={`${testID}-value`}
         >
-          {value}
+          {active ? value : title}
         </ThemedText>
-      </View>
-      <ThemedText style={[styles.chevron, active && styles.buttonValueActive]}>⌄</ThemedText>
-    </TouchableOpacity>
+        {!active && <IconSymbol name="chevron.down" size={14} color="#6B7280" weight="semibold" />}
+      </TouchableOpacity>
+      {active && (
+        <TouchableOpacity
+          style={styles.pillClear}
+          onPress={onClear}
+          // 32 wide plus 8 either side = a 48pt target without spending the
+          // label's width on it; symmetric, because hitSlop is physical and the
+          // x changes sides in RTL
+          hitSlop={{ top: 8, bottom: 2, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('trips.clearFilter', { name: title })}
+          testID={`${testID}-clear`}
+        >
+          <IconSymbol name="xmark.circle.fill" size={18} color="#5469D4" />
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
@@ -201,6 +257,7 @@ function OptionSheet({
   onClose: () => void;
   testID?: string;
 }) {
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
 
   return (
@@ -214,7 +271,13 @@ function OptionSheet({
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]} testID={testID}>
           <View style={styles.header}>
             <ThemedText style={styles.title}>{title}</ThemedText>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} testID="trips-filter-sheet-close">
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel={t('trips.filterClose')}
+              testID="trips-filter-sheet-close"
+            >
               <ThemedText style={styles.closeText}>✕</ThemedText>
             </TouchableOpacity>
           </View>
@@ -306,6 +369,9 @@ function SheetBody({
               <TouchableOpacity
                 style={[styles.option, on && styles.optionOn]}
                 onPress={() => onPick(item.value)}
+                accessibilityRole="button"
+                // the tick is only drawn, so say it too
+                accessibilityState={{ selected: on }}
                 testID={`trips-filter-option-${item.value || 'all'}`}
               >
                 <View style={styles.optionText}>
@@ -337,25 +403,57 @@ function SheetBody({
 
 const styles = StyleSheet.create({
   // flexDirection 'row' flips itself under RTL, so "assigned to" stays first
-  row: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 8 },
-  button: {
+  // gap 8, the same as between the chips below
+  row: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 },
+  rowStacked: { flexDirection: 'column' },
+  // white with a soft lift, so the pills read as controls above the flat grey
+  // status chips rather than as two more of them
+  pill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    // a minimum rather than a height, so a larger system text size can grow it
+    minHeight: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#111827',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  pillStacked: { flex: 0 },
+  // flat once set; elevation as well as the shadow, or Android keeps its lift
+  pillActive: { backgroundColor: '#EEF2FF', borderColor: '#A5B4FC', shadowOpacity: 0, elevation: 0 },
+  pillMain: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    paddingStart: 6,
+    paddingEnd: 12,
+    paddingVertical: 4,
+    gap: 6,
   },
-  buttonActive: { backgroundColor: '#EEF2FF', borderColor: '#5469D4' },
-  buttonText: { flex: 1, alignItems: 'flex-start' },
-  buttonTitle: { fontSize: 10, fontWeight: '600', color: '#6B7280' },
-  buttonTitleActive: { color: '#5469D4' },
-  buttonValue: { fontSize: 13, fontWeight: '700', color: '#374151', marginTop: 1 },
-  buttonValueActive: { color: '#3B4CB8' },
-  chevron: { fontSize: 14, color: '#6B7280', marginStart: 6 },
+  // the clear button carries its own spacing, so the label gets this back
+  pillMainActive: { paddingEnd: 0 },
+  pillIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF2FF',
+  },
+  pillIconActive: { backgroundColor: '#5469D4' },
+  // 13pt: a step above the chips' 12 so the pills still read as the main
+  // controls, and room for a full name or plate in half a phone's width. One
+  // weight in both states, so choosing a value does not make it wider; an
+  // explicit lineHeight, or ThemedText's 24 would be scaled into the label.
+  pillLabel: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: '#374151', textAlign: 'left' },
+  pillLabelActive: { color: '#3B4CB8' },
+  pillClear: { width: 32, alignItems: 'center', justifyContent: 'center' },
   backdropWrap: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   // a fixed height, so the sheet does not jump as the search narrows the list;
@@ -375,7 +473,16 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   title: { fontSize: 17, fontWeight: '800', color: '#111827' },
-  closeBtn: { paddingHorizontal: 8, paddingVertical: 2 },
+  // a 44pt target; the negative margins keep the glyph and the header height
+  // where they were
+  closeBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginEnd: -10,
+    marginVertical: -8,
+  },
   closeText: { fontSize: 18, color: '#6B7280' },
   search: {
     marginHorizontal: 16,

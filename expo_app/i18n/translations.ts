@@ -115,6 +115,10 @@ export const translations: Record<Lang, Record<string, string>> = {
     'trips.allVehicles': 'All vehicles',
     'trips.filterOptionsFailed': "Couldn't load the choices",
     'trips.filterNoOptions': 'No trips yet, so nothing to choose.',
+    // screen-reader only
+    'trips.filterHint': 'Opens a list to choose from',
+    'trips.clearFilter': 'Clear filter: {name}',
+    'trips.filterClose': 'Close',
     // multi-select + aggregate summary. Wording copied from the web summary so
     // the two products say the same thing; 'trips.summary' is already the trip
     // detail card title, hence summaryButton.
@@ -1465,6 +1469,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     'trips.allVehicles': 'جميع المركبات',
     'trips.filterOptionsFailed': 'تعذّر تحميل الخيارات',
     'trips.filterNoOptions': 'لا توجد رحلات بعد، فلا خيارات.',
+    'trips.filterHint': 'يفتح قائمة للاختيار',
+    'trips.clearFilter': 'إزالة التصفية: {name}',
+    'trips.filterClose': 'إغلاق',
     // التحديد المتعدد وملخص الرحلات المحددة — نفس صياغة الويب
     'trips.selectHint': 'اضغط مطولاً على رحلة لتحديد عدة رحلات.',
     'trips.selectedCount': 'المحدد: {count}',

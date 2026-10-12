@@ -517,7 +517,9 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
   filterText: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
   filterTextActive: { color: '#fff' },
-  selectHint: { fontSize: 11, color: '#9CA3AF', paddingHorizontal: 16, paddingBottom: 6 },
+  // its own lineHeight: ThemedText's 24 scaled with a large text size and the
+  // hint was clipped by the first card
+  selectHint: { fontSize: 11, lineHeight: 15, color: '#9CA3AF', paddingHorizontal: 16, paddingBottom: 6 },
   list: { paddingHorizontal: 16, paddingBottom: 32 },
   card: {
     backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10,
