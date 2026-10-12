@@ -714,6 +714,10 @@ export const translations: Record<Lang, Record<string, string>> = {
   'expenses.paidOut': 'Paid out',
   'expenses.stillOwed': 'Still owed',
   'expenses.recordPayout': 'Record payout',
+  'expenses.deleteConfirm': 'Delete this expense? This cannot be undone.',
+  'expenses.deleteConfirmPaid':
+    'This expense has been paid ({amount}). Deleting it also deletes its payouts, and the money goes back to the account it was paid from. This cannot be undone.',
+  'expenses.deleteFailed': "Couldn't delete this expense.",
   'payouts.record': 'Record payout',
 
   'expenses.entries': 'Entries',
@@ -2049,6 +2053,10 @@ export const translations: Record<Lang, Record<string, string>> = {
   'expenses.paidOut': 'المدفوع',
   'expenses.stillOwed': 'المتبقي',
   'expenses.recordPayout': 'تسجيل دفعة',
+  'expenses.deleteConfirm': 'حذف هذا المصروف؟ لا يمكن التراجع عن ذلك.',
+  'expenses.deleteConfirmPaid':
+    'هذا المصروف مدفوع ({amount}). حذفه يحذف دفعاته أيضاً، ويعود المبلغ إلى الحساب الذي دُفع منه. لا يمكن التراجع عن ذلك.',
+  'expenses.deleteFailed': 'تعذّر حذف هذا المصروف.',
   'payouts.record': 'تسجيل دفعة',
 
   'expenses.entries': 'عدد القيود',

@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
+import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ModuleDetailScreen, DetailRow, DetailAction } from '@/components/ModuleDetailScreen';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasModule } from '@/hooks/useModuleAccess';
+import { apiCall, apiErrorText, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 
 const money = (n?: number | null, c?: string | null) =>
@@ -37,6 +40,26 @@ export default function ExpensesDetailScreen() {
   // recording a payout is a payouts-module write even though it starts here; a user
   // without that module would have the request refused, so it is not offered
   const canPayout = useHasModule('payouts');
+  // DELETE /expense/<uuid> is admin-only on the server (scopes_required admin,
+  // superuser — a role grant does not reach it), so it is offered to admins only
+  const { isAdmin } = useAuth();
+
+  const remove = async () => {
+    // the server deletes the expense's payouts in the same write, and their
+    // amounts return to the accounts they were paid from
+    const res = await apiCall(`/expense/${uuid}`, { method: 'DELETE' });
+    if (isOk(res.status)) {
+      // opened from a link there is nothing to go back to — land on the list
+      // rather than stay on an expense that no longer exists
+      if (router.canGoBack()) router.back();
+      else router.replace('/expenses');
+      return;
+    }
+    Alert.alert(
+      t('expenses.deleteFailed'),
+      res.status === 403 ? t('purchaseOrders.forbidden') : apiErrorText(res.error, t('form.tryAgain')),
+    );
+  };
 
   const actions: DetailAction<Expense>[] = [
     {
@@ -76,6 +99,20 @@ export default function ExpensesDetailScreen() {
           },
         });
       },
+    });
+  }
+
+  if (isAdmin) {
+    actions.push({
+      label: t('detail.delete'),
+      destructive: true,
+      testID: 'expense-delete',
+      // a paid expense takes its payouts with it — say so before, not after
+      confirmText: (x) =>
+        Number(x.amount_paid ?? 0) > 0
+          ? t('expenses.deleteConfirmPaid', { amount: money(x.amount_paid, x.currency) })
+          : t('expenses.deleteConfirm'),
+      onPress: remove,
     });
   }
 
