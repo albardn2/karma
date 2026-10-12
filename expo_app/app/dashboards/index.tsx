@@ -110,6 +110,13 @@ const IMPLEMENTED: Entry[] = [
     titleKey: 'dashboards.spend',
     descKey: 'dashboards.spendDesc',
   },
+  {
+    id: 'tag-funnels',
+    route: '/dashboards/tag-funnels',
+    icon: '🔻',
+    titleKey: 'dashboards.tagFunnels',
+    descKey: 'dashboards.tagFunnelsDesc',
+  },
 ];
 
 /**
