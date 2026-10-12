@@ -32,6 +32,7 @@ import { TripStopsMap } from "@/components/map/TripStopsMap";
 import { type PlaybackPoint } from "@/components/location/LocationPlayback";
 import { TripLocationMap } from "@/components/location/TripLocationMap";
 import { TripAnalytics } from "@/components/trips/TripAnalytics";
+import { CashStatement } from "@/components/trips/CashStatement";
 import { TripTagFunnels } from "@/components/trips/TripTagFunnels";
 import { Table as TableIcon, Map as MapIcon } from "lucide-react";
 
@@ -147,12 +148,6 @@ export default function TripDetail() {
       ...Object.keys(trip?.trip_expenses || {}),
     ])
   ).sort();
-  // a cost booked to the trip but never paid has taken no cash off the van, so
-  // it does not come off what the driver owes back. The column only appears
-  // when there is something outstanding — normally everything is paid at once.
-  const hasUnpaidSpend = Object.values(trip?.trip_expenses_unpaid || {}).some(
-    (amount) => Number(amount) > 0
-  );
 
   // recorded GPS series for this trip (admin-only endpoint; hide the section on error)
   const { data: locationData } = useQuery<{ points: PlaybackPoint[]; total_count: number }>({
@@ -171,7 +166,17 @@ export default function TripDetail() {
   const activityRows: any[] =
     activityTab === "orders" ? activity?.orders || []
     : activityTab === "fulfillments" ? activity?.fulfillments || []
+    : activityTab === "debt" ? activity?.debt_collected || []
     : activity?.payments || [];
+  // the debt tab's total per currency, over every row rather than the page:
+  // the same figure as the Expected Cash card's "Debt collected" line
+  const debtTotals: [string, number][] = Object.entries(
+    (activity?.debt_collected || []).reduce((acc: Record<string, number>, r: any) => {
+      const cur = r.currency || "?";
+      acc[cur] = (acc[cur] || 0) + Number(r.amount || 0);
+      return acc;
+    }, {})
+  ).sort(([a], [b]) => a.localeCompare(b)) as [string, number][];
   const pageRows = activityRows.slice(activityPage * PAGE_SIZE, (activityPage + 1) * PAGE_SIZE);
   const pageCount = Math.max(1, Math.ceil(activityRows.length / PAGE_SIZE));
 
@@ -608,10 +613,12 @@ export default function TripDetail() {
           </Card>
         </div>
 
-        {/* Cash reconciliation: collected at the stops, less what was actually
-            paid out on the road, giving what should come back. Costs booked but
-            still unpaid are shown apart — they are owed to whoever fronted
-            them, not missing from the van */}
+        {/* Cash reconciliation, read top to bottom like a statement: cash from
+            this trip's sales, plus old debt collected at its stops, less what
+            was actually paid out on the road, giving what should come back.
+            One column per currency; they are never added together. Costs
+            booked but still unpaid are shown apart, under the total: they are
+            owed to whoever fronted them, not missing from the van */}
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -621,55 +628,21 @@ export default function TripDetail() {
           </CardHeader>
           <CardContent>
             {cashCurrencies.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm" data-testid="table-trip-cash">
-                  <thead>
-                    <tr className="text-start text-gray-500 border-b">
-                      <th className="py-2 pe-4 font-medium">{t('common.currency')}</th>
-                      <th className="py-2 pe-4 font-medium text-end">{t('trips.cashCollected')}</th>
-                      <th className="py-2 pe-4 font-medium text-end">{t('trips.tripSpend')}</th>
-                      {hasUnpaidSpend && (
-                        <th className="py-2 pe-4 font-medium text-end">{t('trips.unpaidSpend')}</th>
-                      )}
-                      <th className="py-2 font-medium text-end">{t('trips.shouldReturn')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cashCurrencies.map((cur) => {
-                      const collected = Number((trip.expected_cash || {})[cur] || 0);
-                      const paid = Number((trip.trip_expenses_paid || {})[cur] || 0);
-                      const unpaid = Number((trip.trip_expenses_unpaid || {})[cur] || 0);
-                      const net = Number(
-                        (trip.net_expected_cash || {})[cur] ?? collected - paid
-                      );
-                      return (
-                        <tr key={cur} className="border-b last:border-0" data-testid={`trip-cash-${cur}`}>
-                          <td className="py-2 pe-4">{te(cur)}</td>
-                          <td className="py-2 pe-4 text-end tabular-nums">{collected.toFixed(2)}</td>
-                          <td className="py-2 pe-4 text-end tabular-nums text-amber-700">
-                            {paid ? `- ${paid.toFixed(2)}` : "—"}
-                          </td>
-                          {hasUnpaidSpend && (
-                            <td
-                              className="py-2 pe-4 text-end tabular-nums text-gray-500"
-                              data-testid={`trip-cash-unpaid-${cur}`}
-                            >
-                              {unpaid ? unpaid.toFixed(2) : "—"}
-                            </td>
-                          )}
-                          <td
-                            className={`py-2 text-end font-semibold tabular-nums ${
-                              net < 0 ? "text-red-600" : ""
-                            }`}
-                          >
-                            {net.toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <CashStatement
+                testId="table-trip-cash"
+                currencies={cashCurrencies}
+                figures={(cur) => {
+                  const collected = Number((trip.expected_cash || {})[cur] || 0);
+                  const paid = Number((trip.trip_expenses_paid || {})[cur] || 0);
+                  return {
+                    revenue: Number((trip.cash_from_trip_sales || {})[cur] || 0),
+                    debt: Number((trip.cash_from_debt || {})[cur] || 0),
+                    spend: paid,
+                    unpaid: Number((trip.trip_expenses_unpaid || {})[cur] || 0),
+                    net: Number((trip.net_expected_cash || {})[cur] ?? collected - paid),
+                  };
+                }}
+              />
             ) : (
               <p className="text-sm text-gray-500" data-testid="expected-cash-empty">{t('trips.noCashCollected')}</p>
             )}
@@ -925,6 +898,9 @@ export default function TripDetail() {
                 <TabsTrigger value="payments" data-testid="tab-payments">
                   {t('trips.tabPaid', { count: activity?.payments?.length ?? 0 })}
                 </TabsTrigger>
+                <TabsTrigger value="debt" data-testid="tab-debt">
+                  {t('trips.tabDebtCollected', { count: activity?.debt_collected?.length ?? 0 })}
+                </TabsTrigger>
                 <TabsTrigger value="analytics" data-testid="tab-analytics">
                   {t('trips.tabAnalytics')}
                 </TabsTrigger>
@@ -958,6 +934,12 @@ export default function TripDetail() {
                           )}
                           {activityTab === "payments" && (
                             <th className="py-2 font-medium text-end">{t('common.amount')}</th>
+                          )}
+                          {activityTab === "debt" && (
+                            <>
+                              <th className="py-2 pe-4 font-medium">{t('trips.debtOrderDate')}</th>
+                              <th className="py-2 font-medium text-end">{t('common.amount')}</th>
+                            </>
                           )}
                         </tr>
                       </thead>
@@ -1000,9 +982,30 @@ export default function TripDetail() {
                             {activityTab === "payments" && (
                               <td className="py-2 text-end">{r.amount} {te(r.currency)}</td>
                             )}
+                            {activityTab === "debt" && (
+                              <>
+                                {/* when the debt was run up: the order being paid off */}
+                                <td className="py-2 pe-4 whitespace-nowrap text-gray-500">
+                                  {r.order_created_at ? formatDateTime(r.order_created_at) : "—"}
+                                </td>
+                                <td className="py-2 text-end whitespace-nowrap">{r.amount} {te(r.currency)}</td>
+                              </>
+                            )}
                           </tr>
                         ))}
                       </tbody>
+                      {activityTab === "debt" && debtTotals.length > 0 && (
+                        <tfoot>
+                          <tr className="border-t-2 border-gray-200 dark:border-gray-700" data-testid="trip-debt-total">
+                            <td className="py-2 pe-4 font-semibold" colSpan={3}>
+                              {t('trips.debtCollectedTotal')}
+                            </td>
+                            <td className="py-2 text-end font-semibold whitespace-nowrap">
+                              {debtTotals.map(([cur, amount]) => `${amount.toFixed(2)} ${te(cur)}`).join(" · ")}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
                     </table>
                   </div>
                 )}

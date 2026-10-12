@@ -2197,23 +2197,104 @@ class Trip(Base):
     def is_audited(cls):
         return cls.audited_at.isnot(None)
 
-    @hybrid_property
-    def expected_cash(self):
-        # cash actually collected at this trip's stops (payments tagged to the stop),
-        # including payments taken for previously-created orders during the trip.
-        # Keyed by currency, since a trip may collect in more than one (USD/SYP).
-        totals: dict[str, float] = {}
+    def _stop_payments(self):
+        """(payment, order) for every live payment taken at this trip's stops.
+
+        order is None for a payment that pays no order (a debit note, say).
+        Money from deleted invoices or orders is skipped: legacy voids that
+        were deleted without cascading to their payments.
+        """
         for stop in self.stops:
             for payment in stop.payments:
                 if payment.is_deleted:
                     continue
                 inv = payment.invoice
                 order = inv.customer_order if inv else None
-                # ignore money from deleted invoices/orders (legacy non-cascaded voids)
                 if (inv and inv.is_deleted) or (order and order.is_deleted):
                     continue
-                totals[payment.currency] = totals.get(payment.currency, 0) + payment.amount
+                yield payment, order
+
+    @hybrid_property
+    def expected_cash(self):
+        # cash actually collected at this trip's stops (payments tagged to the stop),
+        # including payments taken for previously-created orders during the trip.
+        # Keyed by currency, since a trip may collect in more than one (USD/SYP).
+        # cash_from_trip_sales + cash_from_debt splits it in two.
+        totals: dict[str, float] = {}
+        for payment, _order in self._stop_payments():
+            totals[payment.currency] = totals.get(payment.currency, 0) + payment.amount
         return totals
+
+    def stop_uuid_set(self):
+        """This trip's stop uuids. Never None: an office order's
+        trip_stop_uuid is None, and must not match an unsaved stop."""
+        return {stop.uuid for stop in self.stops if stop.uuid}
+
+    def delivered_order_uuid_set(self):
+        """Orders whose goods left the van at one of this trip's stops: a live
+        'sale' event tagged to the stop. Includes orders created elsewhere (an
+        office pre-order, one written up on an earlier trip) that this trip
+        delivered; sold_inventory_map counts their stock the same way."""
+        out = set()
+        for stop in self.stops:
+            for event in stop.vehicle_inventory_events:
+                item = event.customer_order_item
+                if event.is_deleted or event.event_type != "sale" or item is None or item.is_deleted:
+                    continue
+                if item.customer_order_uuid:
+                    out.add(item.customer_order_uuid)
+        return out
+
+    @staticmethod
+    def pays_order_sold_on_trip(order, stop_uuids, delivered_order_uuids=frozenset()):
+        """THE rule for splitting a trip's cash. A payment is trip revenue when
+        the order it pays belongs to this run: created at one of the trip's
+        stops, or delivered from the van at one of them (a pre-order paid on
+        delivery is a sale of the trip that delivered it, not a debt). It is
+        debt collected otherwise: an order whose goods were handed over before
+        this trip, or a payment that pays no order. The Expected Cash card and
+        the activity tab's debt list both go through here, so they cannot
+        disagree."""
+        if order is None:
+            return False
+        return order.trip_stop_uuid in stop_uuids or (
+            order.uuid is not None and order.uuid in delivered_order_uuids
+        )
+
+    def _split_stop_cash(self):
+        """expected_cash in two parts, (from this trip's sales, from old debt),
+        per pays_order_sold_on_trip. Both dicts carry every currency
+        expected_cash has, 0 where a part is empty, so the two always add up
+        to it.
+        """
+        stop_uuids = self.stop_uuid_set()
+        delivered = self.delivered_order_uuid_set()
+        sales: dict[str, float] = {}
+        debt: dict[str, float] = {}
+        for payment, order in self._stop_payments():
+            sales.setdefault(payment.currency, 0)
+            debt.setdefault(payment.currency, 0)
+            bucket = sales if self.pays_order_sold_on_trip(order, stop_uuids, delivered) else debt
+            bucket[payment.currency] += payment.amount
+        return sales, debt
+
+    @property
+    def cash_from_trip_sales(self):
+        """Cash taken at this trip's stops for orders sold or delivered on this trip, by currency.
+
+        Cash, not the value of what was sold: a sale left on credit adds
+        nothing here (it shows as debt on the order).
+        """
+        return self._split_stop_cash()[0]
+
+    @property
+    def cash_from_debt(self):
+        """Cash taken at this trip's stops for orders NOT sold or delivered on this trip, by currency.
+
+        Old debt collected on the road: goods handed over earlier (on a previous
+        trip, or from the warehouse) and paid for now.
+        """
+        return self._split_stop_cash()[1]
 
     def _expense_totals(self, amount_of):
         """Sum a per-expense figure over this trip's live expenses, by currency.

@@ -198,6 +198,9 @@ class TripRead(BaseModel):
     assigned_username: Optional[str] = None
     inventory_reconciliation: Optional[dict] = None
     expected_cash: Optional[dict] = None  # {currency: amount} collected at this trip's stops
+    # expected_cash in two parts, same currency keys, always adding up to it:
+    cash_from_trip_sales: Optional[dict] = None  # paying orders sold on this trip
+    cash_from_debt: Optional[dict] = None  # paying older orders: debt collected on the road
     trip_expenses: Optional[dict] = None  # {currency: amount} costs booked to this trip, paid or not
     trip_expenses_paid: Optional[dict] = None  # of those, the cash actually paid out
     trip_expenses_unpaid: Optional[dict] = None  # booked but not settled: a payable, not missing cash
@@ -322,6 +325,11 @@ class TripSummaryCash(BaseModel):
 
     currency: str
     collected: float = Field(..., description="Cash taken at the stops")
+    # collected in two parts, as on each trip's own Expected Cash card
+    revenue_collected: float = Field(
+        0.0, description="Of collected, cash each trip took for orders it sold or delivered itself")
+    debt_collected: float = Field(
+        0.0, description="Of collected, old debt: orders delivered before the trip that collected it")
     expenses: float = Field(..., description="Costs booked to the trips, paid or not")
     expenses_paid: float = Field(..., description="Of those costs, the cash actually paid out")
     expenses_unpaid: float = Field(

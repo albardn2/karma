@@ -59,6 +59,14 @@ export const translations: Record<Lang, Record<string, string>> = {
     'trips.unpaidSpend': 'Booked, unpaid',
     'trips.expenseUnpaid': 'unpaid',
     'trips.shouldReturn': 'Should return',
+    // the expected-cash statement; same wording as the web trip page
+    'trips.cashTripRevenue': 'Trip revenue',
+    'trips.cashDebtCollected': 'Debt collected',
+    'trips.unpaidSpendNotDeducted': 'Booked, unpaid (not deducted)',
+    'trips.cashBreakdownNote':
+      'Trip revenue is cash taken for orders sold or delivered on this trip. Debt collected is cash taken at its stops for older orders, delivered before this trip.',
+    'trips.cashBreakdownNoteMany':
+      'Trip revenue is cash each trip took for orders it sold or delivered itself. Debt collected is cash each trip took for orders delivered before it, including on another of these trips.',
     'trips.tripExpenses': 'Trip expenses',
     'tripExpense.button': 'Expense',
     'tripExpense.title': 'Trip expense',
@@ -80,6 +88,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     'trips.tab_orders': 'Orders',
     'trips.tab_fulfillments': 'Fulfilled',
     'trips.tab_payments': 'Paid',
+    'trips.tab_debt': 'Debt collected',
+    'trips.debtPaidForOrder': 'Paid {paid} · order from {ordered}',
+    'trips.debtCollectedTotal': 'Total debt collected',
     'trips.nothingHere': 'Nothing here for this trip yet.',
     'trips.inventory': 'Trip Inventory',
     'trips.material': 'Material',
@@ -1417,6 +1428,13 @@ export const translations: Record<Lang, Record<string, string>> = {
     'trips.unpaidSpend': 'مُسجَّل وغير مدفوع',
     'trips.expenseUnpaid': 'غير مدفوع',
     'trips.shouldReturn': 'الواجب إرجاعه',
+    'trips.cashTripRevenue': 'إيرادات الرحلة',
+    'trips.cashDebtCollected': 'الديون المُحصّلة',
+    'trips.unpaidSpendNotDeducted': 'مُسجَّل وغير مدفوع (لا يُخصم)',
+    'trips.cashBreakdownNote':
+      'إيرادات الرحلة: نقد مُحصّل عن طلبات بيعت أو سُلّمت في هذه الرحلة. الديون المُحصّلة: نقد مُحصّل في محطاتها عن طلبات سابقة سُلّمت قبل هذه الرحلة.',
+    'trips.cashBreakdownNoteMany':
+      'إيرادات الرحلة: نقد حصّلته كل رحلة عن طلبات باعتها أو سلّمتها بنفسها. الديون المُحصّلة: نقد حصّلته كل رحلة عن طلبات سُلّمت قبلها، ولو في رحلة أخرى من هذه الرحلات.',
     'trips.tripExpenses': 'مصاريف الرحلة',
     'tripExpense.button': 'مصروف',
     'tripExpense.title': 'مصروف رحلة',
@@ -1438,6 +1456,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     'trips.tab_orders': 'الطلبات',
     'trips.tab_fulfillments': 'المسلَّم',
     'trips.tab_payments': 'المدفوع',
+    'trips.tab_debt': 'الديون المُحصّلة',
+    'trips.debtPaidForOrder': 'دُفع {paid} · طلب بتاريخ {ordered}',
+    'trips.debtCollectedTotal': 'إجمالي الديون المُحصّلة',
     'trips.nothingHere': 'لا يوجد شيء لهذه الرحلة بعد.',
     'trips.inventory': 'مخزون الرحلة',
     'trips.material': 'المادة',

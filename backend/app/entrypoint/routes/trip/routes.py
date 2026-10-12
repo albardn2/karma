@@ -281,7 +281,8 @@ def _assigned_username_for_wfe(uow, wfe_uuid):
     PermissionScope.SALES.value,
 )
 def get_trip_activity(uuid: str):
-    """Stops, orders, fulfillments (vehicle sales) and payments at this trip's stops."""
+    """Stops, orders, fulfillments (vehicle sales) and payments at this trip's stops,
+    plus debt_collected: the payments for orders NOT sold on this trip."""
     from app.utils.geom_utils import wkt_or_wkb_to_lat_lon
 
     with SqlAlchemyUnitOfWork() as uow:
@@ -325,7 +326,10 @@ def get_trip_activity(uuid: str):
             })
         stops.sort(key=lambda s: (s["index"] is None, s["index"], s["created_at"] or ""))
 
-        orders, fulfillments, payments = [], [], []
+        orders, fulfillments, payments, debt_collected = [], [], [], []
+        # the same split as the Expected Cash card's "Debt collected" line
+        stop_uuids = trip.stop_uuid_set()
+        delivered_order_uuids = trip.delivered_order_uuid_set()
         for stop in trip.stops:
             for o in stop.customer_orders:
                 if o.is_deleted:
@@ -395,13 +399,31 @@ def get_trip_activity(uuid: str):
                 order = inv.customer_order if inv else None
                 if (inv and inv.is_deleted) or (order and order.is_deleted):
                     continue
+                is_debt = not TripModel.pays_order_sold_on_trip(
+                    order, stop_uuids, delivered_order_uuids
+                )
                 payments.append({
                     "created_at": p.created_at.isoformat() if p.created_at else None,
                     "amount": p.amount,
                     "currency": p.currency,
                     "customer_name": customer_name(order.customer) if order else None,
                     "customer_order_uuid": order.uuid if order else None,
+                    "is_debt": is_debt,
                 })
+                if is_debt:
+                    # A payment that pays no order (a debit note, say) still has
+                    # a customer: the one whose stop it was collected at.
+                    debt_collected.append({
+                        "created_at": p.created_at.isoformat() if p.created_at else None,
+                        "amount": p.amount,
+                        "currency": p.currency,
+                        "customer_name": customer_name(order.customer if order else stop.customer),
+                        "customer_order_uuid": order.uuid if order else None,
+                        # when the debt was run up: the order being paid off
+                        "order_created_at": (
+                            order.created_at.isoformat() if order and order.created_at else None
+                        ),
+                    })
 
         newest_first = lambda rows: sorted(rows, key=lambda r: r["created_at"] or "", reverse=True)
         result = {
@@ -409,6 +431,7 @@ def get_trip_activity(uuid: str):
             "orders": newest_first(orders),
             "fulfillments": newest_first(fulfillments),
             "payments": newest_first(payments),
+            "debt_collected": newest_first(debt_collected),
         }
     return jsonify(result), 200
 #

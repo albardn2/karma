@@ -25,9 +25,16 @@ GHOST = "cccccccc-3333-4333-8333-cccccccccccc"
 
 class _Trip:
     def __init__(self, uuid, expected_cash=None, trip_expenses=None,
-                 trip_expenses_paid=None, start=None, end=None, sold=None):
+                 trip_expenses_paid=None, start=None, end=None, sold=None, debt=None):
         self.uuid = uuid
         self.expected_cash = expected_cash or {}
+        # the model splits expected_cash in two; here `debt` is the old-debt
+        # part and the rest is this trip's sales, so the two add up as they do
+        debt = debt or {}
+        self.cash_from_debt = {c: debt.get(c, 0) for c in self.expected_cash}
+        self.cash_from_trip_sales = {
+            c: amount - debt.get(c, 0) for c, amount in self.expected_cash.items()
+        }
         self.trip_expenses = trip_expenses or {}
         # the ordinary case is a cost paid the moment it is booked, so paid
         # defaults to the whole of it; tests that care pass their own split
@@ -138,6 +145,28 @@ def test_cash_is_summed_per_currency_never_across():
     assert by_currency["USD"].collected == 40.0
     assert by_currency["USD"].expenses == 5.0
     assert by_currency["USD"].net == 35.0
+
+
+def test_collected_is_split_into_revenue_and_debt_summed_per_currency():
+    """The same breakdown as each trip's Expected Cash card, added up."""
+    trips = [
+        _Trip("t1", expected_cash={"SYP": 1000.0, "USD": 65.0}, debt={"USD": 25.0},
+              trip_expenses={"SYP": 200.0}),
+        _Trip("t2", expected_cash={"SYP": 500.0}, debt={"SYP": 150.0}),
+    ]
+    by_currency = {row.currency: row for row in _summary(trips).cash}
+    syp, usd = by_currency["SYP"], by_currency["USD"]
+    assert (syp.revenue_collected, syp.debt_collected, syp.collected) == (1350.0, 150.0, 1500.0)
+    assert (usd.revenue_collected, usd.debt_collected, usd.collected) == (40.0, 25.0, 65.0)
+    assert syp.net == 1300.0  # (1350 + 150) - 200 paid
+    for row in (syp, usd):
+        assert row.revenue_collected + row.debt_collected == row.collected
+
+
+def test_a_currency_only_spent_in_has_no_revenue_or_debt():
+    trips = [_Trip("t1", expected_cash={"USD": 20.0}, trip_expenses={"SYP": 300.0})]
+    syp = {row.currency: row for row in _summary(trips).cash}["SYP"]
+    assert (syp.revenue_collected, syp.debt_collected) == (0, 0)
 
 
 def test_only_what_was_paid_comes_off_the_net():

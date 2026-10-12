@@ -530,6 +530,10 @@ export interface Trip {
     { start: number; sold: number; expected_end: number; actual_end: number | null; variance: number | null }
   > | null;
   expected_cash?: Record<string, number> | null;
+  // expected_cash in two parts, same currencies, always adding up to it: cash
+  // for orders sold on this trip, and cash for older orders (debt collected)
+  cash_from_trip_sales?: Record<string, number> | null;
+  cash_from_debt?: Record<string, number> | null;
   // costs booked to the trip, then split by whether the cash actually left:
   // only the paid part comes off net_expected_cash
   trip_expenses?: Record<string, number> | null;
@@ -611,6 +615,9 @@ export interface TripPage {
 export interface TripSummaryCash {
   currency: string;
   collected: number;
+  // collected in two parts, as on each trip's own Expected Cash card
+  revenue_collected?: number;
+  debt_collected?: number;
   expenses: number;
   expenses_paid: number;
   expenses_unpaid: number;

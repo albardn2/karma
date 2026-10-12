@@ -20,6 +20,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 interface CashRow {
   currency: string;
   collected: number;
+  // collected in two parts, as on each trip's own Expected cash card
+  revenue_collected?: number;
+  debt_collected?: number;
   // booked, then split by whether the cash actually left: net is
   // collected - expenses_paid, so an unsettled cost does not move it
   expenses: number;
@@ -171,31 +174,44 @@ export function TripSummarySheet({
                     testID={`summary-cash-${row.currency}`}
                   >
                     <ThemedText style={styles.cashCurrency}>{te(row.currency)}</ThemedText>
+                    {/* the trip page's statement, summed: every line always
+                        shown (a dash for none), so the breakdown is complete */}
                     <SheetRow
-                      label={t('trips.cashCollected')}
-                      value={fmtMoney(row.collected)}
+                      label={t('trips.cashTripRevenue')}
+                      value={signed(row.revenue_collected ?? row.collected)}
+                      muted={!(row.revenue_collected ?? row.collected)}
                     />
-                    {row.expenses_paid !== 0 && (
+                    <SheetRow
+                      label={t('trips.cashDebtCollected')}
+                      value={signed(row.debt_collected ?? 0, '+')}
+                      muted={!row.debt_collected}
+                    />
+                    <SheetRow
+                      label={t('trips.tripSpend')}
+                      value={signed(row.expenses_paid, '-')}
+                      tone={row.expenses_paid ? '#B45309' : undefined}
+                      muted={!row.expenses_paid}
+                    />
+                    <View style={styles.cashTotal}>
                       <SheetRow
-                        label={t('trips.tripSpend')}
-                        value={`- ${fmtMoney(row.expenses_paid)}`}
-                        tone="#B45309"
+                        label={t('trips.shouldReturn')}
+                        value={fmtMoney(row.net)}
+                        bold
+                        tone={row.net < 0 ? '#DC2626' : undefined}
                       />
-                    )}
+                    </View>
                     {row.expenses_unpaid > 0 && (
                       <SheetRow
-                        label={t('trips.unpaidSpend')}
+                        label={t('trips.unpaidSpendNotDeducted')}
                         value={fmtMoney(row.expenses_unpaid)}
+                        muted
                       />
                     )}
-                    <SheetRow
-                      label={t('trips.shouldReturn')}
-                      value={fmtMoney(row.net)}
-                      bold
-                      tone={row.net < 0 ? '#DC2626' : undefined}
-                    />
                   </View>
                 ))
+              )}
+              {summary.cash.length > 0 && (
+                <ThemedText style={styles.hint}>{t('trips.cashBreakdownNoteMany')}</ThemedText>
               )}
 
               {/* stock, per material */}
@@ -276,22 +292,35 @@ export function TripSummarySheet({
   );
 }
 
+/** A statement amount: a dash for none, else the sign then the money, so the
+ *  arithmetic reads off the sheet (revenue, + debt, - spend). */
+const signed = (n: number, sign?: '+' | '-') =>
+  !n ? '—' : `${sign ? `${sign} ` : ''}${fmtMoney(n)}`;
+
 function SheetRow({
   label,
   value,
   bold,
   tone,
+  muted,
 }: {
   label: string;
   value: string;
   bold?: boolean;
   tone?: string;
+  /** a zero line, or the not-deducted unpaid line: greyed */
+  muted?: boolean;
 }) {
   return (
     <View style={styles.rowBetween}>
-      <ThemedText style={styles.rowLabel}>{label}</ThemedText>
+      <ThemedText style={[styles.rowLabel, bold && styles.rowLabelBold]}>{label}</ThemedText>
       <ThemedText
-        style={[styles.rowValue, bold && { fontWeight: '800' }, tone ? { color: tone } : null]}
+        style={[
+          styles.rowValue,
+          bold && { fontWeight: '800' },
+          muted && styles.rowValueMuted,
+          tone ? { color: tone } : null,
+        ]}
       >
         {value}
       </ThemedText>
@@ -343,7 +372,10 @@ const styles = StyleSheet.create({
   cashCurrency: { fontSize: 13, fontWeight: '700', color: '#6B7280', marginBottom: 2 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
   rowLabel: { fontSize: 13, color: '#6B7280' },
+  rowLabelBold: { color: '#111827', fontWeight: '700' },
   rowValue: { fontSize: 13, fontWeight: '600', color: '#111827' },
+  rowValueMuted: { color: '#9CA3AF', fontWeight: '400' },
+  cashTotal: { marginTop: 6, paddingTop: 2, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.08)' },
   tableHead: {
     flexDirection: 'row', paddingBottom: 6,
     borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
