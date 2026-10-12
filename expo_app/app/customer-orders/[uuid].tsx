@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -111,6 +111,18 @@ export default function CustomerOrderDetailScreen() {
   const canUpdateLine = useHasEndpoint('customer_order_item', 'update');
   const canUpdatePrice = useHasEndpoint('invoice_item', 'update');
   const [reloadKey, setReloadKey] = useState(0);
+
+  // focus, not push: fulfil-and-pay and an invoice's record-payment open a screen that
+  // writes, and a stack pop does not remount this one. A bump before the push refetched
+  // while that screen was opening, before the write, so coming back showed the old
+  // lines and amounts due. The editors below are Modals, not routes, so they still bump
+  // after their own save. One bump per focus event; setState does not re-trigger focus,
+  // so this cannot loop.
+  useFocusEffect(
+    useCallback(() => {
+      setReloadKey((k) => k + 1);
+    }, []),
+  );
 
   // notes editor state — the draft is seeded from the fetched record when opened
   const [notesOpen, setNotesOpen] = useState(false);
@@ -407,7 +419,6 @@ export default function CustomerOrderDetailScreen() {
                         <TouchableOpacity
                           style={styles.payBtn}
                           onPress={() => {
-                            setReloadKey((k) => k + 1);
                             router.push({
                               pathname: '/distribution/order',
                               params: { orderUuid: uuid, invoiceUuid: inv.uuid },
@@ -431,7 +442,6 @@ export default function CustomerOrderDetailScreen() {
             label: t('customerOrders.fulfilAndPay'),
             testID: 'order-fulfil-pay',
             onPress: () => {
-              setReloadKey((k) => k + 1);
               router.push({ pathname: '/distribution/order', params: { orderUuid: uuid } });
             },
           },

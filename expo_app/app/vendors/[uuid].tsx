@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
@@ -25,6 +25,17 @@ export default function VendorsDetailScreen() {
   const { t, tef } = useLanguage();
   const [reloadKey, setReloadKey] = useState(0);
   const canCreatePo = useHasEndpoint('purchase_order', 'create');
+
+  // focus, not push: edit and new order both open screens that write (a new order moves
+  // the balance), and a stack pop does not remount this one. A bump before the push
+  // refetched while that screen was opening, before the write, so coming back showed
+  // the old record. One bump per focus event; setState does not re-trigger focus, so
+  // this cannot loop.
+  useFocusEffect(
+    useCallback(() => {
+      setReloadKey((k) => k + 1);
+    }, []),
+  );
 
   /**
    * Balance is signed, and the sign is the whole point: negative means money is
@@ -84,8 +95,6 @@ export default function VendorsDetailScreen() {
           label: t('detail.edit'),
           testID: 'vendor-edit',
           onPress: (x) => {
-            // bump on return so the record reflects the edit without a manual pull
-            setReloadKey((k) => k + 1);
             router.push({
               pathname: '/vendors/create',
               params: {

@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Platform, StyleSheet, View } from 'react-native';
 import MapView, { Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/ModuleDetailScreen';
@@ -65,6 +65,16 @@ export default function ServiceAreaDetailScreen() {
   const canUpdate = useHasEndpoint('service_area', 'update') && isAdmin;
   const canDelete = useHasEndpoint('service_area', 'delete') && isAdmin;
 
+  // focus, not push: edit and boundary both open screens that write, and a stack pop
+  // does not remount this one. A bump before the push refetched while that screen was
+  // opening, before the write, so coming back showed the old name and outline. One bump
+  // per focus event; setState does not re-trigger focus, so this cannot loop.
+  useFocusEffect(
+    useCallback(() => {
+      setReloadKey((k) => k + 1);
+    }, []),
+  );
+
   const outerOf = (a: ServiceArea) =>
     parseWktPolygons(a.geometry ?? '')[0]?.coordinates ?? [];
 
@@ -104,7 +114,6 @@ export default function ServiceAreaDetailScreen() {
       testID: 'service-area-edit',
       visible: () => canUpdate,
       onPress: (a) => {
-        setReloadKey((k) => k + 1);
         router.push({
           pathname: '/service-areas/edit',
           params: { uuid: a.uuid, name: a.name, description: a.description ?? '' },
@@ -118,7 +127,6 @@ export default function ServiceAreaDetailScreen() {
       testID: 'service-area-boundary',
       visible: () => canUpdate,
       onPress: (a) => {
-        setReloadKey((k) => k + 1);
         router.push({ pathname: '/service-areas/boundary', params: { uuid: a.uuid } });
       },
     },
