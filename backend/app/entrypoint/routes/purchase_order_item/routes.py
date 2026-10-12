@@ -5,7 +5,6 @@ from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWo
 from app.dto.purchase_order_item import (
     PurchaseOrderItemCreate,
     PurchaseOrderItemRead,
-    PurchaseOrderItemUpdate,
     PurchaseOrderItemListParams,
     PurchaseOrderItemPage,
 )
@@ -87,27 +86,13 @@ def get_item(uuid: str):
         result = PurchaseOrderItemRead.from_orm(item).model_dump(mode='json')
     return jsonify(result), 200
 
-@poi_blueprint.route('/<string:uuid>', methods=['PUT'])
-@jwt_required()
-@scopes_required(PermissionScope.ADMIN.value,
-                 PermissionScope.SUPER_ADMIN.value,
-                 PermissionScope.OPERATION_MANAGER
-                 )
-def update_item(uuid: str):
-    try:
-        payload = PurchaseOrderItemUpdate(**request.json)
-        updates = payload.model_dump(exclude_unset=True, mode='json')
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
-    with SqlAlchemyUnitOfWork() as uow:
-        item = uow.purchase_order_item_repository.find_one(uuid=uuid, is_deleted=False)
-        if not item:
-            return jsonify({'message': 'PurchaseOrderItem not found'}), 404
-        for field, val in updates.items(): setattr(item, field, val)
-        uow.purchase_order_item_repository.save(model=item, commit=True)
-        result = PurchaseOrderItemRead.from_orm(item).model_dump(mode='json')
-    return jsonify(result), 200
+# There is deliberately no PUT /<uuid>. A raw field-by-field update used to
+# live here, and nothing called it. A line's quantity, is_fulfilled and
+# is_deleted each carry side effects (the PURCHASE_ORDER inventory event, the
+# stock that fulfillment creates, the checks before a line may go), and a
+# blind setattr skipped every one of them. Quantity and price corrections go
+# through PUT /purchase-order/<uuid> (PurchaseOrderDomain.edit_items), and
+# fulfillment through /fulfill-items and /unfulfill-items.
 
 @poi_blueprint.route('/<string:uuid>', methods=['DELETE'])
 @jwt_required()
