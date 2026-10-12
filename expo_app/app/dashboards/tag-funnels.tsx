@@ -13,33 +13,18 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
+import {
+  FunnelPanel,
+  INTEREST_COLOURS,
+  SALE_COLOURS,
+  interestLabels,
+  saleLabels,
+  type Funnel,
+} from '@/components/TagFunnel';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
 
-interface Step {
-  /** the tag's value half; null = carries no tag for the key */
-  value: string | null;
-  /** customers on the step today */
-  current: number;
-  /** customers on the step when the period ended — equals `current` for the current period */
-  at_period_end: number;
-  net_change: number;
-  entered: number;
-  left: number;
-}
-interface Move {
-  from: string | null;
-  to: string | null;
-  count: number;
-}
-interface Funnel {
-  key: string;
-  steps: Step[];
-  transitions: Move[];
-  outside: number;
-  outside_at_period_end: number;
-}
 interface Period {
   granularity: Gran;
   offset: number;
@@ -67,12 +52,6 @@ type Mode = 'current' | 'change';
 
 // how far back ‹ may step, per granularity — mirrors MAX_OFFSET on the server
 const MAX_OFFSET: Record<Gran, number> = { week: 104, month: 36, quarter: 12, year: 5 };
-
-const k = (v: string | null) => (v === null ? 'none' : v);
-
-// step colours: the web page's slate / blue / green and slate / rose / green
-const SALE_COLOURS = ['#94a3b8', '#3b82f6', '#16a34a'];
-const INTEREST_COLOURS = ['#94a3b8', '#f43f5e', '#16a34a'];
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const ymd = (d: Date) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
@@ -293,14 +272,9 @@ export function TagFunnelsScreenImpl({ embedded = false }: { embedded?: boolean 
             title={t('dashboards.tfSales')}
             testID="tf-sale"
             funnel={data.funnels.sale}
-            mode={mode}
-            periodLabel={periodLabel}
-            labels={{
-              none: t('dashboards.tfNoTag'),
-              no_sale: t('dashboards.tfNoSale'),
-              one_time_sale: t('dashboards.tfOneTime'),
-              repeated_sale: t('dashboards.tfRepeated'),
-            }}
+            showMovement={mode === 'change'}
+            movesTitle={t('dashboards.tfMoves', { period: periodLabel })}
+            labels={saleLabels(t)}
             colours={SALE_COLOURS}
             outsideText={(n) => t('dashboards.tfOutsideSale', { n })}
           />
@@ -308,13 +282,9 @@ export function TagFunnelsScreenImpl({ embedded = false }: { embedded?: boolean 
             title={t('dashboards.tfInterest')}
             testID="tf-interest"
             funnel={data.funnels.interest}
-            mode={mode}
-            periodLabel={periodLabel}
-            labels={{
-              none: t('dashboards.tfUnknown'),
-              not_interested: t('dashboards.tfNotInterested'),
-              interested: t('dashboards.tfInterested'),
-            }}
+            showMovement={mode === 'change'}
+            movesTitle={t('dashboards.tfMoves', { period: periodLabel })}
+            labels={interestLabels(t)}
             colours={INTEREST_COLOURS}
             outsideText={(n) => t('dashboards.tfOutsideInterest', { n })}
           />
@@ -378,146 +348,6 @@ export default function TagFunnelsScreen() {
   return <TagFunnelsScreenImpl />;
 }
 
-function FunnelPanel({
-  title,
-  testID,
-  funnel,
-  mode,
-  periodLabel,
-  labels,
-  colours,
-  outsideText,
-}: {
-  title: string;
-  testID: string;
-  funnel: Funnel;
-  mode: Mode;
-  periodLabel: string;
-  labels: Record<string, string>;
-  colours: string[];
-  outsideText: (n: number) => string;
-}) {
-  const { t } = useLanguage();
-  const name = (v: string | null) => labels[k(v)] ?? (v as string);
-  // the number a step shows: today's count, or where it stood when the
-  // period closed — and the footnote speaks of the same moment
-  const shown = (s: Step) => (mode === 'change' ? s.at_period_end : s.current);
-  const outside = mode === 'change' ? funnel.outside_at_period_end : funnel.outside;
-  const max = Math.max(1, ...funnel.steps.map(shown));
-  // the funnel's population today, for the shares (the `outside` customers
-  // are not on it, so they are not in anyone's share)
-  const placed = funnel.steps.reduce((sum, s) => sum + s.current, 0);
-
-  // the count moving between two ADJACENT steps, each way
-  const between = (a: string | null, b: string | null) => {
-    let forward = 0;
-    let back = 0;
-    for (const m of funnel.transitions) {
-      if (m.from === a && m.to === b) forward += m.count;
-      else if (m.from === b && m.to === a) back += m.count;
-    }
-    return { forward, back };
-  };
-  // points the way reading goes, so it flips with the layout
-  const toArrow = I18nManager.isRTL ? '←' : '→';
-
-  return (
-    <View style={styles.panel} testID={testID}>
-      <ThemedText style={styles.panelTitle}>{title}</ThemedText>
-
-      {funnel.steps.map((s, i) => {
-        const count = shown(s);
-        const share = placed > 0 ? (100 * s.current) / placed : 0;
-        const pct = share > 0 && share < 1 ? '<1' : String(Math.round(share));
-        return (
-          <React.Fragment key={k(s.value)}>
-            <View style={styles.step} testID={`${testID}-step-${k(s.value)}`}>
-              <ThemedText style={styles.stepLabel}>{name(s.value)}</ThemedText>
-              <View style={styles.stepRow}>
-                <ThemedText style={styles.stepCount}>{count}</ThemedText>
-                {mode === 'change' ? (
-                  <Delta n={s.net_change} />
-                ) : (
-                  <ThemedText style={styles.share}>{t('dashboards.tfShare', { pct })}</ThemedText>
-                )}
-              </View>
-              {/* the bar is the funnel: each step's width relative to the fullest step */}
-              <View style={styles.barTrack}>
-                <View style={[styles.barFill, { width: `${Math.round((100 * count) / max)}%`, backgroundColor: colours[i] ?? '#9ca3af' }]} />
-              </View>
-              {mode === 'change' && (s.entered > 0 || s.left > 0) && (
-                <View style={styles.edgeRow}>
-                  {s.entered > 0 && <ThemedText style={styles.edgeText}>{t('dashboards.tfEntered', { n: s.entered })}</ThemedText>}
-                  {s.left > 0 && <ThemedText style={styles.edgeText}>{t('dashboards.tfLeft', { n: s.left })}</ThemedText>}
-                </View>
-              )}
-            </View>
-
-            {i < funnel.steps.length - 1 && (
-              <Connector {...between(s.value, funnel.steps[i + 1].value)} showCounts={mode === 'change'} testID={`${testID}-arrow-${i}`} />
-            )}
-          </React.Fragment>
-        );
-      })}
-
-      {mode === 'change' && (
-        <View style={styles.moves}>
-          <ThemedText style={styles.movesTitle}>{t('dashboards.tfMoves', { period: periodLabel })}</ThemedText>
-          {funnel.transitions.length === 0 ? (
-            <ThemedText style={styles.stateText}>{t('dashboards.tfNoMoves')}</ThemedText>
-          ) : (
-            funnel.transitions.map((m) => (
-              <View key={`${k(m.from)}>${k(m.to)}`} style={styles.moveRow}>
-                <ThemedText style={styles.moveText} numberOfLines={2}>
-                  {name(m.from)} {toArrow} {name(m.to)}
-                </ThemedText>
-                <ThemedText style={styles.moveCount}>{m.count}</ThemedText>
-              </View>
-            ))
-          )}
-        </View>
-      )}
-
-      {outside > 0 && (
-        <ThemedText style={styles.caveat} testID={`${testID}-outside`}>
-          {outsideText(outside)}
-        </ThemedText>
-      )}
-    </View>
-  );
-}
-
-/** The net-change badge: an arrow that points the way the step moved. */
-function Delta({ n }: { n: number }) {
-  const tone = n > 0 ? styles.deltaUp : n < 0 ? styles.deltaDown : styles.deltaFlat;
-  const glyph = n > 0 ? '↗' : n < 0 ? '↘' : '—';
-  const text = n > 0 ? `+${n}` : String(n);
-  return (
-    <View style={[styles.delta, tone]}>
-      <ThemedText style={[styles.deltaText, tone]}>
-        {glyph} {text}
-      </ThemedText>
-    </View>
-  );
-}
-
-/** The arrow between two steps — labelled with who moved along it in the
- * change view; just the shape of the funnel in the current view. */
-function Connector({ forward, back, showCounts, testID }: { forward: number; back: number; showCounts: boolean; testID: string }) {
-  const { t } = useLanguage();
-  return (
-    <View style={styles.connector} testID={testID}>
-      <ThemedText style={styles.connectorArrow}>↓</ThemedText>
-      {showCounts && <ThemedText style={styles.connectorCount}>{forward}</ThemedText>}
-      {showCounts && back > 0 && (
-        <ThemedText style={styles.connectorBack} accessibilityLabel={t('dashboards.tfBack', { n: back })}>
-          ↶ {back}
-        </ThemedText>
-      )}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   embeddedSection: { paddingHorizontal: 20 },
   embeddedTitle: { fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 12, textAlign: 'left' },
@@ -546,39 +376,6 @@ const styles = StyleSheet.create({
   periodLabel: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: '#111827', minWidth: 92, textAlign: 'center', lineHeight: 19 },
   summary: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 12 },
   dimmed: { opacity: 0.6 },
-  panel: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16 },
-  panelTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 12 },
-  step: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, padding: 12 },
-  stepLabel: { fontSize: 11, fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.6 },
-  stepRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginTop: 2 },
-  stepCount: { fontSize: 26, fontWeight: '700', color: '#111827', fontVariant: ['tabular-nums'] },
-  share: { fontSize: 12, fontWeight: '600', color: '#6B7280', fontVariant: ['tabular-nums'] },
-  barTrack: { height: 6, borderRadius: 3, backgroundColor: '#F3F4F6', marginTop: 8, overflow: 'hidden' },
-  barFill: { height: 6, borderRadius: 3 },
-  edgeRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  edgeText: { fontSize: 11, color: '#6B7280', fontVariant: ['tabular-nums'] },
-  delta: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  deltaText: { fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  deltaUp: { backgroundColor: '#f0fdf4', color: '#15803d' },
-  deltaDown: { backgroundColor: '#fef2f2', color: '#b91c1c' },
-  deltaFlat: { backgroundColor: '#F3F4F6', color: '#6B7280' },
-  connector: { alignItems: 'center', paddingVertical: 6, gap: 2 },
-  connectorArrow: { fontSize: 18, lineHeight: 20, color: '#9ca3af' },
-  connectorCount: { fontSize: 12, fontWeight: '700', color: '#111827', fontVariant: ['tabular-nums'] },
-  connectorBack: { fontSize: 11, color: '#B45309', fontVariant: ['tabular-nums'] },
-  moves: { marginTop: 14 },
-  movesTitle: { fontSize: 10, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
-  moveRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    paddingVertical: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
-  },
-  moveText: { flex: 1, fontSize: 12, color: '#374151' },
-  moveCount: { fontSize: 12, fontWeight: '700', color: '#111827', fontVariant: ['tabular-nums'] },
   defn: { fontSize: 11, color: '#6B7280', lineHeight: 16, marginTop: 4 },
   caveat: { fontSize: 12, color: '#B45309', lineHeight: 17, marginTop: 10 },
   centre: { alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },

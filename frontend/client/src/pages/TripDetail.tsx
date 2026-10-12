@@ -32,6 +32,7 @@ import { TripStopsMap } from "@/components/map/TripStopsMap";
 import { type PlaybackPoint } from "@/components/location/LocationPlayback";
 import { TripLocationMap } from "@/components/location/TripLocationMap";
 import { TripAnalytics } from "@/components/trips/TripAnalytics";
+import { TripTagFunnels } from "@/components/trips/TripTagFunnels";
 import { Table as TableIcon, Map as MapIcon } from "lucide-react";
 
 // apiRequest throws Error("<status>: <raw body>") and the backend error body is
@@ -1111,6 +1112,9 @@ export default function TripDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* Sales & interest funnels over the customers this trip stopped at */}
+        <TripTagFunnels tripUuid={trip.uuid} />
       </div>
     </AppLayout>
   );
