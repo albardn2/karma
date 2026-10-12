@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -288,7 +288,7 @@ export default function PurchaseOrderDetail() {
     onError: (error: any) => {
       toast({
         title: t('common.error'),
-        description: error.message || t('purchaseOrders.updateError'),
+        description: apiErrorMessage(error, t('purchaseOrders.updateError')),
         variant: "destructive",
       });
     },
@@ -310,7 +310,7 @@ export default function PurchaseOrderDetail() {
     onError: (error: any) => {
       toast({
         title: t('common.error'),
-        description: error.message || t('purchaseOrders.deleteError'),
+        description: apiErrorMessage(error, t('purchaseOrders.deleteError')),
         variant: "destructive",
       });
     },
@@ -455,7 +455,7 @@ export default function PurchaseOrderDetail() {
     onError: (error: any) => {
       toast({
         title: t('common.error'),
-        description: error.message || t('purchaseOrders.itemFulfillError'),
+        description: apiErrorMessage(error, t('purchaseOrders.itemFulfillError')),
         variant: "destructive",
       });
     },
@@ -477,7 +477,7 @@ export default function PurchaseOrderDetail() {
     onError: (error: any) => {
       toast({
         title: t('common.error'),
-        description: error.message || t('purchaseOrders.itemUnfulfillError'),
+        description: apiErrorMessage(error, t('purchaseOrders.itemUnfulfillError')),
         variant: "destructive",
       });
     },

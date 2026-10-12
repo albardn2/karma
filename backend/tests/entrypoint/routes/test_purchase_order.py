@@ -7,7 +7,8 @@ from models.common import PurchaseOrder as PurchaseOrderModel
 from app.dto.common_enums import Currency
 from app.dto.purchase_order import PurchaseOrderStatus
 
-from models.common import PurchaseOrderItem, Payout
+from models.common import PurchaseOrderItem, Payout, Material, Vendor
+from app.entrypoint.routes.common.errors import register_error_handlers
 
 
 # --- CREATE ---
@@ -159,23 +160,45 @@ def test_update_order_not_found(client):
 
 # --- DELETE (soft) ---
 
-def test_delete_order_marks_deleted(client, return_dicts, dummy_uow_class):
-    return_single, _ = return_dicts
+@pytest.fixture
+def admin_headers(app, admin_token):
+    # the delete route reports the domain's refusals through the app's global
+    # error handlers, which the shared test app does not register
+    register_error_handlers(app)
+    return {"Authorization": f"Bearer {admin_token}"}
 
+
+def _stored_order(return_dicts, payouts=()):
+    """One order with one unreceived line, served by the dummy repositories."""
+    return_single, return_all = return_dicts
     po = PurchaseOrderModel(
         uuid=str(uuid.uuid4()),
         created_by_uuid=None,
-        vendor_uuid=str(uuid.uuid4()),
+        vendor=Vendor(uuid="v-1", company_name="Acme Seeds"), vendor_uuid="v-1",
         currency=Currency.USD.value,
-        status=PurchaseOrderStatus.PENDING.value,
         created_at=datetime.utcnow(),
         is_deleted=False,
     )
-    po.purchase_order_items = []
-    po.payouts = []
+    item = PurchaseOrderItem(
+        uuid=str(uuid.uuid4()), purchase_order=po, purchase_order_uuid=po.uuid,
+        material=Material(uuid="mat-1", name="raw peanuts"), material_uuid="mat-1",
+        quantity=10, price_per_unit=2.0,
+        currency=Currency.USD.value, unit="kg", created_at=datetime.utcnow(),
+        is_fulfilled=False, quantity_received=0.0, is_deleted=False,
+    )
+    for amount in payouts:
+        Payout(uuid=str(uuid.uuid4()), purchase_order=po, amount=amount,
+               currency=Currency.USD.value, is_deleted=False)
     return_single["purchase_order"] = po
+    return_single["purchase_order_item"] = item
+    return_all["payout"] = list(po.payouts)
+    return po, item
 
-    resp = client.delete(f"/purchase_order/{po.uuid}")
+
+def test_delete_order_marks_deleted(client, return_dicts, dummy_uow_class, admin_headers):
+    po, item = _stored_order(return_dicts)
+
+    resp = client.delete(f"/purchase_order/{po.uuid}", headers=admin_headers)
     assert resp.status_code == 200
 
     data = resp.get_json()
@@ -184,6 +207,25 @@ def test_delete_order_marks_deleted(client, return_dicts, dummy_uow_class):
     uow = dummy_uow_class.last_instance
     saved: PurchaseOrderModel = uow.purchase_order_repository.saved_model
     assert saved.is_deleted is True
+    # the lines go with the order rather than staying live under it
+    assert item.is_deleted is True
+
+
+def test_delete_order_refuses_an_order_with_a_payout(client, return_dicts, dummy_uow_class, admin_headers):
+    po, item = _stored_order(return_dicts, payouts=[5.0])
+
+    resp = client.delete(f"/purchase_order/{po.uuid}", headers=admin_headers)
+    assert resp.status_code == 400
+    assert resp.get_json() == {"error": "PurchaseOrder has payout"}
+    assert po.is_deleted is False
+    assert item.is_deleted is False
+    assert dummy_uow_class.last_instance.purchase_order_repository.saved_model is None
+
+
+def test_delete_order_not_found(client, admin_headers):
+    resp = client.delete(f"/purchase_order/{uuid.uuid4()}", headers=admin_headers)
+    assert resp.status_code == 404
+    assert resp.get_json() == {"error": "PurchaseOrder not found"}
 
 
 # --- LIST (filters + pagination) ---

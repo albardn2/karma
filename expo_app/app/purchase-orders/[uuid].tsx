@@ -82,11 +82,12 @@ interface PurchaseOrder {
  * fulfil/unfulfil cycle strands a phantom lot in the receive screen's own lot
  * picker. That needs fixing server-side before it is worth offering.
  *
- * DELETE IS THE GUARDED ROUTE ONLY. /purchase-order/with-items/<uuid> voids the order
- * and soft-deletes its lines together; the loose route flips one flag and leaves the
- * lines live and queryable under a parent that then 404s. The button is hidden whenever
- * the server would refuse — received or paid — which on production today is every
- * existing order, and the footnote says why rather than leaving the absence a mystery.
+ * DELETE IS THE GUARDED ROUTE. /purchase-order/with-items/<uuid> voids the order and
+ * soft-deletes its lines together. The loose /purchase-order/<uuid> once flipped one
+ * flag and left the lines live; it now runs the same guarded delete. The button is
+ * hidden whenever the server would refuse — received or paid — which on production
+ * today is every existing order, and the footnote says why rather than leaving the
+ * absence a mystery.
  */
 export default function PurchaseOrdersDetailScreen() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
