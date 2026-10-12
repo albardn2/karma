@@ -41,21 +41,6 @@ class PurchaseOrderItemCreate(PurchaseOrderItemBase):
     created_by_uuid: Optional[str]      = None
     quantity_received:   float           = 0.0
 
-class PurchaseOrderItemUpdate(BaseModel):
-    """All fields optional for partial updates."""
-    model_config = ConfigDict(extra="forbid")
-
-    purchase_order_uuid: Optional[str]      = None
-    material_uuid:       Optional[str]      = None
-    quantity:            Optional[int]       = None
-    price_per_unit:      Optional[float]     = None
-    currency:            Optional[Currency]  = None
-    unit:                Optional[UnitOfMeasure] = None
-    quantity_received:   Optional[float]     = None
-    is_fulfilled:        Optional[bool]      = None
-    fulfilled_at:        Optional[datetime]  = None
-    is_deleted:          Optional[bool]      = None
-
 class PurchaseOrderItemEdit(BaseModel):
     """One line's correction, sent with PUT /purchase-order/<uuid>.
 

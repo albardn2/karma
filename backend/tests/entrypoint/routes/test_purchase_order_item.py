@@ -122,46 +122,11 @@ def test_get_item_success(client, return_dicts):
 
 # --- UPDATE ---
 
-def test_update_item_success(client, return_dicts, dummy_uow_class):
-    return_single, _ = return_dicts
-
-    material = MaterialModel(
-        uuid=str(uuid.uuid4()), created_at=datetime.utcnow()
-    )
-    material.unit = UnitOfMeasure.PCS.value
-    po = PurchaseOrderModel(
-        uuid=str(uuid.uuid4()), created_at=datetime.utcnow(),
-        vendor_uuid=str(uuid.uuid4()), currency=Currency.USD.value, status="draft"
-    )
-
-    item = PurchaseOrderItemModel(
-        uuid=str(uuid.uuid4()), purchase_order_uuid=po.uuid,
-        material_uuid=material.uuid, quantity=2, price_per_unit=7.5,
-        currency=Currency.USD.value, unit=UnitOfMeasure.PCS.value,
-        created_at=datetime.utcnow(), is_fulfilled=False,
-        quantity_received=0.0, is_deleted=False
-    )
-    item.material = material
-    item.purchase_order = po
-    return_single["purchase_order_item"] = item
-
-    update_payload = {"quantity": 5, "price_per_unit": 10.0}
-    resp = client.put(f"/purchase_order_item/{item.uuid}", json=update_payload)
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["quantity"] == 5
-    assert data["price_per_unit"] == 10.0
-    assert data["total_price"] == 5 * 10.0
-
-    uow = dummy_uow_class.last_instance
-    saved: PurchaseOrderItemModel = uow.purchase_order_item_repository.saved_model  # type: ignore
-    assert saved.quantity == 5
-    assert saved.price_per_unit == 10.0
-
-
-def test_update_item_not_found(client):
+def test_put_item_is_not_routed(client):
+    # the raw field-by-field update was removed; line corrections must not
+    # reach the model without their inventory and fulfillment side effects
     resp = client.put(f"/purchase_order_item/{uuid.uuid4()}", json={"quantity": 1})
-    assert resp.status_code == 404
+    assert resp.status_code == 405
 
 # --- DELETE (soft) ---
 
