@@ -7,6 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasModule } from '@/hooks/useModuleAccess';
 import { apiCall, apiErrorText, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
+import { markListsStale } from '@/utils/listRefresh';
 
 const money = (n?: number | null, c?: string | null) =>
   n == null ? '—' : `${Number(n).toFixed(2)}${c ? ` ${c}` : ''}`;
@@ -49,6 +50,9 @@ export default function ExpensesDetailScreen() {
     // amounts return to the accounts they were paid from
     const res = await apiCall(`/expense/${uuid}`, { method: 'DELETE' });
     if (isOk(res.status)) {
+      // the lists behind this screen refetch when shown again: the expense and
+      // its payouts are gone, and the money is back in its account
+      markListsStale('/expense/', '/payout/', '/financial-account/');
       // opened from a link there is nothing to go back to — land on the list
       // rather than stay on an expense that no longer exists
       if (router.canGoBack()) router.back();

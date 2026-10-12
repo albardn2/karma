@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,9 +13,11 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, apiErrorText, isOk } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
+import { markListsStale } from '@/utils/listRefresh';
 
 interface Payment {
   uuid: string;
@@ -26,6 +29,8 @@ interface Payment {
   invoice_uuid?: string | null;
   debit_note_item_uuid?: string | null;
   financial_account_uuid?: string | null;
+  /** set when the cash was collected at a trip stop */
+  trip_stop_uuid?: string | null;
 }
 
 /**
@@ -51,6 +56,10 @@ export default function PaymentDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // DELETE /payment/<uuid> is admin-only on the server (scopes_required admin,
+  // superuser; a role grant does not reach it), so it is offered to admins only
+  const { isAdmin } = useAuth();
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -92,6 +101,51 @@ export default function PaymentDetailScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Deleting is the whole reversal: the invoice's paid and owed amounts, the
+  // account balance and a trip's expected cash are all summed from live
+  // payments on every read, and a payment writes nothing else. So the warning
+  // says what will move, before it moves.
+  const confirmDelete = () => {
+    if (!payment) return;
+    const amount = `${Number(payment.amount ?? 0).toFixed(2)}${payment.currency ? ` ${payment.currency}` : ''}`;
+    const what = payment.invoice_uuid
+      ? t('payments.deleteConfirmInvoice', { amount })
+      : payment.debit_note_item_uuid
+        ? t('payments.deleteConfirmDebitNote', { amount })
+        : t('payments.deleteConfirm', { amount });
+    const body = [
+      what,
+      payment.trip_stop_uuid ? t('payments.deleteConfirmTrip') : null,
+      t('detail.confirmDestructive'),
+    ]
+      .filter(Boolean)
+      .join(' ');
+    Alert.alert(t('payments.delete'), body, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('payments.delete'), style: 'destructive', onPress: remove },
+    ]);
+  };
+
+  const remove = async () => {
+    setDeleting(true);
+    const res = await apiCall(`/payment/${uuid}`, { method: 'DELETE' });
+    setDeleting(false);
+    if (isOk(res.status)) {
+      // the lists still mounted behind this screen refetch when shown again:
+      // the payment is gone, and an order or invoice it paid owes again
+      markListsStale('/payment/', '/customer-order/', '/financial-account/');
+      // opened from a link there is nothing to go back to: land on the list
+      // rather than stay on a payment that no longer exists
+      if (router.canGoBack()) router.back();
+      else router.replace('/payments');
+      return;
+    }
+    Alert.alert(
+      t('payments.deleteFailed'),
+      res.status === 403 ? t('purchaseOrders.forbidden') : apiErrorText(res.error, t('form.tryAgain')),
+    );
+  };
 
   const rows: Array<[string, string]> = payment
     ? [
@@ -176,6 +230,24 @@ export default function PaymentDetailScreen() {
                 </View>
               </>
             )}
+
+            {/* last on the screen and outlined, not filled: the same destructive
+                style the other detail screens use, out of the way of a mis-tap */}
+            {isAdmin && (
+              <TouchableOpacity
+                style={[styles.deleteBtn, deleting && styles.deleteBtnBusy]}
+                onPress={confirmDelete}
+                disabled={deleting}
+                accessibilityRole="button"
+                testID="payment-delete"
+              >
+                {deleting ? (
+                  <ActivityIndicator color="#dc2626" />
+                ) : (
+                  <ThemedText style={styles.deleteText}>{t('payments.delete')}</ThemedText>
+                )}
+              </TouchableOpacity>
+            )}
           </ScrollView>
         )}
       </ThemedView>
@@ -199,6 +271,18 @@ const styles = StyleSheet.create({
   rowValue: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1f2937', textAlign: 'right' },
   sectionTitle: { fontSize: 15, fontWeight: '700', marginTop: 22, marginBottom: -6 },
   notes: { fontSize: 14, lineHeight: 20, opacity: 0.8 },
+  // matches ModuleDetailScreen's destructive action
+  deleteBtn: {
+    marginTop: 28,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  deleteBtnBusy: { opacity: 0.6 },
+  deleteText: { color: '#dc2626', fontSize: 15, fontWeight: '700' },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
   stateIcon: { fontSize: 34 },
   stateText: { fontSize: 15, opacity: 0.6, textAlign: 'center' },

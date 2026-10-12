@@ -679,6 +679,16 @@ export const translations: Record<Lang, Record<string, string>> = {
   'payments.appliedTo': 'Applied to',
   'payments.received': 'Received',
   'payments.notes': 'Notes',
+  // deleting is admin-only; the confirm says what moves back
+  'payments.delete': 'Delete payment',
+  'payments.deleteConfirmInvoice':
+    'Delete this payment of {amount}? The invoice it paid will owe this amount again, and the money comes off the account it was deposited to.',
+  'payments.deleteConfirmDebitNote':
+    'Delete this payment of {amount}? The debit note it paid will owe this amount again, and the money comes off the account it was deposited to.',
+  'payments.deleteConfirm':
+    'Delete this payment of {amount}? The money comes off the account it was deposited to.',
+  'payments.deleteConfirmTrip': "It also comes off the expected cash of the trip that collected it.",
+  'payments.deleteFailed': "Couldn't delete this payment.",
   'menu.inventoryEvents': 'Stock movements',
   'inventoryEvents.type': 'Event',
   'inventoryEvents.costPerUnit': 'Cost per unit',
@@ -2037,6 +2047,14 @@ export const translations: Record<Lang, Record<string, string>> = {
   'payments.appliedTo': 'مطبَّق على',
   'payments.received': 'تاريخ الاستلام',
   'payments.notes': 'ملاحظات',
+  'payments.delete': 'حذف الدفعة',
+  'payments.deleteConfirmInvoice':
+    'حذف هذه الدفعة بقيمة {amount}؟ ستعود الفاتورة التي سددتها مستحقة بهذا المبلغ، ويُخصم المبلغ من الحساب الذي أُودع فيه.',
+  'payments.deleteConfirmDebitNote':
+    'حذف هذه الدفعة بقيمة {amount}؟ سيعود إشعار المدين الذي سددته مستحقاً بهذا المبلغ، ويُخصم المبلغ من الحساب الذي أُودع فيه.',
+  'payments.deleteConfirm': 'حذف هذه الدفعة بقيمة {amount}؟ يُخصم المبلغ من الحساب الذي أُودع فيه.',
+  'payments.deleteConfirmTrip': 'ويُخصم أيضاً من النقد المتوقع للرحلة التي حصّلته.',
+  'payments.deleteFailed': 'تعذّر حذف هذه الدفعة.',
   'menu.inventoryEvents': 'حركات المخزون',
   'inventoryEvents.type': 'نوع الحركة',
   'inventoryEvents.costPerUnit': 'تكلفة الوحدة',
