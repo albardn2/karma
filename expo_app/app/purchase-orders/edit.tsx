@@ -4,14 +4,14 @@ import { ModuleForm, FormField } from '@/components/ModuleForm';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 /**
- * Edit a purchase order — which means its notes and its payout due date, and nothing
- * else.
+ * Edit a purchase order — which means its notes and its payout due date.
  *
- * That is not a simplification for the phone: PurchaseOrderUpdate is extra="forbid" and
- * declares exactly those two fields, so vendor_uuid, currency, status and
- * purchase_order_items each 422 the request. An order's commercial terms are frozen the
- * moment it is created, and the note above the fields says so rather than leaving a
- * user to discover it from a rejection.
+ * That is not a simplification for the phone: PurchaseOrderUpdate is extra="forbid", so
+ * vendor_uuid, currency and status each 422 the request — an order's vendor and
+ * currency are fixed the moment it is created. The one other thing it takes,
+ * purchase_order_items, is a list of line corrections (quantity, price), and those are
+ * made one line at a time from the line itself (edit-line). The note above the fields
+ * says both, rather than leaving a user to discover either from a rejection.
  *
  * THE CLEAR-DATE SWITCH EXISTS BECAUSE AN EMPTY FIELD CANNOT CLEAR A COLUMN.
  * ModuleForm omits empty values from the payload rather than sending null — the right

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/ModuleDetailScreen';
@@ -72,6 +72,11 @@ interface PurchaseOrder {
  * predate that, so the value is trustworthy. The web detail shows it; this screen still
  * leans on the Fulfilled badge for compactness rather than a separate received row.
  *
+ * LINE CORRECTIONS. A line's quantity and price can be corrected after the fact
+ * (edit-line). The write is the order's own update, so the link needs the same
+ * purchase_order update grant as Edit — not the purchase_order_item grant Receive
+ * needs. On a received line the server moves the receipt, and so the lot, with it.
+ *
  * WHY THERE IS NO UNFULFIL. The endpoint exists, writes, and reports the items it
  * touched — but it still leaves the inventory lot live at zero, so every
  * fulfil/unfulfil cycle strands a phantom lot in the receive screen's own lot
@@ -111,6 +116,17 @@ export default function PurchaseOrdersDetailScreen() {
   useEffect(() => {
     loadPayouts();
   }, [loadPayouts, reloadKey]);
+
+  // focus, not push: every action here (record payout, edit, edit a line, receive)
+  // opens a screen that writes, and a stack pop does not remount this one. Bumping
+  // the key before the push refetched while that screen was opening — before the
+  // write — so coming back showed the old totals and lines. One bump per focus
+  // event; setState does not re-trigger focus, so this cannot loop.
+  useFocusEffect(
+    useCallback(() => {
+      setReloadKey((k) => k + 1);
+    }, []),
+  );
 
   const qty = (n?: number | null) =>
     n == null ? '—' : Number.isInteger(n) ? String(n) : Number(n).toFixed(2);
@@ -183,7 +199,6 @@ export default function PurchaseOrdersDetailScreen() {
       testID: 'po-payout',
       visible: (x) => canPayout && !x.is_paid && Number(x.net_amount_due ?? 0) > 0,
       onPress: (x) => {
-        setReloadKey((k) => k + 1);
         router.push({
           pathname: '/payouts/create',
           params: {
@@ -199,7 +214,6 @@ export default function PurchaseOrdersDetailScreen() {
       testID: 'po-edit',
       visible: () => canEdit,
       onPress: (x) => {
-        setReloadKey((k) => k + 1);
         router.push({
           pathname: '/purchase-orders/edit',
           params: {
@@ -289,6 +303,33 @@ export default function PurchaseOrdersDetailScreen() {
                         {formatNumericDate(parseTs(li.fulfilled_at))}
                       </ThemedText>
                     )}
+                    {canEdit && (
+                      <TouchableOpacity
+                        style={styles.editLine}
+                        testID={`po-edit-line-${li.uuid}`}
+                        hitSlop={8}
+                        onPress={() => {
+                          router.push({
+                            pathname: '/purchase-orders/edit-line',
+                            params: {
+                              order_uuid: x.uuid,
+                              uuid: li.uuid,
+                              material_name: li.material_name ?? '',
+                              quantity: li.quantity != null ? String(li.quantity) : '',
+                              price_per_unit:
+                                li.price_per_unit != null ? String(li.price_per_unit) : '',
+                              unit: li.unit ?? '',
+                              currency: li.currency ?? x.currency ?? '',
+                              received: li.is_fulfilled ? 'true' : 'false',
+                            },
+                          });
+                        }}
+                      >
+                        <ThemedText style={styles.editLineText}>
+                          {t('purchaseOrders.editLine')}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
                   </View>
                   {li.is_fulfilled ? (
                     <ThemedText style={styles.done}>{t('purchaseOrders.received')}</ThemedText>
@@ -297,7 +338,6 @@ export default function PurchaseOrdersDetailScreen() {
                       style={styles.receive}
                       testID={`po-receive-${li.uuid}`}
                       onPress={() => {
-                        setReloadKey((k) => k + 1);
                         router.push({
                           pathname: '/purchase-orders/receive',
                           params: {
@@ -379,6 +419,9 @@ const styles = StyleSheet.create({
   lineMeta: { fontSize: 11, opacity: 0.55, marginTop: 1 },
   done: { fontSize: 12, fontWeight: '700', color: '#16a34a' },
   awaiting: { fontSize: 12, opacity: 0.55 },
+  // a link, not a third button beside Receive: alignSelf keeps the touch target to the word
+  editLine: { alignSelf: 'flex-start', marginTop: 4 },
+  editLineText: { fontSize: 12, fontWeight: '700', color: '#5469D4' },
   blocked: { fontSize: 11, opacity: 0.5, lineHeight: 16, marginTop: 10 },
   subhead: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   vendorLink: { fontSize: 13, fontWeight: '700', color: '#5469D4', marginTop: 4 },
