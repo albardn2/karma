@@ -465,7 +465,13 @@ export default function TripsScreen() {
         onClose={() => setShowSummary(false)}
       />
 
-      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      {/* While selecting, the action bar takes the tab bar's place. The tab bar
+          is absolutely positioned over the bottom of the screen (zIndex 1000),
+          so with both mounted it sat on top of the action bar and the Summary
+          button could not be seen or tapped. */}
+      {!selectionMode && (
+        <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      )}
     </ThemedView>
   );
 }
