@@ -56,6 +56,20 @@ class PurchaseOrderItemUpdate(BaseModel):
     fulfilled_at:        Optional[datetime]  = None
     is_deleted:          Optional[bool]      = None
 
+class PurchaseOrderItemEdit(BaseModel):
+    """One line's correction, sent with PUT /purchase-order/<uuid>.
+
+    Only the two figures that can be corrected after the fact: how much was
+    ordered and what it cost. Material, unit and currency are fixed when the
+    line is created.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    uuid:           str
+    quantity:       Optional[int]   = Field(None, gt=0)
+    # 0 is a real price (free goods), so only a negative one is refused
+    price_per_unit: Optional[float] = Field(None, ge=0)
+
 class PurchaseOrderItemRead(BaseModel):
     """Response model for a single purchase order item, including total_price."""
     model_config = ConfigDict(from_attributes=True,extra="forbid")

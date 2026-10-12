@@ -10,6 +10,7 @@ from app.dto.common_enums import Currency
 from app.dto.purchase_order_item import PurchaseOrderItemCreate
 
 from app.dto.purchase_order_item import PurchaseOrderItemRead
+from app.dto.purchase_order_item import PurchaseOrderItemEdit
 
 
 class PurchaseOrderStatus(str,Enum):
@@ -56,6 +57,8 @@ class PurchaseOrderUpdate(BaseModel):
 
     notes: Optional[str] = None
     payout_due_date: Optional[datetime] = None
+    # corrections to existing lines; lines not listed are left alone
+    purchase_order_items: Optional[List[PurchaseOrderItemEdit]] = None
 
 class PurchaseOrderRead(BaseModel):
     """Response model for a single purchase order, including computed fields."""

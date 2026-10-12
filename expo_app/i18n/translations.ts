@@ -825,10 +825,20 @@ export const translations: Record<Lang, Record<string, string>> = {
   'purchaseOrders.orderTotal': 'Order total',
   'purchaseOrders.unitFromMaterial': 'The unit comes from the material and cannot be changed.',
   'purchaseOrders.frozenNote':
-    'Vendor, currency and lines cannot be changed after the order is created.',
+    "Vendor and currency cannot be changed after the order is created, and lines cannot be added or removed — only a line's quantity and price can be corrected later.",
   'purchaseOrders.needALine': 'Add at least one line.',
   'purchaseOrders.editTitle': 'Edit order',
-  'purchaseOrders.editNote': 'Only the notes and the payout due date can be changed.',
+  'purchaseOrders.editNote':
+    "Here you can change the notes and the payout due date. To correct a line's quantity or price, tap Edit on the line.",
+  'purchaseOrders.editLine': 'Edit',
+  'purchaseOrders.editLineTitle': 'Edit line',
+  'purchaseOrders.editLineNote':
+    'Only the quantity and the unit price can be corrected — the material, unit and currency are fixed.',
+  'purchaseOrders.editLineReceivedNote':
+    'This line has been received: its stock moves with the quantity, and its lot is re-costed at the new price.',
+  'purchaseOrders.editLineRefused':
+    'That would take the order below what has already been paid out on it, or the line below what its credit or debit notes return. Adjust those first.',
+  'purchaseOrders.lineGone': 'This line no longer exists on the order.',
   'purchaseOrders.clearDueDate': 'Remove the due date',
   'purchaseOrders.deleteConfirm': 'This deletes the order and its {lines} line(s).',
   'purchaseOrders.deleteBlocked': 'Orders that have been received or paid cannot be deleted.',
@@ -2190,10 +2200,21 @@ export const translations: Record<Lang, Record<string, string>> = {
   'purchaseOrders.pricePerUnit': 'سعر الوحدة',
   'purchaseOrders.orderTotal': 'إجمالي الأمر',
   'purchaseOrders.unitFromMaterial': 'الوحدة تأتي من المادة ولا يمكن تغييرها.',
-  'purchaseOrders.frozenNote': 'لا يمكن تغيير المورد أو العملة أو البنود بعد إنشاء الأمر.',
+  'purchaseOrders.frozenNote':
+    'لا يمكن تغيير المورد أو العملة بعد إنشاء الأمر، ولا إضافة بنود أو حذفها — يمكن لاحقاً تصحيح كمية البند وسعره فقط.',
   'purchaseOrders.needALine': 'أضف بنداً واحداً على الأقل.',
   'purchaseOrders.editTitle': 'تعديل الأمر',
-  'purchaseOrders.editNote': 'يمكن تعديل الملاحظات وتاريخ استحقاق الدفع فقط.',
+  'purchaseOrders.editNote':
+    'يمكنك هنا تعديل الملاحظات وتاريخ استحقاق الدفع. لتصحيح كمية بند أو سعره، اضغط تعديل على البند.',
+  'purchaseOrders.editLine': 'تعديل',
+  'purchaseOrders.editLineTitle': 'تعديل البند',
+  'purchaseOrders.editLineNote':
+    'يمكن تصحيح الكمية وسعر الوحدة فقط — المادة والوحدة والعملة ثابتة.',
+  'purchaseOrders.editLineReceivedNote':
+    'تم استلام هذا البند: يتغيّر مخزونه مع الكمية، ويُعاد احتساب تكلفة دفعته بالسعر الجديد.',
+  'purchaseOrders.editLineRefused':
+    'سيجعل ذلك الأمر أقل مما دُفع عليه، أو البند أقل مما تُرجعه إشعارات الدائن أو المدين الخاصة به. عدّل تلك أولاً.',
+  'purchaseOrders.lineGone': 'هذا البند لم يعد موجوداً في الأمر.',
   'purchaseOrders.clearDueDate': 'إزالة تاريخ الاستحقاق',
   'purchaseOrders.deleteConfirm': 'سيحذف هذا الأمر و{lines} من بنوده.',
   'purchaseOrders.deleteBlocked': 'لا يمكن حذف الأوامر التي تم استلامها أو دفعها.',

@@ -1271,12 +1271,14 @@ class PurchaseOrderItem(Base):
     def adjusted_quantity(self):
         debit_note_change = 0
         credit_note_change = 0
+        # a money-only note stores inventory_change NULL; it moves no stock
+        # (the SQL expression's SUM skips it the same way)
         for item in self.debit_note_items:
             if not item.is_deleted:
-                debit_note_change += item.inventory_change
+                debit_note_change += item.inventory_change or 0
         for item in self.credit_note_items:
             if not item.is_deleted:
-                credit_note_change += item.inventory_change
+                credit_note_change += item.inventory_change or 0
         return self.quantity + debit_note_change + credit_note_change
 
     @adjusted_quantity.expression
