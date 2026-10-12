@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +17,8 @@ import {
 } from "@/components/ui/popover";
 import { Filter } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import type { TripFilters as TripFiltersType } from "@/lib/types";
+import { apiRequest } from "@/lib/queryClient";
+import type { TripFilters as TripFiltersType, TripFilterOptions } from "@/lib/types";
 
 interface TripFiltersProps {
   filters: Omit<TripFiltersType, 'page' | 'per_page'>;
@@ -37,10 +39,36 @@ export function TripFilters({
   const [localFilters, setLocalFilters] = useState(filters);
   const [isOpen, setIsOpen] = useState(false);
 
+  // Only the people and vehicles that are on at least one trip, so every choice
+  // finds something. Under the "/trip/" key prefix on purpose: creating or
+  // deleting a trip already invalidates ["/trip/"], which refreshes these too.
+  const {
+    data: options,
+    isLoading: optionsLoading,
+    isError: optionsFailed,
+  } = useQuery<TripFilterOptions>({
+    queryKey: ["/trip/", "filter-options"],
+    queryFn: () => apiRequest("/trip/filter-options"),
+  });
+  const assignees = options?.assignees ?? [];
+  const vehicles = options?.vehicles ?? [];
+  // A chosen value can outlive its option (its last trip deleted since). Keep it
+  // selectable rather than leaving an active filter with a blank box.
+  const orphanAssignee =
+    localFilters.assigned_user_uuid &&
+    !assignees.some((a) => a.uuid === localFilters.assigned_user_uuid)
+      ? localFilters.assigned_user_uuid
+      : null;
+  const orphanVehicle =
+    localFilters.vehicle_uuid && !vehicles.some((v) => v.uuid === localFilters.vehicle_uuid)
+      ? localFilters.vehicle_uuid
+      : null;
+
   useEffect(() => {
     setLocalFilters({
       uuid: filters.uuid || undefined,
       vehicle_uuid: filters.vehicle_uuid || undefined,
+      assigned_user_uuid: filters.assigned_user_uuid || undefined,
       service_area_uuid: filters.service_area_uuid || undefined,
       status: filters.status || undefined,
       // NOT `|| undefined` like the others: is_audited is a boolean, and false
@@ -129,16 +157,71 @@ export function TripFilters({
                 />
               </div>
 
+              {/* 'all' is the same sentinel as the status filter below: Radix
+                  Select cannot hold an empty value, and it converts back to
+                  undefined so the param is simply left off. */}
               <div>
-                <Label htmlFor="filter-vehicle" className="text-sm">{t('trips.vehicleUuid')}</Label>
-                <Input
-                  id="filter-vehicle"
-                  placeholder={t('trips.enterVehicleUuid')}
-                  value={localFilters.vehicle_uuid || ''}
-                  onChange={(e) => setLocalFilters({ ...localFilters, vehicle_uuid: e.target.value || undefined })}
-                  data-testid="input-filter-vehicle"
-                />
+                <Label htmlFor="filter-assignee" className="text-sm">{t('trips.filterAssignee')}</Label>
+                <Select
+                  value={localFilters.assigned_user_uuid || 'all'}
+                  onValueChange={(value) => setLocalFilters({
+                    ...localFilters,
+                    assigned_user_uuid: value === 'all' ? undefined : value,
+                  })}
+                  disabled={optionsLoading}
+                >
+                  <SelectTrigger id="filter-assignee" data-testid="select-filter-assignee">
+                    <SelectValue placeholder={t('trips.allAssignees')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('trips.allAssignees')}</SelectItem>
+                    {assignees.map((a) => (
+                      <SelectItem key={a.uuid} value={a.uuid} data-testid={`option-assignee-${a.username}`}>
+                        {a.name}
+                        {a.name !== a.username && (
+                          <span className="ms-1 text-gray-500 dark:text-gray-400">· {a.username}</span>
+                        )}
+                      </SelectItem>
+                    ))}
+                    {orphanAssignee && (
+                      <SelectItem value={orphanAssignee}>{orphanAssignee}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
+
+              <div>
+                <Label htmlFor="filter-vehicle" className="text-sm">{t('trips.filterVehicle')}</Label>
+                <Select
+                  value={localFilters.vehicle_uuid || 'all'}
+                  onValueChange={(value) => setLocalFilters({
+                    ...localFilters,
+                    vehicle_uuid: value === 'all' ? undefined : value,
+                  })}
+                  disabled={optionsLoading}
+                >
+                  <SelectTrigger id="filter-vehicle" data-testid="select-filter-vehicle">
+                    <SelectValue placeholder={t('trips.allVehicles')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('trips.allVehicles')}</SelectItem>
+                    {vehicles.map((v) => (
+                      <SelectItem key={v.uuid} value={v.uuid} data-testid={`option-vehicle-${v.plate_number}`}>
+                        {v.plate_number}
+                      </SelectItem>
+                    ))}
+                    {orphanVehicle && (
+                      <SelectItem value={orphanVehicle}>{orphanVehicle}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {optionsFailed && (
+                <p className="text-xs text-red-600 dark:text-red-400" data-testid="text-filter-options-failed">
+                  {t('trips.filterOptionsFailed')}
+                </p>
+              )}
 
               <div>
                 <Label htmlFor="filter-service-area" className="text-sm">{t('trips.serviceAreaUuid')}</Label>

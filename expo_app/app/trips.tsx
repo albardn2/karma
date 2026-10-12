@@ -19,13 +19,15 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { TripSummarySheet } from '@/components/TripSummarySheet';
+import { TripFilterDropdowns } from '@/components/TripFilterDropdowns';
 import { apiCall } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime } from '@/utils/date';
 
 // Admin-only Trips module — mirrors the web trips list (plate, assignee,
-// status, times), newest first, with status filter chips and paging.
+// status, times), newest first, with assignee / vehicle dropdowns, status
+// filter chips and paging.
 
 interface Trip {
   uuid: string;
@@ -148,6 +150,9 @@ export default function TripsScreen() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [auditFilter, setAuditFilter] = useState('all');
+  // '' means "no filter": the param is then left off, which is what lists everyone
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [vehicleFilter, setVehicleFilter] = useState('');
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -214,8 +219,12 @@ export default function TripsScreen() {
       const generation = replace ? ++fetchGeneration.current : fetchGeneration.current;
       const status = statusFilter === 'all' ? '' : `&status=${statusFilter}`;
       const audited = auditFilter === 'all' ? '' : `&is_audited=${auditFilter}`;
+      const assignee = assigneeFilter
+        ? `&assigned_user_uuid=${encodeURIComponent(assigneeFilter)}`
+        : '';
+      const vehicle = vehicleFilter ? `&vehicle_uuid=${encodeURIComponent(vehicleFilter)}` : '';
       const res = await apiCall<{ items: Trip[]; pages: number }>(
-        `/trip/?page=${pageNum}&per_page=${PER_PAGE}${status}${audited}`
+        `/trip/?page=${pageNum}&per_page=${PER_PAGE}${status}${audited}${assignee}${vehicle}`
       );
       if (fetchGeneration.current !== generation) return; // superseded
       if (res.data) {
@@ -232,7 +241,7 @@ export default function TripsScreen() {
         });
       }
     },
-    [statusFilter, auditFilter]
+    [statusFilter, auditFilter, assigneeFilter, vehicleFilter]
   );
 
   useEffect(() => {
@@ -360,6 +369,21 @@ export default function TripsScreen() {
       <NativeHeader
         title={t('trips.title')}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/?tab=menu'))}
+      />
+
+      {/* who and which vehicle, above the status chips; like a chip, a change
+          drops the selection, since the trips it named may no longer be listed */}
+      <TripFilterDropdowns
+        assignee={assigneeFilter}
+        vehicle={vehicleFilter}
+        onAssigneeChange={(uuid) => {
+          exitSelection();
+          setAssigneeFilter(uuid);
+        }}
+        onVehicleChange={(uuid) => {
+          exitSelection();
+          setVehicleFilter(uuid);
+        }}
       />
 
       <ScrollingChipRow>

@@ -23,7 +23,7 @@ import { TripFilters } from "@/components/trips/TripFilters";
 import { AddTripDialog } from "@/components/trips/AddTripDialog";
 import { TripSummaryDialog } from "@/components/trips/TripSummaryDialog";
 import { format } from "date-fns";
-import type { TripPage, TripFilters as TripFiltersType } from "@/lib/types";
+import { TripStatus, type TripPage, type TripFilters as TripFiltersType } from "@/lib/types";
 
 export default function Trips() {
   const [, setLocation] = useLocation();
@@ -97,25 +97,29 @@ export default function Trips() {
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     setSelected([]);
-    let newFilters: TripFiltersType = {};
-    
+    // A tab is a status, so it replaces only the status. The rest of the filter
+    // menu (who, which vehicle, audit) stays: picking someone and then their
+    // completed trips should not silently drop the person.
+    const { status: _previousStatus, ...rest } = filters;
+    let newFilters: TripFiltersType = rest;
+
     switch (tab) {
       case 'planned':
-        newFilters = { status: 'planned' };
+        newFilters = { ...rest, status: TripStatus.PLANNED };
         break;
       case 'in_progress':
-        newFilters = { status: 'in_progress' };
+        newFilters = { ...rest, status: TripStatus.IN_PROGRESS };
         break;
       case 'completed':
-        newFilters = { status: 'completed' };
+        newFilters = { ...rest, status: TripStatus.COMPLETED };
         break;
       case 'cancelled':
-        newFilters = { status: 'cancelled' };
+        newFilters = { ...rest, status: TripStatus.CANCELLED };
         break;
       default:
-        newFilters = {};
+        newFilters = rest;
     }
-    
+
     setFilters(newFilters);
     setCurrentPage(1);
   };

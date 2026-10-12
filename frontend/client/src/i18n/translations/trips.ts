@@ -47,6 +47,13 @@ export const en: Record<string, string> = {
   'trips.auditLabel': 'Audit',
   'trips.selectAuditState': 'Select audit state',
   'trips.allAuditStates': 'Audited and not',
+  // the assignee / vehicle dropdowns offer only people and vehicles that are on
+  // at least one trip, so an empty list means there are no trips yet
+  'trips.filterAssignee': 'Assigned to',
+  'trips.allAssignees': 'Everyone',
+  'trips.filterVehicle': 'Vehicle',
+  'trips.allVehicles': 'All vehicles',
+  'trips.filterOptionsFailed': "Couldn't load the choices",
   'trips.clear': 'Clear',
 
   // create dialog
@@ -273,6 +280,11 @@ export const ar: Record<string, string> = {
   'trips.auditLabel': 'المراجعة',
   'trips.selectAuditState': 'اختر حالة المراجعة',
   'trips.allAuditStates': 'المُراجَعة وغير المُراجَعة',
+  'trips.filterAssignee': 'مسندة إلى',
+  'trips.allAssignees': 'الجميع',
+  'trips.filterVehicle': 'المركبة',
+  'trips.allVehicles': 'جميع المركبات',
+  'trips.filterOptionsFailed': 'تعذّر تحميل الخيارات',
   'trips.clear': 'مسح',
 
   // create dialog
