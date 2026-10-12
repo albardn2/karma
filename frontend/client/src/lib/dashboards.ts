@@ -7,6 +7,7 @@ import {
   Package,
   UserPlus,
   MapPin,
+  Filter,
   type LucideIcon,
 } from "lucide-react";
 
@@ -124,6 +125,13 @@ export const IMPLEMENTED_DASHBOARDS: DashboardEntry[] = [
     icon: Receipt,
     titleKey: "dashboards.spend",
     descKey: "dashboards.spendDesc",
+  },
+  {
+    id: "tag-funnels",
+    href: "/dashboards/tag-funnels",
+    icon: Filter,
+    titleKey: "dashboards.tagFunnels",
+    descKey: "dashboards.tagFunnelsDesc",
   },
 ];
 

@@ -8,6 +8,7 @@ import ProfitabilityDashboard from "@/pages/ProfitabilityDashboard";
 import RevenueOverTimeDashboard from "@/pages/RevenueOverTimeDashboard";
 import CustomerOrdersDashboard from "@/pages/CustomerOrdersDashboard";
 import NewCustomersDashboard from "@/pages/NewCustomersDashboard";
+import TagFunnelsDashboard from "@/pages/TagFunnelsDashboard";
 import MaterialsSoldDashboard from "@/pages/MaterialsSoldDashboard";
 import TripStopsDashboard from "@/pages/TripStopsDashboard";
 import MyTripStopsDashboard from "@/pages/MyTripStopsDashboard";
@@ -22,6 +23,7 @@ const PANELS: Record<string, () => JSX.Element> = {
   "revenue-over-time": () => <RevenueOverTimeDashboard embedded />,
   "customer-orders": () => <CustomerOrdersDashboard embedded />,
   "new-customers": () => <NewCustomersDashboard embedded />,
+  "tag-funnels": () => <TagFunnelsDashboard embedded />,
   "materials-sold": () => <MaterialsSoldDashboard embedded />,
   "trip-stops": () => <TripStopsDashboard embedded />,
   spend: () => <SpendDashboard embedded />,
