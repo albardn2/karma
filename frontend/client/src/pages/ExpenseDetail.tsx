@@ -13,7 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
+import { refreshAfterExpenseDelete } from "@/components/expenses/afterExpenseDelete";
 import { format } from "date-fns";
 
 interface Expense {
@@ -57,9 +58,11 @@ export default function ExpenseDetail() {
 
   const updateMutation = useMutation({
     mutationFn: (data: { vendor_uuid?: string; category?: string; description?: string }) =>
+      // apiRequest serializes the body itself; stringifying here too sent a
+      // JSON *string*, which the server cannot unpack (every edit 500'd)
       apiRequest(`/expense/${params?.id}`, {
         method: "PUT",
-        body: JSON.stringify(data),
+        body: data,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/expense/"] });
@@ -81,7 +84,8 @@ export default function ExpenseDetail() {
   const deleteMutation = useMutation({
     mutationFn: () => apiRequest(`/expense/${params?.id}`, { method: "DELETE" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/expense/"] });
+      // its payouts went too, so balances, payouts and trips move as well
+      refreshAfterExpenseDelete();
       toast({
         title: t('common.success'),
         description: t('expenses.deleteSuccess'),
@@ -91,7 +95,7 @@ export default function ExpenseDetail() {
     onError: (error: any) => {
       toast({
         title: t('common.error'),
-        description: error.message || t('expenses.deleteFailed'),
+        description: apiErrorMessage(error, t('expenses.deleteFailed')),
         variant: "destructive",
       });
     },
@@ -269,8 +273,13 @@ export default function ExpenseDetail() {
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>{t('expenses.deleteTitle')}</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {t('expenses.deleteConfirmDesc')}
+                      <AlertDialogDescription data-testid="expense-delete-desc">
+                        {/* a paid expense takes its payouts with it — say so before, not after */}
+                        {expense.amount_paid > 0
+                          ? t('expenses.deleteConfirmDescPaid', {
+                              amount: formatCurrency(expense.amount_paid, expense.currency),
+                            })
+                          : t('expenses.deleteConfirmDesc')}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

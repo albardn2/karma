@@ -45,9 +45,11 @@ export default function TransactionDetail() {
 
   const updateMutation = useMutation({
     mutationFn: (data: { notes?: string }) =>
+      // apiRequest serializes the body itself — a pre-stringified one arrives
+      // as a JSON string the server cannot unpack
       apiRequest(`/transaction/${params?.id}`, {
         method: "PUT",
-        body: JSON.stringify(data),
+        body: data,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/transaction/"] });

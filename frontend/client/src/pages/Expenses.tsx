@@ -10,7 +10,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
+import { refreshAfterExpenseDelete } from "@/components/expenses/afterExpenseDelete";
 import { ExpenseFilters } from "@/components/expenses/ExpenseFilters";
 import { ExpensesAnalytics } from "@/components/expenses/ExpensesAnalytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -76,7 +77,8 @@ export default function Expenses() {
   const deleteMutation = useMutation({
     mutationFn: (uuid: string) => apiRequest(`/expense/${uuid}`, { method: "DELETE" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/expense/"] });
+      // its payouts went too, so balances, payouts and trips move as well
+      refreshAfterExpenseDelete();
       toast({
         title: t('common.success'),
         description: t('expenses.deleteSuccess'),
@@ -85,7 +87,7 @@ export default function Expenses() {
     onError: (error: any) => {
       toast({
         title: t('common.error'),
-        description: error.message || t('expenses.deleteFailed'),
+        description: apiErrorMessage(error, t('expenses.deleteFailed')),
         variant: "destructive",
       });
     },
@@ -104,9 +106,14 @@ export default function Expenses() {
     setFilters(prev => ({ ...prev, page }));
   };
 
-  const handleDelete = (uuid: string) => {
-    if (window.confirm(t('expenses.confirmDelete'))) {
-      deleteMutation.mutate(uuid);
+  const handleDelete = (expense: Expense) => {
+    // a paid expense takes its payouts with it — say so before, not after
+    const message =
+      expense.amount_paid > 0
+        ? t('expenses.confirmDeletePaid', { amount: formatCurrency(expense.amount_paid, expense.currency) })
+        : t('expenses.confirmDelete');
+    if (window.confirm(message)) {
+      deleteMutation.mutate(expense.uuid);
     }
   };
 
@@ -301,7 +308,7 @@ export default function Expenses() {
                                 {t('common.viewDetails')}
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => handleDelete(expense.uuid)}
+                                onClick={() => handleDelete(expense)}
                                 className="text-red-600"
                               >
                                 {t('common.delete')}

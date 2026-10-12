@@ -14,6 +14,8 @@ export const en: Record<string, string> = {
   'expenses.created': 'Created',
   'expenses.pagination': 'Showing {from} to {to} of {total} expenses',
   'expenses.confirmDelete': 'Are you sure you want to delete this expense?',
+  'expenses.confirmDeletePaid':
+    'Delete this expense? Its payouts ({amount}) are deleted too, and the money goes back to the account it was paid from.',
   'expenses.loadError': 'Error loading expenses: {message}',
   'expenses.deleteSuccess': 'Expense deleted successfully',
   'expenses.deleteFailed': 'Failed to delete expense',
@@ -74,6 +76,8 @@ export const en: Record<string, string> = {
   'expenses.createPayout': 'Create Payout',
   'expenses.deleteTitle': 'Delete Expense',
   'expenses.deleteConfirmDesc': 'Are you sure you want to delete this expense? This action cannot be undone.',
+  'expenses.deleteConfirmDescPaid':
+    'This expense has been paid ({amount}). Deleting it also deletes its payouts, and the money goes back to the account it was paid from. This action cannot be undone.',
   'expenses.updateSuccess': 'Expense updated successfully',
   'expenses.updateFailed': 'Failed to update expense',
   'expenses.expenseUuid': 'Expense UUID',
@@ -125,6 +129,8 @@ export const ar: Record<string, string> = {
   'expenses.created': 'تاريخ الإنشاء',
   'expenses.pagination': 'عرض {from} إلى {to} من {total} مصروف',
   'expenses.confirmDelete': 'هل أنت متأكد من حذف هذا المصروف؟',
+  'expenses.confirmDeletePaid':
+    'حذف هذا المصروف؟ ستُحذف دفعاته ({amount}) أيضاً، ويعود المبلغ إلى الحساب الذي دُفع منه.',
   'expenses.loadError': 'خطأ في تحميل المصاريف: {message}',
   'expenses.deleteSuccess': 'تم حذف المصروف بنجاح',
   'expenses.deleteFailed': 'فشل حذف المصروف',
@@ -185,6 +191,8 @@ export const ar: Record<string, string> = {
   'expenses.createPayout': 'إنشاء دفعة صادرة',
   'expenses.deleteTitle': 'حذف المصروف',
   'expenses.deleteConfirmDesc': 'هل أنت متأكد من حذف هذا المصروف؟ لا يمكن التراجع عن هذا الإجراء.',
+  'expenses.deleteConfirmDescPaid':
+    'هذا المصروف مدفوع ({amount}). حذفه يحذف دفعاته أيضاً، ويعود المبلغ إلى الحساب الذي دُفع منه. لا يمكن التراجع عن هذا الإجراء.',
   'expenses.updateSuccess': 'تم تحديث المصروف بنجاح',
   'expenses.updateFailed': 'فشل تحديث المصروف',
   'expenses.expenseUuid': 'معرّف المصروف',

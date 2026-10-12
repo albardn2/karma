@@ -87,9 +87,11 @@ export default function ProcessDetail() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: EditFormData) => {
+      // apiRequest serializes the body itself — a pre-stringified one arrives
+      // as a JSON string the server cannot unpack
       return await apiRequest(`/process/${uuid}`, {
         method: "PUT",
-        body: JSON.stringify(data),
+        body: data,
       });
     },
     onSuccess: () => {
