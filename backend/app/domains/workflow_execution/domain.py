@@ -10,6 +10,7 @@ from app.dto.workflow_execution import (
 )
 from models.common import WorkflowExecution as WorkflowExecutionModel
 from app.domains.task_execution.domain import TaskExecutionDomain
+from app.domains.workflow_execution.run_lock import lock_run
 
 
 class WorkflowExecutionDomain:
@@ -51,6 +52,9 @@ class WorkflowExecutionDomain:
         workflow_execution = uow.workflow_execution_repository.find_one(uuid=uuid, is_deleted=False)
         if not workflow_execution:
             raise NotFoundError(f"WorkflowExecution not found with uuid: {uuid}")
+        # a run being finished (skip-and-finish) while it is cancelled must end
+        # one way or the other, not half of each (run_lock.py)
+        lock_run(uow, workflow_execution)
 
         if workflow_execution.status in [WorkflowStatus.COMPLETED.value, WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value]:
             raise BadRequestError("Cannot cancel a completed or already cancelled workflow execution")

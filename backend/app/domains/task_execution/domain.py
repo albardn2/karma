@@ -13,6 +13,7 @@ from app.dto.workflow_execution import (
 from app.dto.task_execution import TaskExecutionComplete
 from app.domains.task_execution.workflow_operators.operator_entry_point import OperatorEntryPoint
 from app.domains.task_execution.callback_functions import CALLBACK_FN_MAPPER
+from app.domains.workflow_execution.run_lock import lock_run
 from app.dto.task_execution import TaskExecutionCreate
 
 
@@ -101,6 +102,14 @@ class TaskExecutionDomain:
         task_exe = uow.task_execution_repository.find_one(uuid=payload.uuid)
         if not task_exe:
             raise NotFoundError(f"TaskExecution not found with uuid: {payload.uuid}")
+
+        # one writer per run at a time (app/domains/workflow_execution/run_lock.py),
+        # then re-read this step under the lock: a stop that skip-and-finish
+        # cancelled a moment ago is refused below as cancelled, instead of
+        # being completed over the top of it
+        if task_exe.workflow_execution is not None:
+            lock_run(uow, task_exe.workflow_execution)
+            uow.session.refresh(task_exe)
 
         if task_exe.status in [WorkflowStatus.CANCELLED.value, WorkflowStatus.FAILED.value,WorkflowStatus.NOT_STARTED]:
             raise BadRequestError(f"TaskExecution cannot be completed with status: {task_exe.status}")

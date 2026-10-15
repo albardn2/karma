@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
@@ -19,6 +19,7 @@ import { apiCall } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime } from '@/utils/date';
+import { takeListStale } from '@/utils/listRefresh';
 
 const TRIP_WORKFLOW_NAME = 'simple_trip_workflow';
 
@@ -159,6 +160,15 @@ export default function DistributionScreen() {
     fetchExecutions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflowUuid, page, statusFilter, isAdmin, assignedUsername]);
+
+  // back from a trip that was just finished: this screen stayed mounted, so
+  // without a refetch the trip would still be listed as in progress
+  useFocusEffect(
+    useCallback(() => {
+      if (takeListStale('/workflow-execution/')) fetchExecutions(false);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workflowUuid, page, statusFilter, isAdmin, assignedUsername])
+  );
 
   const userLabel = (u: { username: string; first_name?: string; last_name?: string }) => {
     const name = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
