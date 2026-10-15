@@ -232,6 +232,20 @@ export const en: Record<string, string> = {
   'workflows.executionCancelled': 'Execution cancelled',
   'workflows.executionCancelledDesc': 'Workflow execution has been cancelled successfully.',
   'workflows.cancelFailed': 'Failed to cancel workflow execution',
+  // ending a trip with stops still open (terminology follows the mobile app)
+  'workflows.skipAndFinishTrip': 'Skip and finish trip',
+  'workflows.skipAndFinishOpenStops': '{count} stops not visited yet',
+  'workflows.skipAndFinishOpenStopsOne': '1 stop not visited yet',
+  'workflows.skipAndFinishTitle': 'Skip and finish the trip?',
+  'workflows.skipAndFinishDesc': 'The {count} stops not visited yet will be cancelled and the trip finished. This cannot be undone.',
+  'workflows.skipAndFinishDescOne': 'The stop not visited yet will be cancelled and the trip finished. This cannot be undone.',
+  'workflows.skipAndFinishDescNone': 'Every stop is resolved; the trip will be finished.',
+  'workflows.skipAndFinishConfirm': 'Skip and finish',
+  'workflows.skipAndFinishing': 'Finishing...',
+  'workflows.tripSkippedAndFinished': 'Trip finished',
+  'workflows.tripSkippedAndFinishedDesc': '{count} stops not visited were cancelled.',
+  'workflows.tripSkippedAndFinishedDescOne': '1 stop not visited was cancelled.',
+  'workflows.skipAndFinishFailed': 'Could not finish the trip',
 
   // Task execution DAG / progress
   'workflows.noTaskExecutions': 'No task executions yet',
@@ -516,6 +530,20 @@ export const ar: Record<string, string> = {
   'workflows.executionCancelled': 'تم إلغاء التنفيذ',
   'workflows.executionCancelledDesc': 'تم إلغاء تنفيذ سير العمل بنجاح.',
   'workflows.cancelFailed': 'فشل إلغاء تنفيذ سير العمل',
+  // إنهاء رحلة لا تزال فيها محطات مفتوحة (المصطلحات كما في تطبيق الجوال)
+  'workflows.skipAndFinishTrip': 'تخطي وإنهاء الرحلة',
+  'workflows.skipAndFinishOpenStops': 'محطات لم تتم زيارتها بعد: {count}',
+  'workflows.skipAndFinishOpenStopsOne': 'محطة واحدة لم تتم زيارتها بعد',
+  'workflows.skipAndFinishTitle': 'تخطي المحطات المتبقية وإنهاء الرحلة؟',
+  'workflows.skipAndFinishDesc': 'سيتم إلغاء المحطات التي لم تتم زيارتها بعد ({count}) وإنهاء الرحلة. لا يمكن التراجع عن هذا.',
+  'workflows.skipAndFinishDescOne': 'سيتم إلغاء المحطة التي لم تتم زيارتها بعد وإنهاء الرحلة. لا يمكن التراجع عن هذا.',
+  'workflows.skipAndFinishDescNone': 'تم إنهاء جميع المحطات؛ سيتم إنهاء الرحلة.',
+  'workflows.skipAndFinishConfirm': 'تخطي وإنهاء',
+  'workflows.skipAndFinishing': 'جارٍ الإنهاء...',
+  'workflows.tripSkippedAndFinished': 'تم إنهاء الرحلة',
+  'workflows.tripSkippedAndFinishedDesc': 'تم إلغاء المحطات التي لم تتم زيارتها ({count}).',
+  'workflows.tripSkippedAndFinishedDescOne': 'تم إلغاء المحطة التي لم تتم زيارتها.',
+  'workflows.skipAndFinishFailed': 'تعذر إنهاء الرحلة',
 
   // Task execution DAG / progress
   'workflows.noTaskExecutions': 'لا توجد عمليات تنفيذ للمهام بعد',

@@ -40,6 +40,7 @@ import {
   Ban,
   Trash2,
   Pencil,
+  SkipForward,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -54,7 +55,7 @@ import { StrategyPoolPreview } from "@/components/trips/StrategyPoolPreview";
 import { CreateTripExpenseDialog } from "@/components/expenses/CreateTripExpenseDialog";
 import { CustomerRecentOrders } from "@/components/customer-orders/CustomerRecentOrders";
 import { TripStopVisitHistory } from "@/components/trips/TripStopVisitHistory";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { findSaleOption, hasRevenueOrderAtStop } from "@/lib/tripStopOutcome";
 import { useToast } from "@/hooks/use-toast";
 import type { WorkflowExecution } from "@/types/workflowExecution";
@@ -99,6 +100,7 @@ export default function WorkflowExecutionTaskDetail() {
   const [selectedTaskExecutionUuid, setSelectedTaskExecutionUuid] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showSkipFinishDialog, setShowSkipFinishDialog] = useState(false);
   const [strategyDialogOpen, setStrategyDialogOpen] = useState(false);
   const [editingStrategy, setEditingStrategy] = useState<EditableStrategy | null>(null);
 
@@ -122,6 +124,7 @@ export default function WorkflowExecutionTaskDetail() {
   }, [taskExecutions, selectedTaskExecutionUuid]);
 
   const selectedTaskExecution = taskExecutions.find(te => te.uuid === selectedTaskExecutionUuid);
+  const finishTaskExecution = taskExecutions.find((te) => te.operator === "trip_finish_operator");
 
   // Fetch the task definition for the selected task execution
   const { data: task } = useQuery<Task>({
@@ -482,6 +485,55 @@ export default function WorkflowExecutionTaskDetail() {
     },
   });
 
+  // End the trip with stops still open: the server cancels every stop not
+  // visited yet and finishes the trip in one write, so none is left open to
+  // keep its customer out of later strategy-built trips.
+  const skipAndFinishMutation = useMutation({
+    mutationFn: async (): Promise<{ cancelled_stop_count: number }> => {
+      return await apiRequest(`/workflow-execution/${executionUuid}/skip-and-finish`, {
+        method: "POST",
+        body: {},
+      });
+    },
+    onSuccess: async (data) => {
+      // the run, its trip and its stops all changed status: every list and
+      // report showing them reads stale until refetched. Prefixes, because
+      // some keys drop the trailing slash ("/workflow-execution" on the live
+      // map) or extend it ("/trip-stop/customer-history", "/dashboard/my-trip-stops").
+      await queryClient.invalidateQueries({
+        predicate: (q) => {
+          const key = String(q.queryKey[0] ?? "");
+          return (
+            key.startsWith("/workflow-execution") ||
+            key.startsWith("/task-execution") ||
+            key.startsWith("/trip") ||
+            key.startsWith("/location/trip") ||
+            (key.startsWith("/dashboard/") && key.includes("trip-stops"))
+          );
+        },
+      });
+      await queryClient.refetchQueries({ queryKey: ["/workflow-execution/", executionUuid] });
+      if (finishTaskExecution) setSelectedTaskExecutionUuid(finishTaskExecution.uuid);
+      const count = data?.cancelled_stop_count ?? 0;
+      toast({
+        title: t('workflows.tripSkippedAndFinished'),
+        description:
+          count === 0
+            ? undefined
+            : count === 1
+              ? t('workflows.tripSkippedAndFinishedDescOne')
+              : t('workflows.tripSkippedAndFinishedDesc', { count }),
+      });
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t('common.error'),
+        description: apiErrorMessage(error, t('workflows.skipAndFinishFailed')),
+        variant: "destructive",
+      });
+    },
+  });
+
   // Soft-delete workflow execution (admins only)
   const deleteExecutionMutation = useMutation({
     mutationFn: async () => {
@@ -554,8 +606,13 @@ export default function WorkflowExecutionTaskDetail() {
 
   const calculateProgress = () => {
     if (taskExecutions.length === 0) return 0;
-    const completedCount = taskExecutions.filter(te => 
-      te.status === "completed" || te.status === "failed"
+    // a stop cancelled by skip and finish is closed, so a finished run reads
+    // 100% — but only a FINISHED one: a run ended by Cancel Execution cancels
+    // every open step too, and must keep reading as the share actually done
+    const runFinished = workflowExecution?.status === "completed";
+    const completedCount = taskExecutions.filter(te =>
+      te.status === "completed" || te.status === "failed" ||
+      (runFinished && (te.status === "cancelled" || te.status === "skipped"))
     ).length;
     return (completedCount / taskExecutions.length) * 100;
   };
@@ -931,6 +988,19 @@ export default function WorkflowExecutionTaskDetail() {
     (te: any) => (te.operator || te.task?.operator) === "trip_finish_operator" && te.status === "completed"
   );
   const canAddStop = tripStarted && !tripFinished;
+
+  // Finishing a trip under way. The finish_trip step completes only once no
+  // stop is open (the server refuses it before), so while any stop is still
+  // to visit the way out is skip and finish — offered in every case the plain
+  // finish is not, including a run whose finish step never unblocked.
+  const openStopCount = taskExecutions.filter(
+    (te) =>
+      te.operator === "trip_stop_operator" &&
+      (te.status === "not_started" || te.status === "in_progress"),
+  ).length;
+  const canPlainFinish = finishTaskExecution?.status === "in_progress" && openStopCount === 0;
+  const canSkipAndFinish =
+    canAddStop && workflowExecution?.status === "in_progress" && !canPlainFinish;
 
   const renderFormField = (field: TaskInputField) => {
     const key = field.name;
@@ -1490,6 +1560,37 @@ export default function WorkflowExecutionTaskDetail() {
                     selectedTaskExecutionUuid={selectedTaskExecutionUuid}
                     onSelectTaskExecution={setSelectedTaskExecutionUuid}
                   />
+                  {/* at the end of the stops, as on the app's stops sheet —
+                      not beside Cancel Execution in the header, which ends
+                      the run without finishing it */}
+                  {canSkipAndFinish && (
+                    <div className="mt-2 flex flex-wrap items-center justify-end gap-3 border-t pt-4">
+                      {openStopCount > 0 && (
+                        <span className="text-sm text-gray-500" data-testid="text-open-stop-count">
+                          {openStopCount === 1
+                            ? t('workflows.skipAndFinishOpenStopsOne')
+                            : t('workflows.skipAndFinishOpenStops', { count: openStopCount })}
+                        </span>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                        onClick={() => setShowSkipFinishDialog(true)}
+                        disabled={skipAndFinishMutation.isPending}
+                        data-testid="button-skip-finish-trip"
+                      >
+                        {skipAndFinishMutation.isPending ? (
+                          <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <SkipForward className="me-2 h-4 w-4 rtl:rotate-180" />
+                        )}
+                        {skipAndFinishMutation.isPending
+                          ? t('workflows.skipAndFinishing')
+                          : t('workflows.skipAndFinishTrip')}
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1643,6 +1744,35 @@ export default function WorkflowExecutionTaskDetail() {
               data-testid="button-cancel-dialog-confirm"
             >
               {cancelExecutionMutation.isPending ? t('workflows.cancelling') : t('workflows.yesCancelExecution')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Skip and Finish Trip Confirmation Dialog */}
+      <AlertDialog open={showSkipFinishDialog} onOpenChange={setShowSkipFinishDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('workflows.skipAndFinishTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {openStopCount === 0
+                ? t('workflows.skipAndFinishDescNone')
+                : openStopCount === 1
+                  ? t('workflows.skipAndFinishDescOne')
+                  : t('workflows.skipAndFinishDesc', { count: openStopCount })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-skip-finish">
+              {t('common.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => skipAndFinishMutation.mutate()}
+              disabled={skipAndFinishMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-skip-finish"
+            >
+              {t('workflows.skipAndFinishConfirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

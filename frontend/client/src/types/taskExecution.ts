@@ -30,6 +30,9 @@ export interface TaskExecution {
   created_at: string;
   parent_task_execution_uuid?: string | null;
   name?: string | null;
+  // the task's operator (trip_stop_operator, trip_finish_operator, …); the
+  // backend's TaskExecutionRead carries it
+  operator?: string | null;
   depends_on?: string[];
 }
 

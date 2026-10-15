@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { StopsSheet } from '@/components/StopsSheet';
 import { parseWktPolygons } from '@/utils/wkt';
 import { formatMonthDayTime } from '@/utils/date';
+import { markListsStale } from '@/utils/listRefresh';
 
 interface TaskExecution {
   uuid: string;
@@ -195,6 +196,7 @@ export default function ExecutionDetailScreen() {
   // lifted here so a tap elsewhere on either surface dismisses it.
   const [armedStopUuid, setArmedStopUuid] = useState<string | null>(null);
   const [resorting, setResorting] = useState(false);
+  const [skipping, setSkipping] = useState(false);
   // service areas picked in the trip setup, drawn on the map as boundaries
   const [serviceAreas, setServiceAreas] = useState<TripMapArea[]>([]);
 
@@ -380,6 +382,14 @@ export default function ExecutionDetailScreen() {
     [tripStops]
   );
 
+  // Stops not visited yet, counted off the execution rather than tripStops:
+  // tripStops is empty while loading and drops a stop whose task fetch failed,
+  // and this number is what the skip-and-finish confirm promises to cancel.
+  const openStopCount = useMemo(
+    () => stopTasks.filter((te) => te.status === 'not_started' || te.status === 'in_progress').length,
+    [stopTasks]
+  );
+
   // drop the armed "Set current" selection once it's no longer an upcoming stop
   useEffect(() => {
     if (!armedStopUuid) return;
@@ -474,7 +484,55 @@ export default function ExecutionDetailScreen() {
             body: JSON.stringify({ uuid: finishTask.uuid, result: {} }),
           });
           if (res.status !== 200) Alert.alert(t('trip.error'), errorMessage(res.error, t('trip.couldNotFinishTrip')));
-          else fetchExecution(false);
+          else {
+            markListsStale('/workflow-execution/');
+            fetchExecution(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  // The way out when the day ran out before the stop list did. One request:
+  // the server cancels every stop not visited yet and finishes the trip in the
+  // same write, so no stop is left open to keep its customer off later trips.
+  const skipAndFinish = () => {
+    if (!execution || skipping) return;
+    const body =
+      openStopCount === 0
+        ? t('trip.finishTripConfirm')
+        : openStopCount === 1
+          ? t('trip.skipAndFinishConfirmOne')
+          : t('trip.skipAndFinishConfirm', { count: String(openStopCount) });
+    Alert.alert(t('trip.skipAndFinishTitle'), body, [
+      { text: t('trip.cancel'), style: 'cancel' },
+      {
+        text: t('trip.skipAndFinish'),
+        style: 'destructive',
+        onPress: async () => {
+          setSkipping(true);
+          try {
+            const res = await apiCall(`/workflow-execution/${execution.uuid}/skip-and-finish`, {
+              method: 'POST',
+              body: JSON.stringify({}),
+            });
+            if (res.status !== 200) {
+              Alert.alert(t('trip.error'), errorMessage(res.error, t('trip.couldNotFinishTrip')));
+              // the usual cause is that the run is already finished — from the
+              // office's web page, or by this very request whose response was
+              // lost — and the map view has no pull-to-refresh to find that out.
+              // Quietly: an outage must not swap the map for an error screen.
+              const fresh = await apiCall<WorkflowExecution>(`/workflow-execution/${uuid}`);
+              if (fresh.data) setExecution(fresh.data);
+              return;
+            }
+            markListsStale('/workflow-execution/');
+            // the run is completed now, so this lands on the list view's
+            // "Trip completed" card
+            await fetchExecution(false);
+          } finally {
+            setSkipping(false);
+          }
         },
       },
     ]);
@@ -540,7 +598,11 @@ export default function ExecutionDetailScreen() {
 
   // MAP VIEW — trip is underway
   if (tripPhase) {
-    const finishActive = finishTask?.status === 'in_progress';
+    // Exactly one way to finish is offered. The plain finish once every stop
+    // is resolved (the server refuses it before that); skip-and-finish in
+    // every other case, including the odd run whose finish step never
+    // unblocked — it finishes that too.
+    const canPlainFinish = finishTask?.status === 'in_progress' && openStopCount === 0;
     return (
       <ThemedView style={styles.container}>
         <Stack.Screen options={{ headerShown: false }} />
@@ -597,7 +659,12 @@ export default function ExecutionDetailScreen() {
             resorting={resorting}
             armedStopUuid={armedStopUuid}
             onArm={setArmedStopUuid}
-            finishAction={finishActive ? { label: t('trip.finishTripButton'), onPress: finishTrip } : null}
+            finishAction={canPlainFinish ? { label: t('trip.finishTripButton'), onPress: finishTrip } : null}
+            skipFinishAction={
+              canPlainFinish
+                ? null
+                : { label: t('trip.skipAndFinishButton'), onPress: skipAndFinish, busy: skipping }
+            }
           />
           </>
           )}

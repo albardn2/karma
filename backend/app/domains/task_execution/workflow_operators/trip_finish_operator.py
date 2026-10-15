@@ -23,6 +23,23 @@ class TripFinishOperatorSchema(BaseModel):
     notes: Optional[str] = None
 
 
+def close_trip(uow: SqlAlchemyUnitOfWork, trip, notes: Optional[str] = None) -> None:
+    """The trip-record half of finishing: append the notes, snapshot the van's
+    closing stock, and mark the trip completed. Shared by the finish step and by
+    skip-and-finish (app/domains/trip/skip_and_finish.py), so the two ways a trip
+    can end leave the same record behind."""
+    if notes:
+        trip.notes = (f"{trip.notes}\n" if trip.notes else "") + notes
+
+    # snapshot the vehicle's per-material inventory at trip end
+    from app.domains.vehicle_inventory.domain import VehicleInventoryDomain
+    trip.end_inventory = VehicleInventoryDomain.balances_for_vehicle(uow=uow, vehicle_uuid=trip.vehicle_uuid)
+
+    trip.status = TripStatus.COMPLETED.value
+    trip.end_time = datetime.now()
+    uow.trip_repository.save(model=trip, commit=False)
+
+
 class TripFinishOperator(OperatorInterface):
 
     def execute(self,uow:SqlAlchemyUnitOfWork,
@@ -53,16 +70,7 @@ class TripFinishOperator(OperatorInterface):
                 f"Cannot finish the trip: {len(open_stops)} trip stop(s) still open"
             )
 
-        if operator_schema.notes:
-            trip.notes = (f"{trip.notes}\n" if trip.notes else "") + operator_schema.notes
-
-        # snapshot the vehicle's per-material inventory at trip end
-        from app.domains.vehicle_inventory.domain import VehicleInventoryDomain
-        trip.end_inventory = VehicleInventoryDomain.balances_for_vehicle(uow=uow, vehicle_uuid=trip.vehicle_uuid)
-
-        trip.status = TripStatus.COMPLETED.value
-        trip.end_time = datetime.now()
-        uow.trip_repository.save(model=trip, commit=False)
+        close_trip(uow=uow, trip=trip, notes=operator_schema.notes)
 
         task_exe.result = operator_schema.model_dump(mode="json")
         task_exe.status = WorkflowStatus.COMPLETED.value

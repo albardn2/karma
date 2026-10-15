@@ -116,3 +116,11 @@ class WorkflowExecutionPage(BaseModel):
     page: int = Field(..., description="Current page number")
     per_page: int = Field(..., description="Number of items per page")
     pages: int = Field(..., description="Total pages available")
+
+
+class SkipAndFinishParams(BaseModel):
+    """Finish a trip now: its unvisited stops are cancelled. `notes` is the same
+    optional note the finish step takes."""
+    model_config = ConfigDict(extra="forbid")
+
+    notes: Optional[str] = None

@@ -49,6 +49,7 @@ export function StopsSheet({
   armedStopUuid,
   onArm,
   finishAction,
+  skipFinishAction,
 }: {
   stops: SheetStop[];
   currentStopUuid: string | null;
@@ -67,6 +68,10 @@ export function StopsSheet({
   armedStopUuid?: string | null;
   onArm?: (uuid: string | null) => void;
   finishAction?: { label: string; onPress: () => void } | null;
+  // Ends the trip with stops still open: they are cancelled and the trip is
+  // finished. Offered instead of finishAction while anything is left to visit,
+  // which is exactly when the plain finish is refused.
+  skipFinishAction?: { label: string; onPress: () => void; busy?: boolean } | null;
 }) {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -215,6 +220,21 @@ export function StopsSheet({
               <ThemedText style={styles.finishText}>{finishAction.label}</ThemedText>
             </TouchableOpacity>
           )}
+
+          {skipFinishAction && (
+            <TouchableOpacity
+              style={[styles.skipFinishBtn, skipFinishAction.busy && styles.skipFinishBusy]}
+              onPress={() => { if (!skipFinishAction.busy) skipFinishAction.onPress(); }}
+              disabled={skipFinishAction.busy}
+              testID="sheet-skip-finish-trip"
+            >
+              {skipFinishAction.busy ? (
+                <ActivityIndicator color="#dc2626" />
+              ) : (
+                <ThemedText style={styles.skipFinishText}>{skipFinishAction.label}</ThemedText>
+              )}
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </Animated.View>
     </>
@@ -271,4 +291,13 @@ const styles = StyleSheet.create({
   chevron: { fontSize: 24, color: '#5469D4', paddingHorizontal: 6 },
   finishBtn: { marginTop: 16, backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   finishText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  // outlined red, as ModuleDetailScreen's destructive actions are: it cancels
+  // stops, so it must not read as the green "all done" finish. minHeight holds
+  // the size while the spinner replaces the label.
+  skipFinishBtn: {
+    marginTop: 16, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#fecaca',
+    paddingVertical: 14, minHeight: 54, alignItems: 'center', justifyContent: 'center',
+  },
+  skipFinishBusy: { opacity: 0.6 },
+  skipFinishText: { color: '#dc2626', fontWeight: '700', fontSize: 15 },
 });

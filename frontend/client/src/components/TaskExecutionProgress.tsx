@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Check, X, Clock, Circle } from "lucide-react";
+import { Check, X, Clock, Circle, Ban } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { TaskExecution } from "@/types/taskExecution";
 
@@ -154,6 +154,11 @@ function getStatusCircleClasses(status: string): string {
       return "border-blue-500 bg-blue-100 dark:bg-blue-900";
     case "not_started":
       return "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800";
+    // a stop the trip ended without (skip and finish, or a cancelled run):
+    // closed, but nothing happened there — so neither green nor red
+    case "cancelled":
+    case "skipped":
+      return "border-gray-400 dark:border-gray-500 bg-gray-100 dark:bg-gray-800";
     default:
       return "border-yellow-500 bg-yellow-100 dark:bg-yellow-900";
   }
@@ -169,6 +174,9 @@ function getStatusIcon(status: string) {
       return <Clock className="h-6 w-6 text-blue-600 dark:text-blue-400" />;
     case "not_started":
       return <Circle className="h-5 w-5 text-gray-400" />;
+    case "cancelled":
+    case "skipped":
+      return <Ban className="h-5 w-5 text-gray-500 dark:text-gray-400" />;
     default:
       return <Circle className="h-5 w-5 text-yellow-500" />;
   }

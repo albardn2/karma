@@ -18,6 +18,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.domains.workflow.domain import WorkflowDomain
 from app.dto.workflow import WorkflowTags
 from app.domains.workflow_execution.domain import WorkflowExecutionDomain
+from app.domains.workflow_execution.run_lock import lock_run
 from app.dto.workflow_execution import (
     WorkflowExecutionCreate,
     WorkflowExecutionRead,
@@ -205,6 +206,10 @@ def add_manual_stop(uuid: str):
         workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid, is_deleted=False)
         if not workflow_exe:
             raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
+        # a stop added while the trip is being finished must wait and then be
+        # refused by the trip-status check below — not land, open, on a
+        # finished trip (see app/domains/workflow_execution/run_lock.py)
+        lock_run(uow, workflow_exe)
         _assert_execution_access(uow, workflow_exe)
         trips = workflow_exe.trips
         if not trips:
@@ -380,6 +385,9 @@ def set_current_stop(uuid: str):
         workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid, is_deleted=False)
         if not workflow_exe:
             raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
+        # rewires the stop chain, so it must not interleave with another writer
+        # of this run (app/domains/workflow_execution/run_lock.py)
+        lock_run(uow, workflow_exe)
         _assert_execution_access(uow, workflow_exe)
 
         tasks = list(workflow_exe.task_executions)
@@ -441,6 +449,12 @@ def resort_stops(uuid: str):
         workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid, is_deleted=False)
         if not workflow_exe:
             raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
+        # rewires the stop chain, so it must not interleave with another writer
+        # of this run (app/domains/workflow_execution/run_lock.py). Held across
+        # the road-path calls too — they are capped (stop_resort.LEG_TIMEOUT_SECONDS,
+        # MAX_ROUTED_LEGS), and a re-sort that rewired stops a concurrent
+        # skip-and-finish had just cancelled would reopen them on a finished run.
+        lock_run(uow, workflow_exe)
         _assert_execution_access(uow, workflow_exe)
         trips = workflow_exe.trips
         if not trips:
@@ -479,6 +493,45 @@ def resort_stops(uuid: str):
         "route_coordinates": [list(p) for p in result["route_coordinates"]],
     }), 200
 
+
+
+@workflow_execution_blueprint.route("/<string:uuid>/skip-and-finish", methods=["POST"])
+@jwt_required()
+@scopes_required(
+    PermissionScope.ADMIN.value,
+    PermissionScope.SUPER_ADMIN.value,
+    PermissionScope.OPERATION_MANAGER.value,
+    PermissionScope.OPERATOR.value,
+    PermissionScope.DRIVER.value,
+    PermissionScope.SALES.value)
+def skip_and_finish(uuid: str):
+    """Finish a trip whose stop list was not worked through: every stop not
+    yet visited is cancelled, the trip is finished as the finish step would
+    finish it, and the run is completed. See app/domains/trip/skip_and_finish.py."""
+    from app.domains.trip.skip_and_finish import skip_and_finish_trip
+    from app.dto.workflow_execution import SkipAndFinishParams
+
+    params = SkipAndFinishParams(**(request.get_json(silent=True) or {}))
+    with SqlAlchemyUnitOfWork() as uow:
+        workflow_exe = uow.workflow_execution_repository.find_one(uuid=uuid, is_deleted=False)
+        if not workflow_exe:
+            raise NotFoundError(f"workflow_exe not found with uuid: {uuid}")
+        # before reading anything else off the run: a double tap, or the driver
+        # and the office at once, would otherwise both see it in progress and
+        # both finish it — the second waits here, then reads it completed. The
+        # other mid-trip writers take the same lock, so a stop being added or
+        # completed meanwhile is applied either wholly before this or not at all.
+        lock_run(uow, workflow_exe)
+        _assert_execution_access(uow, workflow_exe)
+
+        result = skip_and_finish_trip(
+            uow=uow,
+            workflow_exe=workflow_exe,
+            completed_by_uuid=get_jwt_identity(),
+            notes=params.notes,
+        )
+        uow.commit()
+    return jsonify(result), 200
 
 # # Route to update a Workflow
 # @workflow_execution_blueprint.route("/<string:uuid>", methods=["PUT"])
