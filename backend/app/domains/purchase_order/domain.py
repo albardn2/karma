@@ -115,5 +115,7 @@ class PurchaseOrderDomain:
         if payouts:
             raise BadRequestError("PurchaseOrder has payout")
 
-        if po.is_paid or po.net_amount_paid > 0:
+        # not is_paid: that only says nothing is due, which is also true of an
+        # order whose lines total 0 and that has never been paid at all
+        if po.net_amount_paid > 0:
             raise BadRequestError("PurchaseOrder has been paid or partially paid")

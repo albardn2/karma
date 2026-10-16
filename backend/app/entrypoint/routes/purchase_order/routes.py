@@ -108,13 +108,14 @@ def update_order(uuid: str):
                  PermissionScope.SUPER_ADMIN.value
                  )
 def delete_order(uuid: str):
+    # the same guarded delete as /with-items/<uuid> (the web app calls this
+    # path): it refuses an order with payouts or a received line, and takes
+    # the lines with it. Flipping is_deleted here used to void a paid order
+    # and leave its lines live under a parent that then 404s.
     with SqlAlchemyUnitOfWork() as uow:
-        po = uow.purchase_order_repository.find_one(uuid=uuid, is_deleted=False)
-        if not po:
-            return jsonify({'message': 'PurchaseOrder not found'}), 404
-        po.is_deleted = True
-        uow.purchase_order_repository.save(model=po, commit=True)
-        result = PurchaseOrderRead.from_orm(po).model_dump(mode='json')
+        dto = PurchaseOrderDomain.delete_purchase_order_with_items(uow=uow, uuid=uuid)
+        result = dto.model_dump(mode='json')
+        uow.commit()
     return jsonify(result), 200
 
 @purchase_order_blueprint.route('/', methods=['GET'])
