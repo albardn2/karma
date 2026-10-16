@@ -100,13 +100,13 @@ def get_item(uuid: str):
                  PermissionScope.SUPER_ADMIN.value
                  )
 def delete_item(uuid: str):
+    # through the domain, which refuses a line that was received or carries
+    # notes, inventory events or a fixed asset — flipping is_deleted here
+    # used to leave a received line's receipt event and its stock behind
     with SqlAlchemyUnitOfWork() as uow:
-        item = uow.purchase_order_item_repository.find_one(uuid=uuid, is_deleted=False)
-        if not item:
-            return jsonify({'message': 'PurchaseOrderItem not found'}), 404
-        item.is_deleted = True
-        uow.purchase_order_item_repository.save(model=item, commit=True)
-        result = PurchaseOrderItemRead.from_orm(item).model_dump(mode='json')
+        po_item_read = PurchaseOrderItemDomain.delete_item(uow=uow, uuid=uuid)
+        result = po_item_read.model_dump(mode='json')
+        uow.commit()
     return jsonify(result), 200
 
 @poi_blueprint.route('/', methods=['GET'])

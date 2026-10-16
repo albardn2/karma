@@ -222,14 +222,30 @@ class PurchaseOrderItemDomain:
             PurchaseOrderItemDomain.delete_item(uow=uow, uuid=uuid)
 
     @staticmethod
-    def delete_item(uow: SqlAlchemyUnitOfWork, uuid: str) -> None:
+    def delete_item(uow: SqlAlchemyUnitOfWork, uuid: str) -> PurchaseOrderItemRead:
+        """Soft-delete one line that has not yet moved stock or money.
+
+        Removing a line lowers the order's total, and payouts cannot be edited,
+        so the line may not take the order below what has been paid out on it —
+        the same rule PurchaseOrderDomain.edit_items applies to a correction.
+        Only a removal that makes the amount due worse is refused, so a free
+        line can still go from an order that is already overpaid.
+        """
         po_item = uow.purchase_order_item_repository.find_one(uuid=uuid, is_deleted=False)
         if not po_item:
             raise NotFoundError("PurchaseOrderItem not found")
 
         PurchaseOrderItemDomain.validate_po_item_delete(uow=uow, po_item=po_item)
+        po = po_item.purchase_order
+        due_before = po.net_amount_due
         po_item.is_deleted = True
+        if po.net_amount_due < -MONEY_TOLERANCE and po.net_amount_due < due_before:
+            raise BadRequestError(
+                f"Without this line the order's total ({po.total_adjusted_amount:g} {po.currency}) "
+                f"is less than the {po.net_amount_paid:g} already paid out on it — remove a payout first"
+            )
         uow.purchase_order_item_repository.save(model=po_item, commit=False)
+        return PurchaseOrderItemRead.from_orm(po_item)
 
 
     @staticmethod
