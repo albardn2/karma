@@ -15,7 +15,8 @@ import {
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useRouter, useLocalSearchParams, Stack, useFocusEffect } from "expo-router";
-import { apiCall } from "@/utils/api";
+import { apiCall, apiErrorText } from "@/utils/api";
+import { markListsStale, setListFlash } from "@/utils/listRefresh";
 import { LinearGradient } from "expo-linear-gradient";
 import { CustomerLocationMap } from "@/components/CustomerLocationMap";
 import { NativeHeader } from "@/components/layout/NativeHeader";
@@ -199,6 +200,9 @@ export default function CustomerDetailScreen() {
   const bannerAnimation = useState(new Animated.Value(0))[0];
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // its own flag: the shared `loading` blanks the screen to a spinner, and the
+  // modal must stay up (and the button inert) while the DELETE is in flight
+  const [deleting, setDeleting] = useState(false);
   const deleteModalAnimation = useState(new Animated.Value(0))[0];
   const [locationLoading, setLocationLoading] = useState(false);
 
@@ -223,6 +227,11 @@ export default function CustomerDetailScreen() {
   // full-page spinner over the success banner, and turning a network blip into
   // the "failed to load" bounce right after a save that actually worked.
   const isEditingRef = React.useRef(false);
+  const customerRef = React.useRef<Customer | null>(null);
+  customerRef.current = customer;
+  // a DELETE can outlive this screen; navigating then would pop another one
+  const mountedRef = React.useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
   useEffect(() => {
     isEditingRef.current = isEditing;
   }, [isEditing]);
@@ -273,7 +282,7 @@ export default function CustomerDetailScreen() {
     }
 
     const hasPhone = editedCustomer.phone_number?.trim().length > 0;
-    const hasEmail = editedCustomer.email_address?.trim().length > 0;
+    const hasEmail = (editedCustomer.email_address?.trim().length ?? 0) > 0;
 
     if (!hasPhone && !hasEmail) {
       newErrors.phone_number = t('custdetail.phoneOrEmailRequired');
@@ -344,7 +353,7 @@ export default function CustomerDetailScreen() {
     // customer with the screen already populated, and throwing them out over a
     // dropped signal — right after a save that succeeded — reads as data loss.
     const failed = () => {
-      if (customer) return;
+      if (customerRef.current) return;
       Alert.alert(t('custdetail.error'), t('custdetail.loadCustomerFailed'));
       router.back();
     };
@@ -373,6 +382,8 @@ export default function CustomerDetailScreen() {
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditedCustomer(customer);
+    // or the abandoned edit's errors come back with the next Edit
+    setErrors({});
   };
 
   const handleSaveEdit = async () => {
@@ -394,8 +405,12 @@ export default function CustomerDetailScreen() {
       if (editedCustomer.company_name !== customer.company_name) {
         updateData.company_name = editedCustomer.company_name;
       }
-      if (editedCustomer.email_address !== customer.email_address) {
-        updateData.email_address = editedCustomer.email_address;
+      // Cleared optional fields are sent as null, which the API stores as "none".
+      // "" is neither a valid email nor a coordinate, so a cleared email or
+      // location used to fail the whole save.
+      const orNull = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
+      if (orNull(editedCustomer.email_address) !== orNull(customer.email_address)) {
+        updateData.email_address = orNull(editedCustomer.email_address);
       }
       if (editedCustomer.phone_number !== customer.phone_number) {
         updateData.phone_number = editedCustomer.phone_number;
@@ -403,17 +418,17 @@ export default function CustomerDetailScreen() {
       if (editedCustomer.full_address !== customer.full_address) {
         updateData.full_address = editedCustomer.full_address;
       }
-      if (editedCustomer.business_cards !== customer.business_cards) {
-        updateData.business_cards = editedCustomer.business_cards;
+      if (orNull(editedCustomer.business_cards) !== orNull(customer.business_cards)) {
+        updateData.business_cards = orNull(editedCustomer.business_cards);
       }
-      if (editedCustomer.notes !== customer.notes) {
-        updateData.notes = editedCustomer.notes;
+      if (orNull(editedCustomer.notes) !== orNull(customer.notes)) {
+        updateData.notes = orNull(editedCustomer.notes);
       }
       if (editedCustomer.category !== customer.category) {
         updateData.category = editedCustomer.category;
       }
-      if (editedCustomer.coordinates !== customer.coordinates) {
-        updateData.coordinates = editedCustomer.coordinates;
+      if (orNull(editedCustomer.coordinates) !== orNull(customer.coordinates)) {
+        updateData.coordinates = orNull(editedCustomer.coordinates);
       }
       // arrays compare by identity; diff by content so an unchanged tag list
       // isn't sent (and a reorder/edit is)
@@ -441,19 +456,18 @@ export default function CustomerDetailScreen() {
         setEditedCustomer(response.data);
         setIsEditing(false);
         setErrors({});
+        markListsStale('/customer/');
         showBanner("success", t('custdetail.updateSuccess'));
       } else {
-        let errorMsg = t('custdetail.updateFailed');
-        if (response.error) {
-          try {
-            const err =
-              typeof response.error === "string"
-                ? JSON.parse(response.error)
-                : response.error;
-            errorMsg = err.detail || err.message || errorMsg;
-          } catch {}
-        }
-        showBanner("error", errorMsg);
+        // the API's own reason ("Customer with email … already exists",
+        // "Invalid coordinates", a permission refusal), not a generic line
+        showBanner(
+          "error",
+          // status 0 is a transport failure: its text is the platform's, not ours
+          response.status === 0
+            ? t('custdetail.networkError')
+            : apiErrorText(response.error, t('custdetail.updateFailed')),
+        );
       }
     } catch (error) {
       console.error("Error updating customer:", error);
@@ -483,51 +497,41 @@ export default function CustomerDetailScreen() {
     });
   };
 
-  const handleConfirmDelete = () => {
-    closeDeleteConfirm();
-    setTimeout(() => {
-      confirmDelete();
-    }, 300);
-  };
-
-  const confirmDelete = async () => {
+  // The modal stays open, showing "Deleting...", until the server answers: it
+  // used to close first, so there was no feedback and a second tap during the
+  // fade sent a second DELETE.
+  const handleConfirmDelete = async () => {
+    if (deleting) return;
+    setDeleting(true);
     try {
-      setLoading(true);
-      console.log("Attempting to delete customer:", id);
-
       const response = await apiCall(`/customer/${id}`, {
         method: "DELETE",
       });
 
-      console.log("Delete response:", response);
-
       if (response.status === 200) {
-        // Navigate back to customers list page
-        if (isNative) {
-          router.replace("/customers");
-        } else {
-          router.replace("/?section=customers");
-        }
-      } else {
-        // Handle specific error messages from backend
-        let errorMessage = t('custdetail.deleteFailed');
-        if (response.error) {
-          try {
-            const errorData = JSON.parse(response.error);
-            errorMessage =
-              errorData.message || errorData.detail || errorMessage;
-          } catch {
-            // If parsing fails, use the raw error string
-            errorMessage = response.error;
-          }
-        }
-        Alert.alert(t('custdetail.cannotDeleteCustomer'), errorMessage);
+        // Back to the list this screen was opened from, which refetches and
+        // confirms. Replacing to /customers instead stacked a fresh copy over
+        // the old one, and Back then showed the deleted customer again.
+        markListsStale('/customer/');
+        if (!mountedRef.current) return;
+        setListFlash('/customer/', t('custdetail.deleteSuccess', { name: customer?.full_name || '' }));
+        if (router.canGoBack()) router.back();
+        // the tabs screen ignores `section`, so replace to the list itself
+        else router.replace("/customers");
+        return;
       }
+      closeDeleteConfirm();
+      // the API says why ("Customer has orders and cannot be deleted")
+      Alert.alert(
+        t('custdetail.cannotDeleteCustomer'),
+        apiErrorText(response.error, t('custdetail.deleteFailed')),
+      );
     } catch (error) {
       console.error("Error deleting customer:", error);
+      closeDeleteConfirm();
       Alert.alert(t('custdetail.error'), t('custdetail.deleteFailed'));
     } finally {
-      setLoading(false);
+      setDeleting(false);
     }
   };
 
@@ -579,7 +583,7 @@ export default function CustomerDetailScreen() {
     return (
       <ThemedView style={styles.container}>
         <View style={styles.errorContainer}>
-          <ThemedText style={styles.errorText}>{t('custdetail.customerNotFound')}</ThemedText>
+          <ThemedText style={styles.notFoundText}>{t('custdetail.customerNotFound')}</ThemedText>
           <TouchableOpacity onPress={() => router.back()}>
             <LinearGradient
               colors={["#5469D4", "#4F46E5"]}
@@ -753,6 +757,9 @@ export default function CustomerDetailScreen() {
 
         <ScrollView
           style={styles.scrollView}
+          // with the keyboard up, the first tap on Add / a chip / Locate Me
+          // only dismissed the keyboard
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={[
             styles.content,
             isDesktop && styles.desktopContent,
@@ -1167,6 +1174,7 @@ export default function CustomerDetailScreen() {
                   style={styles.deleteModalCancelButton}
                   onPress={closeDeleteConfirm}
                   activeOpacity={0.7}
+                  disabled={deleting}
                 >
                   <ThemedText style={styles.deleteModalCancelText}>
                     {t('custdetail.cancel')}
@@ -1174,19 +1182,23 @@ export default function CustomerDetailScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  // flex here, not only on the gradient inside: without it the
+                  // pair resized whenever the label changed to "Deleting..."
+                  style={styles.deleteModalConfirmTouchable}
                   onPress={handleConfirmDelete}
                   activeOpacity={0.7}
+                  disabled={deleting}
+                  testID="customer-delete-confirm"
                 >
                   <LinearGradient
-                    colors={["#ef4444", "#dc2626"]}
+                    colors={deleting ? ["#f87171", "#ef4444"] : ["#ef4444", "#dc2626"]}
                     style={styles.deleteModalConfirmButton}
                   >
                     <ThemedText style={styles.deleteModalConfirmText}>
-                      {loading ? t('custdetail.deleting') : t('custdetail.deleteCustomer')}
+                      {deleting ? t('custdetail.deleting') : t('custdetail.deleteCustomer')}
                     </ThemedText>
                   </LinearGradient>
-```python
-                  </TouchableOpacity>
+                </TouchableOpacity>
               </View>
             </Animated.View>
           </View>
@@ -1232,7 +1244,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 40,
   },
-  errorText: {
+  notFoundText: {
     fontSize: 18,
     color: "#ef4444",
     marginBottom: 24,
@@ -1612,6 +1624,8 @@ const styles = StyleSheet.create({
   },
   deleteModalIcon: {
     fontSize: 48,
+    // ThemedText's default lineHeight is 24, which cut the 48pt ⚠️ in half
+    lineHeight: 58,
     marginBottom: 12,
   },
   deleteModalTitle: {
@@ -1650,6 +1664,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#6b7280",
   },
+  deleteModalConfirmTouchable: {
+    flex: 1,
+  },
   deleteModalConfirmButton: {
     flex: 1,
     paddingVertical: 14,
@@ -1687,9 +1704,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
-  },
-  locateButtonDisabled: {
-    backgroundColor: '#9ca3af',
   },
   mapContainer: {
     height: 300,

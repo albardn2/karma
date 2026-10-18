@@ -265,6 +265,8 @@ class CustomerListParams(BaseModel):
     company_name: Optional[str] = None
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
+    # the app's search box: one term matched against name, company and phone
+    search: Optional[str] = None
     within_polygon: Optional[str] = None  # WKT Polygon string
     # "lat,lon" of a reference point (e.g. the driver's current location).
     # When set, results are ordered nearest-first and customers without a
@@ -319,9 +321,13 @@ class CustomerMapClusterParams(BaseModel):
     within_polygon: str
     # kept name-for-name with CustomerListParams so the same filter UI can drive
     # either endpoint without a translation layer
+    uuid: Optional[str] = None
     category: Optional[CustomerCategory] = None
+    email_address: Optional[str] = None
     company_name: Optional[str] = None
     full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    search: Optional[str] = None
 
 
 class CustomerMapCluster(BaseModel):

@@ -255,7 +255,10 @@ def add_manual_stop(uuid: str):
         else:
             customer_create = CustomerCreate(**payload.customer)
             customer_create.created_by_uuid = current_uuid
-            if customer_create.email_address and uow.customer_repository.find_one(email_address=customer_create.email_address):
+            # a deleted customer's email is free to reuse; find_first, because a
+            # deleted and a live row may now share one and find_one would raise
+            if customer_create.email_address and uow.customer_repository.find_first(
+                    email_address=customer_create.email_address, is_deleted=False):
                 raise BadRequestError(f"Customer with email {customer_create.email_address} already exists")
             data = customer_create.model_dump()
             if data.get("tags") is None:

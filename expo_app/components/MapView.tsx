@@ -92,9 +92,15 @@ const formatClusterCount = (n: number): string => (n > 999 ? '999+' : String(n))
 
 interface MapViewComponentProps {
   onCustomerPress: (customer: Customer) => void;
-  searchTerm?: string;
-  categoryFilter?: string;
+  /** The list screen's filters as query params (blank values omitted), so the
+   *  map shows the same customers the list does. */
+  filters?: Record<string, string>;
+  /** Bumped when the customers behind the map changed (one was created, edited
+   *  or deleted elsewhere): the visible pins are fetched again. */
+  reloadKey?: number;
 }
+
+const NO_FILTERS: Record<string, string> = {};
 
 const regionToWKT = (region: Region): string => {
   const { latitude, longitude, latitudeDelta, longitudeDelta } = region;
@@ -111,8 +117,8 @@ const regionToWKT = (region: Region): string => {
 
 export const MapViewComponent: React.FC<MapViewComponentProps> = ({
   onCustomerPress,
-  searchTerm = '',
-  categoryFilter = 'all',
+  filters = NO_FILTERS,
+  reloadKey = 0,
 }) => {
   const [clusters, setClusters] = useState<MapCluster[]>([]);
   // How many customers the pins stand for, which is not the number of pins.
@@ -131,6 +137,15 @@ export const MapViewComponent: React.FC<MapViewComponentProps> = ({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLoadingRef = useRef(false);
   const pendingRegionRef = useRef<Region | null>(null);
+  // Read through a ref: the region debounce and the after-load hand-off call
+  // fetchClustersInBounds from closures made renders ago, which would send the
+  // filters as they were then.
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const filterKey = JSON.stringify(filters);
+  const lastWktRef = useRef<string | null>(null);
+  // filters changed while a request was in flight: fetch again once it lands
+  const refetchAfterLoadRef = useRef(false);
 
   const defaultRegion: Region = {
     latitude: 33.5138,
@@ -163,15 +178,8 @@ export const MapViewComponent: React.FC<MapViewComponentProps> = ({
       isLoadingRef.current = true;
       setLoading(true);
 
-      const params = new URLSearchParams({ within_polygon: wkt });
-
-      if (searchTerm) {
-        params.append('full_name', searchTerm);
-      }
-
-      if (categoryFilter && categoryFilter !== 'all') {
-        params.append('category', categoryFilter);
-      }
+      lastWktRef.current = wkt;
+      const params = new URLSearchParams({ within_polygon: wkt, ...filtersRef.current });
 
       const response = await apiCall<MapClusterPage>(`/customer/map-clusters?${params.toString()}`);
 
@@ -201,7 +209,11 @@ export const MapViewComponent: React.FC<MapViewComponentProps> = ({
         pendingRegionRef.current = null;
         const wkt = regionToWKT(pendingRegion);
         setCurrentBounds(wkt);
+        refetchAfterLoadRef.current = false;
         fetchClustersInBounds(wkt);
+      } else if (refetchAfterLoadRef.current && lastWktRef.current) {
+        refetchAfterLoadRef.current = false;
+        fetchClustersInBounds(lastWktRef.current);
       }
     }
   };
@@ -332,9 +344,7 @@ export const MapViewComponent: React.FC<MapViewComponentProps> = ({
     const wkt =
       `POLYGON((${lng - e} ${lat - e}, ${lng - e} ${lat + e}, ` +
       `${lng + e} ${lat + e}, ${lng + e} ${lat - e}, ${lng - e} ${lat - e}))`;
-    const params = new URLSearchParams({ within_polygon: wkt });
-    if (searchTerm) params.append('full_name', searchTerm);
-    if (categoryFilter && categoryFilter !== 'all') params.append('category', categoryFilter);
+    const params = new URLSearchParams({ within_polygon: wkt, ...filtersRef.current });
 
     try {
       const response = await apiCall<CustomerPage>(`/customer/?${params.toString()}`);
@@ -398,13 +408,17 @@ export const MapViewComponent: React.FC<MapViewComponentProps> = ({
   };
 
   useEffect(() => {
-    if (currentBounds) {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      fetchClustersInBounds(currentBounds);
+    const wkt = lastWktRef.current ?? currentBounds;
+    if (!wkt) return;
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
-  }, [searchTerm, categoryFilter]);
+    // a request in flight would swallow this one ("Already loading") and the
+    // map would keep showing the old filter's pins
+    if (isLoadingRef.current) refetchAfterLoadRef.current = true;
+    else fetchClustersInBounds(wkt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey, reloadKey]);
 
   // Give a newly-rendered pin set one window to rasterise itself, then freeze it.
   useEffect(() => {

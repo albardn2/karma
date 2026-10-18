@@ -21,3 +21,22 @@ export function markListsStale(...endpoints: string[]) {
 export function takeListStale(endpoint: string): boolean {
   return stale.delete(endpoint);
 }
+
+/**
+ * A one-line confirmation for the list to show when it comes back into view —
+ * "Customer deleted" — since router.back() cannot carry params, and replacing
+ * to the list instead would stack a second copy of it over the stale first.
+ * Same keying as the stale marks.
+ */
+const flashes = new Map<string, string>();
+
+export function setListFlash(endpoint: string, message: string) {
+  flashes.set(endpoint, message);
+}
+
+/** The pending message, once; null when there is none. */
+export function takeListFlash(endpoint: string): string | null {
+  const message = flashes.get(endpoint) ?? null;
+  flashes.delete(endpoint);
+  return message;
+}

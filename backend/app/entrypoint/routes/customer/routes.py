@@ -109,7 +109,8 @@ def create_customer():
     payload = CustomerCreate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
         add_logged_user_to_payload(uow=uow, user_uuid=current_uuid, payload=payload)
-        if payload.email_address and uow.customer_repository.find_one(email_address=payload.email_address):
+        # a deleted customer's email is free to reuse
+        if payload.email_address and uow.customer_repository.find_first(email_address=payload.email_address, is_deleted=False):
             raise BadRequestError(f"Customer with email {payload.email_address} already exists")
 
         data = payload.model_dump()
@@ -166,10 +167,11 @@ def update_customer(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
         customer = uow.customer_repository.find_one(uuid=uuid, is_deleted=False)
         if not customer:
-            return NotFoundError("Customer not found")
+            raise NotFoundError("Customer not found")
 
         if payload.email_address and payload.email_address != customer.email_address:
-            if uow.customer_repository.find_one(email_address=payload.email_address):
+            # a deleted customer's email is free to reuse
+            if uow.customer_repository.find_first(email_address=payload.email_address, is_deleted=False):
                 raise BadRequestError(f"Customer with email {payload.email_address} already exists")
         # tags is NOT NULL: an explicit null in the body means "clear",
         # which the column spells [] (omitted stays excluded by exclude_unset)
@@ -244,19 +246,7 @@ def list_customers():
     # Parse & validate pagination params
     params = CustomerListParams(**request.args)
     filters = [CustomerModel.is_deleted == False]
-    if params.uuid:
-        filters.append(CustomerModel.uuid == params.uuid)
-    if params.category:
-        filters.append(CustomerModel.category == params.category.value)
-    if params.email_address:
-        #like
-        filters.append(CustomerModel.email_address.ilike(f"%{params.email_address}%"))
-    if params.company_name:
-        filters.append(CustomerModel.company_name.ilike(f"%{params.company_name}%"))
-    if params.full_name:
-        filters.append(CustomerModel.full_name.ilike(f"%{params.full_name}%"))
-    if params.phone_number:
-        filters.append(CustomerModel.phone_number.ilike(f"%{params.phone_number}%"))
+    filters.extend(customer_field_filters(params))
     if params.tags:
         # every requested tag must be present (AND). A bare key also matches
         # any key:value of that key, so "region" finds "region:malki" — same
@@ -770,6 +760,37 @@ def _like_escape(value):
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+def _contains(column, text):
+    """Case-insensitive "contains", with the user's text taken literally — an
+    unescaped "_" matched every customer."""
+    return column.ilike(f"%{_like_escape(text)}%", escape="\\")
+
+
+def customer_field_filters(params):
+    """The list's field filters, shared by GET /customer/ and the map
+    (/customer/map-clusters) so both answer the same question. `search` is the
+    app's search box: one term matched against name, company and phone."""
+    from sqlalchemy import or_
+
+    filters = []
+    if getattr(params, "uuid", None):
+        filters.append(CustomerModel.uuid == params.uuid)
+    if getattr(params, "category", None):
+        filters.append(CustomerModel.category == params.category.value)
+    for field in ("email_address", "company_name", "full_name", "phone_number"):
+        text = (getattr(params, field, None) or "").strip()
+        if text:
+            filters.append(_contains(getattr(CustomerModel, field), text))
+    search = (getattr(params, "search", None) or "").strip()
+    if search:
+        filters.append(or_(
+            _contains(CustomerModel.full_name, search),
+            _contains(CustomerModel.company_name, search),
+            _contains(CustomerModel.phone_number, search),
+        ))
+    return filters
+
+
 def _sales_join(uow, start, end, material_uuids):
     """Base query joining orders -> items -> invoice items -> invoice (revenue
     rows), filtered by window + materials. Amount = price_per_unit * quantity.
@@ -1159,12 +1180,8 @@ def customer_map_clusters():
         if uow.account_uuid is not None:
             filters.append(CustomerModel.account_uuid == uow.account_uuid)
 
-        if params.category:
-            filters.append(CustomerModel.category == params.category.value)
-        if params.company_name:
-            filters.append(CustomerModel.company_name.ilike(f"%{params.company_name}%"))
-        if params.full_name:
-            filters.append(CustomerModel.full_name.ilike(f"%{params.full_name}%"))
+        # the same filters as the list, so the map shows what the list shows
+        filters.extend(customer_field_filters(params))
 
         # Integer cell indices via floor, NOT ST_SnapToGrid. SnapToGrid rounds to
         # the nearest node, which puts cell boundaries at odd half-multiples of
