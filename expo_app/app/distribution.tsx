@@ -344,9 +344,7 @@ export default function DistributionScreen() {
 
       {/* Fixed bottom navigation */}
       <BottomNavigation
-        activeTab="menu"
-        onTabPress={(t) => router.replace(t === 'home' ? '/' : '/?tab=menu')}
-      />
+        activeTab="menu" />
 
       {/* Assigned-user picker (admin) */}
       <Modal visible={userPickerOpen} transparent animationType="slide" onRequestClose={() => setUserPickerOpen(false)}>

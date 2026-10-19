@@ -4,9 +4,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
-import { PickerField } from '@/components/PickerField';
+import { CUSTOMER_PICKER, PickerField } from '@/components/PickerField';
+import { OrderStatusBadges } from '@/components/OrderStatusBadges';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatNumericDate } from '@/utils/date';
+import { useHasEndpoint } from '@/hooks/useModuleAccess';
+import { formatNumericDate, parseTs } from '@/utils/date';
 import { money } from '@/utils/money';
 
 interface CustomerOrder {
@@ -18,8 +20,10 @@ interface CustomerOrder {
   currency?: string | null;
   total_adjusted_amount: number;
   net_amount_due?: number | null;
+  net_amount_paid?: number | null;
   customer_company_name?: string | null;
   customer_full_name?: string | null;
+  customer_order_items?: { is_deleted?: boolean | null; is_fulfilled?: boolean | null }[] | null;
 }
 
 /**
@@ -56,6 +60,9 @@ export default function CustomerOrdersScreen() {
     uuid: customerUuid ?? '',
     label: customerName ?? '',
   });
+  // checkout is a customer_order create; an accountant reads orders but may not
+  // raise one, and a + that answers 403 is a button that lies
+  const canCreate = useHasEndpoint('customer_order', 'create');
 
   // a stable object per chosen customer: ModuleListScreen dep-tracks `params` by
   // identity, so an inline literal would re-fetch on every render
@@ -72,7 +79,19 @@ export default function CustomerOrdersScreen() {
         endpoint="/customer-order/"
         itemsKey="orders"
         params={params}
-        onCreate={() => router.push('/customer-orders/create')}
+        filtered={!!customer.uuid}
+        onCreate={
+          canCreate
+            ? () =>
+                // filtered to one customer: the new order is most likely theirs
+                router.push({
+                  pathname: '/customer-orders/create',
+                  params: customer.uuid
+                    ? { customerUuid: customer.uuid, customerName: customer.label }
+                    : {},
+                })
+            : undefined
+        }
         header={
           <View style={styles.customerFilter}>
             {/* labelled, because unlabelled it reads as a stray form field rather than
@@ -81,15 +100,11 @@ export default function CustomerOrdersScreen() {
               {t('customerOrders.filterCustomer')}
             </ThemedText>
             <PickerField
-              spec={{
-                endpoint: '/customer/',
-                itemsKey: 'customers',
-                searchParam: 'company_name',
-                label: (c) => c.company_name || c.full_name || c.uuid,
-                sublabel: (c) => (c.company_name ? c.full_name || undefined : undefined),
-                value: (c) => c.uuid,
-              }}
+              spec={CUSTOMER_PICKER}
               value={customer.uuid}
+              // the name it arrived with from a customer's screen — the field
+              // otherwise read as a raw uuid until it was opened
+              initialLabel={customer.label}
               onChange={(uuid, label) => setCustomer({ uuid, label })}
               testID="orders-customer-filter"
             />
@@ -137,36 +152,23 @@ export default function CustomerOrdersScreen() {
             </View>
 
             <View style={styles.cardBottom}>
-              <ThemedText style={styles.date}>{formatNumericDate(new Date(o.created_at))}</ThemedText>
-              <View style={styles.badges}>
-                <ThemedText
-                  style={[styles.badge, o.is_fulfilled ? styles.badgeOk : styles.badgePending]}
-                >
-                  {o.is_fulfilled
-                    ? t('customerOrders.fulfilled')
-                    : t('customerOrders.unfulfilled')}
-                </ThemedText>
-                <ThemedText style={[styles.badge, o.is_paid ? styles.badgeOk : styles.badgeDue]}>
-                  {o.is_paid ? t('customerOrders.paid') : t('customerOrders.unpaid')}
-                </ThemedText>
-                {o.is_overdue && (
-                  <ThemedText style={[styles.badge, styles.badgeOverdue]}>
-                    {t('customerOrders.overdue')}
-                  </ThemedText>
-                )}
-              </View>
+              {/* naive UTC from the server: read as local it moved an evening
+                  order to the next day */}
+              <ThemedText style={styles.date}>{formatNumericDate(parseTs(o.created_at))}</ThemedText>
+              <OrderStatusBadges order={o} style={styles.badges} />
             </View>
           </TouchableOpacity>
         )}
       />
-      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      <BottomNavigation activeTab="menu" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  customerFilter: { marginBottom: 12 },
+  // the list's own gutter: the scaffold renders `header` full-bleed
+  customerFilter: { marginHorizontal: 20, marginBottom: 12 },
   filterLabel: { fontSize: 12, fontWeight: '600', opacity: 0.6, marginBottom: 6 },
   clearBtn: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 },
   clearText: { fontSize: 13, color: '#5469D4', fontWeight: '600' },
@@ -192,17 +194,5 @@ const styles = StyleSheet.create({
   amount: { fontSize: 16, fontWeight: '700', color: '#1f2937' },
   cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   date: { fontSize: 13, opacity: 0.55 },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
-  badge: {
-    fontSize: 11,
-    fontWeight: '600',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  badgeOk: { backgroundColor: '#dcfce7', color: '#166534' },
-  badgePending: { backgroundColor: '#f3f4f6', color: '#4b5563' },
-  badgeDue: { backgroundColor: '#fef3c7', color: '#92400e' },
-  badgeOverdue: { backgroundColor: '#fee2e2', color: '#991b1b' },
+  badges: { flexShrink: 1, justifyContent: 'flex-end' },
 });

@@ -75,7 +75,7 @@ export default function PaymentsScreen() {
           </TouchableOpacity>
         )}
       />
-      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      <BottomNavigation activeTab="menu" />
     </View>
   );
 }

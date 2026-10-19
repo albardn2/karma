@@ -77,7 +77,8 @@ export default function RootLayout() {
         <LocationTrackingProvider>
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <NavigationContent />
-            <StatusBar style="auto" />
+            {/* dark glyphs: the app is light-only (hooks/useColorScheme) */}
+            <StatusBar style="dark" />
           </ThemeProvider>
         </LocationTrackingProvider>
       </LanguageProvider>

@@ -57,7 +57,12 @@ export default function CreateCustomerScreen() {
   // the POST can outlive this screen (Back while saving); navigating then would
   // pop whatever screen the user is on by now
   const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  // set again on each (re)mount: Fast Refresh and strict mode run the cleanup
+  // and then the effect, and a ref only ever cleared stayed false for good
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Platform detection
   const isWeb = Platform.OS === 'web';

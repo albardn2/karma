@@ -144,7 +144,7 @@ export default function TransactionsScreen() {
           );
         }}
       />
-      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      <BottomNavigation activeTab="menu" />
     </View>
   );
 }
