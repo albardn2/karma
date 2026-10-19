@@ -20,8 +20,8 @@ interface Customer {
 
 interface MapViewComponentProps {
   onCustomerPress: (customer: Customer) => void;
-  searchTerm?: string;
-  categoryFilter?: string;
+  filters?: Record<string, string>;
+  reloadKey?: number;
 }
 
 export const MapViewComponent: React.FC<MapViewComponentProps> = () => {

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Platform, Dimensions, Animated } from 'react-native';
 import { View } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useRouter, Stack } from 'expo-router';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, apiErrorText, isOk } from '@/utils/api';
+import { markListsStale, setListFlash } from '@/utils/listRefresh';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,6 +49,15 @@ export default function CreateCustomerScreen() {
   const [errors, setErrors] = useState<Partial<Record<keyof CustomerForm, string>>>({});
   const [locationLoading, setLocationLoading] = useState(false);
   const router = useRouter();
+  const scrollRef = useRef<ScrollView>(null);
+  // set the moment a POST goes out and never cleared on success: the button
+  // used to re-enable while the success banner showed, and a second tap
+  // created the same customer twice
+  const submittedRef = useRef(false);
+  // the POST can outlive this screen (Back while saving); navigating then would
+  // pop whatever screen the user is on by now
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   // Platform detection
   const isWeb = Platform.OS === 'web';
@@ -116,9 +126,16 @@ export default function CreateCustomerScreen() {
   };
 
   const handleSubmit = async () => {
-    console.log('▶️ handleSubmit');
-    if (!validateForm()) return;
+    if (submittedRef.current) return;
+    if (!validateForm()) {
+      // the errors sit under the fields at the top, off-screen from this
+      // button — say so, and bring them into view
+      showBanner('error', t('custdetail.fixValidationErrors'));
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      return;
+    }
 
+    submittedRef.current = true;
     setLoading(true);
     try {
       const payload: any = {
@@ -143,32 +160,33 @@ export default function CreateCustomerScreen() {
 
       console.log('API response:', response);
       if (isOk(response.status)) {
-        showBanner('success', t('custcreate.createSuccess'));
-        setTimeout(() => {
-          // Navigate back and trigger refresh
-          if (isNative) {
-            router.replace('/(tabs)?section=customers&refresh=true');
-          } else {
-            router.replace('/?section=customers&refresh=true');
-          }
-        }, 1500);
+        // Back to the list, which refetches and shows the confirmation. This
+        // used to replace to the tabs screen, which ignores `section`, so it
+        // landed on the Home dashboard instead.
+        markListsStale('/customer/');
+        if (!mountedRef.current) return;
+        setListFlash('/customer/', t('custcreate.createSuccess'));
+        if (router.canGoBack()) router.back();
+        // the tabs screen ignores `section`, so replace to the list itself
+        else router.replace('/customers');
         return;
       }
 
-      let errorMsg = t('custcreate.createFailed');
-      if (response.error) {
-        try {
-          const err = typeof response.error === 'string' ? JSON.parse(response.error) : response.error;
-          errorMsg = err.detail || err.message || errorMsg;
-        } catch {}
-      }
-      showBanner('error', errorMsg);
-
+      submittedRef.current = false;
+      setLoading(false);
+      // the API's own reason, e.g. "Customer with email … already exists"
+      showBanner(
+        'error',
+        // status 0 is a transport failure: its text is the platform's, not ours
+        response.status === 0
+          ? t('custcreate.networkError')
+          : apiErrorText(response.error, t('custcreate.createFailed')),
+      );
     } catch (e) {
       console.error('Network error:', e);
-      showBanner('error', t('custcreate.networkError'));
-    } finally {
+      submittedRef.current = false;
       setLoading(false);
+      showBanner('error', t('custcreate.networkError'));
     }
   };
 
@@ -258,7 +276,7 @@ export default function CreateCustomerScreen() {
         </View>
       )}
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={[
+      <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" style={styles.scrollView} contentContainerStyle={[
         styles.formContainer,
         isDesktop ? styles.desktopForm : 
         isNative ? styles.nativeForm : styles.mobileForm

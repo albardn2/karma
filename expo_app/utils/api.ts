@@ -195,6 +195,8 @@ export { API_BASE_URL };
 export function apiErrorText(error: unknown, fallback = ''): string {
   const raw = typeof error === 'string' ? error : error == null ? '' : String(error);
   if (!raw) return fallback;
+  // a proxy's HTML error page (nginx 502/504) — markup, not a reason
+  if (/^\s*</.test(raw)) return fallback;
   try {
     const parsed = JSON.parse(raw);
     const msg = parsed?.error || parsed?.msg || parsed?.message;

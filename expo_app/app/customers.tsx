@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Platform, Dimensions, Animated, Modal, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Platform, Dimensions, Animated, Modal, RefreshControl, Pressable, KeyboardAvoidingView } from 'react-native';
 import { View } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { apiCall } from '@/utils/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapViewComponent } from '@/components/MapView';
@@ -12,6 +12,7 @@ import { DesktopCustomersLayout } from '@/components/layouts/DesktopCustomersLay
 import { Colors } from '@/constants/Colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { takeListFlash, takeListStale } from '@/utils/listRefresh';
 
 interface Customer {
   uuid: string;
@@ -43,11 +44,15 @@ export default function CustomersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t, tef } = useLanguage();
-  const { deleted, message } = useLocalSearchParams<{ deleted?: string; message?: string }>();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  // Only the FIRST load takes over the screen. Every later fetch (a page, a
+  // filter, a search keystroke) used to swap the whole screen for a spinner,
+  // which would unmount the search box mid-typing and reset the map.
+  const [hasLoaded, setHasLoaded] = useState(false);
+  // what is typed, and the debounced term that is actually searched
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'roastery' | 'restaurant' | 'minimarket' | 'supermarket' | 'distributer' | 'school' | 'university' | 'hospital'>('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [screenData, setScreenData] = useState(Dimensions.get('window'));
@@ -55,7 +60,6 @@ export default function CustomersScreen() {
   const [banner, setBanner] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const bannerAnimation = useState(new Animated.Value(0))[0];
   const [showFilters, setShowFilters] = useState(false);
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -105,17 +109,22 @@ export default function CustomersScreen() {
     return () => subscription?.remove();
   }, []);
 
+  // The list itself loads from the effect below; fetching here as well sent
+  // the same first request twice.
   useEffect(() => {
     fetchCategories();
-    fetchCustomers();
+  }, []);
 
-    // Show banner if customer was deleted
-    if (deleted === 'true' && message) {
-      showBanner('success', message);
-      // Clear the URL parameters
-      router.replace('/customers');
-    }
-  }, [deleted, message]);
+  // search as you type, without a request per keystroke
+  useEffect(() => {
+    const term = searchInput.trim();
+    if (term === searchTerm) return;
+    const timer = setTimeout(() => {
+      setSearchTerm(term);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchInput, searchTerm]);
 
   const fetchCategories = async () => {
     try {
@@ -139,16 +148,44 @@ export default function CustomersScreen() {
     setBanner({ type, message });
     Animated.sequence([
       Animated.timing(bannerAnimation, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.delay(3000),
+      // long enough to read after the screen transition that brings you here
+      Animated.delay(4000),
       Animated.timing(bannerAnimation, { toValue: 0, duration: 300, useNativeDriver: true }),
     ]).start(() => setBanner(null));
   };
 
   useEffect(() => {
     fetchCustomers();
-  }, [page, searchTerm, categoryFilter, appliedFilters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, searchTerm, appliedFilters]);
+
+  // Coming back from create, edit or delete: this screen stayed mounted, so
+  // without this it showed the customer as it was (or still listed a deleted
+  // one). Those screens mark the list stale and leave a confirmation for it.
+  const fetchRef = useRef<() => void>(() => {});
+  // the map keeps its own pins, so a stale list means a stale map too
+  const [mapReloadKey, setMapReloadKey] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      if (takeListStale('/customer/')) {
+        fetchRef.current();
+        setMapReloadKey((k) => k + 1);
+      }
+      const flash = takeListFlash('/customer/');
+      if (flash) showBanner('success', flash);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
+
+  // Requests overlap now that the screen stays usable while one is in flight
+  // (search as you type, a quick second Next): only the latest may land, or an
+  // older page's rows show under the newer page number or search term.
+  const requestSeqRef = useRef(0);
+  const listScrollRef = useRef<ScrollView>(null);
 
   const fetchCustomers = async () => {
+    const seq = ++requestSeqRef.current;
+    const isLatest = () => seq === requestSeqRef.current;
     try {
       setLoading(true);
 
@@ -165,24 +202,26 @@ export default function CustomersScreen() {
         }
       });
 
+      // name, company or phone — one box, matched server-side
       if (searchTerm) {
-        params.append('full_name', searchTerm);
-      }
-
-      if (categoryFilter !== 'all') {
-        params.append('category', categoryFilter);
+        params.append('search', searchTerm);
       }
 
       console.log('Making API call to:', `/customer/?${params.toString()}`);
       const response = await apiCall<CustomerPage>(`/customer/?${params.toString()}`);
 
-      console.log('API Response:', response);
+      if (!isLatest()) return;
 
       if (response.status === 200 && response.data) {
-        console.log('Successfully loaded customers from backend:', response.data);
+        const pages = response.data.pages;
+        setTotalPages(pages);
+        // the page we were on emptied (its last row was just deleted): step
+        // back to the new last page, which the page effect then fetches
+        if (pages > 0 && page > pages) {
+          setPage(pages);
+          return;
+        }
         setCustomers(response.data.customers);
-        setTotalPages(response.data.pages);
-        // setFilteredCustomers(response.data.customers);  // Removed filteredCustomers
       } else {
         console.error('Failed to load customers from backend:', response);
         // Show error message instead of mock data
@@ -199,12 +238,24 @@ export default function CustomersScreen() {
         setTotalPages(0);
       }
     } catch (error) {
+      if (!isLatest()) return;
       console.error('Error fetching customers:', error);
       Alert.alert(t('customers.error'), t('customers.failedToLoadCustomers'));
     } finally {
-      setLoading(false);
+      // a superseded request must not end the newer one's loading state
+      if (isLatest()) {
+        setLoading(false);
+        setHasLoaded(true);
+      }
     }
   };
+  fetchRef.current = fetchCustomers;
+
+  // a new page, search or filter opens at its first row; the list stays
+  // mounted across fetches now, so it would otherwise keep the old offset
+  useEffect(() => {
+    listScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [page, searchTerm, appliedFilters]);
 
   const handleCreateCustomer = () => {
     router.push('/customers/create');
@@ -222,7 +273,18 @@ export default function CustomersScreen() {
     setAppliedFilters({ ...filters });
     setPage(1);
     setShowFilters(false);
-    setShowCategoryDropdown(false);
+  };
+
+  // The sheet edits a draft. Closing it without applying throws the draft away
+  // — it used to survive, so text never applied reappeared next time while the
+  // badge counted only what was applied.
+  const openFilters = () => {
+    setFilters({ ...appliedFilters });
+    setShowFilters(true);
+  };
+  const closeFilters = () => {
+    setFilters({ ...appliedFilters });
+    setShowFilters(false);
   };
 
   const clearFilters = () => {
@@ -238,24 +300,28 @@ export default function CustomersScreen() {
     setAppliedFilters(emptyFilters);
     setPage(1);
     setShowFilters(false);
-    setShowCategoryDropdown(false);
   };
 
   const hasActiveFilters = Object.values(appliedFilters).some(value => value.trim() !== '');
+
+  // the map shows exactly what the list shows: the same params, blanks omitted
+  const mapFilters = useMemo(() => {
+    const out: Record<string, string> = {};
+    Object.entries(appliedFilters).forEach(([key, value]) => {
+      if (value.trim()) out[key] = value.trim();
+    });
+    if (searchTerm) out.search = searchTerm;
+    return out;
+  }, [appliedFilters, searchTerm]);
 
   const handleRefresh = async () => {
     console.log('Pull to refresh triggered');
     setRefreshing(true);
 
     try {
-      // Reset to first page
-      setPage(1);
-
-      // Clear search and filters for fresh data
-      setSearchTerm('');
-      setCategoryFilter('all');
-
-      // Fetch fresh data
+      // Reload what is on screen. This used to reset the page and the search
+      // AND fetch with the old page at the same time, so two requests raced
+      // and the older page's rows could land under "Page 1 of N".
       await fetchCustomers();
 
       console.log('Refresh completed successfully');
@@ -267,31 +333,12 @@ export default function CustomersScreen() {
     }
   };
 
-  const parseCoordinates = (coordinatesString: string | null): { lat: number; lng: number } | null => {
-    if (!coordinatesString) return null;
-
-    try {
-      // Assuming coordinates are stored as "lat,lng" or similar format
-      const coords = coordinatesString.split(',');
-      if (coords.length === 2) {
-        const lat = parseFloat(coords[0].trim());
-        const lng = parseFloat(coords[1].trim());
-        if (!isNaN(lat) && !isNaN(lng)) {
-          return { lat, lng };
-        }
-      }
-    } catch (error) {
-      console.error('Error parsing coordinates:', error);
-    }
-    return null;
-  };
-
   const TableHeader = () => (
     <View style={styles.tableHeader}>
-      <ThemedText style={[styles.tableHeaderText, styles.nameHeaderColumn]}>{t('customers.nameAndCompany')}</ThemedText>
-      <ThemedText style={[styles.tableHeaderText, styles.categoryHeaderColumn]}>{t('customers.category')}</ThemedText>
-      <ThemedText style={[styles.tableHeaderText, styles.contactHeaderColumn]}>{t('customers.contact')}</ThemedText>
-      <ThemedText style={[styles.tableHeaderText, styles.balanceHeaderColumn]}>{t('customers.balance')}</ThemedText>
+      <ThemedText style={[styles.tableHeaderText, styles.nameHeaderColumn]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{t('customers.nameAndCompany')}</ThemedText>
+      <ThemedText style={[styles.tableHeaderText, styles.categoryHeaderColumn]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{t('customers.category')}</ThemedText>
+      <ThemedText style={[styles.tableHeaderText, styles.contactHeaderColumn]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{t('customers.contact')}</ThemedText>
+      <ThemedText style={[styles.tableHeaderText, styles.balanceHeaderColumn]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{t('customers.balance')}</ThemedText>
       <View style={styles.arrowHeaderColumn} />
     </View>
   );
@@ -331,7 +378,7 @@ export default function CustomersScreen() {
         {/* Category Column */}
         <View style={styles.categoryColumn}>
           <View style={[styles.categoryBadge, { backgroundColor: '#5469D4' }]}>
-            <ThemedText style={styles.categoryText}>
+            <ThemedText style={styles.categoryText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {tef(customer.category)}
             </ThemedText>
           </View>
@@ -362,74 +409,12 @@ export default function CustomersScreen() {
     );
   };
 
-  const MapMarker = ({ customer, onPress }: { customer: Customer; onPress: () => void }) => {
-    const coords = parseCoordinates(customer.coordinates);
-    if (!coords) return null;
-
-    const totalBalance = Object.values(customer.balance_per_currency).reduce((sum, amount) => sum + amount, 0);
-    const getMarkerColor = () => {
-      if (totalBalance > 0) return '#10b981';
-      if (totalBalance < 0) return '#ef4444';
-      return '#5469D4';
-    };
-
-    return (
-      <TouchableOpacity
-        style={[styles.mapMarker, { backgroundColor: getMarkerColor() }]}
-        onPress={onPress}
-      >
-        <ThemedText style={styles.markerText}>{customer.full_name.charAt(0)}</ThemedText>
-      </TouchableOpacity>
-    );
-  };
-
-
-
-  const FilterSection = () => (
-    <View style={[
-      styles.filterSection,
-      isDesktop && styles.desktopFilter,
-      (isMobileWeb || isNative) && styles.mobileFilter
-    ]}>
-      <TextInput
-        style={[
-          styles.searchInput,
-          isDesktop && styles.desktopSearchInput,
-          (isMobileWeb || isNative) && styles.mobileSearchInput
-        ]}
-        placeholder={t('customers.searchByCustomerName')}
-        value={searchTerm}
-        onChangeText={setSearchTerm}
-        placeholderTextColor="#666"
-      />
-
-      <View style={styles.categoryFilterContainer}>
-        {(['all', 'roastery', 'restaurant', 'minimarket', 'supermarket', 'distributer', 'school', 'university', 'hospital'] as const).map((category) => (
-          <TouchableOpacity
-            key={category}
-            style={[
-              styles.filterButton,
-              categoryFilter === category && styles.activeFilterButton
-            ]}
-            onPress={() => setCategoryFilter(category)}
-          >
-            <ThemedText style={[
-              styles.filterButtonText,
-              categoryFilter === category && styles.activeFilterButtonText
-            ]}>
-              {category === 'all' ? t('customers.all') : tef(category)}
-            </ThemedText>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-
-
-
-  if (loading) {
+  if (loading && !hasLoaded) {
     return (
       <ThemedView style={styles.container}>
+        {/* the screen draws its own header; without this the native one, titled
+            "customers", flashed over the spinner */}
+        <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#5469D4" />
           <ThemedText style={styles.loadingText}>{t('customers.loadingCustomers')}</ThemedText>
@@ -448,21 +433,7 @@ export default function CustomersScreen() {
     );
   }
 
-  const filteredCustomers = customers.filter(customer => {
-    // For desktop, use search term; for mobile, skip search filtering
-    if (isDesktop) {
-      const searchTermLower = searchTerm.toLowerCase();
-      const fullNameLower = customer.full_name.toLowerCase();
-      const companyNameLower = customer.company_name.toLowerCase();
-      const matchesSearchTerm = fullNameLower.includes(searchTermLower) || companyNameLower.includes(searchTermLower);
-      const matchesCategory = categoryFilter === 'all' || customer.category === categoryFilter;
-      return matchesSearchTerm && matchesCategory;
-    } else {
-      // Mobile: only filter by category
-      const matchesCategory = categoryFilter === 'all' || customer.category === categoryFilter;
-      return matchesCategory;
-    }
-  });
+  const isFiltered = hasActiveFilters || !!searchTerm;
 
 
   return (
@@ -486,6 +457,8 @@ export default function CustomersScreen() {
         <Animated.View style={[
           styles.banner,
           banner.type === 'success' ? styles.successBanner : styles.errorBanner,
+          // below the status bar: at top 0 it sat behind the clock and notch
+          { top: insets.top },
           { opacity: bannerAnimation, transform: [{ translateY: bannerAnimation.interpolate({ inputRange: [0,1], outputRange: [-100,0] }) }] }
         ]}>
           <ThemedText style={styles.bannerText}>{banner.message}</ThemedText>
@@ -518,7 +491,7 @@ export default function CustomersScreen() {
           {(isMobileWeb || isNative) && (
             <TouchableOpacity
               style={[styles.filterToggle, hasActiveFilters && styles.filterToggleActive]}
-              onPress={() => setShowFilters(true)}
+              onPress={openFilters}
             >
               <ThemedText style={[styles.filterToggleText, hasActiveFilters && styles.filterToggleTextActive]}>
                 🔍 {t('customers.filters')} {hasActiveFilters && `(${Object.values(appliedFilters).filter(v => v.trim()).length})`}
@@ -578,14 +551,40 @@ export default function CustomersScreen() {
         </View>
       )}
 
-      {/* Filters - Only show for desktop */}
-      {isDesktop && <FilterSection />}
+      {/* Search: name, company or phone. Applies to the list and the map. */}
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.searchBox}
+          value={searchInput}
+          onChangeText={setSearchInput}
+          placeholder={t('customers.searchByCustomerName')}
+          placeholderTextColor="#9ca3af"
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+          clearButtonMode="never"
+          testID="customers-search"
+        />
+        {loading ? (
+          <ActivityIndicator size="small" color="#5469D4" style={styles.searchAccessory} />
+        ) : searchInput ? (
+          <TouchableOpacity
+            onPress={() => setSearchInput('')}
+            hitSlop={10}
+            style={styles.searchAccessory}
+            testID="customers-search-clear"
+          >
+            <ThemedText style={styles.searchClear}>✕</ThemedText>
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
       {/* Content */}
       <View style={styles.contentContainer}>
         {viewMode === 'list' ? (
           <View style={{ flex: 1 }}>
             <ScrollView
+              ref={listScrollRef}
               style={styles.scrollView}
               contentContainerStyle={[
                 styles.listContainer,
@@ -611,16 +610,16 @@ export default function CustomersScreen() {
               bounces={true}
               alwaysBounceVertical={isNative}
             >
-              {filteredCustomers.length === 0 ? (
+              {customers.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <ThemedText style={styles.emptyText}>
-                    {customers.length === 0 ? t('customers.noCustomersFound') : t('customers.noCustomersMatchFilters')}
+                    {isFiltered ? t('customers.noCustomersMatchFilters') : t('customers.noCustomersFound')}
                   </ThemedText>
                 </View>
               ) : (
                 <>
                   <TableHeader />
-                  {filteredCustomers.map((customer) => (
+                  {customers.map((customer) => (
                     <CustomerCard key={customer.uuid} customer={customer} />
                   ))}
                 </>
@@ -676,10 +675,10 @@ export default function CustomersScreen() {
           </View>
         ) : (
           <View style={[{ flex: 1 }, (isMobileWeb || isNative) && { marginBottom: 0 }]}>
-            <MapViewComponent 
-              onCustomerPress={handleCustomerPress} 
-              searchTerm={isDesktop ? searchTerm : ''}
-              categoryFilter={categoryFilter}
+            <MapViewComponent
+              onCustomerPress={handleCustomerPress}
+              filters={mapFilters}
+              reloadKey={mapReloadKey}
             />
           </View>
         )}
@@ -694,35 +693,34 @@ export default function CustomersScreen() {
           visible={showFilters}
           transparent={true}
           animationType="slide"
-          onRequestClose={() => {
-            setShowFilters(false);
-            setShowCategoryDropdown(false);
-          }}
+          onRequestClose={closeFilters}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalBackdrop} />
+          <KeyboardAvoidingView
+            style={styles.modalContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            {/* tapping the dimmed area closes the sheet, as on every other sheet */}
+            <Pressable style={styles.modalBackdrop} onPress={closeFilters} testID="customers-filter-backdrop" />
             <View style={[
               styles.filterModal,
               (isMobileWeb || isNative) && styles.mobileFilterModal
             ]}>
               <View style={styles.filterHeader}>
                 <ThemedText style={styles.filterTitle}>{t('customers.filterCustomers')}</ThemedText>
-                <TouchableOpacity 
-                  onPress={() => {
-                    setShowFilters(false);
-                    setShowCategoryDropdown(false);
-                  }}
+                <TouchableOpacity
+                  onPress={closeFilters}
                   style={styles.closeButtonContainer}
+                  hitSlop={10}
                 >
                   <ThemedText style={styles.closeButton}>✕</ThemedText>
                 </TouchableOpacity>
               </View>
 
-              <ScrollView 
-                style={styles.filterContent} 
+              <ScrollView
+                style={styles.filterContent}
                 showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="always"
-                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
               >
                 {/* UUID Filter */}
                 <View style={styles.filterGroup}>
@@ -741,47 +739,24 @@ export default function CustomersScreen() {
                 {/* Category Filter */}
                 <View style={styles.filterGroup}>
                   <ThemedText style={styles.filterLabel}>{t('customers.category')}</ThemedText>
-                  <TouchableOpacity 
-                    style={styles.dropdown}
-                    onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                    activeOpacity={0.7}
-                  >
-                    <ThemedText style={[styles.dropdownText, !filters.category && styles.placeholderText]}>
-                      {filters.category ? tef(filters.category) : t('customers.selectCategory')}
-                    </ThemedText>
-                    <ThemedText style={styles.dropdownArrow}>
-                      {showCategoryDropdown ? '▲' : '▼'}
-                    </ThemedText>
-                  </TouchableOpacity>
-                  {showCategoryDropdown && (
-                    <View style={styles.dropdownOptions}>
-                      <TouchableOpacity 
-                        style={styles.dropdownOption}
-                        onPress={() => {
-                          handleFilterChange('category', '');
-                          setShowCategoryDropdown(false);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <ThemedText style={styles.dropdownOptionText}>{t('customers.allCategories')}</ThemedText>
-                      </TouchableOpacity>
-                      {categories.map((category) => (
+                  <View style={styles.chipRow}>
+                    {['', ...categories].map((category) => {
+                      const selected = filters.category === category;
+                      return (
                         <TouchableOpacity
-                          key={category}
-                          style={styles.dropdownOption}
-                          onPress={() => {
-                            handleFilterChange('category', category);
-                            setShowCategoryDropdown(false);
-                          }}
+                          key={category || 'all'}
+                          style={[styles.chip, selected && styles.chipSelected]}
+                          onPress={() => handleFilterChange('category', category)}
                           activeOpacity={0.7}
+                          testID={`customers-filter-category-${category || 'all'}`}
                         >
-                          <ThemedText style={styles.dropdownOptionText}>
-                            {tef(category)}
+                          <ThemedText style={[styles.chipText, selected && styles.chipTextSelected]}>
+                            {category ? tef(category) : t('customers.allCategories')}
                           </ThemedText>
                         </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
+                      );
+                    })}
+                  </View>
                 </View>
 
                 {/* Email Filter */}
@@ -840,15 +815,18 @@ export default function CustomersScreen() {
                 </View>
               </ScrollView>
 
-              <View style={styles.filterActions}>
-                <TouchableOpacity 
-                  style={styles.clearButton} 
+              <View style={[styles.filterActions, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+                <TouchableOpacity
+                  style={styles.clearButton}
                   onPress={clearFilters}
                   activeOpacity={0.7}
                 >
                   <ThemedText style={styles.clearButtonText}>{t('customers.clearAll')}</ThemedText>
                 </TouchableOpacity>
-                <TouchableOpacity 
+                {/* flex on the touchable, not just the gradient inside it, or the
+                    two buttons come out lopsided */}
+                <TouchableOpacity
+                  style={styles.applyTouchable}
                   onPress={applyFilters}
                   activeOpacity={0.7}
                 >
@@ -858,7 +836,7 @@ export default function CustomersScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       )}
 
@@ -1140,15 +1118,18 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   categoryBadge: {
-    paddingVertical: 2,
+    paddingVertical: 3,
     paddingHorizontal: 6,
     borderRadius: 8,
     alignItems: 'center',
     minWidth: 50,
+    maxWidth: '100%',
     backgroundColor: '#5469D4',
   },
   categoryText: {
-    fontSize: 8,
+    fontSize: 9,
+    // ThemedText's default lineHeight is 24, which made an 8pt pill ~28pt tall
+    lineHeight: 12,
     fontWeight: '600',
     color: '#fff',
     textTransform: 'capitalize',
@@ -1428,68 +1409,75 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     color: '#1f2937',
   },
-  dropdown: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dropdownText: {
-    fontSize: 14,
-    color: '#1f2937',
-    flex: 1,
-  },
-  placeholderText: {
-    color: '#9ca3af',
-  },
-  dropdownArrow: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginLeft: 8,
-  },
-  dropdownOptions: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    marginTop: 4,
-    maxHeight: 200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  dropdownOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  dropdownOptionText: {
-    fontSize: 14,
-    color: '#374151',
-  },
   filterActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: 20,
-    paddingBottom: 10,
-    marginTop: 20,
+    paddingTop: 16,
+    paddingHorizontal: 20,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
     gap: 12,
     backgroundColor: '#fff',
   },
+  applyTouchable: {
+    flex: 1,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    backgroundColor: '#fff',
+  },
+  chipSelected: {
+    backgroundColor: '#5469D4',
+    borderColor: '#5469D4',
+  },
+  chipText: {
+    fontSize: 14,
+    lineHeight: 18,
+    color: '#374151',
+  },
+  chipTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    backgroundColor: '#fff',
+  },
+  searchBox: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#1f2937',
+  },
+  searchAccessory: {
+    marginLeft: 8,
+  },
+  searchClear: {
+    fontSize: 15,
+    lineHeight: 18,
+    color: '#9ca3af',
+  },
   clearButton: {
     flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    // no horizontal padding: Yoga adds it on top of the flex share, which made
+    // Clear All wider than Apply (the label is centred anyway)
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#d1d5db',
