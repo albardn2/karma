@@ -64,7 +64,7 @@ export default function PayoutsScreen() {
           </TouchableOpacity>
         )}
       />
-      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      <BottomNavigation activeTab="menu" />
     </View>
   );
 }

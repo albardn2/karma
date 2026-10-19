@@ -86,7 +86,7 @@ export default function ServiceAreasScreen() {
           <ServiceAreaCard area={a} onPress={() => router.push(`/service-areas/${a.uuid}`)} />
         )}
       />
-      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      <BottomNavigation activeTab="menu" />
     </View>
   );
 }

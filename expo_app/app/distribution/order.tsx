@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -14,9 +13,20 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
-import { apiCall } from '@/utils/api';
+import { EditSheet, editSheetInput } from '@/components/EditSheet';
+import { apiCall, apiErrorText, isOk } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime } from '@/utils/date';
+import { parseAmount } from '@/utils/money';
+import { markListsStale } from '@/utils/listRefresh';
+import {
+  MONEY_LISTS,
+  MONEY_TOLERANCE,
+  ORDER_LISTS,
+  STOCK_LISTS,
+  fulfilState,
+  payState,
+} from '@/utils/orderStatus';
 
 // money is DOUBLE PRECISION end to end; never render or send the raw float
 const round2 = (n: number) => Math.round(Number(n) * 100) / 100;
@@ -24,10 +34,18 @@ const round2 = (n: number) => Math.round(Number(n) * 100) / 100;
 export default function OrderActionsScreen() {
   const { t, te } = useLanguage();
   const router = useRouter();
-  const { orderUuid, tripStopUuid, invoiceUuid } = useLocalSearchParams<{
+  const { orderUuid, tripStopUuid, invoiceUuid, intent } = useLocalSearchParams<{
     orderUuid?: string;
     tripStopUuid?: string;
     invoiceUuid?: string;
+    /**
+     * Which half the caller opened this for. "pay" — an invoice's Record payment,
+     * or Take payment — starts with fulfilment OFF: it used to start on, so
+     * recording cash also marked the goods delivered and took them out of stock.
+     * "fulfil" starts with payment off. Absent (a trip stop, Fulfil & take
+     * payment), both start on, as before.
+     */
+    intent?: 'fulfil' | 'pay';
   }>();
 
   const [data, setData] = useState<any>(null);
@@ -36,9 +54,12 @@ export default function OrderActionsScreen() {
   // which unfulfilled lines this submit will fulfil — all of them by default, so
   // the common case is still one tap; unticking is for the part-delivery
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [doFulfill, setDoFulfill] = useState(true);
-  const [doPay, setDoPay] = useState(true);
+  const [doFulfill, setDoFulfill] = useState(intent !== 'pay' && !invoiceUuid);
+  const [doPay, setDoPay] = useState(intent !== 'fulfil');
   const [submitting, setSubmitting] = useState(false);
+  // state lands a render late: a double tap inside it posted the payment twice,
+  // and a second part payment that still fits the balance is accepted
+  const submittingRef = useRef(false);
   // shown for a beat on success, then the screen pops back to the stop
   const [savedBanner, setSavedBanner] = useState<string | null>(null);
   const backTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -63,11 +84,15 @@ export default function OrderActionsScreen() {
   }, [orderUuid]);
 
   const order = data?.customer_order;
-  // a specific invoice when the caller named one (per-invoice payment from the
-  // order detail); the first otherwise, as before
-  const invoice = invoiceUuid
-    ? (data?.invoices || []).find((i: any) => i.uuid === invoiceUuid) ?? data?.invoices?.[0]
-    : data?.invoices?.[0];
+  // The invoice a payment goes to: the one the caller named (an invoice's own
+  // Record payment), else the first that still has a balance, else the first.
+  // Live ones only — "the first" used to include a voided invoice, and one
+  // already settled, while the order as a whole still owed money elsewhere.
+  const liveInvoices = (data?.invoices || []).filter((i: any) => !i.is_deleted);
+  const invoice =
+    (invoiceUuid ? liveInvoices.find((i: any) => i.uuid === invoiceUuid) : undefined) ??
+    liveInvoices.find((i: any) => (i.net_amount_due ?? 0) > MONEY_TOLERANCE) ??
+    liveInvoices[0];
   const items = (order?.customer_order_items || []).filter((i: any) => !i.is_deleted);
 
   // payment-aware price editing, same rule the order detail screen follows:
@@ -87,31 +112,36 @@ export default function OrderActionsScreen() {
   };
   const [priceItem, setPriceItem] = useState<any>(null);
   const [priceDraft, setPriceDraft] = useState('');
+  const [priceError, setPriceError] = useState('');
   const [priceSaving, setPriceSaving] = useState(false);
 
   const savePrice = async () => {
-    if (!priceItem) return;
-    const price = parseFloat(priceDraft);
-    if (isNaN(price) || price < 0) return;
+    if (!priceItem || priceSaving) return;
+    // strict: parseFloat saved "12abc" as 12, and a non-number said nothing
+    const price = parseAmount(priceDraft);
+    if (price == null) {
+      setPriceError(t('customerOrders.priceInvalid'));
+      return;
+    }
     setPriceSaving(true);
     const res = await apiCall(`/invoice-item/${priceItem.uuid}/price`, {
       method: 'PUT',
       body: JSON.stringify({ price_per_unit: price }),
     });
     setPriceSaving(false);
-    if (res.status === 200) {
+    if (isOk(res.status)) {
+      markListsStale(...ORDER_LISTS, ...MONEY_LISTS);
       setPriceItem(null);
       load();
     } else {
-      Alert.alert(
-        t('customerOrders.editPrice'),
-        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
-      );
+      Alert.alert(t('customerOrders.editPrice'), apiErrorText(res.error, t('form.tryAgain')));
     }
   };
   const unfulfilled = items.filter((i: any) => !i.is_fulfilled);
   const amountDue = invoice?.net_amount_due ?? order?.net_amount_due ?? 0;
-  const currency = order?.currency || '';
+  // the invoice's own: a payment in the order's (first invoice's) currency
+  // against an invoice in another is refused as a currency mismatch
+  const currency = invoice?.currency || order?.currency || '';
   const pickedCount = unfulfilled.filter((i: any) => picked.has(i.uuid)).length;
   const canFulfill = pickedCount > 0;
   // matches the backend's MONEY_TOLERANCE: a balance it already treats as
@@ -134,7 +164,8 @@ export default function OrderActionsScreen() {
     if (canPay) setPayAmount(String(dueRounded));
   }, [dueRounded, canPay]);
 
-  const payNumber = Number(payAmount);
+  // parseAmount, as the price fields: Number("٥٠") is NaN
+  const payNumber = parseAmount(payAmount) ?? NaN;
   const payAmountValid =
     payAmount.trim() !== '' &&
     Number.isFinite(payNumber) &&
@@ -145,8 +176,13 @@ export default function OrderActionsScreen() {
   const remainingAfter = payAmountValid ? round2(dueRounded - payNumber) : null;
 
   const submit = async () => {
+    if (submittingRef.current) return;
     if (!(doFulfill && canFulfill) && !(doPay && canPay && payAmountValid)) return;
+    submittingRef.current = true;
     setSubmitting(true);
+    // set once a step has gone through, so a failure in the next one still
+    // refreshes what the screen and the lists show
+    let changed = false;
     try {
       if (doFulfill && canFulfill) {
         const r = await apiCall('/customer-order-item/fulfill-items', {
@@ -158,7 +194,10 @@ export default function OrderActionsScreen() {
             trip_stop_uuid: tripStopUuid || null,
           }),
         });
-        if (r.status !== 200 && r.status !== 201) throw new Error(r.error || t('order.failedToFulfill'));
+        // the server's reason ("Insufficient inventory for …"), not its JSON
+        if (!isOk(r.status)) throw new Error(apiErrorText(r.error, t('order.failedToFulfill')));
+        changed = true;
+        markListsStale(...ORDER_LISTS, ...STOCK_LISTS);
       }
       if (doPay && canPay && payAmountValid) {
         const r = await apiCall('/payment/', {
@@ -174,7 +213,11 @@ export default function OrderActionsScreen() {
             trip_stop_uuid: tripStopUuid || null,
           }),
         });
-        if (r.status !== 200 && r.status !== 201) throw new Error(r.error || t('order.failedToRecordPayment'));
+        if (!isOk(r.status)) {
+          throw new Error(apiErrorText(r.error, t('order.failedToRecordPayment')));
+        }
+        changed = true;
+        markListsStale(...ORDER_LISTS, ...MONEY_LISTS);
       }
       // Confirm what happened, then get out of the way. Whether the payment
       // settled the order or only part of it, the next step is back at the stop —
@@ -191,7 +234,11 @@ export default function OrderActionsScreen() {
       }, 1100);
     } catch (e: any) {
       Alert.alert(t('order.error'), e?.message || t('order.couldNotUpdateOrder'));
+      // the fulfilment went through and the payment did not: show the order as
+      // it now is, not as it was before the half that worked
+      if (changed) load();
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -230,14 +277,29 @@ export default function OrderActionsScreen() {
           {/* header */}
           <View style={styles.headerRow}>
             <ThemedText style={styles.date}>{fmtDate(order.created_at)}</ThemedText>
-            <View style={styles.badges}>
-              <View style={[styles.badge, order.is_paid ? styles.badgeGreen : styles.badgeRed]}>
-                <ThemedText style={styles.badgeText}>{order.is_paid ? t('order.paid') : t('order.unpaid')}</ThemedText>
+            {/* the order list's rules: no lines is not "fulfilled", 0.00 is not "paid" */}
+            {fulfilState(order) === 'none' ? (
+              <View style={styles.badges}>
+                <View style={[styles.badge, styles.badgeGray]}>
+                  <ThemedText style={styles.badgeText}>{t('customerOrders.noItemsBadge')}</ThemedText>
+                </View>
               </View>
-              <View style={[styles.badge, order.is_fulfilled ? styles.badgeGreen : styles.badgeGray]}>
-                <ThemedText style={styles.badgeText}>{order.is_fulfilled ? t('order.fulfilled') : t('order.unfulfilled')}</ThemedText>
+            ) : (
+              <View style={styles.badges}>
+                {payState(order) === 'free' ? (
+                  <View style={[styles.badge, styles.badgeGray]}>
+                    <ThemedText style={styles.badgeText}>{t('customerOrders.noCharge')}</ThemedText>
+                  </View>
+                ) : (
+                  <View style={[styles.badge, order.is_paid ? styles.badgeGreen : styles.badgeRed]}>
+                    <ThemedText style={styles.badgeText}>{order.is_paid ? t('order.paid') : t('order.unpaid')}</ThemedText>
+                  </View>
+                )}
+                <View style={[styles.badge, fulfilState(order) === 'fulfilled' ? styles.badgeGreen : styles.badgeGray]}>
+                  <ThemedText style={styles.badgeText}>{fulfilState(order) === 'fulfilled' ? t('order.fulfilled') : t('order.unfulfilled')}</ThemedText>
+                </View>
               </View>
-            </View>
+            )}
           </View>
 
           {/* items */}
@@ -256,6 +318,7 @@ export default function OrderActionsScreen() {
                   style={styles.editPriceRow}
                   onPress={() => {
                     setPriceDraft(String(li.price_per_unit ?? ''));
+                    setPriceError('');
                     setPriceItem(li);
                   }}
                   hitSlop={8}
@@ -312,7 +375,7 @@ export default function OrderActionsScreen() {
 
           {/* totals */}
           <View style={styles.totals}>
-            <View style={styles.totalLine}><ThemedText style={styles.totalKey}>{t('order.total')}</ThemedText><ThemedText>{round2(invoice?.total_amount ?? order.total_adjusted_amount ?? 0)} {te(currency)}</ThemedText></View>
+            <View style={styles.totalLine}><ThemedText style={styles.totalKey}>{t('order.total')}</ThemedText><ThemedText>{round2(invoice?.total_adjusted_amount ?? invoice?.total_amount ?? order.total_adjusted_amount ?? 0)} {te(currency)}</ThemedText></View>
             <View style={styles.totalLine}><ThemedText style={styles.totalKey}>{t('order.totalPaid')}</ThemedText><ThemedText>{round2(invoice?.net_amount_paid ?? order.net_amount_paid ?? 0)} {te(currency)}</ThemedText></View>
             <View style={styles.totalLine}><ThemedText style={styles.totalKeyBold}>{t('order.due')}</ThemedText><ThemedText style={styles.totalKeyBold} testID="text-amount-due">{round2(amountDue)} {te(currency)}</ThemedText></View>
           </View>
@@ -384,50 +447,35 @@ export default function OrderActionsScreen() {
         </ScrollView>
       )}
 
-      <Modal
+      <EditSheet
         visible={!!priceItem}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPriceItem(null)}
+        title={`${t('customerOrders.editPrice')}${
+          priceItem?.material_name ? ` — ${priceItem.material_name}` : ''
+        }`}
+        saving={priceSaving}
+        onCancel={() => setPriceItem(null)}
+        onSave={savePrice}
+        saveTestID="order-price-save"
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <ThemedText style={styles.modalTitle}>
-              {t('customerOrders.editPrice')}
-              {priceItem?.material_name ? ` — ${priceItem.material_name}` : ''}
-            </ThemedText>
-            <TextInput
-              style={styles.priceInput}
-              value={priceDraft}
-              onChangeText={setPriceDraft}
-              keyboardType="decimal-pad"
-              placeholder={t('customerOrders.newPricePerUnit')}
-              placeholderTextColor="#9ca3af"
-              autoFocus
-              testID="order-price-input"
-            />
-            <View style={styles.modalRow}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setPriceItem(null)}
-                disabled={priceSaving}
-              >
-                <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSave, priceSaving && styles.modalSaveOff]}
-                onPress={savePrice}
-                disabled={priceSaving}
-                testID="order-price-save"
-              >
-                <ThemedText style={styles.modalSaveText}>
-                  {priceSaving ? t('custdetail.saving') : t('form.save')}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        <TextInput
+          style={editSheetInput.field}
+          value={priceDraft}
+          onChangeText={(v) => {
+            setPriceDraft(v);
+            setPriceError('');
+          }}
+          keyboardType="decimal-pad"
+          placeholder={t('customerOrders.newPricePerUnit')}
+          placeholderTextColor="#9ca3af"
+          autoFocus
+          testID="order-price-input"
+        />
+        {!!priceError && (
+          <ThemedText style={editSheetInput.error} testID="order-price-error">
+            {priceError}
+          </ThemedText>
+        )}
+      </EditSheet>
     </ThemedView>
   );
 }
@@ -465,24 +513,6 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   editPriceText: { fontSize: 12, fontWeight: '700', color: '#5469D4' },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
-  modalSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16, borderTopRightRadius: 16,
-    padding: 16, paddingBottom: 32,
-  },
-  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
-  priceInput: {
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 8,
-    backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 10,
-    fontSize: 16, color: '#111827',
-  },
-  modalRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 12 },
-  modalCancel: { paddingHorizontal: 14, paddingVertical: 10 },
-  modalCancelText: { color: '#6b7280', fontWeight: '600' },
-  modalSave: { backgroundColor: '#5469D4', borderRadius: 10, paddingHorizontal: 18, paddingVertical: 10 },
-  modalSaveOff: { opacity: 0.6 },
-  modalSaveText: { color: '#fff', fontWeight: '700' },
   // same green as the stop screen's completed banner, so success reads the same
   // way everywhere in the app
   savedBanner: { backgroundColor: '#D1FAE5', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 14 },

@@ -1,6 +1,5 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
@@ -62,7 +61,6 @@ interface Billing {
  */
 export default function AccountSettingsScreen() {
   const { t, tef } = useLanguage();
-  const router = useRouter();
 
   const TYPE_LABEL: Record<string, string> = {
     charge: t('account.typeCharge'),
@@ -192,7 +190,7 @@ export default function AccountSettingsScreen() {
           </>
         )}
       />
-      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      <BottomNavigation activeTab="menu" />
     </View>
   );
 }

@@ -35,11 +35,25 @@ class _Repo:
         return [lot for lot in self._lots if lot.current_quantity > 0]
 
 
+class _MaterialRepo:
+    """Account-scoped like the real one: only this account's material resolves."""
+
+    def find_one(self, uuid):
+        return _Named("Roasted peanuts 1kg") if uuid == MATERIAL else None
+
+
+class _Named:
+    def __init__(self, name):
+        self.name = name
+
+
 class _Uow:
     """Just enough of the unit of work for the allocator."""
 
     def __init__(self, lots, all_lots=None):
         self.inventory_repository = _Repo(lots)
+        # the refusals name the material, looked up through its repository
+        self.material_repository = _MaterialRepo()
         self.account_uuid = "acct-1"
         self._all_lots = all_lots if all_lots is not None else lots
         self.session = self
@@ -57,6 +71,7 @@ class _Uow:
 
     def first(self):
         return self._all_lots[-1] if self._all_lots else None
+
 
 
 def allocate(lots, quantity, allow_negative=False, all_lots=None):
@@ -78,8 +93,10 @@ def test_covered_request_stops_at_the_first_sufficient_lot():
 
 def test_shortfall_is_refused_by_default():
     """The production path relies on this."""
-    with pytest.raises(NotFoundError, match="Insufficient inventory"):
+    with pytest.raises(NotFoundError, match="Insufficient inventory") as err:
         allocate([_Lot("old", 10)], 25)
+    # named as the person knows it, not by uuid
+    assert '"Roasted peanuts 1kg"' in str(err.value) and MATERIAL not in str(err.value)
 
 
 def test_shortfall_lands_on_the_lot_fifo_stopped_at():
@@ -101,10 +118,21 @@ def test_no_positive_lots_falls_back_to_an_existing_lot():
     assert [(o.inventory_uuid, o.quantity) for o in out] == [("drained", 30)]
 
 
+def test_a_material_outside_the_account_is_not_named():
+    """The repository is account-scoped, so a foreign uuid is echoed back."""
+    with pytest.raises(NotFoundError) as err:
+        InventoryDomain.get_fifo_inventories_for_material(
+            uow=_Uow([_Lot("old", 10)]), material_uuid="other-tenant-mat", quantity=25,
+        )
+    assert "material other-tenant-mat" in str(err.value)
+    assert "Roasted" not in str(err.value)
+
+
 def test_no_lot_at_all_is_refused_with_a_reason():
     """A lot needs a warehouse and a sale does not name one, so this cannot be guessed."""
-    with pytest.raises(BadRequestError, match="no inventory lot"):
+    with pytest.raises(BadRequestError, match="no inventory lot") as err:
         allocate([], 30, allow_negative=True, all_lots=[])
+    assert '"Roasted peanuts 1kg"' in str(err.value)
 
 
 def test_single_lot_oversell_matches_the_observed_behaviour():

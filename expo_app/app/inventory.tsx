@@ -82,12 +82,10 @@ export default function InventoryScreen() {
     [warehouses],
   );
 
-  // memoised: ModuleListScreen dep-tracks `params` by identity, so a fresh literal
-  // each render would re-fetch forever
-  const params = useMemo(
-    () => ({ cost_currency: ccy, ...(wh ? { warehouse_uuid: wh } : {}) }),
-    [ccy, wh],
-  );
+  // the warehouse narrows the rows; the cost currency only changes how they are
+  // shown, so switching it keeps the page and scroll position
+  const params = useMemo(() => (wh ? { warehouse_uuid: wh } : undefined), [wh]);
+  const displayParams = useMemo(() => ({ cost_currency: ccy }), [ccy]);
 
   const qty = (n: number) => (Number.isInteger(n) ? String(n) : Number(n).toFixed(2));
 
@@ -99,6 +97,7 @@ export default function InventoryScreen() {
         endpoint="/inventory/"
         itemsKey="inventories"
         params={params}
+        displayParams={displayParams}
         onCreate={() => router.push('/inventory/add-stock')}
         header={
           <View style={styles.headerBlock}>
@@ -210,7 +209,7 @@ export default function InventoryScreen() {
           );
         }}
       />
-      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      <BottomNavigation activeTab="menu" />
     </View>
   );
 }

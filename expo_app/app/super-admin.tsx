@@ -104,7 +104,7 @@ export default function SuperAdminHubScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-        <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+        <BottomNavigation activeTab="menu" />
       </ThemedView>
     </ModuleGuard>
   );

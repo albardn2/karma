@@ -27,3 +27,45 @@ export const perCurrency = (m?: Record<string, number> | null): string => {
     ? entries.map(([cur, v]) => `${Number(v).toFixed(2)} ${cur}`).join(' · ')
     : '—';
 };
+
+// Arabic-Indic (U+0660..) and Extended Arabic-Indic (U+06F0..) digits, and the
+// Arabic decimal separator (U+066B), are what an Arabic keyboard types into a
+// number field
+const normaliseDigits = (text: string): string =>
+  text
+    .trim()
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/٫/g, '.');
+
+/**
+ * A typed amount (0 or more), or null when the text is not one.
+ *
+ * Strict where parseFloat is not: parseFloat("12abc") is 12 and parseFloat("1.2.3")
+ * is 1.2, so a typo saved as a different price with no word said.
+ *
+ * A comma is read as a decimal comma only where it cannot be a thousands
+ * separator — one comma, no point, one or two digits after it ("12,5"). "1,250"
+ * is refused rather than read as 1.25: a SYP price a thousand times too small.
+ */
+export const parseAmount = (text: string): number | null => {
+  let s = normaliseDigits(text);
+  if (s.includes(',')) {
+    if (!/^\d+,\d{1,2}$/.test(s)) return null;
+    s = s.replace(',', '.');
+  }
+  if (!/^(\d+(\.\d*)?|\.\d+)$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** The most units one order line may carry — the server's bound (checkout and edit). */
+export const MAX_QUANTITY = 1_000_000;
+
+/** A whole number of units, 1 to MAX_QUANTITY, or null — "1.5" is not 1. */
+export const parseWholeNumber = (text: string): number | null => {
+  const s = normaliseDigits(text);
+  if (!/^\d+$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isSafeInteger(n) && n > 0 && n <= MAX_QUANTITY ? n : null;
+};

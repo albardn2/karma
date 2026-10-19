@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -16,7 +16,7 @@ import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
-import { takeListStale } from '@/utils/listRefresh';
+import { takeListFlash, takeListStale } from '@/utils/listRefresh';
 
 export const PER_PAGE = 20;
 
@@ -51,8 +51,14 @@ interface ModuleListScreenProps<T> {
    */
   searchParam?: string;
   searchPlaceholder?: string;
-  /** extra fixed query params */
+  /** extra fixed query params — filters: changing one starts again at page 1 */
   params?: Record<string, string>;
+  /**
+   * Query params that change how rows are SHOWN, not which rows come back — a
+   * display currency, say. Changing one reloads the same page in place, keeping
+   * the page number and the scroll position.
+   */
+  displayParams?: Record<string, string>;
   /**
    * Envelope field holding the page count. Almost every module calls it `pages`, but
    * the platform-owner endpoints call it `total_pages` — and reading the wrong one is
@@ -68,6 +74,13 @@ interface ModuleListScreenProps<T> {
   filters?: Array<{ id: string; label: string; params: Record<string, string> }>;
   /** rendered above the list, for anything a module needs beyond chips */
   header?: React.ReactNode;
+  /**
+   * The caller has narrowed the list with a control of its own in `header` (a
+   * customer picker, say), so an empty result reads "no matches" rather than
+   * "nothing here yet" — the latter tells someone who filtered that the module
+   * is empty.
+   */
+  filtered?: boolean;
   /**
    * A view-mode strip rendered directly under the title, above the search box.
    *
@@ -117,9 +130,11 @@ export function ModuleListScreen<T>({
   searchParam,
   searchPlaceholder,
   params,
+  displayParams,
   pagesKey = 'pages',
   filters,
   header,
+  filtered,
   tabs,
   body,
   onCreate,
@@ -140,24 +155,43 @@ export function ModuleListScreen<T>({
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  // a one-line confirmation left by the screen that sent the user back here
+  // ("Order deleted") — router.back() cannot carry it as a param
+  const [flash, setFlash] = useState<string | null>(null);
+  const listRef = useRef<FlatList<T>>(null);
+  // Only the newest request may land. Paging or switching filters quickly
+  // leaves several in flight, and an older one answering last would put the
+  // previous filter's rows under the new chip.
+  const requestSeq = useRef(0);
 
   const filterParams = filters?.find((f) => f.id === activeFilter)?.params ?? {};
+  // `params` by value: a caller passing a fresh literal each render would
+  // otherwise refetch forever
+  const paramsKey = JSON.stringify(params ?? {});
+  const displayKey = JSON.stringify(displayParams ?? {});
 
   const load = useCallback(
-    async (targetPage: number, isRefresh = false) => {
+    async (targetPage: number, isRefresh = false, toTop = false) => {
+      const seq = ++requestSeq.current;
+      // The full-screen spinner is for the first load only. Replacing rows
+      // already on screen with it on every page, filter or reload blanked the
+      // list and threw away the scroll position; the header shows a small one
+      // instead while the new rows load.
       if (!isRefresh) setLoading(true);
       setFailed(false);
       try {
         const query = new URLSearchParams({
           page: String(targetPage),
           per_page: String(PER_PAGE),
-          ...(params ?? {}),
+          ...(JSON.parse(paramsKey) as Record<string, string>),
+          ...(JSON.parse(displayKey) as Record<string, string>),
           ...filterParams,
         });
         if (searchParam && appliedSearch.trim()) {
           query.append(searchParam, appliedSearch.trim());
         }
         const res = await apiCall<any>(`${endpoint}?${query.toString()}`);
+        if (seq !== requestSeq.current) return;
         if (isOk(res.status) && res.data) {
           const rows = res.data[itemsKey] ?? [];
           const pages = res.data[pagesKey] ?? 1;
@@ -173,6 +207,9 @@ export function ModuleListScreen<T>({
           setItems(rows);
           setTotalPages(pages);
           setTotalCount(res.data.total_count ?? 0);
+          // a different page or filter starts at its top; a quiet reload (back
+          // from a detail screen, pull to refresh) keeps the reader's place
+          if (toTop) listRef.current?.scrollToOffset({ offset: 0, animated: false });
         } else {
           // 403 included on purpose: the server is the authority, and a role
           // narrowed after this screen opened should read as refused, not empty.
@@ -180,32 +217,72 @@ export function ModuleListScreen<T>({
           setItems([]);
         }
       } catch {
+        if (seq !== requestSeq.current) return;
         setFailed(true);
         setItems([]);
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (seq === requestSeq.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     // filterParams is derived from activeFilter, so depend on the id rather than
     // the object — a fresh object literal each render would re-fetch endlessly
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [endpoint, itemsKey, searchParam, appliedSearch, params, activeFilter],
+    [endpoint, itemsKey, searchParam, appliedSearch, paramsKey, displayKey, activeFilter],
   );
 
+  // What the rows are filtered by. When it changes the list starts again at
+  // page 1 — a caller's own filter (`params`) included, which used to keep the
+  // page number and could land past the end of a shorter result.
+  const queryKey = `${paramsKey}|${activeFilter}|${appliedSearch}`;
+  const lastFetched = useRef({ page, queryKey });
   useEffect(() => {
-    load(page);
-  }, [page, appliedSearch, load]);
+    const prev = lastFetched.current;
+    if (prev.queryKey !== queryKey && page !== 1) {
+      lastFetched.current = { page, queryKey };
+      // Supersede whatever is still in flight for the old filter: until the
+      // page-1 request goes out on the next pass it would count as the newest,
+      // and its answer could show the old rows or move the page again.
+      ++requestSeq.current;
+      setPage(1); // the page change fetches
+      return;
+    }
+    // a different page or filter starts at its top; anything else (a display
+    // param) reloads the page in place
+    const moved = prev.page !== page || prev.queryKey !== queryKey;
+    lastFetched.current = { page, queryKey };
+    load(page, false, moved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, queryKey, load]);
 
   // Back from a detail screen that changed records behind this list (a delete,
   // say): the list is still mounted and would not refetch on its own. Quietly,
   // without the full-screen spinner, so the rows the user was looking at stay
-  // put while the change lands.
+  // put while the change lands. On the first focus the mark is only cleared:
+  // the mount is already fetching, and a mark left by a write made elsewhere
+  // would otherwise fetch everything a second time.
+  const focusedBefore = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      if (takeListStale(endpoint)) load(page, true);
+      const stale = takeListStale(endpoint);
+      if (stale && focusedBefore.current) load(page, true);
+      focusedBefore.current = true;
+      const message = takeListFlash(endpoint);
+      if (message) setFlash(message);
     }, [endpoint, load, page]),
   );
+
+  useEffect(() => {
+    if (!flash) return;
+    // long enough to read after the screen transition that brings you here
+    const timer = setTimeout(() => setFlash(null), 4000);
+    return () => clearTimeout(timer);
+  }, [flash]);
+
+  // first load only: rows already on screen stay while newer ones load
+  const blocking = loading && items.length === 0;
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -238,10 +315,15 @@ export function ModuleListScreen<T>({
             {title}
           </ThemedText>
           <View style={styles.headerRight}>
-            {!loading && !failed && (
-              <ThemedText style={styles.count} testID="module-list-count">
-                {t('moduleList.count', { count: totalCount })}
-              </ThemedText>
+            {loading && !blocking ? (
+              <ActivityIndicator size="small" color="#5469D4" testID="module-list-updating" />
+            ) : (
+              !loading &&
+              !failed && (
+                <ThemedText style={styles.count} testID="module-list-count">
+                  {t('moduleList.count', { count: totalCount })}
+                </ThemedText>
+              )
             )}
             {!!onAnalytics && (
               <TouchableOpacity
@@ -259,6 +341,12 @@ export function ModuleListScreen<T>({
             )}
           </View>
         </View>
+
+        {!!flash && (
+          <View style={styles.flash} testID="module-list-flash">
+            <ThemedText style={styles.flashText}>{flash}</ThemedText>
+          </View>
+        )}
 
         {tabs}
 
@@ -303,7 +391,7 @@ export function ModuleListScreen<T>({
 
         {body ? (
           body
-        ) : loading ? (
+        ) : blocking ? (
           <View style={styles.centre}>
             <ActivityIndicator size="large" color="#5469D4" />
           </View>
@@ -313,12 +401,13 @@ export function ModuleListScreen<T>({
             <ThemedText style={styles.stateText} testID="module-list-error">
               {t('moduleList.failed')}
             </ThemedText>
-            <TouchableOpacity style={styles.retry} onPress={() => load(page)}>
+            <TouchableOpacity style={styles.retry} onPress={() => load(page, false, true)}>
               <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
             </TouchableOpacity>
           </View>
         ) : (
           <FlatList
+            ref={listRef}
             data={items}
             keyExtractor={keyExtractor}
             renderItem={({ item }) => <>{renderItem(item)}</>}
@@ -332,7 +421,9 @@ export function ModuleListScreen<T>({
               <View style={styles.centre}>
                 <ThemedText style={styles.stateIcon}>📭</ThemedText>
                 <ThemedText style={styles.stateText} testID="module-list-empty">
-                  {appliedSearch ? t('moduleList.noMatches') : t('moduleList.empty')}
+                  {appliedSearch || activeFilter || filtered
+                    ? t('moduleList.noMatches')
+                    : t('moduleList.empty')}
                 </ThemedText>
               </View>
             }
@@ -419,7 +510,7 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 20, paddingTop: 6 },
   listEmpty: { flexGrow: 1 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  stateIcon: { fontSize: 34 },
+  stateIcon: { fontSize: 34, lineHeight: 42 },
   stateText: { fontSize: 15, opacity: 0.6, textAlign: 'center' },
   retry: {
     marginTop: 6,
@@ -447,4 +538,13 @@ const styles = StyleSheet.create({
   pageBtnOff: { opacity: 0.35 },
   pageBtnText: { fontSize: 20, fontWeight: '700', color: '#5469D4' },
   pageLabel: { fontSize: 14, opacity: 0.7 },
+  flash: {
+    marginHorizontal: 20,
+    marginTop: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: '#dcfce7',
+  },
+  flashText: { fontSize: 14, fontWeight: '600', color: '#166534', textAlign: 'center' },
 });

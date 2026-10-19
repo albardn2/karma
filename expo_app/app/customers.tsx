@@ -843,7 +843,7 @@ export default function CustomersScreen() {
       {/* The reason the footer never showed: this was imported and mentioned in a
           comment above, but never rendered. The scroll area already reserves 100pt
           for it, and the bar is absolutely positioned, so nothing else moves. */}
-      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      <BottomNavigation activeTab="menu" />
       </ThemedView>
   );
 }

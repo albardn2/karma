@@ -159,7 +159,7 @@ export default function ExchangeRatesScreen() {
           </View>
         )}
       />
-      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      <BottomNavigation activeTab="menu" />
     </View>
   );
 }
