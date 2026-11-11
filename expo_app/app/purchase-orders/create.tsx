@@ -23,6 +23,11 @@ import { money } from '@/utils/money';
 const CURRENCIES = ['USD', 'SYP'];
 
 interface Line {
+  /**
+   * Stable identity for the React key. Keying by position made removing line 1 hand
+   * line 2's data to line 1's picker, which kept showing the removed material's name.
+   */
+  id: number;
   material_uuid: string;
   material_name: string;
   /** the material's own measure_unit — resolved from the server, never guessed */
@@ -31,7 +36,10 @@ interface Line {
   price_per_unit: string;
 }
 
+let nextLineId = 0;
+
 const blank = (): Line => ({
+  id: nextLineId++,
   material_uuid: '',
   material_name: '',
   unit: '',
@@ -244,7 +252,7 @@ export default function PurchaseOrderCreateScreen() {
             <ThemedText style={styles.hint}>{t('purchaseOrders.unitFromMaterial')}</ThemedText>
 
             {lines.map((l, i) => (
-              <View key={i} style={styles.lineCard} testID={`po-line-${i}`}>
+              <View key={l.id} style={styles.lineCard} testID={`po-line-${i}`}>
                 <View style={styles.lineHead}>
                   <ThemedText style={styles.lineIndex}>{i + 1}</ThemedText>
                   <TouchableOpacity
@@ -274,6 +282,7 @@ export default function PurchaseOrderCreateScreen() {
                   }}
                   value={l.material_uuid}
                   onChange={(uuid, label) => pickMaterial(i, uuid, label)}
+                  initialLabel={l.material_name || undefined}
                   testID={`po-line-material-${i}`}
                 />
 
