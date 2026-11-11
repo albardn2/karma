@@ -88,8 +88,10 @@ class CustomerOrderAndInvoiceItemCreate(BaseModel):
     """Fields required to create a new customer order with items and invoice."""
     model_config = ConfigDict(extra="forbid")
     material_uuid: str
-    quantity: int
-    price_per_unit: float
+    # bounded here, at the request, so a bad line is a 422 naming items[i]
+    # rather than a 500 from an integer overflow in the column
+    quantity: int = Field(gt=0, le=1_000_000)
+    price_per_unit: float = Field(ge=0)
 
 class CustomerOrderWithItemsAndInvoiceCreate(BaseModel):
     """Fields required to create a new customer order with items and invoice."""
@@ -143,6 +145,10 @@ class CustomerOrderWithItemsAndInvoiceRead(BaseModel):
     # delta) or "locked". Set by the detail route — both clients read it here
     # so the rule lives server-side only.
     price_edit_state: Optional[str] = None
+    # whether the guarded delete would succeed (CustomerOrderDomain.
+    # can_delete_customer_order), for the same reason: the rule needs payments
+    # and notes a client does not have
+    can_delete: Optional[bool] = None
 
     @classmethod
     def from_customer_order_model(cls, customer_order:CustomerOrder):

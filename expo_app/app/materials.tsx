@@ -88,7 +88,7 @@ export default function MaterialsScreen() {
           </TouchableOpacity>
         )}
       />
-      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+      <BottomNavigation activeTab="menu" />
     </View>
   );
 }

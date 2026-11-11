@@ -78,6 +78,7 @@ def get_customer_order_with_items_and_invoice(uuid: str):
         # both clients decide whether to offer the price editor from this one
         # server-computed flag, so the payment-state rule cannot drift
         dto.price_edit_state, _ = order_price_edit_state(cus_order)
+        dto.can_delete = CustomerOrderDomain.can_delete_customer_order(cus_order)
         result = dto.model_dump(mode="json")
     return jsonify(result), 201
 

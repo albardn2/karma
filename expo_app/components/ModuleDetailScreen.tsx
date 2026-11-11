@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
@@ -29,7 +29,12 @@ export interface DetailSection<T> {
 
 export interface DetailAction<T> {
   label: string;
-  onPress: (item: T) => void;
+  /**
+   * Return the request's promise to have the scaffold hold every action button
+   * until it settles — a second tap on Delete while the first is in flight
+   * otherwise sends the request twice.
+   */
+  onPress: (item: T) => void | Promise<unknown>;
   /** destructive actions get a confirm and red styling */
   destructive?: boolean;
   testID?: string;
@@ -84,6 +89,13 @@ interface ModuleDetailScreenProps<T> {
   footer?: (item: T) => React.ReactNode;
   /** bumped by a caller to force a refetch after a write */
   reloadKey?: number;
+  /**
+   * Refetch, quietly, each time the screen comes back into view — for a record
+   * another screen writes to (record a payment, then back). Not on the first
+   * focus: the mount already fetches, and bumping reloadKey from the caller's
+   * own focus effect fetched everything twice on open.
+   */
+  reloadOnFocus?: boolean;
 }
 
 /**
@@ -108,6 +120,7 @@ export function ModuleDetailScreen<T>({
   actions,
   footer,
   reloadKey,
+  reloadOnFocus,
 }: ModuleDetailScreenProps<T>) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -116,20 +129,29 @@ export function ModuleDetailScreen<T>({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [failed, setFailed] = useState(false);
+  // the action whose request is in flight; every action waits for it
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  // Only the newest request may land: a reload after a save can be overtaken
+  // by an older one still in flight, which would put the pre-save record back.
+  const requestSeq = useRef(0);
 
   const load = useCallback(
     async (isRefresh = false) => {
+      const seq = ++requestSeq.current;
       if (!isRefresh) setLoading(true);
       setFailed(false);
       try {
         const res = await apiCall<T>(endpoint);
+        if (seq !== requestSeq.current) return;
         if (isOk(res.status) && res.data) setItem(res.data);
         else setFailed(true);
       } catch {
-        setFailed(true);
+        if (seq === requestSeq.current) setFailed(true);
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (seq === requestSeq.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     [endpoint],
@@ -138,6 +160,35 @@ export function ModuleDetailScreen<T>({
   useEffect(() => {
     load();
   }, [load, reloadKey]);
+
+  const focusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!reloadOnFocus) return;
+      if (!focusedOnce.current) {
+        focusedOnce.current = true;
+        return;
+      }
+      load(true);
+    }, [reloadOnFocus, load]),
+  );
+
+  const runAction = async (a: DetailAction<T>, record: T) => {
+    if (busyAction) return;
+    const pending = a.onPress(record);
+    if (!pending) return;
+    setBusyAction(a.label);
+    try {
+      await pending;
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  // The full-screen spinner is for the first load only. A reload after a save
+  // swapped the whole record for it, which read as the screen breaking and
+  // dropped the scroll position; the record stays while the new copy loads.
+  const blocking = loading && !item;
 
   // an action with no `visible` predicate always shows; one with a predicate is asked
   const shownActions = item
@@ -156,14 +207,18 @@ export function ModuleDetailScreen<T>({
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {title}
           </ThemedText>
-          <View style={styles.backSpacer} />
+          {loading && !blocking ? (
+            <ActivityIndicator size="small" color="#5469D4" style={styles.backSpacer} />
+          ) : (
+            <View style={styles.backSpacer} />
+          )}
         </View>
 
-        {loading ? (
+        {blocking ? (
           <View style={styles.centre}>
             <ActivityIndicator size="large" color="#5469D4" />
           </View>
-        ) : failed || !item ? (
+        ) : !item ? (
           <View style={styles.centre}>
             <ThemedText style={styles.stateIcon}>⚠️</ThemedText>
             <ThemedText style={styles.stateText} testID="detail-error">
@@ -186,6 +241,14 @@ export function ModuleDetailScreen<T>({
               />
             }
           >
+            {failed && (
+              // a reload that failed with the record already on screen: keep
+              // it, but say it may be out of date rather than pass it off as
+              // current
+              <ThemedText style={styles.staleNote} testID="detail-stale">
+                {t('moduleDetail.refreshFailed')}
+              </ThemedText>
+            )}
             <ThemedText style={styles.heading} testID="detail-heading">
               {heading(item)}
             </ThemedText>
@@ -196,10 +259,15 @@ export function ModuleDetailScreen<T>({
                 {shownActions.map((a) => (
                   <TouchableOpacity
                     key={a.label}
-                    style={[styles.action, a.destructive && styles.actionDestructive]}
+                    style={[
+                      styles.action,
+                      a.destructive && styles.actionDestructive,
+                      !!busyAction && styles.actionBusy,
+                    ]}
+                    disabled={!!busyAction}
                     testID={a.testID}
                     onPress={() => {
-                      if (!a.destructive) return a.onPress(item);
+                      if (!a.destructive) return runAction(a, item);
                       // a destructive action always asks first: these screens are
                       // used one-handed in a van, and a mis-tap should not delete
                       const body =
@@ -208,15 +276,19 @@ export function ModuleDetailScreen<T>({
                           : a.confirmText;
                       Alert.alert(a.label, body ?? t('detail.confirmDestructive'), [
                         { text: t('common.cancel'), style: 'cancel' },
-                        { text: a.label, style: 'destructive', onPress: () => a.onPress(item) },
+                        { text: a.label, style: 'destructive', onPress: () => runAction(a, item) },
                       ]);
                     }}
                   >
-                    <ThemedText
-                      style={[styles.actionText, a.destructive && styles.actionTextDestructive]}
-                    >
-                      {a.label}
-                    </ThemedText>
+                    {busyAction === a.label ? (
+                      <ActivityIndicator color={a.destructive ? '#dc2626' : '#fff'} />
+                    ) : (
+                      <ThemedText
+                        style={[styles.actionText, a.destructive && styles.actionTextDestructive]}
+                      >
+                        {a.label}
+                      </ThemedText>
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -283,8 +355,20 @@ const styles = StyleSheet.create({
   actionDestructive: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#fecaca' },
   actionText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   actionTextDestructive: { color: '#dc2626' },
+  actionBusy: { opacity: 0.6 },
+  staleNote: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#92400e',
+    backgroundColor: '#fef3c7',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  stateIcon: { fontSize: 34 },
+  stateIcon: { fontSize: 34, lineHeight: 42 },
   stateText: { fontSize: 15, opacity: 0.6, textAlign: 'center' },
   retry: {
     marginTop: 6,

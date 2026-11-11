@@ -309,7 +309,7 @@ export default function LiveMapScreen() {
             </ThemedText>
           )}
         </View>
-        <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+        <BottomNavigation activeTab="menu" />
       </ThemedView>
     </ModuleGuard>
   );

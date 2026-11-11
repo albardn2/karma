@@ -494,7 +494,7 @@ export default function TripsScreen() {
           so with both mounted it sat on top of the action bar and the Summary
           button could not be seen or tapped. */}
       {!selectionMode && (
-        <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+        <BottomNavigation activeTab="menu" />
       )}
     </ThemedView>
   );

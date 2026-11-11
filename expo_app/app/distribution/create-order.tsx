@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
   ScrollView,
   StyleSheet,
@@ -14,11 +15,32 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
-import { apiCall } from '@/utils/api';
-import { PickerField } from '@/components/PickerField';
+import { apiCall, apiErrorText, isOk } from '@/utils/api';
+import { CUSTOMER_PICKER, PickerField } from '@/components/PickerField';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { parseAmount, parseWholeNumber } from '@/utils/money';
+import { markListsStale } from '@/utils/listRefresh';
+import { MONEY_LISTS, ORDER_LISTS, STOCK_LISTS } from '@/utils/orderStatus';
 
 const CURRENCIES = ['SYP', 'USD'];
+
+/**
+ * When an unpaid balance falls due. Without one an invoice is never overdue, so
+ * the Overdue filter on the orders list could not match an order made in the app.
+ * Payment terms here are counted in days, so a few fixed choices beat a calendar.
+ */
+const DUE_DAYS = [7, 14, 30];
+
+/**
+ * The end of the local day `days` from today, as the naive-UTC timestamp the
+ * backend's columns hold (the web app sends the same shape).
+ */
+const dueDateIn = (days: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(23, 59, 59, 0);
+  return d.toISOString().slice(0, 19);
+};
 
 interface Material {
   uuid: string;
@@ -58,8 +80,12 @@ export default function CreateOrderScreen() {
   const [notes, setNotes] = useState('');
   const [markFulfilled, setMarkFulfilled] = useState(!standalone);
   const [markPaid, setMarkPaid] = useState(!standalone);
+  const [dueDays, setDueDays] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // state lands a render late; a double tap inside that render sent two orders
+  const submittingRef = useRef(false);
   const [loading, setLoading] = useState(true);
+  const [materialQuery, setMaterialQuery] = useState('');
 
   const [allMaterials, setAllMaterials] = useState<Material[]>([]);
   const [loadedUuids, setLoadedUuids] = useState<string[]>([]);
@@ -91,11 +117,24 @@ export default function CreateOrderScreen() {
     [allMaterials, loadedUuids]
   );
 
+  // the picker's own search: a catalogue of a few hundred is not scrollable by eye
+  const shownMaterials = useMemo(() => {
+    const q = materialQuery.trim().toLowerCase();
+    if (!q) return materials;
+    return materials.filter(
+      (m) => m.name.toLowerCase().includes(q) || (m.sku ?? '').toLowerCase().includes(q),
+    );
+  }, [materials, materialQuery]);
+
   const materialOf = (uuid: string) => allMaterials.find((m) => m.uuid === uuid);
   const unitOf = (uuid: string) => materialOf(uuid)?.measure_unit || '';
 
+  // Read the way the request is built, so the Total is what gets saved: it used
+  // to add up "1.5" as 1.5 while the body sent parseInt's 1.
+  const lineQuantity = (it: LineItem) => parseWholeNumber(it.quantity);
+  const linePrice = (it: LineItem) => parseAmount(it.price_per_unit);
   const total = items.reduce(
-    (sum, it) => sum + (parseFloat(it.quantity) || 0) * (parseFloat(it.price_per_unit) || 0),
+    (sum, it) => sum + (lineQuantity(it) ?? 0) * (linePrice(it) ?? 0),
     0
   );
 
@@ -104,11 +143,34 @@ export default function CreateOrderScreen() {
   const addItem = () => setItems((prev) => [...prev, { material_uuid: '', quantity: '', price_per_unit: '' }]);
   const removeItem = (i: number) => setItems((prev) => prev.filter((_, idx) => idx !== i));
 
-  const validItems = items.filter((it) => it.material_uuid && parseInt(it.quantity, 10) > 0 && it.price_per_unit !== '');
-  const canSubmit = validItems.length > 0 && !submitting && !!customerSel.uuid;
+  const isComplete = (it: LineItem) =>
+    !!it.material_uuid && lineQuantity(it) != null && linePrice(it) != null;
+  const isStarted = (it: LineItem) =>
+    !!it.material_uuid || it.quantity.trim() !== '' || it.price_per_unit.trim() !== '';
+  const validItems = items.filter(isComplete);
+  // A line started but not valid blocks Submit, and says why. It used to be
+  // left off the order without a word — at a stop, with fulfil and pay on,
+  // goods handed over with no sale recorded for them.
+  const badQuantity = items.find((it) => it.quantity.trim() !== '' && lineQuantity(it) == null);
+  const badPrice = items.find((it) => it.price_per_unit.trim() !== '' && linePrice(it) == null);
+  const incomplete = items.find((it) => isStarted(it) && !isComplete(it));
+  const canSubmit = validItems.length > 0 && !submitting && !!customerSel.uuid && !incomplete;
+  // why Submit is greyed out, under it — it used to grey out and say nothing
+  const submitHint = !customerSel.uuid
+    ? t('createorder.hintCustomer')
+    : badQuantity
+      ? t('createorder.quantityWhole', { value: badQuantity.quantity.trim() })
+      : badPrice
+        ? t('customerOrders.priceInvalid')
+        : incomplete
+          ? t('createorder.hintIncomplete')
+          : !validItems.length
+            ? t('createorder.hintItems')
+            : '';
 
   const submit = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const body: any = {
@@ -117,8 +179,8 @@ export default function CreateOrderScreen() {
         trip_stop_uuid: tripStopUuid || null,
         items: validItems.map((it) => ({
           material_uuid: it.material_uuid,
-          quantity: parseInt(it.quantity, 10),
-          price_per_unit: parseFloat(it.price_per_unit),
+          quantity: lineQuantity(it),
+          price_per_unit: linePrice(it),
         })),
         fulfill: markFulfilled,
         pay: markPaid,
@@ -127,16 +189,22 @@ export default function CreateOrderScreen() {
         body.financial_account_uuid = null; // default account by currency
         body.payment_method = 'cash';
       }
-      // checkout accepts and persists notes (verified live); due_date it silently
-      // drops, which is why there is no due-date field to mislead anyone
+      // checkout accepts and persists notes and due_date (verified live)
       if (standalone && notes.trim()) body.notes = notes.trim();
+      if (!markPaid && dueDays != null) body.due_date = dueDateIn(dueDays);
       const res = await apiCall<any>('/customer-order/with-items-and-invoice/checkout', {
         method: 'POST',
         body: JSON.stringify(body),
       });
-      if (res.status !== 201 && res.status !== 200) {
-        throw new Error(res.error || t('createorder.createFailed'));
+      if (!isOk(res.status)) {
+        // the server's reason ("Insufficient inventory for …"), not its JSON
+        throw new Error(apiErrorText(res.error, t('createorder.createFailed')));
       }
+      markListsStale(
+        ...ORDER_LISTS,
+        ...(markPaid ? MONEY_LISTS : []),
+        ...(markFulfilled ? STOCK_LISTS : []),
+      );
       if (standalone) {
         // land on the order just made — but via a fresh GET, never this response:
         // checkout's 201 body reports stale derived fields (is_paid false while the
@@ -150,6 +218,7 @@ export default function CreateOrderScreen() {
     } catch (e: any) {
       Alert.alert(t('createorder.errorTitle'), e?.message || t('createorder.createError'));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -159,7 +228,11 @@ export default function CreateOrderScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <NativeHeader
         title={t('createorder.title')}
-        onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))}
+        onBack={() =>
+          router.canGoBack()
+            ? router.back()
+            : router.replace(standalone ? '/customer-orders' : '/distribution')
+        }
       />
 
       {loading ? (
@@ -170,15 +243,10 @@ export default function CreateOrderScreen() {
             <View style={styles.customerPick}>
               <ThemedText style={styles.sectionLabel}>{t('createorder.selectCustomer')}</ThemedText>
               <PickerField
-                spec={{
-                  endpoint: '/customer/',
-                  itemsKey: 'customers',
-                  searchParam: 'company_name',
-                  label: (c) => c.company_name || c.full_name || c.uuid,
-                  sublabel: (c) => (c.company_name ? c.full_name || undefined : undefined),
-                  value: (c) => c.uuid,
-                }}
+                spec={CUSTOMER_PICKER}
                 value={customerSel.uuid}
+                // the name it arrived with, from a customer's screen or a filtered list
+                initialLabel={customerSel.label}
                 onChange={(uuid, label) => setCustomerSel({ uuid, label })}
                 testID="create-order-customer"
               />
@@ -223,7 +291,7 @@ export default function CreateOrderScreen() {
               <View style={styles.qtyWrap}>
                 <TextInput
                   style={styles.smallInput}
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                   placeholder={t('createorder.qtyPlaceholder')}
                   placeholderTextColor="#9ca3af"
                   value={it.quantity}
@@ -234,7 +302,7 @@ export default function CreateOrderScreen() {
               </View>
               <TextInput
                 style={[styles.smallInput, styles.priceInput]}
-                keyboardType="numeric"
+                keyboardType="decimal-pad"
                 placeholder={t('createorder.pricePlaceholder')}
                 placeholderTextColor="#9ca3af"
                 value={it.price_per_unit}
@@ -275,6 +343,29 @@ export default function CreateOrderScreen() {
             <Switch value={markPaid} onValueChange={setMarkPaid} trackColor={{ true: '#5469D4' }} testID="toggle-paid" />
           </View>
 
+          {/* only for a balance left owing; a paid order has nothing to fall due */}
+          {!markPaid && (
+            <View style={styles.dueBlock}>
+              <ThemedText style={styles.toggleLabel}>{t('customerOrders.dueDate')}</ThemedText>
+              <View style={styles.dueChips}>
+                {[null, ...DUE_DAYS].map((days) => (
+                  <TouchableOpacity
+                    key={String(days)}
+                    style={[styles.chip, dueDays === days && styles.chipActive]}
+                    onPress={() => setDueDays(days)}
+                    testID={`due-${days ?? 'none'}`}
+                  >
+                    <ThemedText style={[styles.chipText, dueDays === days && styles.chipTextActive]}>
+                      {days == null
+                        ? t('customerOrders.dueNone')
+                        : t('customerOrders.dueInDays', { days })}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
           <TouchableOpacity
             style={[styles.submit, !canSubmit && styles.submitDisabled]}
             onPress={submit}
@@ -283,22 +374,48 @@ export default function CreateOrderScreen() {
           >
             {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.submitText}>{t('createorder.submitOrder')}</ThemedText>}
           </TouchableOpacity>
+          {!submitting && !!submitHint && (
+            <ThemedText style={styles.submitHint} testID="create-order-hint">
+              {submitHint}
+            </ThemedText>
+          )}
         </ScrollView>
       )}
 
       {/* material picker modal */}
-      <Modal visible={pickerRow !== null} transparent animationType="slide" onRequestClose={() => setPickerRow(null)}>
-        <View style={styles.modalOverlay}>
+      <Modal
+        visible={pickerRow !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPickerRow(null)}
+        onShow={() => setMaterialQuery('')}
+      >
+        {/* 'padding' on Android too: edge-to-edge Modals do not resize for the keyboard */}
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
               <ThemedText style={styles.modalTitle}>{t('createorder.selectMaterial')}</ThemedText>
               <TouchableOpacity onPress={() => setPickerRow(null)}><ThemedText style={styles.modalClose}>✕</ThemedText></TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalList}>
+            <TextInput
+              style={styles.modalSearch}
+              value={materialQuery}
+              onChangeText={setMaterialQuery}
+              placeholder={t('createorder.searchMaterials')}
+              placeholderTextColor="#9ca3af"
+              autoCorrect={false}
+              testID="material-search"
+            />
+            <ScrollView style={styles.modalList} keyboardShouldPersistTaps="handled">
               {materials.length === 0 ? (
-                <ThemedText style={styles.modalEmpty}>{t('createorder.noMaterials')}</ThemedText>
+                <ThemedText style={styles.modalEmpty}>
+                  {/* "on the truck" only means something at a trip stop */}
+                  {standalone ? t('createorder.noMaterialsCatalogue') : t('createorder.noMaterials')}
+                </ThemedText>
+              ) : shownMaterials.length === 0 ? (
+                <ThemedText style={styles.modalEmpty}>{t('moduleList.noMatches')}</ThemedText>
               ) : (
-                materials.map((m) => (
+                shownMaterials.map((m) => (
                   <TouchableOpacity
                     key={m.uuid}
                     style={styles.modalOption}
@@ -313,7 +430,7 @@ export default function CreateOrderScreen() {
               )}
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ThemedView>
   );
@@ -364,6 +481,18 @@ const styles = StyleSheet.create({
   submit: { marginTop: 16, backgroundColor: '#5469D4', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   submitDisabled: { opacity: 0.5 },
   submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  submitHint: { fontSize: 13, lineHeight: 18, opacity: 0.65, textAlign: 'center', marginTop: 8 },
+  // wraps: four chips are wider than a phone, and wider again in Arabic
+  dueChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  dueBlock: {
+    paddingVertical: 12, gap: 8,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  modalSearch: {
+    marginHorizontal: 12, marginTop: 10, marginBottom: 4,
+    backgroundColor: '#f3f4f6', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: '#1f2937',
+  },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '70%', paddingBottom: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.1)' },

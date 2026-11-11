@@ -329,7 +329,7 @@ export function DashboardScreenImpl({ embedded = false }: { embedded?: boolean }
         >
           {inner}
         </ScrollView>
-        <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+        <BottomNavigation activeTab="menu" />
       </ThemedView>
     </ModuleGuard>
   );

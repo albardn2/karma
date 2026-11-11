@@ -8,7 +8,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 
 interface BottomNavigationProps {
   activeTab: 'home' | 'menu';
-  onTabPress: (tab: 'home' | 'menu') => void;
+  /**
+   * Only for the screen that hosts both tabs and switches between them in place.
+   * Everywhere else leave it out: the bar takes you to the tab you pressed.
+   */
+  onTabPress?: (tab: 'home' | 'menu') => void;
 }
 
 const HomeIcon: React.FC<{ color: string; size: number }> = ({ color, size }) => (
@@ -44,17 +48,29 @@ const MenuIcon: React.FC<{ color: string; size: number }> = ({ color, size }) =>
 
 const brandColor = '#5469D4';
 
-export const BottomNavigation: React.FC<BottomNavigationProps> = ({ 
-  activeTab, 
-  onTabPress 
+export const BottomNavigation: React.FC<BottomNavigationProps> = ({
+  activeTab,
+  onTabPress
 }) => {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  const router = useRouter();
+
+  // Every module screen used to pass its own handler, and 27 of them were the
+  // same copy-paste — `() => router.replace('/(tabs)?tab=menu')` — which ignored
+  // the tab pressed, so "Home" opened the Menu. Routing lives here now.
+  // dismissTo returns to the tabs screen already at the bottom of the stack
+  // (its `tab` param tells it which to show) instead of replacing this screen
+  // with a second copy of it that the back gesture would then reveal.
+  const press = (tab: 'home' | 'menu') => {
+    if (onTabPress) return onTabPress(tab);
+    router.dismissTo({ pathname: '/(tabs)', params: { tab } });
+  };
 
   const dynamicStyle = useMemo(() => [
     styles.bottomNavigation,
-    { 
-      paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 6) : 6 
+    {
+      paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 6) : 6
     }
   ], [insets.bottom]);
 
@@ -65,7 +81,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           styles.bottomNavItem,
           activeTab === 'home' && styles.bottomNavItemActive
         ]}
-        onPress={() => onTabPress('home')}
+        onPress={() => press('home')}
         activeOpacity={0.6}
       >
         <View style={styles.bottomNavIconContainer}>
@@ -82,7 +98,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           styles.bottomNavItem,
           activeTab === 'menu' && styles.bottomNavItemActive
         ]}
-        onPress={() => onTabPress('menu')}
+        onPress={() => press('menu')}
         activeOpacity={0.6}
       >
         <View style={styles.bottomNavIconContainer}>

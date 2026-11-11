@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Platform } from 'react-native';
 import { StyleSheet, ScrollView, TouchableOpacity, View, Alert } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -102,6 +102,18 @@ export default function HomeScreen() {
   // modules navigate back here with ?tab=menu so the menu view is restored
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<'home' | 'menu'>(tab === 'menu' ? 'menu' : 'home');
+  // The bottom bar on other screens returns here by setting `tab`, and this
+  // screen stays mounted under them, so the param is followed after mount too —
+  // not only read once for the initial state.
+  useEffect(() => {
+    if (tab === 'home' || tab === 'menu') setActiveTab(tab);
+  }, [tab]);
+  // and mirrored when the tab is switched in place, so that returning with the
+  // tab that was showing when the user left still counts as a change
+  const switchTab = (next: 'home' | 'menu') => {
+    setActiveTab(next);
+    router.setParams({ tab: next });
+  };
   const insets = useSafeAreaInsets();
 
   const granted = useGrantedModules();
@@ -276,7 +288,7 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <BottomNavigation activeTab={activeTab} onTabPress={setActiveTab} />
+      <BottomNavigation activeTab={activeTab} onTabPress={switchTab} />
     </ThemedView>
   );
 }

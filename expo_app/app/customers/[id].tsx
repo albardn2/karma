@@ -28,6 +28,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime, formatNumericDate } from '@/utils/date';
 import { TagInput } from '@/components/TagInput';
 import { useTagCatalog } from '@/utils/tagCatalog';
+import { useHasEndpoint, useHasModule } from '@/hooks/useModuleAccess';
 
 interface Customer {
   uuid: string;
@@ -183,6 +184,11 @@ const InfoRow: React.FC<InfoRowProps> = ({
 export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  // The order buttons open the customer-orders module, which a driver or an
+  // operator does not hold, and New order is a customer_order create, which an
+  // accountant does not hold — either way the button led to a refusal.
+  const canSeeOrders = useHasModule('customer-orders');
+  const canCreateOrder = useHasEndpoint('customer_order', 'create') && canSeeOrders;
   const insets = useSafeAreaInsets();
   const { t, te, tef } = useLanguage();
   // translates predefined tags for display; custom tags pass through raw
@@ -231,7 +237,12 @@ export default function CustomerDetailScreen() {
   customerRef.current = customer;
   // a DELETE can outlive this screen; navigating then would pop another one
   const mountedRef = React.useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  // set again on each (re)mount: Fast Refresh and strict mode run the cleanup
+  // and then the effect, and a ref only ever cleared stayed false for good
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   useEffect(() => {
     isEditingRef.current = isEditing;
   }, [isEditing]);
@@ -864,8 +875,9 @@ export default function CustomerDetailScreen() {
               Hidden while editing: leaving to create an order lets the server
               derive new tags, and coming back to a form still holding the old
               ones would save them straight over the derivation. */}
-          {!isEditing && (
+          {!isEditing && canSeeOrders && (
           <View style={styles.orderActionsRow}>
+            {canCreateOrder && (
             <TouchableOpacity
               style={styles.orderActionBtn}
               onPress={() =>
@@ -881,6 +893,7 @@ export default function CustomerDetailScreen() {
             >
               <ThemedText style={styles.orderActionText}>{t('customers.newOrder')}</ThemedText>
             </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[styles.orderActionBtn, styles.orderActionSecondary]}
               onPress={() =>

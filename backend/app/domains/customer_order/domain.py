@@ -2,6 +2,7 @@ from datetime import datetime
 from app.dto.customer_order import CustomerOrderCreate,CustomerOrderRead,CustomerOrderUpdate
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from models.common import CustomerOrder as CustomerOrderModel
+from models.common import MONEY_TOLERANCE
 from app.entrypoint.routes.common.errors import NotFoundError
 from app.dto.customer_order import CustomerOrderWithItemsAndInvoiceCreate
 from app.domains.customer_order_item.domain import CustomerOrderItemDomain
@@ -128,24 +129,27 @@ class CustomerOrderDomain:
 
         CustomerOrderDomain.validate_delete_customer_order(customer_order=order)
 
-        # delete all related items
+        # delete the related records that are still live — one removed earlier
+        # (a line deleted on its own) is already gone, and passing it again made
+        # the whole delete fail with "CustomerOrderItem not found"
+        live_invoices = [inv for inv in order.invoices if not inv.is_deleted]
         payload = CustomerOrderItemBulkDelete(
-            uuids=[item.uuid for item in order.customer_order_items]
+            uuids=[item.uuid for item in order.customer_order_items if not item.is_deleted]
         )
         CustomerOrderItemDomain.delete_items(
             payload=payload,
             uow=uow
         )
         # delete invoice items
-        for invoice in order.invoices:
+        for invoice in live_invoices:
             payload = InvoiceItemBulkDelete(
-                uuids=[item.uuid for item in invoice.invoice_items]
+                uuids=[item.uuid for item in invoice.invoice_items if not item.is_deleted]
             )
             InvoiceItemDomain.delete_items(
                 uow=uow,
                 payload=payload
             )
-        for invoice in order.invoices:
+        for invoice in live_invoices:
             InvoiceDomain.delete_invoice(
                 uuid=invoice.uuid,
                 uow=uow
@@ -316,6 +320,30 @@ class CustomerOrderDomain:
         return result
 
     @staticmethod
+    def can_delete_customer_order(customer_order: CustomerOrderModel) -> bool:
+        """Whether the guarded delete would succeed — every check it makes, the
+        per-line ones included (a line with stock events, an invoice line with a
+        credit or debit note), without changing anything. The detail route
+        returns it so the app offers Delete only where it works: a client
+        cannot see payments or notes, and judged on the order's net amount
+        paid it offered Delete on a refunded order the server then refused."""
+        try:
+            CustomerOrderDomain.validate_delete_customer_order(customer_order=customer_order)
+            for item in customer_order.customer_order_items:
+                if not item.is_deleted:
+                    CustomerOrderItemDomain.validate_item_delete(item=item)
+            for invoice in customer_order.invoices:
+                if invoice.is_deleted:
+                    continue
+                InvoiceDomain.validate_delete_invoice(invoice=invoice)
+                for line in invoice.invoice_items:
+                    if not line.is_deleted:
+                        InvoiceItemDomain.validate_item_delete(item=line)
+        except BadRequestError:
+            return False
+        return True
+
+    @staticmethod
     def validate_delete_customer_order(
             customer_order: CustomerOrderModel
     ):
@@ -323,16 +351,21 @@ class CustomerOrderDomain:
         Validate if a customer order can be deleted.
         """
 
-        if customer_order.is_fulfilled:
-            raise BadRequestError("Cannot delete a fulfilled customer order.")
+        # judged on the live lines and invoices: `is_fulfilled` / `is_paid` are
+        # vacuously true for an order with no lines or a 0.00 invoice, which
+        # made such an order impossible to delete although nothing was handed
+        # over or received
+        live_items = [item for item in customer_order.customer_order_items if not item.is_deleted]
+        if any(item.is_fulfilled for item in live_items):
+            raise BadRequestError("Cannot delete a customer order with fulfilled items.")
 
+        # every invoice, deleted ones included: an invoice deleted on its own
+        # can still carry money received (a debit-note payment is not in
+        # invoice.payments), and deleting the order would orphan it
         for invoice in customer_order.invoices:
             payments = [
                 payment for payment in invoice.payments if not payment.is_deleted
             ]
-            if payments:
-                raise BadRequestError("Cannot delete a customer order with paid invoices.")
-
-            if (not invoice.is_deleted) and invoice.is_paid or invoice.net_amount_paid > 0:
+            if payments or invoice.net_amount_paid > MONEY_TOLERANCE:
                 raise BadRequestError("Cannot delete a customer order with paid invoices.")
 

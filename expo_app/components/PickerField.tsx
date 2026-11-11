@@ -1,5 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
@@ -52,6 +59,26 @@ interface PickerFieldProps {
 const PAGE = 20;
 
 /**
+ * Choosing a customer, the same way everywhere.
+ *
+ * Searches `search` — name, company or phone, server-side — rather than
+ * `company_name` alone, which could not find a shop by its owner or a number.
+ * The second line carries what tells two same-named customers apart: the
+ * person behind a company, the phone, the address.
+ */
+export const CUSTOMER_PICKER: PickerSpec = {
+  endpoint: '/customer/',
+  itemsKey: 'customers',
+  searchParam: 'search',
+  label: (c) => c.company_name || c.full_name || c.uuid,
+  sublabel: (c) =>
+    [c.company_name ? c.full_name : null, c.phone_number, c.full_address]
+      .filter(Boolean)
+      .join(' · ') || undefined,
+  value: (c) => c.uuid,
+};
+
+/**
  * Choose one record from a list endpoint.
  *
  * ModuleForm's `select` renders every option as a chip, which is right for an enum of
@@ -70,6 +97,8 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [chosen, setChosen] = useState<string>('');
+  // typing fires a search per pause; only the newest may fill the list
+  const requestSeq = useRef(0);
 
   const load = useCallback(async () => {
     // caller-supplied rows: nothing to fetch, and no failure state to enter
@@ -79,11 +108,13 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
       setFailed(false);
       return;
     }
+    const seq = ++requestSeq.current;
     setLoading(true);
     setFailed(false);
     const qs = new URLSearchParams({ per_page: String(PAGE), ...(spec.params ?? {}) });
     if (spec.searchParam && query.trim()) qs.set(spec.searchParam, query.trim());
     const res = await apiCall<Record<string, any>>(`${spec.endpoint}?${qs.toString()}`);
+    if (seq !== requestSeq.current) return;
     if (isOk(res.status)) setRows((res.data?.[spec.itemsKey] as any[]) ?? []);
     else {
       setRows([]);
@@ -142,7 +173,15 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
           ) : !shown.length ? (
             <ThemedText style={styles.note}>{t('moduleList.noMatches')}</ThemedText>
           ) : (
-            shown.map((r) => {
+            // its own scroller: the panel is capped in height, and rows mapped
+            // straight into it overflowed the box — drawn over whatever sat
+            // below and, past the cap, impossible to reach
+            <ScrollView
+              style={styles.rows}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
+            {shown.map((r) => {
               const v = spec.value(r);
               const sub = spec.sublabel?.(r);
               return (
@@ -160,10 +199,15 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
                   <ThemedText style={styles.rowLabel} numberOfLines={1}>
                     {spec.label(r)}
                   </ThemedText>
-                  {!!sub && <ThemedText style={styles.rowSub}>{sub}</ThemedText>}
+                  {!!sub && (
+                    <ThemedText style={styles.rowSub} numberOfLines={1}>
+                      {sub}
+                    </ThemedText>
+                  )}
                 </TouchableOpacity>
               );
-            })
+            })}
+            </ScrollView>
           )}
         </View>
       )}
@@ -192,8 +236,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.08)',
     paddingVertical: 6,
-    maxHeight: 260,
   },
+  rows: { maxHeight: 220 },
   search: {
     marginHorizontal: 8,
     marginBottom: 4,
@@ -209,5 +253,5 @@ const styles = StyleSheet.create({
   row: { paddingHorizontal: 14, paddingVertical: 10 },
   rowOn: { backgroundColor: '#eef2ff' },
   rowLabel: { fontSize: 14, fontWeight: '600', color: '#1f2937' },
-  rowSub: { fontSize: 11, opacity: 0.55, marginTop: 1 },
+  rowSub: { fontSize: 11, lineHeight: 15, opacity: 0.55, marginTop: 1 },
 });

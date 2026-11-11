@@ -27,16 +27,22 @@ export function takeListStale(endpoint: string): boolean {
  * "Customer deleted" — since router.back() cannot carry params, and replacing
  * to the list instead would stack a second copy of it over the stale first.
  * Same keying as the stale marks.
+ *
+ * Short-lived: it is for the screen the user lands on next. A write made from
+ * a screen with no such list under it (an order deleted from the screen a
+ * customer's New order led to) left the message waiting, and the next visit
+ * to that list, maybe hours later, announced it as news.
  */
-const flashes = new Map<string, string>();
+const FLASH_TTL_MS = 10_000;
+const flashes = new Map<string, { message: string; at: number }>();
 
 export function setListFlash(endpoint: string, message: string) {
-  flashes.set(endpoint, message);
+  flashes.set(endpoint, { message, at: Date.now() });
 }
 
-/** The pending message, once; null when there is none. */
+/** The pending message, once and only while fresh; null when there is none. */
 export function takeListFlash(endpoint: string): string | null {
-  const message = flashes.get(endpoint) ?? null;
+  const entry = flashes.get(endpoint);
   flashes.delete(endpoint);
-  return message;
+  return entry && Date.now() - entry.at <= FLASH_TTL_MS ? entry.message : null;
 }

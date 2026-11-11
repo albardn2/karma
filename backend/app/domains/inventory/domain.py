@@ -12,6 +12,15 @@ from app.dto.inventory import InventoryFIFOOutput
 DEFAULT_COST_CURRENCY = Currency.SYP
 
 
+
+def _material_label(uow, material_uuid) -> str:
+    """The material as a person knows it, for messages that reach the app:
+    "EC 9d572d97", not its uuid. Falls back to the uuid if the row is gone —
+    or belongs to another account: the lookup is the account-scoped repository,
+    so a foreign uuid is echoed back, never resolved to that tenant's name."""
+    material = uow.material_repository.find_one(uuid=material_uuid)
+    return f'"{material.name}"' if material and material.name else f"material {material_uuid}"
+
 class InventoryDomain:
     @staticmethod
     def create_inventory(uow:SqlAlchemyUnitOfWork, payload: InventoryCreate) -> InventoryRead:
@@ -350,7 +359,7 @@ class InventoryDomain:
         if remaining_quantity > 0:
             if not allow_negative:
                 raise NotFoundError(
-                    f"Insufficient inventory for material {material_uuid}: "
+                    f"Insufficient inventory for {_material_label(uow, material_uuid)}: "
                     f"requested {quantity}, available {quantity - remaining_quantity}"
                 )
             InventoryDomain._absorb_shortfall(
@@ -397,7 +406,7 @@ class InventoryDomain:
             )
         if target is None:
             raise BadRequestError(
-                f"Cannot record a sale of material {material_uuid}: it has no "
+                f"Cannot record a sale of {_material_label(uow, material_uuid)}: it has no "
                 f"inventory lot, so there is no warehouse to take the stock from. "
                 f"Add inventory for it first."
             )

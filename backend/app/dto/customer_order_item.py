@@ -59,9 +59,10 @@ class CustomerOrderItemQuantityUpdate(BaseModel):
     """Change one line's ordered quantity — the payment-gated edit that
     cascades to the invoice and order totals (and re-syncs stock if fulfilled).
     gt=0: a zero/negative-quantity line is not an edit, it is a deletion, which
-    is the bulk-delete route's job."""
+    is the bulk-delete route's job. le: the checkout bound, so a typo is a
+    422 rather than a 500 from the integer column."""
     model_config = ConfigDict(extra="forbid")
-    quantity: int = Field(gt=0)
+    quantity: int = Field(gt=0, le=1_000_000)
 
 
 class CustomerOrderItemBulkUnFulfill(BaseModel):
