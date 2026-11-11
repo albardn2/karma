@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { ChartLegend, GroupedBarChart, LineChart } from '@/components/Chart';
@@ -11,6 +11,7 @@ import { money } from '@/utils/money';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery, useCachedQuery } from '@/hooks/useApiQuery';
 import { formatNumericDate, parseTs } from '@/utils/date';
 
 interface Vehicle {
@@ -112,11 +113,6 @@ export default function VehiclesDetailScreen() {
   const { isAdmin } = useAuth();
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const [reloadKey, setReloadKey] = useState(0);
-  const [lots, setLots] = useState<VehicleLot[] | null>(null);
-  const [charted, setCharted] = useState<
-    Array<{ name: string; points: Array<{ label: string; value: number }> }>
-  >([]);
   const [range, setRange] = useState<(typeof RANGES)[number]['id']>('90d');
   /**
    * Which line to chart. Keyed on the LOT uuid rather than the material's, for two
@@ -126,150 +122,112 @@ export default function VehiclesDetailScreen() {
    */
   const [lot, setLot] = useState('');
   const [lotName, setLotName] = useState('');
-  /** what would be orphaned by a delete: the API has no guard, so the app warns */
-  const [tripCount, setTripCount] = useState<number | null>(null);
+  // Every read below is cached and kept fresh (useApiQuery), so a load, unload,
+  // sale or edit made on any screen shows here when this screen is next in view,
+  // and the old numbers stay on screen while the new ones arrive.
+
   // a sub-fetch that FAILED must not read as a sub-fetch that returned nothing:
   // during development a per_page over the DTO's cap of 100 gave a 422, which the
   // empty-state fallback rendered as "no movements" and very nearly shipped
-  const [stockFailed, setStockFailed] = useState(false);
-  const [movesFailed, setMovesFailed] = useState(false);
-
-  // Profitability (revenue / gross / net) for this vehicle. A financial-only
-  // endpoint — a role without access 403s, and the whole section is dropped
-  // rather than shown broken.
-  const [profitGroups, setProfitGroups] = useState<
-    Array<{ label: string; values: number[] }>
-  >([]);
-  const [profitGran, setProfitGran] = useState<'month' | 'quarter' | 'year'>('month');
-  const [profitCcy, setProfitCcy] = useState<CostCcy>('USD');
-  const [profitUncosted, setProfitUncosted] = useState(0);
-  const [profitForbidden, setProfitForbidden] = useState(false);
-  const [profitFailed, setProfitFailed] = useState(false);
-
-  const loadStock = useCallback(async () => {
-    const res = await apiCall<{ vehicle_inventories: VehicleLot[] }>(
-      `/vehicle-inventory/?vehicle_uuid=${uuid}&per_page=${PER_PAGE}`,
-    );
-    // a failed sub-fetch shows an empty section rather than failing the whole record
-    setStockFailed(!isOk(res.status));
-    setLots(isOk(res.status) ? (res.data?.vehicle_inventories ?? []) : []);
-  }, [uuid]);
+  const stockQuery = useApiQuery<{ vehicle_inventories: VehicleLot[] }>(
+    `/vehicle-inventory/?vehicle_uuid=${uuid}&per_page=${PER_PAGE}`,
+  );
+  // a failed sub-fetch shows an empty section rather than failing the whole record
+  const stockFailed = stockQuery.isError;
+  const lots: VehicleLot[] | null = stockQuery.isError
+    ? []
+    : (stockQuery.data?.vehicle_inventories ?? null);
 
   // DELETE /vehicle/ has no server guard — it flips is_deleted and leaves the
   // vehicle's stock rows live under a vehicle that then 404s. The confirm says what
   // is about to be orphaned, which is the only place that can be said.
-  const loadTripCount = useCallback(async () => {
-    const res = await apiCall<{ total_count?: number }>(`/trip/?vehicle_uuid=${uuid}&per_page=1`);
-    setTripCount(isOk(res.status) ? (res.data?.total_count ?? 0) : null);
-  }, [uuid]);
-
-  useEffect(() => {
-    loadStock();
-    loadTripCount();
-  }, [loadStock, loadTripCount, reloadKey]);
-
-  // focus, not push: add material, edit and a stock line's load/unload all open screens
-  // that write, and a stack pop does not remount this one. A bump before the push
-  // refetched while that screen was opening, before the write (and the stock line
-  // pushed with no bump at all), so coming back showed the old stock and profit. One
-  // bump per focus event; setState does not re-trigger focus, so this cannot loop.
-  useFocusEffect(
-    useCallback(() => {
-      setReloadKey((k) => k + 1);
-    }, []),
+  const tripCountQuery = useApiQuery<{ total_count?: number }>(
+    `/trip/?vehicle_uuid=${uuid}&per_page=1`,
   );
+  const tripCount = tripCountQuery.isError ? null : (tripCountQuery.data?.total_count ?? null);
 
-  const loadMovements = useCallback(async () => {
-    setMovesFailed(false);
-    if (!lots?.length) return setCharted([]);
-    const preset = RANGES.find((r) => r.id === range)!;
-    let fromParam = '';
-    if (preset.days != null) {
-      const from = new Date();
-      from.setDate(from.getDate() - preset.days);
-      fromParam = `&start_date=${encodeURIComponent(naiveIso(from))}`;
-    }
+  // The movement chart is one request per charted line, keyed on everything it reads:
+  // the lines and their balances (it walks back from the present balance), the range
+  // and the chosen line. The window starts at midnight so the key holds still all day.
+  const preset = RANGES.find((r) => r.id === range)!;
+  let fromParam = '';
+  if (preset.days != null) {
+    const from = new Date();
+    from.setDate(from.getDate() - preset.days);
+    from.setHours(0, 0, 0, 0);
+    fromParam = `&start_date=${encodeURIComponent(naiveIso(from))}`;
+  }
+  const lotsKey = lots?.map((l) => `${l.uuid}:${l.current_quantity}`).join(',');
+  const movesQuery = useCachedQuery(
+    lots === null ? null : `vehicle-movements:${uuid}:${lot}:${fromParam}:${lotsKey}`,
+    async () => {
+      if (!lots?.length) return { series: [], allFailed: false };
+      // Biggest lines only, so this is at most MAX_SERIES requests however long the
+      // van's manifest is. There is no vehicle_uuid filter on the event endpoint, so
+      // the alternative is fetching every vehicle's events and discarding most.
+      const top = lot
+        ? lots.filter((l) => l.uuid === lot)
+        : lots
+            .slice()
+            .sort(
+              (a, b) =>
+                Math.abs(Number(b.current_quantity ?? 0)) - Math.abs(Number(a.current_quantity ?? 0)),
+            )
+            .slice(0, MAX_SERIES);
 
-    // Biggest lines only, so this is at most MAX_SERIES requests however long the
-    // van's manifest is. There is no vehicle_uuid filter on the event endpoint, so
-    // the alternative is fetching every vehicle's events and discarding most.
-    const top = lot
-      ? lots.filter((l) => l.uuid === lot)
-      : lots
-          .slice()
-          .sort(
-            (a, b) =>
-              Math.abs(Number(b.current_quantity ?? 0)) - Math.abs(Number(a.current_quantity ?? 0)),
-          )
-          .slice(0, MAX_SERIES);
-
-    const results = await Promise.all(
-      top.map((l) =>
-        apiCall<{ events: LotEvent[] }>(
-          `/vehicle-inventory-event/?vehicle_inventory_uuid=${l.uuid}` +
-            `${fromParam}&per_page=${PER_PAGE}`,
-        ).then((res) => {
-          if (!isOk(res.status)) return { lot: l, events: [], ok: false };
-          return { lot: l, events: res.data?.events ?? [], ok: true };
-        }),
-      ),
-    );
-    // if every series failed, say so; a partial failure still draws what it has
-    if (results.length && results.every((r) => !r.ok)) setMovesFailed(true);
-
-    setCharted(
-      results
-        .map(({ lot, events }) => {
+      const results = await Promise.all(
+        top.map((l) =>
+          apiCall<{ events: LotEvent[] }>(
+            `/vehicle-inventory-event/?vehicle_inventory_uuid=${l.uuid}` +
+              `${fromParam}&per_page=${PER_PAGE}`,
+          ).then((res) => {
+            if (!isOk(res.status)) return { lot: l, events: [] as LotEvent[], ok: false };
+            return { lot: l, events: res.data?.events ?? [], ok: true };
+          }),
+        ),
+      );
+      const series = results
+        .map(({ lot: l, events }) => {
           const ordered = events
             .slice()
             .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
           const windowDelta = ordered.reduce((s, e) => s + Number(e.quantity ?? 0), 0);
           // walk back from the present to get the level as the window opened
-          let level = Number(lot.current_quantity ?? 0) - windowDelta;
+          let level = Number(l.current_quantity ?? 0) - windowDelta;
           return {
-            name: `${lot.material_name ?? '—'}${lot.unit ? ` (${lot.unit})` : ''}`,
+            name: `${l.material_name ?? '—'}${l.unit ? ` (${l.unit})` : ''}`,
             points: ordered.map((e) => {
               level += Number(e.quantity ?? 0);
               return { label: tick(e.created_at), value: level };
             }),
           };
         })
-        .filter((s) => s.points.length),
-    );
-  }, [lots, range, lot]);
+        .filter((s) => s.points.length);
+      // if every series failed, say so; a partial failure still draws what it has
+      return { series, allFailed: results.length > 0 && results.every((r) => !r.ok) };
+    },
+  );
+  const charted = movesQuery.data?.series ?? [];
+  const movesFailed = movesQuery.data?.allFailed ?? false;
 
-  useEffect(() => {
-    loadMovements();
-  }, [loadMovements]);
-
-  const loadProfit = useCallback(async () => {
-    setProfitFailed(false);
-    const res = await apiCall<{
-      groups: Array<{ period_label: string; revenue: number; gross: number; net: number }>;
-      disclosure?: { uncosted_quantity?: number };
-    }>(
-      `/dashboard/vehicle-profitability?vehicle_uuid=${uuid}&granularity=${profitGran}&target_currency=${profitCcy}`,
-    );
-    if (res.status === 403) {
-      setProfitForbidden(true);
-      return;
-    }
-    if (isOk(res.status) && res.data) {
-      setProfitGroups(
-        res.data.groups.map((g) => ({
-          label: g.period_label,
-          values: [g.revenue, g.gross, g.net],
-        })),
-      );
-      setProfitUncosted(res.data.disclosure?.uncosted_quantity ?? 0);
-    } else {
-      setProfitFailed(true);
-    }
-  }, [uuid, profitGran, profitCcy]);
-
-  useEffect(() => {
-    loadProfit();
-  }, [loadProfit, reloadKey]);
+  // Profitability (revenue / gross / net) for this vehicle. A financial-only
+  // endpoint — a role without access 403s, and the whole section is dropped
+  // rather than shown broken.
+  const [profitGran, setProfitGran] = useState<'month' | 'quarter' | 'year'>('month');
+  const [profitCcy, setProfitCcy] = useState<CostCcy>('USD');
+  const profitQuery = useApiQuery<{
+    groups: Array<{ period_label: string; revenue: number; gross: number; net: number }>;
+    disclosure?: { uncosted_quantity?: number };
+  }>(
+    `/dashboard/vehicle-profitability?vehicle_uuid=${uuid}&granularity=${profitGran}&target_currency=${profitCcy}`,
+  );
+  const profitForbidden = profitQuery.error?.status === 403;
+  const profitFailed = profitQuery.isError && !profitForbidden;
+  const profitGroups = (profitQuery.data?.groups ?? []).map((g) => ({
+    label: g.period_label,
+    values: [g.revenue, g.gross, g.net],
+  }));
+  const profitUncosted = profitQuery.data?.disclosure?.uncosted_quantity ?? 0;
 
   const profitSeries = [t('dashboards.revenue'), t('dashboards.gross'), t('dashboards.net')];
   const profitHasAny = profitGroups.some((g) => g.values.some((v) => v !== 0));
@@ -279,7 +237,6 @@ export default function VehiclesDetailScreen() {
       module="vehicles"
       title={t('menu.vehicles')}
       endpoint={`/vehicle/${uuid}`}
-      reloadKey={reloadKey}
       heading={(x) => x.plate_number}
       rows={(x): DetailRow[] => [
         [t('vehicles.status'), x.status ? tef(x.status) : '—'],
@@ -376,7 +333,9 @@ export default function VehiclesDetailScreen() {
                   spec={{
                     endpoint: '/vehicle-inventory/',
                     itemsKey: 'vehicle_inventories',
-                    params: { vehicle_uuid: String(uuid), per_page: String(PER_PAGE) },
+                    // the same lines the On board table shows, so the quantities in the
+                    // picker are never older than the table's
+                    rows: lots ?? [],
                     label: (r) => r.material_name ?? '—',
                     sublabel: (r) =>
                       `${qty(Number(r.current_quantity ?? 0))}${r.unit ? ` ${r.unit}` : ''}`,
@@ -566,7 +525,12 @@ export default function VehiclesDetailScreen() {
               : ''),
           onPress: async (x) => {
             const res = await apiCall(`/vehicle/${x.uuid}`, { method: 'DELETE' });
-            if (isOk(res.status)) return router.replace('/vehicles');
+            // back to the list underneath, which refreshes on focus; replacing would
+            // stack a second list over it and leave the stale one one tap away
+            if (isOk(res.status)) {
+              if (router.canGoBack()) return router.back();
+              return router.replace('/vehicles');
+            }
             Alert.alert(
               t('vehicles.deleteFailed'),
               String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),

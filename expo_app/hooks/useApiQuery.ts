@@ -10,8 +10,17 @@ export class ApiQueryError extends Error {
   }
 }
 
+/** One GET, failing with an ApiQueryError rather than resolving to an error shape. */
+export async function apiGet<T>(path: string): Promise<T> {
+  const res = await apiCall<T>(path);
+  if (!isOk(res.status) || res.data == null) throw new ApiQueryError(res.status, res.error);
+  return res.data;
+}
+
 /**
- * A GET against the API, cached and kept fresh.
+ * A read that takes more than one GET (paging through a list, say), cached and kept
+ * fresh exactly like useApiQuery. `key` names the read: it must change whenever the
+ * fetcher would fetch something different. Pass `null` to wait.
  *
  * The screen watches its data only while it is focused: screens under the current
  * one in the stack stay mounted, and without this every write would refetch every
@@ -20,20 +29,19 @@ export class ApiQueryError extends Error {
  *
  * The previous result stays on screen while a new page, filter or search loads,
  * instead of being replaced by a spinner.
- *
- * Pass `null` to wait, e.g. until a route param is known.
  */
-export function useApiQuery<T>(path: string | null) {
+export function useCachedQuery<T>(key: string | null, fetcher: () => Promise<T>) {
   const isFocused = useIsFocused();
   return useQuery<T, ApiQueryError>({
-    queryKey: [API_QUERY_ROOT, path],
-    enabled: path !== null,
+    queryKey: [API_QUERY_ROOT, key],
+    enabled: key !== null,
     subscribed: isFocused,
     placeholderData: keepPreviousData,
-    queryFn: async () => {
-      const res = await apiCall<T>(path as string);
-      if (!isOk(res.status) || res.data == null) throw new ApiQueryError(res.status, res.error);
-      return res.data;
-    },
+    queryFn: fetcher,
   });
+}
+
+/** A GET against the API, cached and kept fresh. Pass `null` to wait, e.g. for a route param. */
+export function useApiQuery<T>(path: string | null) {
+  return useCachedQuery<T>(path, () => apiGet<T>(path as string));
 }
