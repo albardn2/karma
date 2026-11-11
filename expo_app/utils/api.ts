@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { clearQueryCache, invalidateAfterWrite } from '@/utils/queryClient';
 
 // Set per build profile in eas.json (dev/preview -> api-dev, production ->
 // api-prod) and overridable via .env for local `expo start`; resolved by
@@ -70,7 +71,10 @@ const clearStoredAuth = async () => {
   // so the next user to sign in on this device is not compared against the
   // previous one's fingerprint
   knownPermsVersion = null;
+  clearQueryCache();
 };
+
+const isWrite = (method: string | undefined) => !!method && method.toUpperCase() !== 'GET';
 
 // 'ok' = new access token stored; 'rejected' = refresh token invalid/expired
 // (log the user out); 'network' = transient failure (keep the session).
@@ -164,6 +168,9 @@ export const apiCall = async <T = any>(
 
     if (response.ok) {
       const data = await response.json();
+      // Every screen's reads refresh after a write, whichever screen made it, so no
+      // write path can forget to tell the lists and dashboards it touched.
+      if (isWrite(options.method)) invalidateAfterWrite();
       return {
         status: response.status,
         data,

@@ -1,4 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +12,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { LocationTrackingProvider } from '@/contexts/LocationTrackingContext';
 import { AccountUnverifiedNotice } from '@/components/AccountUnverifiedNotice';
+import { queryClient } from '@/utils/queryClient';
 
 function NavigationContent() {
   const { isAuthenticated, loading, isVerified } = useAuth();
@@ -72,15 +74,17 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <LanguageProvider>
-        <LocationTrackingProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <NavigationContent />
-            <StatusBar style="auto" />
-          </ThemeProvider>
-        </LocationTrackingProvider>
-      </LanguageProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <LanguageProvider>
+          <LocationTrackingProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <NavigationContent />
+              <StatusBar style="auto" />
+            </ThemeProvider>
+          </LocationTrackingProvider>
+        </LanguageProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

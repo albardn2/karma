@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -16,7 +16,8 @@ import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { BarChart, LineChart } from '@/components/Chart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 /** A per-day point. `t` is a naive "YYYY-MM-DD", `v` a count or an amount. */
 interface Point {
@@ -111,35 +112,14 @@ export function DashboardScreenImpl({ embedded = false }: { embedded?: boolean }
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { t } = useLanguage();
-  const [data, setData] = useState<Overview | null>(null);
   const [range, setRange] = useState<(typeof RANGES)[number]['id']>('30d');
   const [currency, setCurrency] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      const days = RANGES.find((r) => r.id === range)!.days;
-      try {
-        const res = await apiCall<Overview>(`/dashboard/overview?days=${days}`);
-        if (isOk(res.status) && res.data) setData(res.data);
-        else setFailed(true);
-      } catch {
-        setFailed(true);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [range],
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const days = RANGES.find((r) => r.id === range)!.days;
+  const overview = useApiQuery<Overview>(`/dashboard/overview?days=${days}`);
+  const { refreshing, onRefresh } = usePullToRefresh(overview.refetch);
+  const data = overview.data ?? null;
+  const loading = overview.isPending;
+  const failed = overview.isError;
 
   // the chosen currency, or the first the window actually contains
   const cur = currency ?? data?.currencies?.[0] ?? null;
@@ -173,7 +153,7 @@ export function DashboardScreenImpl({ embedded = false }: { embedded?: boolean }
               <ThemedText style={styles.stateText} testID="dashboard-error">
                 {t('moduleList.failed')}
               </ThemedText>
-              <TouchableOpacity style={styles.retry} onPress={() => load()}>
+              <TouchableOpacity style={styles.retry} onPress={() => overview.refetch()}>
                 <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
               </TouchableOpacity>
             </View>
@@ -317,15 +297,7 @@ export function DashboardScreenImpl({ embedded = false }: { embedded?: boolean }
 
         <ScrollView
           contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                load(true);
-              }}
-            />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {inner}
         </ScrollView>

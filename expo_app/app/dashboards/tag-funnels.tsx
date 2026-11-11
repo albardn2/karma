@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   I18nManager,
@@ -23,7 +23,8 @@ import {
 } from '@/components/TagFunnel';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 interface Period {
   granularity: Gran;
@@ -103,10 +104,6 @@ export function TagFunnelsScreenImpl({ embedded = false }: { embedded?: boolean 
   const [mode, setMode] = useState<Mode>('change');
   const [gran, setGranRaw] = useState<Gran>('month');
   const [offset, setOffset] = useState(0);
-  const [data, setData] = useState<Payload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [failed, setFailed] = useState(false);
 
   // switching granularity re-anchors to the current period — an offset of 3
   // months means nothing in weeks
@@ -118,27 +115,13 @@ export function TagFunnelsScreenImpl({ embedded = false }: { embedded?: boolean 
   // the current view shows nothing period-dependent, so it always reads this
   // month and never waits on whichever period the change view was last on
   const q = mode === 'change' ? { gran, offset } : { gran: 'month' as Gran, offset: 0 };
-  // two quick ‹ taps fire two requests; only the latest may land, or an
-  // out-of-order reply would leave one period's numbers under another's label
-  const requestSeq = useRef(0);
-  const load = useCallback(
-    async (isRefresh = false) => {
-      const mine = ++requestSeq.current;
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      const res = await apiCall<Payload>(`/dashboard/tag-funnels?granularity=${q.gran}&offset=${q.offset}`);
-      if (mine !== requestSeq.current) return;
-      if (isOk(res.status) && res.data) setData(res.data);
-      else setFailed(true);
-      setLoading(false);
-      setRefreshing(false);
-    },
-    [q.gran, q.offset],
+  const dash = useApiQuery<Payload>(
+    `/dashboard/tag-funnels?granularity=${q.gran}&offset=${q.offset}`,
   );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { refreshing, onRefresh } = usePullToRefresh(dash.refetch);
+  const data = dash.data ?? null;
+  const loading = dash.isPending;
+  const failed = dash.isError;
 
   // month names come from the translations (no Intl on the native side);
   // English abbreviates to three letters, Arabic has no short forms
@@ -248,7 +231,7 @@ export function TagFunnelsScreenImpl({ embedded = false }: { embedded?: boolean 
       ) : failed ? (
         <View style={styles.centre}>
           <ThemedText style={styles.stateText}>{t('moduleList.failed')}</ThemedText>
-          <TouchableOpacity style={styles.retry} onPress={() => load()}>
+          <TouchableOpacity style={styles.retry} onPress={() => dash.refetch()}>
             <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
           </TouchableOpacity>
         </View>
@@ -330,10 +313,7 @@ export function TagFunnelsScreenImpl({ embedded = false }: { embedded?: boolean 
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                load(true);
-              }}
+              onRefresh={onRefresh}
             />
           }
         >

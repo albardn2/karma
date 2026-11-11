@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,15 +8,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
-import { takeListStale } from '@/utils/listRefresh';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export const PER_PAGE = 20;
 
@@ -96,6 +96,9 @@ interface ModuleListScreenProps<T> {
  * The shared shape of a module list: fetch, paginate, search, refresh, and the
  * three states everyone forgets — loading, empty, and failed.
  *
+ * The rows come from the query cache (useApiQuery), so a write made on any screen
+ * shows up here when the list is next on screen, without a pull to refresh.
+ *
  * The app's first list screen (customers) grew to ~1,500 lines with all of this
  * inline. Repeating that 25 times means 25 copies of pagination and 25 places a
  * fix has to land, so the mechanics live here and a module supplies only what is
@@ -128,89 +131,40 @@ export function ModuleListScreen<T>({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const [items, setItems] = useState<T[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  // Distinct from "no rows". A failed fetch that renders as an empty list tells
-  // the user their data is gone, which is a worse lie than saying nothing.
-  const [failed, setFailed] = useState(false);
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   const filterParams = filters?.find((f) => f.id === activeFilter)?.params ?? {};
+  const query = new URLSearchParams({
+    page: String(page),
+    per_page: String(PER_PAGE),
+    ...(params ?? {}),
+    ...filterParams,
+  });
+  if (searchParam && appliedSearch.trim()) query.append(searchParam, appliedSearch.trim());
 
-  const load = useCallback(
-    async (targetPage: number, isRefresh = false) => {
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      try {
-        const query = new URLSearchParams({
-          page: String(targetPage),
-          per_page: String(PER_PAGE),
-          ...(params ?? {}),
-          ...filterParams,
-        });
-        if (searchParam && appliedSearch.trim()) {
-          query.append(searchParam, appliedSearch.trim());
-        }
-        const res = await apiCall<any>(`${endpoint}?${query.toString()}`);
-        if (isOk(res.status) && res.data) {
-          const rows = res.data[itemsKey] ?? [];
-          const pages = res.data[pagesKey] ?? 1;
-          // The page went past the end: its last row was deleted (on a detail
-          // screen, or elsewhere) and the server answers an out-of-range page
-          // with no rows rather than an error. Rendering that would show
-          // "Nothing here" under a non-zero total with no pager to get back,
-          // so move to the real last page; the [page] effect fetches it.
-          if (rows.length === 0 && targetPage > 1 && targetPage > pages) {
-            setPage(Math.max(1, pages));
-            return;
-          }
-          setItems(rows);
-          setTotalPages(pages);
-          setTotalCount(res.data.total_count ?? 0);
-        } else {
-          // 403 included on purpose: the server is the authority, and a role
-          // narrowed after this screen opened should read as refused, not empty.
-          setFailed(true);
-          setItems([]);
-        }
-      } catch {
-        setFailed(true);
-        setItems([]);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    // filterParams is derived from activeFilter, so depend on the id rather than
-    // the object — a fresh object literal each render would re-fetch endlessly
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [endpoint, itemsKey, searchParam, appliedSearch, params, activeFilter],
-  );
+  const list = useApiQuery<any>(`${endpoint}?${query.toString()}`);
+  const { refreshing, onRefresh } = usePullToRefresh(list.refetch);
+  const items: T[] = list.data?.[itemsKey] ?? [];
+  const totalPages: number = list.data?.[pagesKey] ?? 1;
+  const totalCount: number = list.data?.total_count ?? 0;
+  const loading = list.isPending;
+  // Distinct from "no rows". A failed fetch that renders as an empty list tells the
+  // user their data is gone, which is a worse lie than saying nothing. A 403 counts:
+  // a role narrowed after this screen opened should read as refused, not empty.
+  const failed = list.isError;
 
+  // The page went past the end: its last row was deleted (on a detail screen, or
+  // elsewhere) and the server answers an out-of-range page with no rows rather than
+  // an error. Rendering that would show "Nothing here" under a non-zero total with
+  // no pager to get back, so move to the real last page.
+  const pastTheEnd =
+    !list.isPlaceholderData && items.length === 0 && page > 1 && page > totalPages;
   useEffect(() => {
-    load(page);
-  }, [page, appliedSearch, load]);
-
-  // Back from a detail screen that changed records behind this list (a delete,
-  // say): the list is still mounted and would not refetch on its own. Quietly,
-  // without the full-screen spinner, so the rows the user was looking at stay
-  // put while the change lands.
-  useFocusEffect(
-    useCallback(() => {
-      if (takeListStale(endpoint)) load(page, true);
-    }, [endpoint, load, page]),
-  );
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    load(page, true);
-  }, [load, page]);
+    if (pastTheEnd) setPage(Math.max(1, totalPages));
+  }, [pastTheEnd, totalPages]);
 
   const submitSearch = () => {
     setPage(1);
@@ -313,7 +267,7 @@ export function ModuleListScreen<T>({
             <ThemedText style={styles.stateText} testID="module-list-error">
               {t('moduleList.failed')}
             </ThemedText>
-            <TouchableOpacity style={styles.retry} onPress={() => load(page)}>
+            <TouchableOpacity style={styles.retry} onPress={() => list.refetch()}>
               <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
             </TouchableOpacity>
           </View>

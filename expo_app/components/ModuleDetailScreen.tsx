@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,7 +14,8 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export type DetailRow = [label: string, value: string];
 
@@ -82,7 +83,10 @@ interface ModuleDetailScreenProps<T> {
   actions?: DetailAction<T>[];
   /** free-text block rendered last, e.g. notes */
   footer?: (item: T) => React.ReactNode;
-  /** bumped by a caller to force a refetch after a write */
+  /**
+   * Bumped by a caller to refetch the record alongside data the caller loads itself.
+   * The record alone needs no bump: a write anywhere refreshes it.
+   */
   reloadKey?: number;
 }
 
@@ -94,6 +98,9 @@ interface ModuleDetailScreenProps<T> {
  * that are identical everywhere belong in one place, and a module supplies only
  * its heading and its rows. Rows are computed by the caller so a module can
  * resolve extra context (a name behind a uuid) before handing them over.
+ *
+ * The record comes from the query cache (useApiQuery). A refetch keeps the record on
+ * screen and the scroll where it was; only the very first load shows the spinner.
  */
 export function ModuleDetailScreen<T>({
   module,
@@ -112,32 +119,20 @@ export function ModuleDetailScreen<T>({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const [item, setItem] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const record = useApiQuery<T>(endpoint);
+  const { refreshing, onRefresh } = usePullToRefresh(record.refetch);
+  const item = record.data ?? null;
+  const loading = record.isPending;
+  const failed = record.isError;
 
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      try {
-        const res = await apiCall<T>(endpoint);
-        if (isOk(res.status) && res.data) setItem(res.data);
-        else setFailed(true);
-      } catch {
-        setFailed(true);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [endpoint],
-  );
-
+  // the mount already fetched; only a later bump asks for another
+  const seenReloadKey = useRef(reloadKey);
+  const { refetch } = record;
   useEffect(() => {
-    load();
-  }, [load, reloadKey]);
+    if (seenReloadKey.current === reloadKey) return;
+    seenReloadKey.current = reloadKey;
+    refetch();
+  }, [reloadKey, refetch]);
 
   // an action with no `visible` predicate always shows; one with a predicate is asked
   const shownActions = item
@@ -169,7 +164,7 @@ export function ModuleDetailScreen<T>({
             <ThemedText style={styles.stateText} testID="detail-error">
               {t('moduleList.failed')}
             </ThemedText>
-            <TouchableOpacity style={styles.retry} onPress={() => load()}>
+            <TouchableOpacity style={styles.retry} onPress={() => record.refetch()}>
               <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
             </TouchableOpacity>
           </View>
@@ -177,13 +172,7 @@ export function ModuleDetailScreen<T>({
           <ScrollView
             contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
             refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => {
-                  setRefreshing(true);
-                  load(true);
-                }}
-              />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
           >
             <ThemedText style={styles.heading} testID="detail-heading">
