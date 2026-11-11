@@ -56,6 +56,15 @@ import {
  * WHY THE POLYGON HAS NO onPress. On Apple, handleMapTap fires `polygon.onPress` for
  * every polygon containing the tap and THEN the map press, so a polygon handler here
  * would double-fire on every tap inside the shape.
+ *
+ * WHY EVERY OVERLAY IS ALWAYS MOUNTED. Under the new architecture, MapView's children
+ * reach AIRMap through the legacy-interop layer, which replays React's child indexes
+ * onto `insertReactSubview:atIndex:`. When an overlay ahead of the vertex markers
+ * mounts or unmounts (the 2-corner Polyline giving way to the Polygon at 3 corners),
+ * the indexes shift and AIRMap's subview array falls out of step: the 2nd vertex
+ * never draws, and the 3rd inserts nil and aborts the app. So the overlays render in
+ * a fixed order with fixed keys, unused ones get transparent placeholder geometry,
+ * and the index-keyed markers come last, so they only ever grow or shrink at the end.
  */
 
 const TAP_GUARD_PT = 22;
@@ -67,6 +76,7 @@ const ANDROID_TAP_DEFER_MS = 250;
 
 const INDIGO = '#5469D4';
 const RED = '#DC2626';
+const HIDDEN = 'transparent';
 
 // --- history ---------------------------------------------------------------
 
@@ -317,6 +327,16 @@ export function PolygonEditor({
   const stroke = bad ? RED : INDIGO;
   const edge = (i: number): LatLng[] => [ring[i], ring[(i + 1) % ring.length]];
 
+  // geometry for an overlay that has nothing to draw; see "always mounted" above
+  const anchor: LatLng = { latitude: initialRegion.latitude, longitude: initialRegion.longitude };
+  const offLine: LatLng[] = [anchor, anchor];
+  const showSaved = !!savedRing && savedRing.length >= 3;
+  const showFill = ring.length >= 3;
+  const showOpenEdge = ring.length === 2;
+  const showClosingEdge = ring.length >= 3 && !savedRing;
+  const showBadEdges = bad && !!problem;
+  const selectedPoint = selected != null ? ring[selected] : undefined;
+
   // glyphs do not mirror under forceRTL, so they are chosen by direction; the LABELS
   // are "previous"/"next", never "left"/"right"
   const prevGlyph = I18nManager.isRTL ? '›' : '‹';
@@ -352,60 +372,65 @@ export function PolygonEditor({
           testID={`${testIDPrefix}-map`}
         >
           {/* the saved boundary, so the delta is visible rather than remembered */}
-          {!!savedRing && savedRing.length >= 3 && (
-            <Polyline
-              coordinates={[...savedRing, savedRing[0]]}
-              strokeColor="rgba(31,41,55,0.45)"
-              strokeWidth={1.5}
-              lineDashPattern={[3, 5]}
-            />
-          )}
+          <Polyline
+            key="saved"
+            coordinates={showSaved ? [...savedRing!, savedRing![0]] : offLine}
+            strokeColor={showSaved ? 'rgba(31,41,55,0.45)' : HIDDEN}
+            strokeWidth={showSaved ? 1.5 : 0}
+            lineDashPattern={[3, 5]}
+          />
 
-          {ring.length >= 3 && (
-            <Polygon
-              coordinates={ring}
-              strokeColor={stroke}
-              fillColor={bad ? 'rgba(220,38,38,0.14)' : 'rgba(84,105,212,0.16)'}
-              strokeWidth={2}
-              // no onPress: handleMapTap fires polygon.onPress AND then map.onPress
-              tappable={false}
-            />
-          )}
-          {ring.length === 2 && (
-            <Polyline coordinates={ring} strokeColor={stroke} strokeWidth={2} />
-          )}
+          <Polygon
+            key="fill"
+            coordinates={showFill ? ring : [anchor, anchor, anchor]}
+            strokeColor={showFill ? stroke : HIDDEN}
+            fillColor={!showFill ? HIDDEN : bad ? 'rgba(220,38,38,0.14)' : 'rgba(84,105,212,0.16)'}
+            strokeWidth={showFill ? 2 : 0}
+            // no onPress: handleMapTap fires polygon.onPress AND then map.onPress
+            tappable={false}
+          />
+          <Polyline
+            key="open-edge"
+            coordinates={showOpenEdge ? ring : offLine}
+            strokeColor={showOpenEdge ? stroke : HIDDEN}
+            strokeWidth={showOpenEdge ? 2 : 0}
+          />
           {/* the auto-closing edge, shown only while authoring from nothing, so it is
               obvious the ring closes itself */}
-          {ring.length >= 3 && !savedRing && (
-            <Polyline
-              coordinates={[ring[ring.length - 1], ring[0]]}
-              strokeColor={stroke}
-              strokeWidth={2}
-              lineDashPattern={[6, 6]}
-            />
-          )}
+          <Polyline
+            key="closing-edge"
+            coordinates={showClosingEdge ? [ring[ring.length - 1], ring[0]] : offLine}
+            strokeColor={showClosingEdge ? stroke : HIDDEN}
+            strokeWidth={showClosingEdge ? 2 : 0}
+            lineDashPattern={[6, 6]}
+          />
 
           {/* the two offending edges, drawn thick and red. leaflet-draw only flashes
               the whole shape amber, which does not say WHERE. */}
-          {bad && problem && (
-            <>
-              <Polyline coordinates={edge(problem.a)} strokeColor={RED} strokeWidth={4} />
-              <Polyline coordinates={edge(problem.b)} strokeColor={RED} strokeWidth={4} />
-            </>
-          )}
+          <Polyline
+            key="bad-edge-a"
+            coordinates={showBadEdges ? edge(problem!.a) : offLine}
+            strokeColor={showBadEdges ? RED : HIDDEN}
+            strokeWidth={showBadEdges ? 4 : 0}
+          />
+          <Polyline
+            key="bad-edge-b"
+            coordinates={showBadEdges ? edge(problem!.b) : offLine}
+            strokeColor={showBadEdges ? RED : HIDDEN}
+            strokeWidth={showBadEdges ? 4 : 0}
+          />
 
           {/* a Circle, not a second marker view: radius is in metres, so 18pt x
               metres-per-point holds a constant on-screen size across zooms and no
               marker view ever has to mutate */}
-          {selected != null && ring[selected] && (
-            <Circle
-              center={ring[selected]}
-              radius={SELECT_HALO_PT * mpp}
-              strokeColor={INDIGO}
-              strokeWidth={2}
-              fillColor="rgba(84,105,212,0.18)"
-            />
-          )}
+          <Circle
+            key="selection"
+            center={selectedPoint ?? anchor}
+            radius={selectedPoint ? SELECT_HALO_PT * mpp : 0}
+            strokeColor={selectedPoint ? INDIGO : HIDDEN}
+            strokeWidth={selectedPoint ? 2 : 0}
+            fillColor={selectedPoint ? 'rgba(84,105,212,0.18)' : HIDDEN}
+          />
 
           {ring.map((p, i) => (
             <Marker
@@ -469,7 +494,7 @@ export function PolygonEditor({
         <ThemedText style={styles.stepLabel} testID={`${testIDPrefix}-selected`}>
           {selected == null
             ? t('serviceAreas.noPointSelected')
-            : t('serviceAreas.selectedPoint', { i: String(selected + 1), n: String(ring.length) })}
+            : t('serviceAreas.selectedPoint', { index: String(selected + 1), total: String(ring.length) })}
         </ThemedText>
         <TouchableOpacity
           style={styles.stepBtn}

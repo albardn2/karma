@@ -268,7 +268,10 @@ export default function LiveMapScreen() {
               provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
               initialRegion={region}
             >
-              {drivers.map((d) => (
+              {/* first-seen order, not the sorted `drivers`: MapView children must
+                  only ever be appended (see PolygonEditor's "always mounted" note),
+                  and the sort reshuffles markers whenever a driver goes stale */}
+              {Object.values(positions).map((d) => (
                 <Marker
                   key={d.userUuid}
                   coordinate={{ latitude: d.lat, longitude: d.lon }}
