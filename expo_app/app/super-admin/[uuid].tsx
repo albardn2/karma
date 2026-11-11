@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow, DetailAction } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatNumericDate } from '@/utils/date';
 
 interface Account {
@@ -61,28 +62,14 @@ interface Charge {
 export default function SuperAdminAccountScreen() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
   const { t, tef } = useLanguage();
-  const [reloadKey, setReloadKey] = useState(0);
-  const [charges, setCharges] = useState<Charge[] | null>(null);
-  const [outstanding, setOutstanding] = useState<Record<string, number>>({});
-  const [chargesFailed, setChargesFailed] = useState(false);
-
-  const loadCharges = useCallback(async () => {
-    setChargesFailed(false);
-    const res = await apiCall<{ charges: Charge[]; total_outstanding: Record<string, number> }>(
-      `/super-admin/accounts/${uuid}/unpaid-charges`,
-    );
-    if (!isOk(res.status)) {
-      setChargesFailed(true);
-      setCharges([]);
-      return;
-    }
-    setCharges(res.data?.charges ?? []);
-    setOutstanding(res.data?.total_outstanding ?? {});
-  }, [uuid]);
-
-  useEffect(() => {
-    loadCharges();
-  }, [loadCharges, reloadKey]);
+  // Cached and kept fresh (useApiQuery), like the account above it, so a block,
+  // charge or payment shows here on return or when the app comes back to the front.
+  const chargesQuery = useApiQuery<{ charges: Charge[]; total_outstanding: Record<string, number> }>(
+    `/super-admin/accounts/${uuid}/unpaid-charges`,
+  );
+  const chargesFailed = chargesQuery.isError;
+  const charges: Charge[] | null = chargesFailed ? [] : (chargesQuery.data?.charges ?? null);
+  const outstanding: Record<string, number> = chargesQuery.data?.total_outstanding ?? {};
 
   const money = (n?: number | null, c?: string | null) =>
     n == null ? '—' : `${Number(n).toFixed(2)}${c ? ` ${c}` : ''}`;
@@ -93,14 +80,14 @@ export default function SuperAdminAccountScreen() {
     return entries.map(([cur, v]) => `${Number(v).toFixed(2)} ${cur}`).join(' · ');
   };
 
-  /** One field, one PUT. The response is authoritative, so the screen refetches. */
+  /** One field, one PUT. */
   const setFlag = async (field: 'is_verified' | 'is_blocked', value: boolean, label: string) => {
     const res = await apiCall(`/super-admin/accounts/${uuid}`, {
       method: 'PUT',
       body: JSON.stringify({ [field]: value }),
     });
-    if (isOk(res.status)) setReloadKey((k) => k + 1);
-    else Alert.alert(label, String(res.error ?? '').slice(0, 300) || t('form.tryAgain'));
+    // on success the write itself refreshes the account and its charges
+    if (!isOk(res.status)) Alert.alert(label, String(res.error ?? '').slice(0, 300) || t('form.tryAgain'));
   };
 
   // DetailAction.visible was added for exactly this: which levers apply depends on the
@@ -135,7 +122,6 @@ export default function SuperAdminAccountScreen() {
       requireScope="superuser"
       title={t('menu.superAdmin')}
       endpoint={`/super-admin/accounts/${uuid}`}
-      reloadKey={reloadKey}
       heading={(a) => a.company_name || t('superAdmin.unnamed')}
       rows={(a): DetailRow[] => [
         [

@@ -1,13 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { ChartLegend, LineChart } from '@/components/Chart';
 import { PickerField } from '@/components/PickerField';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasModule } from '@/hooks/useModuleAccess';
-import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatNumericDate } from '@/utils/date';
 
 interface Warehouse {
@@ -75,60 +75,34 @@ export default function WarehousesDetailScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { t } = useLanguage();
-  const [stock, setStock] = useState<StockItem[] | null>(null);
-  const [series, setSeries] = useState<OverTimeSeries[] | null>(null);
   const [range, setRange] = useState<(typeof RANGES)[number]['id']>('90d');
   /** '' = let the server pick the biggest holders; otherwise one material's uuid */
   const [material, setMaterial] = useState('');
   /** the chosen material's name, so the closed dropdown reads as a name not a uuid */
   const [materialName, setMaterialName] = useState('');
-  const [bucket, setBucket] = useState<string>('week');
-  const [reloadKey, setReloadKey] = useState(0);
   // adding stock is an inventory-module write even though it starts here
   const canAddStock = useHasModule('inventory');
 
-  const loadAnalytics = useCallback(async () => {
-    const preset = RANGES.find((r) => r.id === range)!;
-    const from = new Date();
-    from.setDate(from.getDate() - preset.days);
-
-    const [stateRes, timeRes] = await Promise.all([
-      apiCall<{ items: StockItem[] }>(
-        `/inventory/analytics/warehouse-state?warehouse_uuid=${uuid}`,
-      ),
-      apiCall<{ bucket: string; series: OverTimeSeries[] }>(
-        `/inventory/analytics/warehouse-over-time?warehouse_uuid=${uuid}` +
-          `&bucket=${preset.bucket}&start_date=${encodeURIComponent(naiveIso(from))}` +
-          // the endpoint filters and ranks server-side; the app used to fetch the
-          // default five and throw one away
-          (material ? `&material_uuids=${encodeURIComponent(material)}` : `&top_n=${TOP_N}`),
-      ),
-    ]);
-    setStock(isOk(stateRes.status) ? (stateRes.data?.items ?? []) : []);
-    if (isOk(timeRes.status)) {
-      setSeries(timeRes.data?.series ?? []);
-      setBucket(timeRes.data?.bucket ?? preset.bucket);
-    } else {
-      setSeries([]);
-    }
-  }, [uuid, range, material]);
-
-  useEffect(() => {
-    loadAnalytics();
-    // reloadKey so stock and the chart reflect a lot added moments ago, not just the
-    // warehouse record itself
-  }, [loadAnalytics, reloadKey]);
-
-  // focus, not push: edit and add-stock both open screens that write, and a stack pop
-  // does not remount this one. A bump before the push refetched the record, stock and
-  // chart while that screen was opening, before the write, so coming back showed the
-  // old numbers. One bump per focus event; setState does not re-trigger focus, so this
-  // cannot loop.
-  useFocusEffect(
-    useCallback(() => {
-      setReloadKey((k) => k + 1);
-    }, []),
+  // Cached and kept fresh (useApiQuery): a lot added, a sale or a receipt anywhere
+  // shows here when the screen is next in view or the app comes back to the front.
+  // The window starts at midnight so the request, which is the cache key, holds still.
+  const preset = RANGES.find((r) => r.id === range)!;
+  const from = new Date();
+  from.setDate(from.getDate() - preset.days);
+  from.setHours(0, 0, 0, 0);
+  const stateQuery = useApiQuery<{ items: StockItem[] }>(
+    `/inventory/analytics/warehouse-state?warehouse_uuid=${uuid}`,
   );
+  const timeQuery = useApiQuery<{ bucket: string; series: OverTimeSeries[] }>(
+    `/inventory/analytics/warehouse-over-time?warehouse_uuid=${uuid}` +
+      `&bucket=${preset.bucket}&start_date=${encodeURIComponent(naiveIso(from))}` +
+      // the endpoint filters and ranks server-side; the app used to fetch the
+      // default five and throw one away
+      (material ? `&material_uuids=${encodeURIComponent(material)}` : `&top_n=${TOP_N}`),
+  );
+  const stock: StockItem[] | null = stateQuery.isError ? [] : (stateQuery.data?.items ?? null);
+  const series: OverTimeSeries[] | null = timeQuery.isError ? [] : (timeQuery.data?.series ?? null);
+  const bucket = timeQuery.data?.bucket ?? preset.bucket;
 
   // whatever the server returned for the current selection: one material when the
   // filter is set, its top TOP_N holders otherwise
@@ -152,7 +126,6 @@ export default function WarehousesDetailScreen() {
       module="warehouses"
       title={t('menu.warehouses')}
       endpoint={`/warehouse/${uuid}`}
-      reloadKey={reloadKey}
       heading={(x) => x.name}
       rows={(x): DetailRow[] => [
         [t('warehouses.address'), x.address || '—'],

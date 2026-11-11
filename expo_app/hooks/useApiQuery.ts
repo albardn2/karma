@@ -29,19 +29,30 @@ export async function apiGet<T>(path: string): Promise<T> {
  *
  * The previous result stays on screen while a new page, filter or search loads,
  * instead of being replaced by a spinner.
+ *
+ * `paused` keeps the data the screen has and stops refetching it, e.g. while the
+ * user edits a copy of it: a refresh mid-edit would change what the save diffs
+ * against.
  */
-export function useCachedQuery<T>(key: string | null, fetcher: () => Promise<T>) {
+export function useCachedQuery<T>(
+  key: string | null,
+  fetcher: () => Promise<T>,
+  { paused = false }: { paused?: boolean } = {},
+) {
   const isFocused = useIsFocused();
   return useQuery<T, ApiQueryError>({
     queryKey: [API_QUERY_ROOT, key],
-    enabled: key !== null,
+    enabled: key !== null && !paused,
     subscribed: isFocused,
     placeholderData: keepPreviousData,
     queryFn: fetcher,
   });
 }
 
+/** The cache key a GET of `path` lives under, for seeding it with a write's response. */
+export const apiQueryKey = (path: string) => [API_QUERY_ROOT, path];
+
 /** A GET against the API, cached and kept fresh. Pass `null` to wait, e.g. for a route param. */
-export function useApiQuery<T>(path: string | null) {
-  return useCachedQuery<T>(path, () => apiGet<T>(path as string));
+export function useApiQuery<T>(path: string | null, options?: { paused?: boolean }) {
+  return useCachedQuery<T>(path, () => apiGet<T>(path as string), options);
 }

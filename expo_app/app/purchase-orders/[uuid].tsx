@@ -1,12 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import { money } from '@/utils/money';
 import { formatNumericDate, parseTs, plainDate } from '@/utils/date';
 
@@ -93,10 +94,6 @@ export default function PurchaseOrdersDetailScreen() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
   const { t, tef } = useLanguage();
   const router = useRouter();
-  const [reloadKey, setReloadKey] = useState(0);
-  const [payouts, setPayouts] = useState<Payout[]>([]);
-  // a sub-fetch that FAILED must not read as one that returned nothing
-  const [payoutsFailed, setPayoutsFailed] = useState(false);
 
   const canReceive = useHasEndpoint('purchase_order_item', 'create');
   const canEdit = useHasEndpoint('purchase_order', 'update');
@@ -104,30 +101,15 @@ export default function PurchaseOrdersDetailScreen() {
   const canPayout = useHasEndpoint('payout', 'create');
   const canReadPayouts = useHasEndpoint('payout', 'read');
 
-  const loadPayouts = useCallback(async () => {
-    // a driver is 403 on /payout/ outright — don't ask, and don't show a failure for it
-    if (!canReadPayouts) return;
-    const res = await apiCall<{ payouts?: Payout[] }>(
-      `/payout/?purchase_order_uuid=${uuid}&per_page=100`,
-    );
-    setPayoutsFailed(!isOk(res.status));
-    setPayouts(isOk(res.status) ? (res.data?.payouts ?? []) : []);
-  }, [uuid, canReadPayouts]);
-
-  useEffect(() => {
-    loadPayouts();
-  }, [loadPayouts, reloadKey]);
-
-  // focus, not push: every action here (record payout, edit, edit a line, receive)
-  // opens a screen that writes, and a stack pop does not remount this one. Bumping
-  // the key before the push refetched while that screen was opening — before the
-  // write — so coming back showed the old totals and lines. One bump per focus
-  // event; setState does not re-trigger focus, so this cannot loop.
-  useFocusEffect(
-    useCallback(() => {
-      setReloadKey((k) => k + 1);
-    }, []),
+  // Cached and kept fresh (useApiQuery), like the order above it: a payout, edit or
+  // receipt anywhere shows here when the screen is next in view or the app comes back
+  // to the front. A driver is 403 on /payout/ outright, so they are never asked.
+  const payoutsQuery = useApiQuery<{ payouts?: Payout[] }>(
+    canReadPayouts ? `/payout/?purchase_order_uuid=${uuid}&per_page=100` : null,
   );
+  const payouts: Payout[] = payoutsQuery.data?.payouts ?? [];
+  // a sub-fetch that FAILED must not read as one that returned nothing
+  const payoutsFailed = payoutsQuery.isError;
 
   const qty = (n?: number | null) =>
     n == null ? '—' : Number.isInteger(n) ? String(n) : Number(n).toFixed(2);
@@ -248,7 +230,6 @@ export default function PurchaseOrdersDetailScreen() {
       module="purchase-orders"
       title={t('menu.purchaseOrders')}
       endpoint={`/purchase-order/${uuid}`}
-      reloadKey={reloadKey}
       heading={(x) => x.vendor_name || t('purchaseOrders.noVendor')}
       subheading={(x) => (
         <View style={styles.subhead}>
