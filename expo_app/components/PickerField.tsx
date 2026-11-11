@@ -60,7 +60,10 @@ const PAGE = 20;
  * allows it, and falls back to filtering the first page locally where it does not.
  *
  * It keeps the chosen row's LABEL as well as its uuid, so the field can show "Sugar"
- * rather than the uuid the body carries.
+ * rather than the uuid the body carries. The label is remembered together with the
+ * value it was picked for and shown only while `value` still matches: when the parent
+ * changes the value itself (a reset, or a reused list row), a remembered label would
+ * name a record the field no longer holds.
  */
 export function PickerField({ spec, value, onChange, initialLabel, testID }: PickerFieldProps) {
   const { t } = useLanguage();
@@ -69,7 +72,8 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [chosen, setChosen] = useState<string>('');
+  const [chosen, setChosen] = useState<{ value: string; label: string } | null>(null);
+  const chosenLabel = chosen && chosen.value === value ? chosen.label : '';
 
   const load = useCallback(async () => {
     // caller-supplied rows: nothing to fetch, and no failure state to enter
@@ -119,7 +123,7 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
         testID={testID}
       >
         <ThemedText style={[styles.triggerText, !value && styles.placeholder]} numberOfLines={1}>
-          {value ? chosen || initialLabel || value : t('picker.choose')}
+          {value ? chosenLabel || initialLabel || value : t('picker.choose')}
         </ThemedText>
         <ThemedText style={styles.chevron}>{open ? '⌃' : '⌄'}</ThemedText>
       </TouchableOpacity>
@@ -150,7 +154,7 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
                   key={v}
                   style={[styles.row, v === value && styles.rowOn]}
                   onPress={() => {
-                    setChosen(spec.label(r));
+                    setChosen({ value: v, label: spec.label(r) });
                     onChange(v, spec.label(r));
                     setOpen(false);
                     setQuery('');
