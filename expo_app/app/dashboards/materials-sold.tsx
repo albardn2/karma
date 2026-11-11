@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -16,7 +16,8 @@ import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { StackedBarChart, ChartLegend } from '@/components/Chart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 interface MaterialRow {
   material_uuid: string;
@@ -72,10 +73,6 @@ export function MaterialsSoldScreenImpl({
 
   const [gran, setGranRaw] = useState<Gran>('month');
   const [offset, setOffset] = useState(0);
-  const [data, setData] = useState<Payload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [failed, setFailed] = useState(false);
 
   // switching granularity re-anchors to the current period — an offset of 3
   // months means nothing in weeks
@@ -91,25 +88,14 @@ export function MaterialsSoldScreenImpl({
     : mine
       ? '/dashboard/my-materials-sold'
       : '/dashboard/materials-sold';
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      const res = await apiCall<Payload>(
-        `${endpoint}?granularity=${gran}&offset=${offset}` +
+  const dash = useApiQuery<Payload>(
+    `${endpoint}?granularity=${gran}&offset=${offset}` +
           (userUuid ? `&user_uuid=${userUuid}` : ''),
-      );
-      if (isOk(res.status) && res.data) setData(res.data);
-      else setFailed(true);
-      setLoading(false);
-      setRefreshing(false);
-    },
-    [gran, offset, endpoint, userUuid],
   );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { refreshing, onRefresh } = usePullToRefresh(dash.refetch);
+  const data = dash.data ?? null;
+  const loading = dash.isPending;
+  const failed = dash.isError;
 
   const chartWidth = width - 72;
   const materials = data?.materials ?? [];
@@ -166,7 +152,7 @@ export function MaterialsSoldScreenImpl({
           ) : failed ? (
             <View style={styles.centre}>
               <ThemedText style={styles.stateText}>{t('moduleList.failed')}</ThemedText>
-              <TouchableOpacity style={styles.retry} onPress={() => load()}>
+              <TouchableOpacity style={styles.retry} onPress={() => dash.refetch()}>
                 <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
               </TouchableOpacity>
             </View>
@@ -265,10 +251,7 @@ export function MaterialsSoldScreenImpl({
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                load(true);
-              }}
+              onRefresh={onRefresh}
             />
           }
         >

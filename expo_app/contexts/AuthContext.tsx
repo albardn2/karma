@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, apiCall, setOnAuthFailure, setOnPermsChanged } from '@/utils/api';
+import { clearQueryCache } from '@/utils/queryClient';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error clearing auth data:', error);
     }
+    clearQueryCache();
   };
 
   const fetchUserInfo = async (): Promise<boolean> => {

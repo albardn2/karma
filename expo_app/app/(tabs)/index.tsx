@@ -1,6 +1,9 @@
-import React, { useState, useMemo } from 'react';
-import { Platform } from 'react-native';
+import React, { useCallback, useState, useMemo } from 'react';
+import { Platform, RefreshControl } from 'react-native';
 import { StyleSheet, ScrollView, TouchableOpacity, View, Alert } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { API_QUERY_ROOT } from '@/utils/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -170,12 +173,26 @@ export default function HomeScreen() {
     [insets.bottom]
   );
 
+  // the Home panels are embedded and have no scroller of their own, so one pull here
+  // refetches every one of them that is on screen
+  const queryClient = useQueryClient();
+  const refetchPanels = useCallback(
+    () => queryClient.refetchQueries({ queryKey: [API_QUERY_ROOT], type: 'active' }),
+    [queryClient],
+  );
+  const { refreshing, onRefresh } = usePullToRefresh(refetchPanels);
+
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          activeTab === 'home' ? (
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          ) : undefined
+        }
       >
         {activeTab === 'home' ? (
           // Home: the role's dashboards stacked (falls back to the old welcome

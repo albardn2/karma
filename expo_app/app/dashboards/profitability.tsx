@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -17,7 +17,8 @@ import { CostCurrencyToggle, CostCcy } from '@/components/CostCurrencyToggle';
 import { GroupedBarChart, ChartLegend } from '@/components/Chart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { money } from '@/utils/money';
 
 interface Group {
@@ -64,29 +65,14 @@ export function ProfitabilityScreenImpl({ embedded = false }: { embedded?: boole
 
   const [gran, setGran] = useState<Gran>('month');
   const [ccy, setCcy] = useState<CostCcy>('USD');
-  const [data, setData] = useState<Payload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [failed, setFailed] = useState(false);
 
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      const res = await apiCall<Payload>(
-        `/dashboard/profitability?granularity=${gran}&target_currency=${ccy}`,
-      );
-      if (isOk(res.status) && res.data) setData(res.data);
-      else setFailed(true);
-      setLoading(false);
-      setRefreshing(false);
-    },
-    [gran, ccy],
+  const dash = useApiQuery<Payload>(
+    `/dashboard/profitability?granularity=${gran}&target_currency=${ccy}`,
   );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { refreshing, onRefresh } = usePullToRefresh(dash.refetch);
+  const data = dash.data ?? null;
+  const loading = dash.isPending;
+  const failed = dash.isError;
 
   const chartWidth = width - 72;
   const groups = (data?.groups ?? []).map((g) => ({
@@ -120,7 +106,7 @@ export function ProfitabilityScreenImpl({ embedded = false }: { embedded?: boole
           ) : failed ? (
             <View style={styles.centre}>
               <ThemedText style={styles.stateText}>{t('moduleList.failed')}</ThemedText>
-              <TouchableOpacity style={styles.retry} onPress={() => load()}>
+              <TouchableOpacity style={styles.retry} onPress={() => dash.refetch()}>
                 <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
               </TouchableOpacity>
             </View>
@@ -204,10 +190,7 @@ export function ProfitabilityScreenImpl({ embedded = false }: { embedded?: boole
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                load(true);
-              }}
+              onRefresh={onRefresh}
             />
           }
         >

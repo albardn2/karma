@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -16,7 +16,8 @@ import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { StackedBarChart, ChartLegend } from '@/components/Chart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 interface Group {
   period_label: string;
@@ -52,27 +53,14 @@ export function MyTripStopsScreenImpl({ embedded = false }: { embedded?: boolean
   const { t } = useLanguage();
 
   const [gran, setGran] = useState<Gran>('month');
-  const [data, setData] = useState<Payload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [failed, setFailed] = useState(false);
 
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      const res = await apiCall<Payload>(`/dashboard/my-trip-stops?granularity=${gran}`);
-      if (isOk(res.status) && res.data) setData(res.data);
-      else setFailed(true);
-      setLoading(false);
-      setRefreshing(false);
-    },
-    [gran],
+  const dash = useApiQuery<Payload>(
+    `/dashboard/my-trip-stops?granularity=${gran}`,
   );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { refreshing, onRefresh } = usePullToRefresh(dash.refetch);
+  const data = dash.data ?? null;
+  const loading = dash.isPending;
+  const failed = dash.isError;
 
   const chartWidth = width - 72;
   const groups = data?.groups ?? [];
@@ -104,7 +92,7 @@ export function MyTripStopsScreenImpl({ embedded = false }: { embedded?: boolean
           ) : failed ? (
             <View style={styles.centre}>
               <ThemedText style={styles.stateText}>{t('moduleList.failed')}</ThemedText>
-              <TouchableOpacity style={styles.retry} onPress={() => load()}>
+              <TouchableOpacity style={styles.retry} onPress={() => dash.refetch()}>
                 <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
               </TouchableOpacity>
             </View>
@@ -183,10 +171,7 @@ export function MyTripStopsScreenImpl({ embedded = false }: { embedded?: boolean
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                load(true);
-              }}
+              onRefresh={onRefresh}
             />
           }
         >
