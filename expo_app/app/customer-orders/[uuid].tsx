@@ -274,7 +274,7 @@ export default function CustomerOrderDetailScreen() {
             [t('customerOrders.paidAmount'), money(o.net_amount_paid, o.currency)],
             [t('customerOrders.due'), money(o.net_amount_due, o.currency)],
             [t('payments.received'), formatNumericDate(parseTs(o.created_at))],
-            [t('customerOrders.notes'), o.notes || '—'],
+            [t('customerOrders.notes'), o.notes || '—', 'text'],
           ];
         }}
         sections={[

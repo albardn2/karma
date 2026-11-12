@@ -76,7 +76,7 @@ export default function VendorsDetailScreen() {
         [t('vendors.phone'), x.phone_number || '—'],
         [t('vendors.email'), x.email_address || '—'],
         [t('vendors.category'), x.category ? tef(x.category) : '—'],
-        [t('vendors.address'), x.full_address || '—'],
+        [t('vendors.address'), x.full_address || '—', 'text'],
         ...balanceRows(x),
       ]}
       actions={[

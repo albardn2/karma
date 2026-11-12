@@ -154,7 +154,7 @@ export default function LotDetailScreen() {
       [t('inventory.expiry'), l.expiration_date ? plainDate(l.expiration_date.slice(0, 10)) : '—'],
       [t('inventory.received'), formatNumericDate(parseTs(l.created_at))],
       [t('inventory.createdBy'), l.created_by_uuid ?? '—'],
-      [t('inventory.notes'), l.notes || '—'],
+      [t('inventory.notes'), l.notes || '—', 'text'],
       [t('materials.uuid'), l.uuid],
     ];
   };

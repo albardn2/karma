@@ -123,8 +123,8 @@ export default function WarehousesDetailScreen() {
       endpoint={`/warehouse/${uuid}`}
       heading={(x) => x.name}
       rows={(x): DetailRow[] => [
-        [t('warehouses.address'), x.address || '—'],
-        [t('warehouses.notes'), x.notes || '—'],
+        [t('warehouses.address'), x.address || '—', 'text'],
+        [t('warehouses.notes'), x.notes || '—', 'text'],
       ]}
       sections={[
         {
