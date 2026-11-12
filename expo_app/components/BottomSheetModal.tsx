@@ -50,12 +50,14 @@ export function BottomSheetModal({ visible, onClose, title, busy = false, childr
         />
         <View style={[styles.sheet, { paddingBottom: 16 + insets.bottom }]}>
           <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
+            {/* inside the sheet's own tree: iOS does not attach an accessory view
+                rendered outside the modal's content to the inputs inside it */}
+            <KeyboardDoneBar />
             <ThemedText style={styles.title}>{title}</ThemedText>
             {children}
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
-      <KeyboardDoneBar />
     </Modal>
   );
 }
