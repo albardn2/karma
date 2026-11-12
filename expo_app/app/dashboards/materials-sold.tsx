@@ -43,8 +43,6 @@ type Gran = 'day' | 'week' | 'month' | 'quarter' | 'year';
 const FULFILLED = '#16a34a';
 const UNFULFILLED = '#d97706';
 
-const short = (s: string, n = 7) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-
 /**
  * Quantities of materials sold in ONE period — each bar is a MATERIAL, stacked
  * into fulfilled vs unfulfilled quantity.
@@ -167,8 +165,13 @@ export function MaterialsSoldScreenImpl({
                   width={chartWidth}
                   colours={[FULFILLED, UNFULFILLED]}
                   series={names}
-                  data={materials.map((m) => ({
-                    label: short(m.name),
+                  // numbered, matching the table below: names that share a prefix
+                  // would truncate to identical labels
+                  data={materials.map((m, i) => ({
+                    label: String(i + 1),
+                    // the name is bidi-isolated (FSI…PDI) so an Arabic name keeps the
+                    // rank and unit on their own sides
+                    title: `${i + 1}. \u2068${m.name}\u2069 (${m.unit})`,
                     segments: [m.fulfilled, m.unfulfilled],
                   }))}
                 />
@@ -192,12 +195,17 @@ export function MaterialsSoldScreenImpl({
                     <ThemedText style={[styles.rowVal, styles.head]}>{t('dashboards.unfulfilled')}</ThemedText>
                   </View>
                 </View>
-                {materials.map((m) => (
+                {materials.map((m, i) => (
                   <View key={`${m.material_uuid}-${m.unit}`} style={styles.row}>
-                    <ThemedText style={styles.rowLabel} numberOfLines={2}>
-                      {m.name}
-                      <ThemedText style={styles.unitText}> ({m.unit})</ThemedText>
-                    </ThemedText>
+                    {/* the rank sits outside the name's text run, so an Arabic name
+                        cannot carry it to the far side */}
+                    <View style={[styles.rowLabel, styles.rankedLabel]}>
+                      <ThemedText style={styles.rank}>{i + 1}</ThemedText>
+                      <ThemedText style={styles.rankedName} numberOfLines={2}>
+                        {m.name}
+                        <ThemedText style={styles.unitText}> ({m.unit})</ThemedText>
+                      </ThemedText>
+                    </View>
                     <View style={styles.rowVals}>
                       <ThemedText style={styles.rowVal}>{m.total}</ThemedText>
                       <ThemedText style={[styles.rowVal, { color: FULFILLED }]}>{m.fulfilled}</ThemedText>
@@ -296,6 +304,9 @@ const styles = StyleSheet.create({
   table: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginTop: 16 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 10 },
   rowLabel: { flexBasis: 120, flexShrink: 0, fontSize: 12, fontWeight: '700', color: '#111827', lineHeight: 15 },
+  rankedLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  rank: { fontSize: 12, fontWeight: '700', opacity: 0.5, minWidth: 14 },
+  rankedName: { flex: 1, fontSize: 12, fontWeight: '700', color: '#111827', lineHeight: 15 },
   unitText: { fontSize: 10, fontWeight: '400', color: '#9ca3af' },
   rowVals: { flex: 1, flexDirection: 'row', justifyContent: 'space-between' },
   rowVal: { fontSize: 12, color: '#374151', fontVariant: ['tabular-nums'] },
