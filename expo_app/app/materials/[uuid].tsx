@@ -1,6 +1,5 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
@@ -8,6 +7,7 @@ import { LineChart } from '@/components/Chart';
 import { CostCurrencyToggle, CostCcy } from '@/components/CostCurrencyToggle';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatMonthDayTime, formatNumericDate, parseTs, plainDate } from '@/utils/date';
 
 interface Material {
@@ -67,37 +67,19 @@ export default function MaterialDetailScreen() {
   const router = useRouter();
   const { t, tef } = useLanguage();
   const { width } = useWindowDimensions();
-  const [summary, setSummary] = useState<Summary | null>(null);
   const [ccy, setCcy] = useState<CostCcy>('USD');
-  const [reloadKey, setReloadKey] = useState(0);
 
-  const loadSummary = useCallback(
-    async (currency: CostCcy) => {
-      // cost_currency is a reporting currency, not a filter: every lot's cost is
-      // converted server-side at the rate nearest its own events
-      const res = await apiCall<Summary>(
-        `/material/${uuid}/inventory-summary?cost_currency=${currency}`,
-      );
-      // keep the previous numbers on a failed refetch rather than blanking a section
-      // that had data a second ago
-      if (isOk(res.status) && res.data) setSummary(res.data);
-      else if (!summary) setSummary({ events: [], lots: [] });
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [uuid],
+  // Cached and kept fresh (useApiQuery): add-stock, zero-out or a sale anywhere shows
+  // here when this screen is next in view. cost_currency is a reporting currency, not
+  // a filter: every lot's cost is converted server-side at the rate nearest its own
+  // events.
+  const summaryQuery = useApiQuery<Summary>(
+    `/material/${uuid}/inventory-summary?cost_currency=${ccy}`,
   );
-
-  // focus, not mount: add-stock and zero-out both change what this screen shows, and
-  // returning from the add-stock screen must show the new lot
-  useFocusEffect(
-    useCallback(() => {
-      loadSummary(ccy);
-      // also refresh the material record itself: returning from the edit screen must
-      // show the new name/sku, and a stack pop does not remount this screen. One bump
-      // per focus event — setState does not re-trigger focus, so this cannot loop.
-      setReloadKey((k) => k + 1);
-    }, [loadSummary, ccy]),
-  );
+  // a failed first load shows empty sections; a failed refetch keeps the numbers that
+  // were on screen a second ago
+  const summary: Summary | null =
+    summaryQuery.data ?? (summaryQuery.isError ? { events: [], lots: [] } : null);
 
   const lots = summary?.lots ?? null;
   const onHand = (lots ?? []).reduce((n, l) => n + Number(l.current_quantity ?? 0), 0);
@@ -146,8 +128,8 @@ export default function MaterialDetailScreen() {
               method: 'POST',
               body: JSON.stringify({}),
             });
-            if (isOk(res.status)) loadSummary(ccy);
-            else
+            // on success the write itself refreshes the summary
+            if (!isOk(res.status))
               Alert.alert(
                 t('materials.zeroOutFailed'),
                 String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
@@ -160,7 +142,10 @@ export default function MaterialDetailScreen() {
   const removeMaterial = async (x: Material) => {
     const res = await apiCall(`/material/${x.uuid}`, { method: 'DELETE' });
     if (isOk(res.status)) {
-      router.replace('/materials');
+      // back to the list underneath, which refreshes on focus; replacing would stack a
+      // second list over it and leave the stale one one tap away
+      if (router.canGoBack()) router.back();
+      else router.replace('/materials');
       return;
     }
     // the server's 400 says the material "cannot be updated", which is the wrong verb
@@ -180,7 +165,6 @@ export default function MaterialDetailScreen() {
       module="materials"
       title={t('menu.materials')}
       endpoint={`/material/${uuid}`}
-      reloadKey={reloadKey}
       heading={(x) => x.name}
       rows={(x): DetailRow[] => [
         [t('materials.sku'), x.sku || '—'],

@@ -14,7 +14,9 @@ import {
 } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { useRouter, useLocalSearchParams, Stack, useFocusEffect } from "expo-router";
+import { useRouter, useLocalSearchParams, Stack } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { apiQueryKey, useApiQuery } from "@/hooks/useApiQuery";
 import { apiCall, apiErrorText } from "@/utils/api";
 import { markListsStale, setListFlash } from "@/utils/listRefresh";
 import { LinearGradient } from "expo-linear-gradient";
@@ -187,8 +189,6 @@ export default function CustomerDetailScreen() {
   const { t, te, tef } = useLanguage();
   // translates predefined tags for display; custom tags pass through raw
   const { labelFor } = useTagCatalog();
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [loading, setLoading] = useState(true);
   const [screenData, setScreenData] = useState(Dimensions.get("window"));
   const [isEditing, setIsEditing] = useState(false);
   const [editedCustomer, setEditedCustomer] = useState<Customer | null>(null);
@@ -220,37 +220,44 @@ export default function CustomerDetailScreen() {
     return () => subscription?.remove();
   }, []);
 
-  // Read isEditing through a ref so the focus callback below keeps a STABLE
-  // identity. expo-router re-runs a focus effect whenever its callback changes
-  // while the screen is focused, so listing isEditing as a dependency would
-  // fire a refetch the moment edit mode ends — blanking the screen to the
-  // full-page spinner over the success banner, and turning a network blip into
-  // the "failed to load" bounce right after a save that actually worked.
-  const isEditingRef = React.useRef(false);
-  const customerRef = React.useRef<Customer | null>(null);
-  customerRef.current = customer;
   // a DELETE can outlive this screen; navigating then would pop another one
   const mountedRef = React.useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
-  useEffect(() => {
-    isEditingRef.current = isEditing;
-  }, [isEditing]);
 
-  // Re-read on every focus, not just on mount. The sale and interest tags are
-  // derived server-side from orders and trip-stop outcomes, so this screen goes
-  // stale the moment the rep creates an order from somewhere else in the app —
-  // and stale here is worse than it looks: the edit form PUTs the tag array, so
-  // an edit made from a pre-order snapshot would write the old tags back and
-  // undo the derivation (logging reverse events into the tag history on the
-  // way). Never refetch mid-edit, which would discard what is being typed.
-  // Same pattern as the stop screen's refresh-on-focus.
-  useFocusEffect(
-    React.useCallback(() => {
-      if (id && !isEditingRef.current) {
-        fetchCustomer();
-      }
-    }, [id]),
-  );
+  // Cached and kept fresh (useApiQuery): the sale and interest tags are derived
+  // server-side from orders and trip-stop outcomes, so this screen goes stale the
+  // moment the rep creates an order elsewhere, and a write anywhere or a return to
+  // the foreground refreshes it.
+  //
+  // Paused while editing. The edit form PUTs the tag array diffed against this
+  // copy, so a refresh mid-edit would make the save write the old tags back and
+  // undo the derivation (logging reverse events into the tag history on the way).
+  const queryClient = useQueryClient();
+  const customerPath = id ? `/customer/${id}` : null;
+  const customerQuery = useApiQuery<Customer>(customerPath, { paused: isEditing });
+  const customer = customerQuery.data ?? null;
+  const loading = customerQuery.isPending;
+  const setCustomer = (next: Customer) => {
+    if (customerPath) queryClient.setQueryData(apiQueryKey(customerPath), next);
+  };
+
+  // the edit form's starting point follows the server copy, except mid-edit
+  const { dataUpdatedAt } = customerQuery;
+  useEffect(() => {
+    if (customer && !isEditing) setEditedCustomer(customer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataUpdatedAt, isEditing]);
+
+  // A failed FIRST load leaves nothing to look at, so it bounces back. A failed
+  // refresh must not: the rep is standing in front of the customer with the screen
+  // already populated, and throwing them out over a dropped signal reads as data loss.
+  const firstLoadFailed = customerQuery.isError && !customer;
+  useEffect(() => {
+    if (!firstLoadFailed) return;
+    Alert.alert(t('custdetail.error'), t('custdetail.loadCustomerFailed'));
+    router.back();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstLoadFailed]);
 
   const showBanner = (type: "success" | "error", message: string) => {
     setBanner({ type, message });
@@ -344,34 +351,6 @@ export default function CustomerDetailScreen() {
       );
     } finally {
       setLocationLoading(false);
-    }
-  };
-
-  const fetchCustomer = async () => {
-    // A failed FIRST load leaves nothing to look at, so it bounces back. A
-    // failed refresh-on-focus must not: the rep is standing in front of the
-    // customer with the screen already populated, and throwing them out over a
-    // dropped signal — right after a save that succeeded — reads as data loss.
-    const failed = () => {
-      if (customerRef.current) return;
-      Alert.alert(t('custdetail.error'), t('custdetail.loadCustomerFailed'));
-      router.back();
-    };
-    try {
-      setLoading(true);
-      const response = await apiCall<Customer>(`/customer/${id}`);
-
-      if (response.status === 200 && response.data) {
-        setCustomer(response.data);
-        setEditedCustomer(response.data);
-      } else {
-        failed();
-      }
-    } catch (error) {
-      console.error("Error fetching customer:", error);
-      failed();
-    } finally {
-      setLoading(false);
     }
   };
 

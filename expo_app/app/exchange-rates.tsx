@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
@@ -6,7 +6,7 @@ import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { LineChart } from '@/components/Chart';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatNumericDate } from '@/utils/date';
 
 interface Rate {
@@ -52,26 +52,14 @@ export default function ExchangeRatesScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { t, tef } = useLanguage();
-  const [latest, setLatest] = useState<Rate | null>(null);
-  const [trend, setTrend] = useState<Rate[]>([]);
-  const [noRate, setNoRate] = useState(false);
-
-  const load = useCallback(async () => {
-    const [latestRes, trendRes] = await Promise.all([
-      apiCall<Rate>('/exchange-rate/latest'),
-      apiCall<{ exchange_rates: Rate[] }>(
-        `/exchange-rate/?from_currency=USD&to_currency=SYP&per_page=${TREND_POINTS}`,
-      ),
-    ]);
-    // 404 here means "no rate recorded yet", which is a state, not a failure
-    if (isOk(latestRes.status) && latestRes.data) setLatest(latestRes.data);
-    else setNoRate(true);
-    if (isOk(trendRes.status)) setTrend(trendRes.data?.exchange_rates ?? []);
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const latestQuery = useApiQuery<Rate>('/exchange-rate/latest');
+  const trendQuery = useApiQuery<{ exchange_rates: Rate[] }>(
+    `/exchange-rate/?from_currency=USD&to_currency=SYP&per_page=${TREND_POINTS}`,
+  );
+  const latest = latestQuery.data ?? null;
+  const trend = useMemo(() => trendQuery.data?.exchange_rates ?? [], [trendQuery.data]);
+  // a failed /latest (404: none recorded yet) is a state, not a failure
+  const noRate = latestQuery.isError;
 
   const series = useMemo(() => {
     // newest-first from the API; plotted oldest-first or the line reads backwards

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, apiErrorText, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { formatNumericDate } from '@/utils/date';
 import { markListsStale } from '@/utils/listRefresh';
 
@@ -50,57 +52,29 @@ export default function PaymentDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t, tef } = useLanguage();
-  const [payment, setPayment] = useState<Payment | null>(null);
-  const [payer, setPayer] = useState<string | null>(null);
-  const [account, setAccount] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [failed, setFailed] = useState(false);
   const [deleting, setDeleting] = useState(false);
   // DELETE /payment/<uuid> is admin-only on the server (scopes_required admin,
   // superuser; a role grant does not reach it), so it is offered to admins only
   const { isAdmin } = useAuth();
 
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      setPayer(null);
-      try {
-        const res = await apiCall<Payment>(`/payment/${uuid}`);
-        if (res.status !== 200 || !res.data) {
-          setFailed(true);
-          return;
-        }
-        setPayment(res.data);
-
-        if (res.data.invoice_uuid) {
-          const inv = await apiCall<any>(`/invoice/${res.data.invoice_uuid}`);
-          const customerUuid = isOk(inv.status) ? inv.data?.customer_uuid : null;
-          if (customerUuid) {
-            const cust = await apiCall<any>(`/customer/${customerUuid}`);
-            if (isOk(cust.status)) {
-              setPayer(cust.data?.company_name || cust.data?.full_name || null);
-            }
-          }
-        }
-        if (res.data.financial_account_uuid) {
-          const fa = await apiCall<any>(`/financial-account/${res.data.financial_account_uuid}`);
-          setAccount(isOk(fa.status) ? (fa.data?.account_name ?? null) : null);
-        }
-      } catch {
-        setFailed(true);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [uuid],
+  // The payment, then the names behind its uuids: payer via the invoice's customer,
+  // and the account it went into. Each lookup waits for the one it depends on.
+  const paymentQuery = useApiQuery<Payment>(`/payment/${uuid}`);
+  const payment = paymentQuery.data ?? null;
+  const invoiceQuery = useApiQuery<any>(
+    payment?.invoice_uuid ? `/invoice/${payment.invoice_uuid}` : null,
   );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const customerUuid: string | undefined = invoiceQuery.data?.customer_uuid;
+  const customerQuery = useApiQuery<any>(customerUuid ? `/customer/${customerUuid}` : null);
+  const accountQuery = useApiQuery<any>(
+    payment?.financial_account_uuid ? `/financial-account/${payment.financial_account_uuid}` : null,
+  );
+  const payer: string | null =
+    customerQuery.data?.company_name || customerQuery.data?.full_name || null;
+  const account: string | null = accountQuery.data?.account_name ?? null;
+  const loading = paymentQuery.isPending;
+  const failed = paymentQuery.isError;
+  const { refreshing, onRefresh } = usePullToRefresh(paymentQuery.refetch);
 
   // Deleting is the whole reversal: the invoice's paid and owed amounts, the
   // account balance and a trip's expected cash are all summed from live
@@ -189,7 +163,7 @@ export default function PaymentDetailScreen() {
             <ThemedText style={styles.stateText} testID="payment-error">
               {t('moduleList.failed')}
             </ThemedText>
-            <TouchableOpacity style={styles.retry} onPress={() => load()}>
+            <TouchableOpacity style={styles.retry} onPress={() => paymentQuery.refetch()}>
               <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
             </TouchableOpacity>
           </View>
@@ -197,13 +171,7 @@ export default function PaymentDetailScreen() {
           <ScrollView
             contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
             refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => {
-                  setRefreshing(true);
-                  load(true);
-                }}
-              />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
           >
             <ThemedText style={styles.amount} testID="payment-amount">

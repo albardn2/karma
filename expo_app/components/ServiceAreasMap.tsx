@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { ThemedText } from '@/components/ThemedText';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import { areaColour } from '@/utils/areaColour';
 import { parseWktPolygons, polygonsCoverPoint, LatLng } from '@/utils/wkt';
 
@@ -63,31 +63,16 @@ export function ServiceAreasMap({ footerOffset = 0 }: { footerOffset?: number })
   const { t } = useLanguage();
   const mapRef = useRef<MapView | null>(null);
 
-  const [areas, setAreas] = useState<ServiceArea[]>([]);
-  const [total, setTotal] = useState(0);
   const [me, setMe] = useState<LatLng | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setFailed(false);
-    const res = await apiCall<{ items?: ServiceArea[]; total_count?: number }>(
-      `/service-area/?per_page=${PER_PAGE}`,
-    );
-    if (isOk(res.status)) {
-      setAreas(res.data?.items ?? []);
-      setTotal(Number(res.data?.total_count ?? 0));
-    } else {
-      setFailed(true);
-      setAreas([]);
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  // cached and kept fresh, so an area created, reshaped or deleted elsewhere shows here
+  const areasQuery = useApiQuery<{ items?: ServiceArea[]; total_count?: number }>(
+    `/service-area/?per_page=${PER_PAGE}`,
+  );
+  const areas = useMemo(() => areasQuery.data?.items ?? [], [areasQuery.data]);
+  const total = Number(areasQuery.data?.total_count ?? 0);
+  const loading = areasQuery.isPending;
+  const failed = areasQuery.isError;
 
   // best-effort and silent: a denied permission just means no highlight, and this
   // component must not nag for a location it can do without
@@ -134,6 +119,11 @@ export function ServiceAreasMap({ footerOffset = 0 }: { footerOffset?: number })
   }, [areas, me]);
 
   const allPoints = useMemo(() => shapes.flatMap((s) => s.coordinates), [shapes]);
+  // A changed set of areas remounts the map rather than adding or removing Polygon
+  // children in place: under the new architecture's legacy interop, a child inserted
+  // ahead of others shifts AIRMap's subview indexes and can abort the app (see the
+  // "always mounted" note in PolygonEditor). Reshaping an area keeps its key.
+  const shapeSet = useMemo(() => shapes.map((s) => s.uuid).join(','), [shapes]);
   const undrawable = areas.length - new Set(shapes.map((s) => s.uuid)).size;
 
   const fit = useCallback(() => {
@@ -155,7 +145,7 @@ export function ServiceAreasMap({ footerOffset = 0 }: { footerOffset?: number })
     return (
       <View style={styles.centre}>
         <ThemedText style={styles.stateText}>{t('moduleList.failed')}</ThemedText>
-        <TouchableOpacity style={styles.retry} onPress={load}>
+        <TouchableOpacity style={styles.retry} onPress={() => areasQuery.refetch()}>
           <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
         </TouchableOpacity>
       </View>
@@ -172,6 +162,7 @@ export function ServiceAreasMap({ footerOffset = 0 }: { footerOffset?: number })
   return (
     <View style={styles.flex}>
       <MapView
+        key={shapeSet}
         ref={mapRef}
         style={styles.flex}
         provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}

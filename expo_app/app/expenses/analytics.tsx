@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -15,7 +15,8 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { BarChart, ChartLegend, SERIES_COLOURS } from '@/components/Chart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 interface Bucket {
   period: string;
@@ -68,43 +69,28 @@ export default function ExpenseAnalyticsScreen() {
   const { t, tef } = useLanguage();
   const [range, setRange] = useState<(typeof RANGES)[number]['id']>('90d');
   const [currency, setCurrency] = useState<string | null>(null);
-  const [data, setData] = useState<Analytics | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      try {
-        const preset = RANGES.find((r) => r.id === range)!;
-        const q = new URLSearchParams({ bucket: preset.bucket });
-        if (preset.days) {
-          const from = new Date();
-          from.setDate(from.getDate() - preset.days);
-          // NAIVE ISO, no trailing Z. The backend parses these as naive local
-          // datetimes and rejects a zone suffix outright — toISOString() always
-          // appends Z, which 400s with "Invalid date".
-          q.append('start_date', from.toISOString().replace(/\.\d+Z$/, '').replace(/Z$/, ''));
-        }
-        if (currency) q.append('currency', currency);
-        const res = await apiCall<Analytics>(`/expense/analytics/over-time?${q.toString()}`);
-        if (isOk(res.status) && res.data) setData(res.data);
-        else setFailed(true);
-      } catch {
-        setFailed(true);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [range, currency],
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const preset = RANGES.find((r) => r.id === range)!;
+  const q = new URLSearchParams({ bucket: preset.bucket });
+  if (preset.days) {
+    const from = new Date();
+    from.setDate(from.getDate() - preset.days);
+    // Midnight of that day rather than this minute: the URL is the cache key, and a
+    // start that moves with the clock would make every render a new query. NAIVE ISO,
+    // no trailing Z — the backend parses naive local datetimes and rejects a zone
+    // suffix with "Invalid date".
+    const day = [
+      from.getFullYear(),
+      String(from.getMonth() + 1).padStart(2, '0'),
+      String(from.getDate()).padStart(2, '0'),
+    ].join('-');
+    q.append('start_date', `${day}T00:00:00`);
+  }
+  if (currency) q.append('currency', currency);
+  const analytics = useApiQuery<Analytics>(`/expense/analytics/over-time?${q.toString()}`);
+  const { refreshing, onRefresh } = usePullToRefresh(analytics.refetch);
+  const data = analytics.data ?? null;
+  const loading = analytics.isPending;
+  const failed = analytics.isError;
 
   const money = (n: number) => `${Number(n ?? 0).toFixed(2)} ${data?.currency ?? ''}`;
   const chartWidth = width - 72;
@@ -126,10 +112,7 @@ export default function ExpenseAnalyticsScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                load(true);
-              }}
+              onRefresh={onRefresh}
             />
           }
         >
@@ -155,7 +138,7 @@ export default function ExpenseAnalyticsScreen() {
           ) : failed || !data ? (
             <View style={styles.centre}>
               <ThemedText style={styles.stateText}>{t('moduleList.failed')}</ThemedText>
-              <TouchableOpacity style={styles.retry} onPress={() => load()}>
+              <TouchableOpacity style={styles.retry} onPress={() => analytics.refetch()}>
                 <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
               </TouchableOpacity>
             </View>

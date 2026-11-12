@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   Modal,
@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -110,19 +110,8 @@ export default function CustomerOrderDetailScreen() {
   // not the payment state alone — don't show an editor that will answer 403
   const canUpdateLine = useHasEndpoint('customer_order_item', 'update');
   const canUpdatePrice = useHasEndpoint('invoice_item', 'update');
-  const [reloadKey, setReloadKey] = useState(0);
-
-  // focus, not push: fulfil-and-pay and an invoice's record-payment open a screen that
-  // writes, and a stack pop does not remount this one. A bump before the push refetched
-  // while that screen was opening, before the write, so coming back showed the old
-  // lines and amounts due. The editors below are Modals, not routes, so they still bump
-  // after their own save. One bump per focus event; setState does not re-trigger focus,
-  // so this cannot loop.
-  useFocusEffect(
-    useCallback(() => {
-      setReloadKey((k) => k + 1);
-    }, []),
-  );
+  // The order comes from the query cache (ModuleDetailScreen), so every save below,
+  // and every write on a screen opened from here, refreshes it on its own.
 
   // notes editor state — the draft is seeded from the fetched record when opened
   const [notesOpen, setNotesOpen] = useState(false);
@@ -146,7 +135,6 @@ export default function CustomerOrderDetailScreen() {
     setPriceSaving(false);
     if (isOk(res.status)) {
       setPriceItem(null);
-      setReloadKey((k) => k + 1);
     } else {
       Alert.alert(t('customerOrders.editPrice'), apiErrorText(res.error, t('form.tryAgain')));
     }
@@ -176,7 +164,6 @@ export default function CustomerOrderDetailScreen() {
     setQuantitySaving(false);
     if (isOk(res.status)) {
       setQuantityItem(null);
-      setReloadKey((k) => k + 1);
     } else {
       // the body is JSON ({"code","msg"} / {"error"}) — show the message, not the blob
       Alert.alert(t('customerOrders.editQuantity'), apiErrorText(res.error, t('form.tryAgain')));
@@ -221,7 +208,6 @@ export default function CustomerOrderDetailScreen() {
     setNotesSaving(false);
     if (isOk(res.status)) {
       setNotesOpen(false);
-      setReloadKey((k) => k + 1);
     } else {
       Alert.alert(
         t('customerOrders.editNotes'),
@@ -242,8 +228,7 @@ export default function CustomerOrderDetailScreen() {
             method: 'POST',
             body: JSON.stringify({ items: [{ customer_order_item_uuid: item.uuid }] }),
           });
-          if (isOk(res.status)) setReloadKey((k) => k + 1);
-          else
+          if (!isOk(res.status))
             Alert.alert(
               t('customerOrders.unfulfil'),
               String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
@@ -258,7 +243,6 @@ export default function CustomerOrderDetailScreen() {
         module="customer-orders"
         title={t('menu.customerOrders')}
         endpoint={`/customer-order/with-items-and-invoice/${uuid}`}
-        reloadKey={reloadKey}
         heading={(d) =>
           d.customer_order.customer_company_name ||
           d.customer_order.customer_full_name ||

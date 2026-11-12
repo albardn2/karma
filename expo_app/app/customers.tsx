@@ -12,7 +12,9 @@ import { DesktopCustomersLayout } from '@/components/layouts/DesktopCustomersLay
 import { Colors } from '@/constants/Colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { takeListFlash, takeListStale } from '@/utils/listRefresh';
+import { takeListFlash } from '@/utils/listRefresh';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 interface Customer {
   uuid: string;
@@ -44,24 +46,16 @@ export default function CustomersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t, tef } = useLanguage();
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
-  // Only the FIRST load takes over the screen. Every later fetch (a page, a
-  // filter, a search keystroke) used to swap the whole screen for a spinner,
-  // which would unmount the search box mid-typing and reset the map.
-  const [hasLoaded, setHasLoaded] = useState(false);
   // what is typed, and the debounced term that is actually searched
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [screenData, setScreenData] = useState(Dimensions.get('window'));
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [banner, setBanner] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const bannerAnimation = useState(new Animated.Value(0))[0];
   const [showFilters, setShowFilters] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
 
   const [filters, setFilters] = useState<{
     uuid: string;
@@ -154,102 +148,72 @@ export default function CustomersScreen() {
     ]).start(() => setBanner(null));
   };
 
-  useEffect(() => {
-    fetchCustomers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, searchTerm, appliedFilters]);
+  const params = new URLSearchParams({ page: page.toString(), per_page: '20' });
+  Object.entries(appliedFilters).forEach(([key, value]) => {
+    if (value.trim()) params.append(key, value.trim());
+  });
+  // name, company or phone — one box, matched server-side
+  if (searchTerm) params.append('search', searchTerm);
 
-  // Coming back from create, edit or delete: this screen stayed mounted, so
-  // without this it showed the customer as it was (or still listed a deleted
-  // one). Those screens mark the list stale and leave a confirmation for it.
-  const fetchRef = useRef<() => void>(() => {});
-  // the map keeps its own pins, so a stale list means a stale map too
+  // Cached and kept fresh by useApiQuery: a create, edit or delete anywhere (an
+  // order moving a balance included) shows here when the list is next on screen.
+  // The previous page stays on screen while a new page, filter or search loads, so
+  // only the very first load takes over the screen.
+  const list = useApiQuery<CustomerPage>(`/customer/?${params.toString()}`);
+  const { refreshing, onRefresh: handleRefresh } = usePullToRefresh(list.refetch);
+  const customers: Customer[] = list.data?.customers ?? [];
+  const totalPages = list.isError ? 0 : (list.data?.pages ?? 1);
+  const loading = list.isFetching;
+  const hasLoaded = !list.isPending;
+
+  // the page we were on emptied (its last row was just deleted): step back to the
+  // new last page
+  useEffect(() => {
+    const pages = list.data?.pages ?? 0;
+    if (!list.isPlaceholderData && pages > 0 && page > pages) setPage(pages);
+  }, [list.data, list.isPlaceholderData, page]);
+
+  // said once per failure, not on every render the error stays
+  const { error, errorUpdatedAt } = list;
+  useEffect(() => {
+    if (!error) return;
+    if (error.status === 0) {
+      Alert.alert(t('customers.networkError'), t('customers.networkErrorMessage'));
+    } else if (error.status === 401) {
+      Alert.alert(t('customers.authenticationError'), t('customers.sessionExpired'));
+    } else {
+      Alert.alert(
+        t('customers.error'),
+        t('customers.failedToLoadCustomersDetail', { error: error.body || t('customers.unknownError') }),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [errorUpdatedAt]);
+
+  // The map fetches its own pins, so it reloads whenever the list's data does:
+  // whatever refreshed the list (a write, a pull, a return to the app) is stale
+  // for the map too. The first load is the map's own.
   const [mapReloadKey, setMapReloadKey] = useState(0);
+  const firstListData = useRef(true);
+  useEffect(() => {
+    if (!list.dataUpdatedAt) return;
+    if (firstListData.current) {
+      firstListData.current = false;
+      return;
+    }
+    setMapReloadKey((k) => k + 1);
+  }, [list.dataUpdatedAt]);
+
+  // the confirmation a create, edit or delete screen leaves for this list
   useFocusEffect(
     useCallback(() => {
-      if (takeListStale('/customer/')) {
-        fetchRef.current();
-        setMapReloadKey((k) => k + 1);
-      }
       const flash = takeListFlash('/customer/');
       if (flash) showBanner('success', flash);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
 
-  // Requests overlap now that the screen stays usable while one is in flight
-  // (search as you type, a quick second Next): only the latest may land, or an
-  // older page's rows show under the newer page number or search term.
-  const requestSeqRef = useRef(0);
   const listScrollRef = useRef<ScrollView>(null);
-
-  const fetchCustomers = async () => {
-    const seq = ++requestSeqRef.current;
-    const isLatest = () => seq === requestSeqRef.current;
-    try {
-      setLoading(true);
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        page: page.toString(),
-        per_page: '20'
-      });
-
-      // Apply filters to API call
-      Object.entries(appliedFilters).forEach(([key, value]) => {
-        if (value.trim()) {
-          params.append(key, value.trim());
-        }
-      });
-
-      // name, company or phone — one box, matched server-side
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-
-      console.log('Making API call to:', `/customer/?${params.toString()}`);
-      const response = await apiCall<CustomerPage>(`/customer/?${params.toString()}`);
-
-      if (!isLatest()) return;
-
-      if (response.status === 200 && response.data) {
-        const pages = response.data.pages;
-        setTotalPages(pages);
-        // the page we were on emptied (its last row was just deleted): step
-        // back to the new last page, which the page effect then fetches
-        if (pages > 0 && page > pages) {
-          setPage(pages);
-          return;
-        }
-        setCustomers(response.data.customers);
-      } else {
-        console.error('Failed to load customers from backend:', response);
-        // Show error message instead of mock data
-        if (response.status === 0) {
-          Alert.alert(t('customers.networkError'), t('customers.networkErrorMessage'));
-        } else if (response.status === 401) {
-          Alert.alert(t('customers.authenticationError'), t('customers.sessionExpired'));
-        } else {
-          Alert.alert(t('customers.error'), t('customers.failedToLoadCustomersDetail', { error: response.error || t('customers.unknownError') }));
-        }
-        // Set empty arrays instead of mock data
-        // setCustomers([]);  // Modified to only set customers
-        // setFilteredCustomers([]);   // Removed filteredCustomers
-        setTotalPages(0);
-      }
-    } catch (error) {
-      if (!isLatest()) return;
-      console.error('Error fetching customers:', error);
-      Alert.alert(t('customers.error'), t('customers.failedToLoadCustomers'));
-    } finally {
-      // a superseded request must not end the newer one's loading state
-      if (isLatest()) {
-        setLoading(false);
-        setHasLoaded(true);
-      }
-    }
-  };
-  fetchRef.current = fetchCustomers;
 
   // a new page, search or filter opens at its first row; the list stays
   // mounted across fetches now, so it would otherwise keep the old offset
@@ -313,25 +277,6 @@ export default function CustomersScreen() {
     if (searchTerm) out.search = searchTerm;
     return out;
   }, [appliedFilters, searchTerm]);
-
-  const handleRefresh = async () => {
-    console.log('Pull to refresh triggered');
-    setRefreshing(true);
-
-    try {
-      // Reload what is on screen. This used to reset the page and the search
-      // AND fetch with the old page at the same time, so two requests raced
-      // and the older page's rows could land under "Page 1 of N".
-      await fetchCustomers();
-
-      console.log('Refresh completed successfully');
-    } catch (error) {
-      console.error('Error refreshing customers:', error);
-      Alert.alert(t('customers.error'), t('customers.failedToRefresh'));
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const TableHeader = () => (
     <View style={styles.tableHeader}>

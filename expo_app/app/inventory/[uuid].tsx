@@ -1,6 +1,5 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/ModuleDetailScreen';
@@ -8,6 +7,7 @@ import { CostCurrencyToggle, CostCcy } from '@/components/CostCurrencyToggle';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiCall, isOk } from '@/utils/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatMonthDayTime, formatNumericDate, parseTs, plainDate } from '@/utils/date';
 
 interface Lot {
@@ -65,39 +65,28 @@ export default function LotDetailScreen() {
   const { t, tef } = useLanguage();
   const { isAdmin } = useAuth();
   const [ccy, setCcy] = useState<CostCcy>('USD');
-  const [reloadKey, setReloadKey] = useState(0);
-  const [whName, setWhName] = useState<string | null>(null);
-  const [moves, setMoves] = useState<Movement[] | null>(null);
 
   const qty = (n?: number | null) =>
     n == null ? '—' : Number.isInteger(n) ? String(n) : Number(n).toFixed(2);
   const money = (n?: number | null, c?: string | null) =>
     n == null ? t('inventory.costUnknown') : `${Number(n).toFixed(2)} ${c ?? ccy}`;
 
+  // Cached and kept fresh (useApiQuery): edit, add-stock, zero-out or a sale
+  // anywhere shows here when this screen is next in view.
+  //
   // this lot's own movements — inventory_uuid IS a real applied filter here, unlike
   // material_uuid on the same route, which 422s
-  const loadMoves = useCallback(async () => {
-    const res = await apiCall<{ events: Movement[] }>(
-      `/inventory-event/?inventory_uuid=${uuid}&page=1&per_page=100`,
-    );
-    if (isOk(res.status)) setMoves(res.data?.events ?? []);
-    else setMoves((prev) => prev ?? []);
-  }, [uuid]);
-
-  const resolveWarehouse = useCallback(async (id?: string | null) => {
-    if (!id) return;
-    const res = await apiCall<{ name?: string }>(`/warehouse/${id}`);
-    if (isOk(res.status)) setWhName(res.data?.name ?? null);
-  }, []);
-
-  // focus, not mount: edit, add-stock and zero-out all change what this shows, and a
-  // stack pop does not remount
-  useFocusEffect(
-    useCallback(() => {
-      loadMoves();
-      setReloadKey((k) => k + 1);
-    }, [loadMoves]),
+  const movesQuery = useApiQuery<{ events: Movement[] }>(
+    `/inventory-event/?inventory_uuid=${uuid}&page=1&per_page=100`,
   );
+  const moves: Movement[] | null = movesQuery.isError ? [] : (movesQuery.data?.events ?? null);
+  // the same read ModuleDetailScreen makes below, so this shares its cache entry
+  const lotQuery = useApiQuery<Lot>(`/inventory/${uuid}?cost_currency=${ccy}`);
+  const warehouseUuid = lotQuery.data?.warehouse_uuid;
+  const warehouseQuery = useApiQuery<{ name?: string }>(
+    warehouseUuid ? `/warehouse/${warehouseUuid}` : null,
+  );
+  const whName = warehouseQuery.data?.name ?? null;
 
   const moveCount = (moves ?? []).length;
 
@@ -114,9 +103,9 @@ export default function LotDetailScreen() {
             method: 'POST',
             body: JSON.stringify({}),
           });
+          // on success the write itself refreshes the lot and its movements
           if (isOk(res.status)) {
-            loadMoves();
-            setReloadKey((k) => k + 1);
+            return;
           } else if (res.status === 400) {
             Alert.alert(t('materials.zeroOut'), t('inventory.alreadyZero'));
           } else {
@@ -132,7 +121,10 @@ export default function LotDetailScreen() {
   const remove = async () => {
     const res = await apiCall(`/inventory/${uuid}`, { method: 'DELETE' });
     if (isOk(res.status)) {
-      router.replace('/inventory');
+      // back to the list underneath, which refreshes on focus; replacing would stack a
+      // second list over it and leave the stale one one tap away
+      if (router.canGoBack()) router.back();
+      else router.replace('/inventory');
       return;
     }
     // a business rule wearing a 404: the lot still has movements
@@ -145,7 +137,6 @@ export default function LotDetailScreen() {
   };
 
   const rows = (l: Lot): DetailRow[] => {
-    if (l.warehouse_uuid && whName === null) resolveWarehouse(l.warehouse_uuid);
     return [
       [t('inventory.warehouse'), whName ?? t('materials.unknownWarehouse')],
       [t('inventory.lotId'), l.lot_id],
@@ -228,7 +219,6 @@ export default function LotDetailScreen() {
       // the reporting currency rides in the query string, and the scaffold keys its
       // fetch on `endpoint` — so flipping the toggle refetches by itself
       endpoint={`/inventory/${uuid}?cost_currency=${ccy}`}
-      reloadKey={reloadKey}
       heading={(l) => l.material_name || t('inventory.unknownMaterial')}
       subheading={(l) => (
         <View style={styles.sub}>

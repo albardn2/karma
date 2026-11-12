@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -15,7 +15,8 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiGet, useCachedQuery } from '@/hooks/useApiQuery';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 interface Pricing {
   uuid: string;
@@ -36,6 +37,32 @@ interface Material {
 const PER_PAGE = 100;
 /** Stop after this many pages so a huge catalogue cannot hang the screen. */
 const MAX_PAGES = 6;
+
+/** Page through a list endpoint up to MAX_PAGES; the flag says whether rows were left over. */
+async function drain<T>(path: string, key: string): Promise<[T[], boolean]> {
+  const out: T[] = [];
+  let page = 1;
+  let more = true;
+  while (more && page <= MAX_PAGES) {
+    const sep = path.includes('?') ? '&' : '?';
+    const data = await apiGet<Record<string, any>>(`${path}${sep}page=${page}&per_page=${PER_PAGE}`);
+    out.push(...((data[key] as T[]) ?? []));
+    more = page < Number(data.pages ?? 1);
+    page += 1;
+  }
+  return [out, more];
+}
+
+/** Every price, and the materials they name, keyed by uuid for the join below. */
+async function loadPriceList() {
+  const [[prices, truncated], [mats]] = await Promise.all([
+    drain<Pricing>('/pricing/', 'pricings'),
+    drain<Material>('/material/', 'materials'),
+  ]);
+  const materials: Record<string, Material> = {};
+  for (const m of mats) materials[m.uuid] = m;
+  return { prices, materials, truncated };
+}
 
 /**
  * The price list — what a material sells for.
@@ -61,63 +88,16 @@ export default function PricingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const [rows, setRows] = useState<Pricing[] | null>(null);
-  const [materials, setMaterials] = useState<Record<string, Material>>({});
   const [query, setQuery] = useState('');
   const [currency, setCurrency] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [truncated, setTruncated] = useState(false);
 
-  /** Page through a list endpoint up to MAX_PAGES, returning what it got. */
-  const drain = useCallback(async <T,>(path: string, key: string): Promise<[T[], boolean]> => {
-    const out: T[] = [];
-    let page = 1;
-    let more = true;
-    while (more && page <= MAX_PAGES) {
-      const sep = path.includes('?') ? '&' : '?';
-      const res = await apiCall<Record<string, any>>(
-        `${path}${sep}page=${page}&per_page=${PER_PAGE}`,
-      );
-      if (!isOk(res.status)) throw new Error(String(res.status));
-      const batch = (res.data?.[key] as T[]) ?? [];
-      out.push(...batch);
-      const pages = Number(res.data?.pages ?? 1);
-      more = page < pages;
-      page += 1;
-    }
-    return [out, more];
-  }, []);
-
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!isRefresh) setLoading(true);
-      setFailed(false);
-      try {
-        const [[prices, pricesTruncated], [mats]] = await Promise.all([
-          drain<Pricing>('/pricing/', 'pricings'),
-          drain<Material>('/material/', 'materials'),
-        ]);
-        const byUuid: Record<string, Material> = {};
-        for (const m of mats) byUuid[m.uuid] = m;
-        setMaterials(byUuid);
-        setRows(prices);
-        setTruncated(pricesTruncated);
-      } catch {
-        setFailed(true);
-        setRows([]);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [drain],
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const priceList = useCachedQuery('pricing:price-list', loadPriceList);
+  const { refreshing, onRefresh } = usePullToRefresh(priceList.refetch);
+  const rows = priceList.data?.prices ?? null;
+  const materials = priceList.data?.materials ?? {};
+  const truncated = priceList.data?.truncated ?? false;
+  const loading = priceList.isPending;
+  const failed = priceList.isError;
 
   const currencies = useMemo(
     () => Array.from(new Set((rows ?? []).map((r) => r.currency).filter(Boolean))).sort(),
@@ -205,13 +185,7 @@ export default function PricingScreen() {
           <ScrollView
             contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
             refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => {
-                  setRefreshing(true);
-                  load(true);
-                }}
-              />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
           >
             {failed ? (
@@ -219,7 +193,7 @@ export default function PricingScreen() {
                 <ThemedText style={styles.stateText} testID="pricing-error">
                   {t('moduleList.failed')}
                 </ThemedText>
-                <TouchableOpacity style={styles.retry} onPress={() => load()}>
+                <TouchableOpacity style={styles.retry} onPress={() => priceList.refetch()}>
                   <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
                 </TouchableOpacity>
               </View>
