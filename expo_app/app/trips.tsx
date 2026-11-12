@@ -4,7 +4,6 @@ import {
   Alert,
   BackHandler,
   FlatList,
-  I18nManager,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -24,6 +23,7 @@ import { apiCall } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime, parseTs } from '@/utils/date';
+import { FORWARD_GLYPH } from '@/utils/rtl';
 
 // Admin-only Trips module — mirrors the web trips list (plate, assignee,
 // status, times), newest first, with assignee / vehicle dropdowns, status
@@ -134,7 +134,7 @@ function ScrollingChipRow({ children }: { children: React.ReactNode }) {
           testID="trips-filter-more"
         >
           {/* points the way reading goes, so it flips with the layout */}
-          <ThemedText style={styles.moreArrow}>{I18nManager.isRTL ? '‹' : '›'}</ThemedText>
+          <ThemedText style={styles.moreArrow}>{FORWARD_GLYPH}</ThemedText>
         </TouchableOpacity>
       )}
     </View>

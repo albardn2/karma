@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { BACK_GLYPH, FORWARD_GLYPH } from '@/utils/rtl';
 
 export const PER_PAGE = 20;
 
@@ -186,7 +187,7 @@ export function ModuleListScreen<T>({
             hitSlop={12}
             testID="module-list-back"
           >
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.title} numberOfLines={1}>
             {title}
@@ -300,7 +301,7 @@ export function ModuleListScreen<T>({
                     onPress={() => setPage((p) => Math.max(1, p - 1))}
                     testID="module-list-prev"
                   >
-                    <ThemedText style={styles.pageBtnText}>‹</ThemedText>
+                    <ThemedText style={styles.pageBtnText}>{BACK_GLYPH}</ThemedText>
                   </TouchableOpacity>
                   <ThemedText style={styles.pageLabel}>
                     {t('moduleList.page', { page, pages: totalPages })}
@@ -311,7 +312,7 @@ export function ModuleListScreen<T>({
                     onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
                     testID="module-list-next"
                   >
-                    <ThemedText style={styles.pageBtnText}>›</ThemedText>
+                    <ThemedText style={styles.pageBtnText}>{FORWARD_GLYPH}</ThemedText>
                   </TouchableOpacity>
                 </View>
               ) : null

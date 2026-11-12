@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 /**
  * Web stub for the create screen.
@@ -26,7 +27,7 @@ export default function ServiceAreaCreateWebScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="form-cancel">
-          <ThemedText style={styles.back}>‹</ThemedText>
+          <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
         </TouchableOpacity>
         <ThemedText style={styles.topTitle}>{t('serviceAreas.createTitle')}</ThemedText>
         <View style={styles.backSpacer} />

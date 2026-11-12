@@ -20,6 +20,7 @@ import { apiCall, apiErrorText, isOk } from '@/utils/api';
 import { DateField } from '@/components/DateField';
 import { PickerField, PickerSpec } from '@/components/PickerField';
 import { KEYBOARD_DONE_BAR_ID, KeyboardDoneBar } from '@/components/KeyboardDoneBar';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 export interface FormField {
   name: string;
@@ -255,7 +256,7 @@ export function ModuleForm({
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="form-cancel">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {title}

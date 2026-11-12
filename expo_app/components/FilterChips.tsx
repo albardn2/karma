@@ -1,12 +1,12 @@
 import React, { useRef, useState } from 'react';
 import {
-  I18nManager,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
+import { FORWARD_GLYPH } from '@/utils/rtl';
 
 /**
  * The app's one filter-chip design, lifted from the trips screen — grey resting
@@ -100,7 +100,7 @@ export function ScrollingChipRow({ children, inset }: { children: React.ReactNod
           testID="chip-row-more"
         >
           {/* points the way reading goes, so it flips with the layout */}
-          <ThemedText style={styles.moreArrow}>{I18nManager.isRTL ? '‹' : '›'}</ThemedText>
+          <ThemedText style={styles.moreArrow}>{FORWARD_GLYPH}</ThemedText>
         </TouchableOpacity>
       )}
     </View>

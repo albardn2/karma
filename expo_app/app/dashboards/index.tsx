@@ -8,6 +8,7 @@ import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { BACK_GLYPH, FORWARD_GLYPH } from '@/utils/rtl';
 
 interface Entry {
   id: string;
@@ -142,7 +143,7 @@ export default function DashboardsHub() {
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="dashboards-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle}>{t('dashboards.hubTitle')}</ThemedText>
           <View style={styles.backSpacer} />
@@ -173,7 +174,7 @@ export default function DashboardsHub() {
                   <ThemedText style={styles.cardTitle}>{t(d.titleKey)}</ThemedText>
                   <ThemedText style={styles.cardDesc}>{t(d.descKey)}</ThemedText>
                 </View>
-                <ThemedText style={styles.chevron}>›</ThemedText>
+                <ThemedText style={styles.chevron}>{FORWARD_GLYPH}</ThemedText>
               </TouchableOpacity>
             ))
           )}

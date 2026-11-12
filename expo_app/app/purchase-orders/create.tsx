@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { money } from '@/utils/money';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 const CURRENCIES = ['USD', 'SYP'];
 
@@ -188,7 +189,7 @@ export default function PurchaseOrderCreateScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="form-cancel">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {t('purchaseOrders.create')}

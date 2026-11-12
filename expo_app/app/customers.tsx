@@ -16,6 +16,7 @@ import { takeListFlash } from '@/utils/listRefresh';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { formatAmount, money } from '@/utils/money';
+import { BACK_GLYPH, FORWARD_GLYPH } from '@/utils/rtl';
 
 interface Customer {
   uuid: string;
@@ -349,7 +350,7 @@ export default function CustomersScreen() {
 
         {/* Arrow */}
         <View style={styles.arrowColumn}>
-          <ThemedText style={styles.arrow}>›</ThemedText>
+          <ThemedText style={styles.arrow}>{FORWARD_GLYPH}</ThemedText>
         </View>
       </TouchableOpacity>
     );
@@ -425,7 +426,7 @@ export default function CustomersScreen() {
           hitSlop={12}
           testID="customers-back"
         >
-          <ThemedText style={styles.backChevron}>‹</ThemedText>
+          <ThemedText style={styles.backChevron}>{BACK_GLYPH}</ThemedText>
         </TouchableOpacity>
 
         {/* No spacer and no title: styles.header is already justifyContent:

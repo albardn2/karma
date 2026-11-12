@@ -21,6 +21,7 @@ import {
   ringsEqual,
   type LatLng,
 } from '@/utils/wkt';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 /**
  * Replace the boundary of an existing service area.
@@ -128,7 +129,7 @@ export default function ServiceAreaBoundaryScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={leave} hitSlop={12} testID="sa-boundary-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {name || t('serviceAreas.boundaryTitle')}

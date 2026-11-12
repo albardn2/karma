@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  I18nManager,
   Modal,
   RefreshControl,
   ScrollView,
@@ -20,6 +19,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime, parseTs } from '@/utils/date';
 import { findSaleOption, hasRevenueOrderAtStop } from '@/utils/tripStopOutcome';
 import { money } from '@/utils/money';
+import { BACK_GLYPH, FORWARD_GLYPH } from '@/utils/rtl';
 
 interface Field {
   name: string;
@@ -410,7 +410,7 @@ export default function StopDetailScreen() {
                     testID="history-prev"
                   >
                     <ThemedText style={[styles.pagerArrow, history.page <= 1 && styles.pagerDisabled]}>
-                      {I18nManager.isRTL ? '›' : '‹'}
+                      {BACK_GLYPH}
                     </ThemedText>
                   </TouchableOpacity>
                   <ThemedText style={styles.pagerLabel}>
@@ -423,7 +423,7 @@ export default function StopDetailScreen() {
                     testID="history-next"
                   >
                     <ThemedText style={[styles.pagerArrow, history.page >= history.pages && styles.pagerDisabled]}>
-                      {I18nManager.isRTL ? '‹' : '›'}
+                      {FORWARD_GLYPH}
                     </ThemedText>
                   </TouchableOpacity>
                 </View>

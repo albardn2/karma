@@ -18,6 +18,7 @@ import { LineChart, ChartLegend, SERIES_COLOURS } from '@/components/Chart';
 import { MaterialsSoldScreenImpl } from '@/app/dashboards/materials-sold';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 interface Summary {
   user_uuid: string;
@@ -158,7 +159,7 @@ export default function UserAnalyticsScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="ua-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {username ? `${t('ua.title')} · @${username}` : t('ua.title')}

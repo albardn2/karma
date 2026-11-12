@@ -13,6 +13,7 @@ import {
 import { ThemedText } from '@/components/ThemedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FORWARD_GLYPH } from '@/utils/rtl';
 
 export interface SheetStop {
   taskExecutionUuid: string;
@@ -208,7 +209,7 @@ export function StopsSheet({
                       <ThemedText style={styles.setCurrentText}>{t('sheet.setCurrent')}</ThemedText>
                     </TouchableOpacity>
                   ) : (
-                    isCurrent && <ThemedText style={styles.chevron}>›</ThemedText>
+                    isCurrent && <ThemedText style={styles.chevron}>{FORWARD_GLYPH}</ThemedText>
                   )}
                 </TouchableOpacity>
               );

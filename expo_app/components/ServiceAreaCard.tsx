@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { I18nManager, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { ThemedText } from '@/components/ThemedText';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -7,6 +7,7 @@ import { formatNumericDate, parseTs } from '@/utils/date';
 import { formatKm2, parseWktPolygons, ringAreaM2, ringVertexCount } from '@/utils/wkt';
 import { AREA_NO_SHAPE, areaColour } from '@/utils/areaColour';
 import { thumbPath } from '@/utils/areaThumb';
+import { FORWARD_GLYPH } from '@/utils/rtl';
 
 export interface ServiceAreaRow {
   uuid: string;
@@ -170,7 +171,7 @@ export const ServiceAreaCard = React.memo(function ServiceAreaCard({
 
       {/* last child, so forceRTL lands it on the trailing edge; the glyph itself does
           not mirror, so it is picked the way ScrollingChipRow picks its overflow arrow */}
-      <ThemedText style={styles.chevron}>{I18nManager.isRTL ? '‹' : '›'}</ThemedText>
+      <ThemedText style={styles.chevron}>{FORWARD_GLYPH}</ThemedText>
     </TouchableOpacity>
   );
 });

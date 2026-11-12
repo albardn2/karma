@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  I18nManager,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -25,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { BACK_GLYPH, FORWARD_GLYPH } from '@/utils/rtl';
 
 interface Period {
   granularity: Gran;
@@ -171,8 +171,8 @@ export function TagFunnelsScreenImpl({ embedded = false }: { embedded?: boolean 
   ];
   // the chevrons point the way each button travels in time, so they flip with
   // the layout: in RTL "previous" sits on the right and points right
-  const prevGlyph = I18nManager.isRTL ? '›' : '‹';
-  const nextGlyph = I18nManager.isRTL ? '‹' : '›';
+  const prevGlyph = BACK_GLYPH;
+  const nextGlyph = FORWARD_GLYPH;
   // while a new period loads, keep the last one on screen dimmed rather than
   // collapsing both funnels to a spinner (the spinner is for the first load)
   const dimmed = loading && !!data;
@@ -302,7 +302,7 @@ export function TagFunnelsScreenImpl({ embedded = false }: { embedded?: boolean 
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="tf-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle}>{t('dashboards.tagFunnels')}</ThemedText>
           <View style={styles.backSpacer} />
