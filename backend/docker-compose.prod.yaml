@@ -246,6 +246,11 @@ services:
       - certs:/etc/nginx/certs
       - vhost:/etc/nginx/vhost.d
       - html:/usr/share/nginx/html
+      # The companion's ACME account and its record of issued certificates.
+      # Without a volume every deploy (compose down, then up) starts it blank,
+      # so it requests a brand-new certificate each time and runs into Let's
+      # Encrypt's limit of 5 per week for the same name, which takes HTTPS down.
+      - acme:/etc/acme.sh
     networks:
       - proxy
 
@@ -254,6 +259,7 @@ volumes:
   certs:
   vhost:
   html:
+  acme:
 
 networks:
   proxy:
