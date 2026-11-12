@@ -18,7 +18,15 @@ import { ApiQueryError, useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { BACK_GLYPH } from '@/utils/rtl';
 
-export type DetailRow = [label: string, value: string];
+/**
+ * How a detail row lays out. 'inline' puts the value beside its label, capped at
+ * three lines, which suits amounts, dates and states. 'text' is for free text a
+ * user wrote (notes, descriptions, addresses): label above, the whole value below
+ * at full width, never cut.
+ */
+export type DetailRowLayout = 'inline' | 'text';
+
+export type DetailRow = [label: string, value: string, layout?: DetailRowLayout];
 
 export interface DetailSection<T> {
   title: string;
@@ -248,14 +256,23 @@ export function ModuleDetailScreen<T>({
             )}
 
             <View style={styles.card}>
-              {rows(item).map(([label, value]) => (
-                <View key={label} style={styles.row}>
-                  <ThemedText style={styles.rowLabel}>{label}</ThemedText>
-                  <ThemedText style={styles.rowValue} numberOfLines={3}>
-                    {value}
-                  </ThemedText>
-                </View>
-              ))}
+              {rows(item).map(([label, value, layout]) =>
+                layout === 'text' ? (
+                  <View key={label} style={styles.textRow}>
+                    <ThemedText style={styles.rowLabel}>{label}</ThemedText>
+                    <ThemedText style={styles.textValue} selectable>
+                      {value}
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <View key={label} style={styles.row}>
+                    <ThemedText style={styles.rowLabel}>{label}</ThemedText>
+                    <ThemedText style={styles.rowValue} numberOfLines={3}>
+                      {value}
+                    </ThemedText>
+                  </View>
+                ),
+              )}
             </View>
 
             {sections?.map((sec) => (
@@ -295,6 +312,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   rowLabel: { flex: 1, fontSize: 14, opacity: 0.65 },
   rowValue: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1f2937', textAlign: 'right' },
+  textRow: { gap: 4 },
+  textValue: { fontSize: 14, lineHeight: 20, fontWeight: '500', color: '#1f2937' },
   sectionTitle: { fontSize: 15, fontWeight: '700', marginTop: 22, marginBottom: -6 },
   // above the record, not below it: what you came to DO should be in reach
   // without scrolling past everything there is to read

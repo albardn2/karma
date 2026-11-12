@@ -111,7 +111,7 @@ export default function TransactionDetailScreen() {
           x.usd_to_syp_exchange_rate != null ? String(x.usd_to_syp_exchange_rate) : '—',
         ],
         [t('transactions.when'), x.created_at ? formatNumericDate(parseTs(x.created_at)) : '—'],
-        [t('transactions.notes'), x.notes || '—'],
+        [t('transactions.notes'), x.notes || '—', 'text'],
       ]}
       actions={actions}
     />

@@ -41,7 +41,7 @@ export default function EmployeesDetailScreen() {
         [t('employees.role'), x.role ? tef(x.role) : '—'],
         [t('employees.phone'), x.phone_number || '—'],
         [t('employees.email'), x.email_address || '—'],
-        [t('employees.address'), x.full_address || '—'],
+        [t('employees.address'), x.full_address || '—', 'text'],
         [t('employees.identification'), x.identification || '—'],
       ]}
       actions={[

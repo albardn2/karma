@@ -28,7 +28,7 @@ export default function PayoutsDetailScreen() {
         [t('payouts.amount'), money(x.amount, x.currency)],
         [t('payouts.appliedTo'), x.expense_uuid ? t('payouts.forExpense') : x.purchase_order_uuid ? t('payouts.forPurchaseOrder') : t('payouts.unlinked')],
         [t('payouts.when'), formatNumericDate(parseTs(x.created_at))],
-        [t('payouts.notes'), x.notes || '—'],
+        [t('payouts.notes'), x.notes || '—', 'text'],
       ]}
     />
   );

@@ -91,7 +91,7 @@ export default function MovementDetailScreen() {
         e.affect_original === true ? t('common.yes') : t('common.no'),
       ],
       [t('inventoryEvents.when'), formatMonthDayTime(parseTs(e.created_at))],
-      [t('inventory.notes'), e.notes || '—'],
+      [t('inventory.notes'), e.notes || '—', 'text'],
       [t('materials.uuid'), e.uuid],
     ];
   };

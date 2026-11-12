@@ -43,7 +43,7 @@ export default function FinancialAccountsDetailScreen() {
           t('financialAccounts.kind'),
           x.is_external ? t('financialAccounts.external') : t('financialAccounts.internal'),
         ],
-        [t('financialAccounts.notes'), x.notes || '—'],
+        [t('financialAccounts.notes'), x.notes || '—', 'text'],
       ]}
       actions={[
         {

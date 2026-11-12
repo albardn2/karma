@@ -229,7 +229,7 @@ export default function ProcessDetailScreen() {
         [t('processes.when'), p.created_at ? formatNumericDate(parseTs(p.created_at)) : '—'],
         [t('processes.costCurrency'), p.data?.cost_currency || '—'],
         [t('processes.warehouse'), warehouseRow(p)],
-        [t('processes.notes'), p.notes || '—'],
+        [t('processes.notes'), p.notes || '—', 'text'],
       ]}
       actions={actions}
       reloadKey={reloadKey}

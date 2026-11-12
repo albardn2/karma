@@ -93,7 +93,7 @@ export default function ServiceAreaDetailScreen() {
   const rows = (a: ServiceArea): DetailRow[] => {
     const outer = outerOf(a);
     return [
-      [t('serviceAreas.description'), a.description || '—'],
+      [t('serviceAreas.description'), a.description || '—', 'text'],
       [
         t('serviceAreas.created'),
         a.created_at ? formatNumericDate(parseTs(a.created_at)) : '—',
