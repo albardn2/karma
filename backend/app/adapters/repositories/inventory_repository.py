@@ -30,6 +30,7 @@ from app.entrypoint.routes.common.errors import BadRequestError
 # has no purchase on them — they need a memo on the cost context instead.
 INVENTORY_SERIALIZATION_LOADERS = [
     selectinload(Inventory.material),
+    selectinload(Inventory.warehouse),
     selectinload(Inventory.inventory_events).selectinload(InventoryEvent.process),
     selectinload(Inventory.inventory_events)
     .selectinload(InventoryEvent.purchase_order_item)

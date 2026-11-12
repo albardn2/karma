@@ -40,6 +40,8 @@ class PricingRead(BaseModel):
     created_at: datetime
     is_deleted: bool
     unit: Optional[UnitOfMeasure] = None
+    material_name: Optional[str] = None
+    material_sku: Optional[str] = None
 
 class PricingListParams(BaseModel):
     """Pagination parameters for listing pricings."""
@@ -47,6 +49,7 @@ class PricingListParams(BaseModel):
     uuid : Optional[str] = None
     material_uuid: Optional[str] = None
     currency: Optional[Currency] = None
+    material_query: Optional[str] = Field(None, description="Case-insensitive substring of the material's name or SKU")
     page: int = Field(1, gt=0, description="Page number (>=1)")
     per_page: int = Field(20, gt=0, le=100, description="Items per page (<=100)")
 

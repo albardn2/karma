@@ -10,7 +10,10 @@ from app.dto.pricing import (
     PricingListParams,
     PricingPage,
 )
-from models.common import Pricing as PricingModel
+from sqlalchemy import or_, select
+from sqlalchemy.orm import selectinload
+
+from models.common import Material as MaterialModel, Pricing as PricingModel
 from app.entrypoint.routes.pricing import pricing_blueprint
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.errors import NotFoundError
@@ -108,12 +111,22 @@ def list_pricings():
         filters.append(PricingModel.material_uuid == params.material_uuid)
     if params.currency:
         filters.append(PricingModel.currency == params.currency.value)
+    if params.material_query:
+        pattern = f"%{params.material_query}%"
+        # a subquery rather than a join, so pagination counts pricing rows only
+        filters.append(PricingModel.material_uuid.in_(
+            select(MaterialModel.uuid).where(
+                or_(MaterialModel.name.ilike(pattern), MaterialModel.sku.ilike(pattern))
+            )
+        ))
 
     with SqlAlchemyUnitOfWork() as uow:
         page_obj = uow.pricing_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
-            per_page=params.per_page
+            per_page=params.per_page,
+            # each row reads unit, material_name and material_sku off its material
+            options=[selectinload(PricingModel.material)],
         )
         items = [
             PricingRead.from_orm(p).model_dump(mode='json')

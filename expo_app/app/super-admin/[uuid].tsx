@@ -81,6 +81,7 @@ export default function SuperAdminAccountScreen() {
   };
 
   /** One field, one PUT. */
+  // returns the write, so the detail screen holds the buttons busy until it lands
   const setFlag = async (field: 'is_verified' | 'is_blocked', value: boolean, label: string) => {
     const res = await apiCall(`/super-admin/accounts/${uuid}`, {
       method: 'PUT',

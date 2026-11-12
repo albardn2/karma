@@ -8,6 +8,7 @@ import { apiCall, apiErrorText, isOk } from '@/utils/api';
 import { markListsStale, setListFlash } from '@/utils/listRefresh';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeHeader } from '@/components/layout/NativeHeader';
+import { useRevealOnFocus } from '@/hooks/useRevealOnFocus';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -50,6 +51,7 @@ export default function CreateCustomerScreen() {
   const [locationLoading, setLocationLoading] = useState(false);
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
+  const revealOnFocus = useRevealOnFocus(scrollRef);
   // set the moment a POST goes out and never cleared on success: the button
   // used to re-enable while the success banner showed, and a second tap
   // created the same customer twice
@@ -276,7 +278,17 @@ export default function CreateCustomerScreen() {
         </View>
       )}
 
-      <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" style={styles.scrollView} contentContainerStyle={[
+      <ScrollView
+        ref={scrollRef}
+        // iOS insets by the keyboard and scrolls up a field it would cover; a field
+        // clipped at the top is brought down by revealOnFocus
+        automaticallyAdjustKeyboardInsets
+        onScroll={revealOnFocus.onScroll}
+        scrollEventThrottle={64}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        style={styles.scrollView}
+        contentContainerStyle={[
         styles.formContainer,
         isDesktop ? styles.desktopForm : 
         isNative ? styles.nativeForm : styles.mobileForm
@@ -285,7 +297,7 @@ export default function CreateCustomerScreen() {
           {/* Customer Name */}
           <View style={styles.fieldContainer}>
             <ThemedText style={styles.label}>{t('custcreate.customerNameLabel')}</ThemedText>
-            <TextInput style={[styles.input, errors.full_name && styles.inputError]}
+            <TextInput onFocus={revealOnFocus.onFocus} style={[styles.input, errors.full_name && styles.inputError]}
               value={form.full_name}
               onChangeText={(v) => updateForm('full_name', v)}
               placeholder={t('custcreate.customerNamePlaceholder')}
@@ -296,7 +308,7 @@ export default function CreateCustomerScreen() {
           {/* Company Name */}
           <View style={styles.fieldContainer}>
             <ThemedText style={styles.label}>{t('custcreate.companyNameLabel')}</ThemedText>
-            <TextInput style={[styles.input, errors.company_name && styles.inputError]}
+            <TextInput onFocus={revealOnFocus.onFocus} style={[styles.input, errors.company_name && styles.inputError]}
               value={form.company_name}
               onChangeText={(v) => updateForm('company_name', v)}
               placeholder={t('custcreate.companyNamePlaceholder')}
@@ -307,7 +319,7 @@ export default function CreateCustomerScreen() {
           {/* Phone */}
           <View style={styles.fieldContainer}>
             <ThemedText style={styles.label}>{t('custcreate.phoneNumberLabel')}</ThemedText>
-            <TextInput style={[styles.input, errors.phone_number && styles.inputError]}
+            <TextInput onFocus={revealOnFocus.onFocus} style={[styles.input, errors.phone_number && styles.inputError]}
               value={form.phone_number}
               onChangeText={(v) => updateForm('phone_number', v)}
               placeholder={t('custcreate.phoneNumberPlaceholder')}
@@ -319,7 +331,7 @@ export default function CreateCustomerScreen() {
           {/* Email */}
           <View style={styles.fieldContainer}>
             <ThemedText style={styles.label}>{t('custcreate.emailLabel')}</ThemedText>
-            <TextInput style={[styles.input, errors.email_address && styles.inputError]}
+            <TextInput onFocus={revealOnFocus.onFocus} style={[styles.input, errors.email_address && styles.inputError]}
               value={form.email_address}
               onChangeText={(v) => updateForm('email_address', v)}
               placeholder={t('custcreate.emailPlaceholder')}
@@ -348,7 +360,7 @@ export default function CreateCustomerScreen() {
           {/* Full Address */}
           <View style={styles.fieldContainer}>
             <ThemedText style={styles.label}>{t('custcreate.fullAddressLabel')}</ThemedText>
-            <TextInput style={[styles.input, styles.textArea]}
+            <TextInput onFocus={revealOnFocus.onFocus} style={[styles.input, styles.textArea]}
               value={form.full_address}
               onChangeText={(v)=>updateForm('full_address',v)}
               placeholder={t('custcreate.fullAddressPlaceholder')}
@@ -359,7 +371,7 @@ export default function CreateCustomerScreen() {
           {/* Business Cards */}
           <View style={styles.fieldContainer}>
             <ThemedText style={styles.label}>{t('custcreate.businessCardsLabel')}</ThemedText>
-            <TextInput style={styles.input}
+            <TextInput onFocus={revealOnFocus.onFocus} style={styles.input}
               value={form.business_cards}
               onChangeText={(v) => updateForm('business_cards', v)}
               placeholder={t('custcreate.businessCardsPlaceholder')}
@@ -370,7 +382,7 @@ export default function CreateCustomerScreen() {
           <View style={styles.fieldContainer}>
             <ThemedText style={styles.label}>{t('custcreate.coordinatesLabel')}</ThemedText>
             <View style={styles.coordinatesInputContainer}>
-              <TextInput style={[styles.input, styles.coordinatesInput]}
+              <TextInput onFocus={revealOnFocus.onFocus} style={[styles.input, styles.coordinatesInput]}
                 value={form.coordinates}
                 onChangeText={(v) => updateForm('coordinates', v)}
                 placeholder={t('custcreate.coordinatesPlaceholder')}
@@ -390,7 +402,7 @@ export default function CreateCustomerScreen() {
           {/* Notes */}
           <View style={styles.fieldContainer}>
             <ThemedText style={styles.label}>{t('custcreate.notesLabel')}</ThemedText>
-            <TextInput style={[styles.input, styles.textArea]}
+            <TextInput onFocus={revealOnFocus.onFocus} style={[styles.input, styles.textArea]}
               value={form.notes}
               onChangeText={(v) => updateForm('notes', v)}
               placeholder={t('custcreate.notesPlaceholder')}

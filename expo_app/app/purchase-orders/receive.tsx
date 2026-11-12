@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { ModuleForm, FormField } from '@/components/ModuleForm';
+import { formatMonthDayTime, parseTs } from '@/utils/date';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 /**
@@ -84,10 +85,15 @@ export default function ReceiveLineScreen() {
           is_active: 'true',
           ...(material_uuid ? { material_uuid } : {}),
         },
-        label: (i) => i.lot_id ?? i.uuid,
+        // where the lot sits and when it arrived; the lot id is a UTC timestamp string,
+        // so it is kept as a reference under the label rather than as the label
+        label: (i) =>
+          [i.warehouse_name, i.created_at ? formatMonthDayTime(parseTs(i.created_at)) : null]
+            .filter(Boolean)
+            .join(' · ') || i.lot_id || i.uuid,
         value: (i) => i.uuid,
         sublabel: (i) =>
-          [i.material_name, i.current_quantity != null ? `${i.current_quantity}` : null]
+          [i.material_name, i.current_quantity != null ? `${i.current_quantity}` : null, i.lot_id]
             .filter(Boolean)
             .join(' · ') || undefined,
       },

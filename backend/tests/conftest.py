@@ -27,6 +27,11 @@ def admin_token(client):
         )
 
 
+@pytest.fixture
+def admin_headers(admin_token):
+    return {"Authorization": f"Bearer {admin_token}"}
+
+
 @pytest.fixture(autouse=True)
 def return_dicts():
     return_single = {}
@@ -95,6 +100,8 @@ class DummyRepo:
         # every route that passes it — which is how this was discovered, as a
         # sudden crop of unrelated-looking failures.
         self.last_options = options
+        # recorded so a test can assert which filters a route built
+        self.last_filters = filters
         return self.find_all_paginated(page, per_page)
 
 class DummySession:

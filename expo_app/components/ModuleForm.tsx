@@ -17,13 +17,15 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, apiErrorText, isOk } from '@/utils/api';
+import { DateField } from '@/components/DateField';
 import { PickerField, PickerSpec } from '@/components/PickerField';
 import { KEYBOARD_DONE_BAR_ID, KeyboardDoneBar } from '@/components/KeyboardDoneBar';
 
 export interface FormField {
   name: string;
   label: string;
-  kind?: 'text' | 'number' | 'multiline' | 'select' | 'boolean' | 'picker';
+  /** 'date' is a date-only YYYY-MM-DD picked from a calendar */
+  kind?: 'text' | 'number' | 'multiline' | 'select' | 'boolean' | 'picker' | 'date';
   required?: boolean;
   placeholder?: string;
   /** for kind 'select'; for 'boolean' the values must be 'true' and 'false' */
@@ -291,6 +293,13 @@ export function ModuleForm({
                     value={values[f.name] ?? ''}
                     onChange={(v) => set(f.name, v)}
                     initialLabel={f.pickerInitialLabel}
+                    testID={`form-${f.name}`}
+                  />
+                ) : f.kind === 'date' ? (
+                  <DateField
+                    value={values[f.name] ?? ''}
+                    onChange={(v) => set(f.name, v)}
+                    title={f.label}
                     testID={`form-${f.name}`}
                   />
                 ) : f.kind === 'select' || f.kind === 'boolean' ? (

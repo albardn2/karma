@@ -144,13 +144,23 @@ export function ProfitabilityScreenImpl({ embedded = false }: { embedded?: boole
 
               {/* the numbers behind the bars, newest first */}
               <View style={styles.table}>
+                <View style={styles.row}>
+                  <View style={styles.rowLabel} />
+                  <View style={styles.rowVals}>
+                    {seriesNames.map((n) => (
+                      <ThemedText key={n} style={[styles.rowVal, styles.headVal]}>
+                        {n}
+                      </ThemedText>
+                    ))}
+                  </View>
+                </View>
                 {[...(data?.groups ?? [])].reverse().map((g) => (
                   <View key={g.period_label} style={styles.row}>
                     <ThemedText style={styles.rowLabel}>{g.period_label}</ThemedText>
                     <View style={styles.rowVals}>
-                      <ThemedText style={styles.rowVal}>{money(g.revenue, ccy)}</ThemedText>
-                      <ThemedText style={styles.rowVal}>{money(g.gross, ccy)}</ThemedText>
-                      <ThemedText style={[styles.rowVal, g.net < 0 && styles.neg]}>
+                      <ThemedText style={styles.rowVal} numberOfLines={1} adjustsFontSizeToFit>{money(g.revenue, ccy)}</ThemedText>
+                      <ThemedText style={styles.rowVal} numberOfLines={1} adjustsFontSizeToFit>{money(g.gross, ccy)}</ThemedText>
+                      <ThemedText style={[styles.rowVal, g.net < 0 && styles.neg]} numberOfLines={1} adjustsFontSizeToFit>
                         {money(g.net, ccy)}
                       </ThemedText>
                     </View>
@@ -221,8 +231,10 @@ const styles = StyleSheet.create({
   table: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginTop: 16 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 10 },
   rowLabel: { width: 64, fontSize: 12, fontWeight: '700', color: '#111827' },
-  rowVals: { flex: 1, flexDirection: 'row', justifyContent: 'space-between' },
-  rowVal: { fontSize: 12, color: '#374151', fontVariant: ['tabular-nums'] },
+  rowVals: { flex: 1, flexDirection: 'row', gap: 6 },
+  // equal right-aligned columns, so each figure sits under its header
+  rowVal: { flex: 1, textAlign: 'right', fontSize: 12, color: '#374151', fontVariant: ['tabular-nums'] },
+  headVal: { fontWeight: '700', opacity: 0.6 },
   neg: { color: '#dc2626' },
   centre: { alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
   stateText: { fontSize: 14, color: '#6B7280', textAlign: 'center' },

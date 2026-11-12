@@ -1044,6 +1044,14 @@ class Pricing(Base):
     def unit(self):
         return self.material.measure_unit
 
+    @property
+    def material_name(self):
+        return self.material.name
+
+    @property
+    def material_sku(self):
+        return self.material.sku
+
     def __repr__(self):
         return (
             f"<Pricing(uuid={self.uuid}, material_name={self.material.name}, "
