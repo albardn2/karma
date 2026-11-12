@@ -6,9 +6,7 @@ import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatNumericDate, parseTs } from '@/utils/date';
-const money = (n?: number | null, c?: string | null) =>
-  n == null ? '—' : `${Number(n).toFixed(2)}${c ? ` ${c}` : ''}`;
-
+import { money } from '@/utils/money';
 interface Payout {
   uuid: string;
   amount?: number | null;

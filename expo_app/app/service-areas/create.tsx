@@ -272,7 +272,7 @@ export default function ServiceAreaCreateScreen() {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
           >
-            <ScrollingChipRow>
+            <ScrollingChipRow inset={20}>
               <FilterChip
                 label={t('serviceAreas.shapeCircle')}
                 active={mode === 'circle'}
@@ -366,7 +366,7 @@ export default function ServiceAreaCreateScreen() {
             </View>
 
             <ThemedText style={styles.label}>{t('serviceAreas.radius')}</ThemedText>
-            <ScrollingChipRow>
+            <ScrollingChipRow inset={20}>
               {RADII.map((m) => (
                 <FilterChip
                   key={m}

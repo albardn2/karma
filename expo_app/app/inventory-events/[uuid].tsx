@@ -7,6 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { formatMonthDayTime, parseTs } from '@/utils/date';
+import { money } from '@/utils/money';
 
 interface InventoryEvent {
   uuid: string;
@@ -80,7 +81,7 @@ export default function MovementDetailScreen() {
       [
         t('inventoryEvents.costPerUnit'),
         e.cost_per_unit != null
-          ? `${Number(e.cost_per_unit).toFixed(2)} ${e.currency ?? ''}`
+          ? money(e.cost_per_unit, e.currency)
           : t('inventory.costUnknown'),
       ],
       // what separates an opening balance from a correction, and why zeroing a lot

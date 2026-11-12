@@ -19,6 +19,7 @@ import { apiCall } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime, parseTs } from '@/utils/date';
 import { findSaleOption, hasRevenueOrderAtStop } from '@/utils/tripStopOutcome';
+import { money } from '@/utils/money';
 
 interface Field {
   name: string;
@@ -319,7 +320,7 @@ export default function StopDetailScreen() {
               ) : (
                 Object.entries(balance).map(([cur, amt]) => (
                   <View key={cur} style={[styles.balanceBadge, Number(amt) > 0 ? styles.owed : styles.clear]}>
-                    <ThemedText style={styles.balanceBadgeText}>{Number(amt).toFixed(2)} {te(cur)}</ThemedText>
+                    <ThemedText style={styles.balanceBadgeText}>{money(Number(amt), te(cur))}</ThemedText>
                   </View>
                 ))
               )}

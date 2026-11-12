@@ -5,6 +5,7 @@ import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
+import { formatAmount } from '@/utils/money';
 
 interface Vendor {
   uuid: string;
@@ -47,8 +48,8 @@ export default function VendorsDetailScreen() {
     Object.entries(v.balance_per_currency ?? {}).map(([currency, amount]) => [
       t('vendors.balanceIn', { currency }),
       Number(amount) < 0
-        ? t('vendors.owed', { amount: Math.abs(Number(amount)).toFixed(2) })
-        : t('vendors.credit', { amount: Number(amount).toFixed(2) }),
+        ? t('vendors.owed', { amount: formatAmount(Math.abs(Number(amount))) })
+        : t('vendors.credit', { amount: formatAmount(Number(amount)) }),
     ]);
 
   const remove = async () => {

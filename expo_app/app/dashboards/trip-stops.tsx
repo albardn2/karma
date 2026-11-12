@@ -89,7 +89,7 @@ export function TripStopsScreenImpl({ embedded = false }: { embedded?: boolean }
   const inner = (
     <>
           <View style={styles.controls}>
-            <ScrollingChipRow>
+            <ScrollingChipRow inset={20}>
               {GRANS.map(([g, l]) => (
                 <FilterChip key={g} label={l} active={gran === g} onPress={() => setGran(g)} testID={`ts-gran-${g}`} />
               ))}

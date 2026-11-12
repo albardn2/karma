@@ -18,6 +18,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { plainMonthDay, plainMonthYear } from '@/utils/date';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { money } from '@/utils/money';
 
 interface Bucket {
   period: string;
@@ -88,7 +89,7 @@ export default function ExpenseAnalyticsScreen() {
   const loading = analytics.isPending;
   const failed = analytics.isError;
 
-  const money = (n: number) => `${Number(n ?? 0).toFixed(2)} ${data?.currency ?? ''}`;
+  const spend = (n: number) => money(n ?? 0, data?.currency);
   const chartWidth = width - 72;
 
   return (
@@ -165,9 +166,9 @@ export default function ExpenseAnalyticsScreen() {
 
               <View style={styles.cards}>
                 {[
-                  [t('expenses.totalSpend'), money(data.total)],
-                  [t('expenses.paidOut'), money(data.paid)],
-                  [t('expenses.stillOwed'), money(data.unpaid)],
+                  [t('expenses.totalSpend'), spend(data.total)],
+                  [t('expenses.paidOut'), spend(data.paid)],
+                  [t('expenses.stillOwed'), spend(data.unpaid)],
                   [t('expenses.entries'), String(data.count ?? 0)],
                 ].map(([k, v]) => (
                   <View key={k} style={styles.card} testID={`stat-${k}`}>

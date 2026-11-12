@@ -5,9 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
-
-const money = (n?: number | null, c?: string | null) =>
-  n == null ? '—' : `${Number(n).toFixed(2)}${c ? ` ${c}` : ''}`;
+import { money } from '@/utils/money';
 
 interface FinancialAccount {
   uuid: string;

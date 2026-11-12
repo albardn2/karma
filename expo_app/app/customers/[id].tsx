@@ -30,6 +30,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { formatNumericDate, parseTs } from '@/utils/date';
 import { TagInput } from '@/components/TagInput';
 import { useTagCatalog } from '@/utils/tagCatalog';
+import { formatAmount } from '@/utils/money';
 
 interface Customer {
   uuid: string;
@@ -1085,7 +1086,7 @@ export default function CustomerDetailScreen() {
                           { color: getBalanceColor(amount) },
                         ]}
                       >
-                        {amount.toFixed(2)}
+                        {formatAmount(amount)}
                       </ThemedText>
                     </View>
                   ),

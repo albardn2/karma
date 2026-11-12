@@ -9,6 +9,7 @@ import { PickerField } from '@/components/PickerField';
 import { FilterChip } from '@/components/FilterChips';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatNumericDate, parseTs } from '@/utils/date';
+import { money } from '@/utils/money';
 
 interface Transaction {
   uuid: string;
@@ -32,9 +33,6 @@ interface Account {
 const PER_PAGE = 100;
 
 type Direction = 'out' | 'in';
-
-const money = (n?: number | null, c?: string | null) =>
-  n == null ? null : `${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}${c ? ` ${c}` : ''}`;
 
 /**
  * Money moving between financial accounts.
@@ -130,8 +128,8 @@ export default function TransactionsScreen() {
         }
         keyExtractor={(x) => x.uuid}
         renderItem={(x) => {
-          const out = money(x.from_amount, x.from_currency);
-          const into = money(x.to_amount, x.to_currency);
+          const out = x.from_amount == null ? null : money(x.from_amount, x.from_currency);
+          const into = x.to_amount == null ? null : money(x.to_amount, x.to_currency);
           const from = nameOf(x.from_account_uuid);
           const to = nameOf(x.to_account_uuid);
           // a transfer shows both sides; a one-sided movement shows only the side it has

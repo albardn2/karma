@@ -9,6 +9,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatMonthDayTime, formatNumericDate, parseTs, plainDate } from '@/utils/date';
+import { money } from '@/utils/money';
 
 interface Material {
   uuid: string;
@@ -174,7 +175,7 @@ export default function MaterialDetailScreen() {
           t('materials.onHand'),
           lots == null ? '…' : `${qty(onHand)}${x.measure_unit ? ` ${x.measure_unit}` : ''}`,
         ],
-        [t('materials.avgCost'), weighted == null ? '—' : `${weighted.toFixed(2)} ${ccy}`],
+        [t('materials.avgCost'), weighted == null ? '—' : money(weighted, ccy)],
         // parsed as UTC (append-Z): the column is naive UTC, and a bare new Date()
         // reads it as local, shifting the shown date by the viewer's offset
         [t('materials.created'), formatNumericDate(parseTs(x.created_at))],
@@ -205,12 +206,10 @@ export default function MaterialDetailScreen() {
                       <ThemedText style={styles.lotMeta} numberOfLines={1}>
                         {l.lot_id}
                         {l.cost_per_unit != null
-                          ? ` · ${Number(l.cost_per_unit).toFixed(2)} ${l.currency ?? ccy}/${
-                              l.unit ?? x.measure_unit ?? ''
-                            }`
+                          ? ` · ${money(l.cost_per_unit, l.currency ?? ccy)}/${l.unit ?? x.measure_unit ?? ''}`
                           : ` · ${t('materials.noCost')}`}
                         {value != null
-                          ? ` · ${t('materials.stockValue')} ${value.toFixed(2)} ${ccy}`
+                          ? ` · ${t('materials.stockValue')} ${money(value, ccy)}`
                           : ''}
                       </ThemedText>
                       {(l.created_at || l.expiration_date) && (

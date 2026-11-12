@@ -6,6 +6,7 @@ import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatNumericDate, parseTs } from '@/utils/date';
+import { money } from '@/utils/money';
 
 interface Payment {
   uuid: string;
@@ -53,8 +54,7 @@ export default function PaymentsScreen() {
           >
             <View style={styles.cardTop}>
               <ThemedText style={styles.amount}>
-                {Number(p.amount ?? 0).toFixed(2)}
-                {p.currency ? ` ${p.currency}` : ''}
+                {money(p.amount ?? 0, p.currency)}
               </ThemedText>
               {!!p.payment_method && (
                 <ThemedText style={styles.method}>{tef(p.payment_method)}</ThemedText>

@@ -3,6 +3,7 @@ import { View, StyleSheet, ActivityIndicator, Dimensions, ScrollView, TouchableO
 import MapView, { Marker, Region, PROVIDER_GOOGLE } from 'react-native-maps';
 import { ThemedText } from '@/components/ThemedText';
 import { apiCall } from '@/utils/api';
+import { money } from '@/utils/money';
 import * as Location from 'expo-location';
 
 interface Customer {
@@ -599,17 +600,18 @@ export const MapViewComponent: React.FC<MapViewComponentProps> = ({
             {!!selectedCustomer.full_address && (
               <ThemedText style={styles.infoPopupAddress}>{selectedCustomer.full_address}</ThemedText>
             )}
-            {(() => {
-              const totalBalance = Object.values(selectedCustomer.balance_per_currency).reduce((sum, amount) => sum + amount, 0);
-              return totalBalance !== 0 ? (
-                <ThemedText style={[
-                  styles.infoPopupBalance,
-                  { color: totalBalance > 0 ? '#10b981' : '#ef4444' }
-                ]}>
-                  Balance: {totalBalance > 0 ? '+' : ''}${totalBalance.toFixed(2)}
+            {/* one line per currency: a SYP and a USD balance are never added together */}
+            {Object.entries(selectedCustomer.balance_per_currency ?? {})
+              .filter(([, amount]) => amount !== 0)
+              .map(([currency, amount]) => (
+                <ThemedText
+                  key={currency}
+                  style={[styles.infoPopupBalance, { color: amount > 0 ? '#10b981' : '#ef4444' }]}
+                >
+                  Balance: {amount > 0 ? '+' : ''}
+                  {money(amount, currency)}
                 </ThemedText>
-              ) : null;
-            })()}
+              ))}
 
             <TouchableOpacity
               style={[styles.visitButton, !selectedCustomer.uuid && styles.visitButtonDisabled]}

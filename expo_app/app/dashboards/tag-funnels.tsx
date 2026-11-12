@@ -180,7 +180,7 @@ export function TagFunnelsScreenImpl({ embedded = false }: { embedded?: boolean 
   const inner = (
     <>
       <View style={styles.controls}>
-        <ScrollingChipRow>
+        <ScrollingChipRow inset={20}>
           <FilterChip label={t('dashboards.tfModeCurrent')} active={mode === 'current'} onPress={() => setMode('current')} testID="tf-mode-current" />
           <FilterChip label={t('dashboards.tfModeChange')} active={mode === 'change'} onPress={() => setMode('change')} testID="tf-mode-change" />
         </ScrollingChipRow>
@@ -188,7 +188,7 @@ export function TagFunnelsScreenImpl({ embedded = false }: { embedded?: boolean 
         {/* the period only means something when movement is shown */}
         {mode === 'change' && (
           <>
-            <ScrollingChipRow>
+            <ScrollingChipRow inset={20}>
               {GRANS.map(([g, label]) => (
                 <FilterChip key={g} label={label} active={gran === g} onPress={() => setGran(g)} testID={`tf-gran-${g}`} />
               ))}

@@ -20,6 +20,7 @@ import { useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { formatNumericDate, parseTs } from '@/utils/date';
 import { markListsStale } from '@/utils/listRefresh';
+import { money } from '@/utils/money';
 
 interface Payment {
   uuid: string;
@@ -82,7 +83,7 @@ export default function PaymentDetailScreen() {
   // says what will move, before it moves.
   const confirmDelete = () => {
     if (!payment) return;
-    const amount = `${Number(payment.amount ?? 0).toFixed(2)}${payment.currency ? ` ${payment.currency}` : ''}`;
+    const amount = money(payment.amount ?? 0, payment.currency);
     const what = payment.invoice_uuid
       ? t('payments.deleteConfirmInvoice', { amount })
       : payment.debit_note_item_uuid
@@ -175,8 +176,7 @@ export default function PaymentDetailScreen() {
             }
           >
             <ThemedText style={styles.amount} testID="payment-amount">
-              {Number(payment.amount ?? 0).toFixed(2)}
-              {payment.currency ? ` ${payment.currency}` : ''}
+              {money(payment.amount ?? 0, payment.currency)}
             </ThemedText>
 
             <View style={styles.card}>

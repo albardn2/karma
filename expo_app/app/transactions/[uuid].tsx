@@ -4,6 +4,7 @@ import { ModuleDetailScreen, DetailRow, DetailAction } from '@/components/Module
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate, parseTs } from '@/utils/date';
+import { money } from '@/utils/money';
 
 interface Transaction {
   uuid: string;
@@ -25,9 +26,6 @@ interface Account {
 }
 
 const PER_PAGE = 100;
-
-const money = (n?: number | null, c?: string | null) =>
-  n == null ? '—' : `${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}${c ? ` ${c}` : ''}`;
 
 /**
  * One money movement.

@@ -760,7 +760,7 @@ export default function ProcessCreateScreen() {
             )}
 
             <ThemedText style={styles.label}>{t('processes.type')} *</ThemedText>
-            <ScrollingChipRow>
+            <ScrollingChipRow inset={20}>
               {types.map((ty) => (
                 <FilterChip
                   key={ty}

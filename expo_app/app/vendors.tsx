@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { money } from '@/utils/money';
 
 interface Vendor {
   uuid: string;
@@ -21,7 +22,7 @@ interface Vendor {
 const owedSummary = (b?: Record<string, number> | null) =>
   Object.entries(b ?? {})
     .filter(([, amount]) => Math.abs(Number(amount)) > 0.005)
-    .map(([currency, amount]) => `${Math.abs(Number(amount)).toFixed(2)} ${currency}`)
+    .map(([currency, amount]) => money(Math.abs(Number(amount)), currency))
     .join(' · ');
 
 /**
