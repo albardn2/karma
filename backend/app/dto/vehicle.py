@@ -3,7 +3,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 class VehicleStatus(str, Enum):
     ACTIVE = "active"
@@ -47,7 +47,7 @@ class VehicleRead(BaseModel):
 
     uuid: str
     created_by_uuid: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDateTime
     plate_number: str
     model: str
     make: str

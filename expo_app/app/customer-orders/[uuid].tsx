@@ -15,7 +15,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs, plainDate } from '@/utils/date';
 import { money } from '@/utils/money';
 
 interface OrderItem {
@@ -273,7 +273,7 @@ export default function CustomerOrderDetailScreen() {
             [t('customerOrders.total'), money(o.total_adjusted_amount, o.currency)],
             [t('customerOrders.paidAmount'), money(o.net_amount_paid, o.currency)],
             [t('customerOrders.due'), money(o.net_amount_due, o.currency)],
-            [t('payments.received'), formatNumericDate(new Date(o.created_at))],
+            [t('payments.received'), formatNumericDate(parseTs(o.created_at))],
             [t('customerOrders.notes'), o.notes || '—'],
           ];
         }}
@@ -344,7 +344,7 @@ export default function CustomerOrderDetailScreen() {
                       </View>
                       <ThemedText style={styles.invoiceMeta}>
                         {t('customerOrders.paidAmount')} {money(inv.net_amount_paid, inv.currency)}
-                        {inv.due_date ? ` · ${formatNumericDate(new Date(inv.due_date))}` : ''}
+                        {inv.due_date ? ` · ${plainDate(inv.due_date)}` : ''}
                       </ThemedText>
                       {d.price_edit_state === 'single_payment' && (
                         <ThemedText style={styles.priceNote}>

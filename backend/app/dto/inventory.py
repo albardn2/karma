@@ -1,7 +1,7 @@
 from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, model_validator
 from app.entrypoint.routes.common.errors import BadRequestError
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import CalendarDay, UtcDateTime
 from app.dto.common_enums import UnitOfMeasure, Currency
 
 class InventoryBase(BaseModel):
@@ -11,7 +11,7 @@ class InventoryBase(BaseModel):
     warehouse_uuid: Optional[str] = None
     notes: Optional[str] = None
     lot_id: Optional[str] = None
-    expiration_date: Optional[datetime] = None
+    expiration_date: Optional[CalendarDay] = None
     cost_per_unit: Optional[float] = Field(None)
     unit: UnitOfMeasure
     current_quantity: Optional[float] = Field(None)
@@ -27,7 +27,7 @@ class InventoryCreate(BaseModel):
     created_by_uuid: Optional[str] = None
     notes: Optional[str] = None
     lot_id: Optional[str] = None
-    expiration_date: Optional[datetime] = None
+    expiration_date: Optional[CalendarDay] = None
     is_active: bool = True
 
 class InventoryManualAdd(BaseModel):
@@ -40,7 +40,7 @@ class InventoryManualAdd(BaseModel):
     quantity: float = Field(..., gt=0, description="Opening quantity, must be positive")
     notes: Optional[str] = None
     lot_id: Optional[str] = None
-    expiration_date: Optional[datetime] = None
+    expiration_date: Optional[CalendarDay] = None
     cost_per_unit: Optional[float] = Field(None, ge=0)
     currency: Optional[Currency] = None
 
@@ -57,13 +57,13 @@ class InventoryUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     warehouse_uuid: Optional[str] = None
     notes: Optional[str] = None
-    expiration_date: Optional[datetime] = None
+    expiration_date: Optional[CalendarDay] = None
     is_active: Optional[bool] = None
 
 class InventoryRead(InventoryBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool
     total_original_cost: Optional[float] = None
     # the currency cost_per_unit/total_original_cost are reported in — set by

@@ -16,7 +16,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatMonthDayTime } from '@/utils/date';
+import { formatMonthDayTime, parseTs } from '@/utils/date';
 
 // money is DOUBLE PRECISION end to end; never render or send the raw float
 const round2 = (n: number) => Math.round(Number(n) * 100) / 100;
@@ -205,7 +205,7 @@ export default function OrderActionsScreen() {
 
   const fmtDate = (s?: string) => {
     if (!s) return '';
-    const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z');
+    const d = parseTs(s);
     return isNaN(d.getTime()) ? s : formatMonthDayTime(d);
   };
 

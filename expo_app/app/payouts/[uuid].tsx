@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 const money = (n?: number | null, c?: string | null) =>
   n == null ? '—' : `${Number(n).toFixed(2)}${c ? ` ${c}` : ''}`;
 
@@ -29,7 +29,7 @@ export default function PayoutsDetailScreen() {
       rows={(x): DetailRow[] => [
         [t('payouts.amount'), money(x.amount, x.currency)],
         [t('payouts.appliedTo'), x.expense_uuid ? t('payouts.forExpense') : x.purchase_order_uuid ? t('payouts.forPurchaseOrder') : t('payouts.unlinked')],
-        [t('payouts.when'), formatNumericDate(new Date(x.created_at))],
+        [t('payouts.when'), formatNumericDate(parseTs(x.created_at))],
         [t('payouts.notes'), x.notes || '—'],
       ]}
     />

@@ -6,7 +6,7 @@ import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/Module
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 import { LANGUAGE_LABELS } from '@/i18n/translations';
 
 interface Permissions {
@@ -107,7 +107,7 @@ export default function UserDetailScreen() {
       t('users.tracking'),
       u.track_location ? t('users.enabled') : t('users.trackingOff'),
     ],
-    [t('users.created'), u.created_at ? formatNumericDate(new Date(u.created_at)) : '—'],
+    [t('users.created'), u.created_at ? formatNumericDate(parseTs(u.created_at)) : '—'],
   ];
 
   const actions: DetailAction<User>[] = [

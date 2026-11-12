@@ -27,7 +27,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatMonthDayTime, formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 import { TagInput } from '@/components/TagInput';
 import { useTagCatalog } from '@/utils/tagCatalog';
 
@@ -515,7 +515,7 @@ export default function CustomerDetailScreen() {
   };
 
   const formatDate = (dateString: string) => {
-    return formatNumericDate(new Date(dateString));
+    return formatNumericDate(parseTs(dateString));
   };
 
   const getTotalBalance = () => {

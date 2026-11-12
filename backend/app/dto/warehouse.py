@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List
 from uuid import UUID
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 from app.utils.geom_utils import lat_lon_to_wkt, wkt_or_wkb_to_lat_lon
 
@@ -57,7 +57,7 @@ class WarehouseRead(WarehouseBase):
 
     uuid:            UUID
     created_by_uuid: Optional[UUID] = None
-    created_at:      datetime
+    created_at:      UtcDateTime
     is_deleted:      bool
 
     @field_validator("coordinates", mode="before")

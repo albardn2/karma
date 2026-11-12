@@ -9,7 +9,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 import {
   formatKm2,
   parseWktPolygons,
@@ -96,7 +96,7 @@ export default function ServiceAreaDetailScreen() {
       [t('serviceAreas.description'), a.description || '—'],
       [
         t('serviceAreas.created'),
-        a.created_at ? formatNumericDate(new Date(a.created_at)) : '—',
+        a.created_at ? formatNumericDate(parseTs(a.created_at)) : '—',
       ],
       [t('serviceAreas.points'), outer.length ? String(ringVertexCount(outer)) : '—'],
       [

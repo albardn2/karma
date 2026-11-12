@@ -35,6 +35,7 @@ cancellation.
 
 Kept pure so the window rules are tested without a database.
 """
+from app.utils.time_utils import utc_iso
 from datetime import timedelta
 
 from app.domains.customer.tag_funnels import build_payload
@@ -112,8 +113,8 @@ def build_trip_payload(*, trip_uuid: str, start, end, is_open: bool, history_fro
     """
     payload = build_payload(
         period={
-            "start": start.isoformat(),
-            "end": end.isoformat(),
+            "start": utc_iso(start),
+            "end": utc_iso(end),
             # the dashboard's word for "still running, measured to now"
             "is_current": is_open,
             # the trip did not record when it started or stopped working, so

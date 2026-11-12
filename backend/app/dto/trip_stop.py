@@ -2,7 +2,7 @@
 
 from enum import Enum
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import CalendarDay, UtcDateTime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from shapely import wkt as shapely_wkt
@@ -120,7 +120,7 @@ class TripStopRead(BaseModel):
 
     uuid: str
     created_by_uuid: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDateTime
     trip_uuid: str
     coordinates: str
     notes: Optional[str] = None
@@ -198,7 +198,7 @@ class TripStopHistoryItem(BaseModel):
     uuid: str
     # when the result was recorded (task-execution end time), falling back to
     # the stop's creation time for rows completed before end times were kept
-    date: datetime
+    date: CalendarDay
     outcome: str
     notes: Optional[str] = None
 

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.dto.common_enums import Currency
 
 from app.dto.common_enums import UnitOfMeasure
@@ -30,7 +30,7 @@ class InvoiceItemBulkCreate(BaseModel):
 class InvoiceItemRead(InvoiceItemBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
-    created_at: datetime
+    created_at: UtcDateTime
     quantity: float
     material_name: str
     material_uuid: str

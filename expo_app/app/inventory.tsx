@@ -8,7 +8,7 @@ import { CostCurrencyToggle, CostCcy } from '@/components/CostCurrencyToggle';
 import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
-import { plainDate } from '@/utils/date';
+import { daysUntilPlain, plainDate } from '@/utils/date';
 
 interface InventoryLot {
   uuid: string;
@@ -31,21 +31,13 @@ const isDepleted = (lot: InventoryLot) => Number(lot.current_quantity ?? 0) <= 0
 /**
  * Whether a lot is past its expiry, or close enough to matter.
  *
- * Compared date-only. expiration_date arrives as a naive timestamp, and a lot that
- * expires today should read as expiring today rather than flipping on the hour the
- * timestamp happens to carry.
+ * Compared date-only, on the calendar day as stored: a lot that expires today reads
+ * as expiring today rather than flipping on the hour or zone the timestamp carries.
  */
 const EXPIRY_SOON_DAYS = 30;
 function expiryState(iso?: string | null): 'none' | 'soon' | 'expired' {
-  if (!iso) return 'none';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return 'none';
-  const today = new Date();
-  const day = 24 * 60 * 60 * 1000;
-  const days = Math.floor(
-    (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) -
-      Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / day,
-  );
+  const days = daysUntilPlain(iso);
+  if (days == null) return 'none';
   if (days < 0) return 'expired';
   return days <= EXPIRY_SOON_DAYS ? 'soon' : 'none';
 }

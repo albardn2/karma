@@ -18,7 +18,7 @@ import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { apiCall } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatMonthDayTime } from '@/utils/date';
+import { formatMonthDayTime, parseTs } from '@/utils/date';
 import { takeListStale } from '@/utils/listRefresh';
 
 const TRIP_WORKFLOW_NAME = 'simple_trip_workflow';
@@ -70,7 +70,7 @@ const STATUS_STYLES: Record<string, { bg: string; fg: string; labelKey: string }
 // backend timestamps are naive UTC; parse them as UTC
 const toDate = (s?: string | null) => {
   if (!s) return null;
-  const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z');
+  const d = parseTs(s);
   return isNaN(d.getTime()) ? null : d;
 };
 

@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 
 interface Payment {
   uuid: string;
@@ -62,7 +62,7 @@ export default function PaymentsScreen() {
             </View>
             <View style={styles.cardBottom}>
               <ThemedText style={styles.date}>
-                {formatNumericDate(new Date(p.created_at))}
+                {formatNumericDate(parseTs(p.created_at))}
               </ThemedText>
               <ThemedText style={styles.against}>
                 {p.invoice_uuid

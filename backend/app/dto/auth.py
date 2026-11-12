@@ -3,7 +3,7 @@ from enum import Enum
 import pydantic
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.entrypoint.routes.common.errors import BadRequestError
 
 
@@ -166,7 +166,7 @@ class UserRead(BaseModel):
     phone_number: Optional[str]
     language: Optional[str]
     track_location: bool = False
-    created_at: datetime
+    created_at: UtcDateTime
     permission_scope: Optional[str]
     is_deleted: bool
     # False = deactivated: cannot sign in and live sessions are cut

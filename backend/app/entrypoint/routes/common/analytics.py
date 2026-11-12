@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from flask import request
 
 from app.entrypoint.routes.common.errors import BadRequestError
+from app.utils.time_utils import parse_client_iso
 
 BUCKETS = ("day", "week", "month")
 
@@ -16,7 +17,7 @@ def parse_dt(value, end_of_day=False):
     if not value:
         return None
     try:
-        parsed = datetime.fromisoformat(value)
+        parsed = parse_client_iso(value)
     except ValueError:
         raise BadRequestError(f"Invalid date: {value}")
     # a date-only upper bound means "through that day", not "up to its midnight"

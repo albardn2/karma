@@ -1,7 +1,7 @@
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 from app.dto.common_enums import UnitOfMeasure
 
@@ -52,7 +52,7 @@ class MaterialRead(MaterialBase):
     model_config = ConfigDict(extra="forbid")
 
     uuid: str
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: Optional[bool] = None
 
 class MaterialListParams(BaseModel):

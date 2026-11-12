@@ -23,7 +23,7 @@ import { TripFilterDropdowns } from '@/components/TripFilterDropdowns';
 import { apiCall } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatMonthDayTime } from '@/utils/date';
+import { formatMonthDayTime, parseTs } from '@/utils/date';
 
 // Admin-only Trips module — mirrors the web trips list (plate, assignee,
 // status, times), newest first, with assignee / vehicle dropdowns, status
@@ -71,7 +71,7 @@ export const STATUS_BADGE: Record<string, { bg: string; fg: string; labelKey: st
 
 const toDate = (s?: string | null) => {
   if (!s) return null;
-  const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z');
+  const d = parseTs(s);
   return isNaN(d.getTime()) ? null : d;
 };
 const fmt = (s?: string | null) => {

@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from enum import Enum
 
 # You can expand this enum with more QC types as needed.
@@ -29,15 +29,15 @@ class QualityControlUpdate(BaseModel):
 class QualityControlRead(QualityControlBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid:       str
-    created_at: datetime
+    created_at: UtcDateTime
 class QualityControlListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
     uuid:             Optional[str]                = None
     process_uuid:     Optional[str]                = None
     type:             Optional[QualityControlType]  = None
     created_by_uuid:  Optional[str]                = None
-    start_date:       Optional[datetime]            = None
-    end_date:         Optional[datetime]            = None
+    start_date:       Optional[UtcDateTime]            = None
+    end_date:         Optional[UtcDateTime]            = None
     page:             int     = Field(1, gt=0)
     per_page:         int     = Field(20, gt=0, le=100)
 

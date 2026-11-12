@@ -2,7 +2,8 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import List, Optional
-from datetime import date, datetime
+from datetime import date
+from app.dto.utc_datetime import UtcDateTime
 
 from app.dto.common_enums import Currency
 
@@ -70,7 +71,7 @@ class ExchangeRateRead(ExchangeRateBase):
 
     uuid: str
     created_by_uuid: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDateTime
     source: str
     is_deleted: bool
 

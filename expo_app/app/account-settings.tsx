@@ -6,7 +6,7 @@ import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { money, perCurrency } from '@/utils/money';
-import { formatNumericDate, plainDate, plainDayOfMonth, todayPlain } from '@/utils/date';
+import { formatNumericDate, parseTs, plainDate, plainDayOfMonth, todayPlain } from '@/utils/date';
 
 interface LedgerEntry {
   uuid: string;
@@ -172,7 +172,7 @@ export default function AccountSettingsScreen() {
                       </ThemedText>
                     )}
                     <ThemedText style={styles.when}>
-                      {e.created_at ? formatNumericDate(new Date(e.created_at)) : ''}
+                      {e.created_at ? formatNumericDate(parseTs(e.created_at)) : ''}
                     </ThemedText>
                   </View>
                 ))}

@@ -13,7 +13,7 @@ RoutingStrategyConfig both at save time and again when the route step runs
 garbage).
 """
 import re
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from enum import Enum
 from typing import Annotated, List, Literal, Optional, Union
 
@@ -311,7 +311,7 @@ class RoutingStrategyRead(BaseModel):
     name: str
     config: dict
     created_by_uuid: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool = False
 
 

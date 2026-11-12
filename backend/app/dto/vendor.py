@@ -4,7 +4,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from typing import Optional, List
 from uuid import UUID
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.utils.geom_utils import lat_lon_to_wkt, wkt_or_wkb_to_lat_lon
 
 
@@ -74,7 +74,7 @@ class VendorRead(BaseModel):
 
     uuid: UUID
     created_by_uuid: Optional[UUID] = None
-    created_at: datetime
+    created_at: UtcDateTime
     email_address: Optional[EmailStr] = None
     company_name: str
     full_name: str

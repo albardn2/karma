@@ -33,6 +33,7 @@ customers. The route joins the event log to live customers for exactly this.
 Everything here is pure: the route fetches rows, this module does the
 arithmetic, and the tests exercise the arithmetic without a database.
 """
+from app.utils.time_utils import utc_iso
 from collections import Counter, defaultdict
 
 from app.domains.customer.auto_tags import (
@@ -251,7 +252,7 @@ def build_payload(*, period: dict, history_from, total: int, tag_lists,
 
     return {
         "period": period,
-        "history_from": history_from.isoformat() if history_from else None,
+        "history_from": utc_iso(history_from),
         "total_customers": total,
         "total_at_period_end": total_end,
         "new_customers": created,

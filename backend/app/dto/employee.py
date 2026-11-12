@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 class EmployeeRole(str, Enum):
     ADMIN = "admin"
@@ -49,7 +49,7 @@ class EmployeeRead(EmployeeBase):
 
     uuid: str
     created_by_uuid: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool
 
 class EmployeeListParams(BaseModel):

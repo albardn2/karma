@@ -7,7 +7,7 @@ import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { LineChart } from '@/components/Chart';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import { formatNumericDate } from '@/utils/date';
+import { plainDate } from '@/utils/date';
 
 interface Rate {
   uuid: string;
@@ -89,7 +89,7 @@ export default function ExchangeRatesScreen() {
               {latest
                 ? `${latest.from_currency} → ${latest.to_currency}` +
                   (latest.rate_date
-                    ? ` · ${formatNumericDate(new Date(latest.rate_date))}`
+                    ? ` · ${plainDate(latest.rate_date)}`
                     : '') +
                   (latest.source ? ` · ${tef(latest.source)}` : '')
                 : ''}
@@ -142,7 +142,7 @@ export default function ExchangeRatesScreen() {
               </ThemedText>
             </View>
             <ThemedText style={styles.date}>
-              {r.rate_date ? formatNumericDate(new Date(r.rate_date)) : ''}
+              {r.rate_date ? plainDate(r.rate_date) : ''}
             </ThemedText>
           </View>
         )}

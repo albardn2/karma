@@ -2,6 +2,7 @@ from enum import Enum
 from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.dto.common_enums import Currency
 
@@ -73,7 +74,7 @@ class InventoryEventRead(InventoryEventBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
     material_uuid: str
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool
     material_name: Optional[str] = Field(
         None,
@@ -91,8 +92,8 @@ class InventoryEventListParams(BaseModel):
     credit_note_item_uuid: Optional[str] = None
     process_uuid: Optional[str] = None
     event_type: Optional[InventoryEventType] = None
-    start_date: Optional[datetime] = Field(None, description="On or after this datetime")
-    end_date:   Optional[datetime] = Field(None, description="On or before this datetime")
+    start_date: Optional[UtcDateTime] = Field(None, description="On or after this datetime")
+    end_date:   Optional[UtcDateTime] = Field(None, description="On or before this datetime")
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
 

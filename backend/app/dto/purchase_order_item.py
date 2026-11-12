@@ -1,7 +1,7 @@
 ## app/dto/purchase_order_item.py
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List, Union
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 from app.dto.common_enums import Currency, UnitOfMeasure
 from models.common import PurchaseOrderItem as PurchaseOrderItemModel
@@ -69,8 +69,8 @@ class PurchaseOrderItemRead(BaseModel):
     unit:               UnitOfMeasure
     quantity_received:  float
     is_fulfilled:       bool
-    fulfilled_at:       Optional[datetime] = None
-    created_at:         datetime
+    fulfilled_at:       Optional[UtcDateTime] = None
+    created_at:         UtcDateTime
     is_deleted:         bool
     total_price:        float  # computed
     material_name:   str
@@ -83,8 +83,8 @@ class PurchaseOrderItemListParams(BaseModel):
     purchase_order_uuid: Optional[str]   = None
     material_uuid:       Optional[str]   = None
     is_fulfilled:        Optional[bool]   = None
-    start_date:          Optional[datetime] = Field(None, description="Filter created_at >=")
-    end_date:            Optional[datetime] = Field(None, description="Filter created_at <=")
+    start_date:          Optional[UtcDateTime] = Field(None, description="Filter created_at >=")
+    end_date:            Optional[UtcDateTime] = Field(None, description="Filter created_at <=")
     uuid : Optional[str] = None
 
     page:     int = Field(1, gt=0, description="Page number >=1")

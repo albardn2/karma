@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 from app.dto.common_enums import Currency
 
@@ -35,7 +35,7 @@ class VehicleInventoryRead(BaseModel):
     currency: Optional[str] = None
     is_active: Optional[bool] = None
     is_deleted: bool
-    created_at: datetime
+    created_at: UtcDateTime
     current_quantity: Optional[float] = None
 
 
