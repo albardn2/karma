@@ -184,7 +184,7 @@ export function DashboardScreenImpl({ embedded = false }: { embedded?: boolean }
                       {k}
                       {cur ? ` (${cur})` : ''}
                     </ThemedText>
-                    <ThemedText style={styles.cardValue} numberOfLines={1}>
+                    <ThemedText style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
                       {v}
                     </ThemedText>
                   </View>
@@ -200,7 +200,7 @@ export function DashboardScreenImpl({ embedded = false }: { embedded?: boolean }
                 ].map(([k, v]) => (
                   <View key={k} style={styles.card} testID={`dash-stat-${k}`}>
                     <ThemedText style={styles.cardLabel}>{k}</ThemedText>
-                    <ThemedText style={styles.cardValue} numberOfLines={1}>
+                    <ThemedText style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
                       {v}
                     </ThemedText>
                   </View>
