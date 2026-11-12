@@ -3,9 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatNumericDate, parseTs } from '@/utils/date';
-const money = (n?: number | null, c?: string | null) =>
-  n == null ? '—' : `${Number(n).toFixed(2)}${c ? ` ${c}` : ''}`;
-
+import { money } from '@/utils/money';
 interface Payout {
   uuid: string;
   amount?: number | null;

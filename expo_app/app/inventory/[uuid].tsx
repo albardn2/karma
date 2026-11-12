@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatMonthDayTime, formatNumericDate, parseTs, plainDate } from '@/utils/date';
+import { money } from '@/utils/money';
 
 interface Lot {
   uuid: string;
@@ -68,8 +69,8 @@ export default function LotDetailScreen() {
 
   const qty = (n?: number | null) =>
     n == null ? '—' : Number.isInteger(n) ? String(n) : Number(n).toFixed(2);
-  const money = (n?: number | null, c?: string | null) =>
-    n == null ? t('inventory.costUnknown') : `${Number(n).toFixed(2)} ${c ?? ccy}`;
+  const cost = (n?: number | null, c?: string | null) =>
+    n == null ? t('inventory.costUnknown') : money(n, c ?? ccy);
 
   // Cached and kept fresh (useApiQuery): edit, add-stock, zero-out or a sale
   // anywhere shows here when this screen is next in view.
@@ -142,16 +143,14 @@ export default function LotDetailScreen() {
       [t('inventory.lotId'), l.lot_id],
       [t('inventory.current'), `${qty(l.current_quantity)}${l.unit ? ` ${l.unit}` : ''}`],
       [t('inventory.original'), `${qty(l.original_quantity)}${l.unit ? ` ${l.unit}` : ''}`],
-      [t('inventory.costPerUnit'), money(l.cost_per_unit, l.cost_currency)],
+      [t('inventory.costPerUnit'), cost(l.cost_per_unit, l.cost_currency)],
       [
         t('inventory.valueOnHand'),
         l.cost_per_unit != null && Number(l.current_quantity) > 0
-          ? `${(Number(l.cost_per_unit) * Number(l.current_quantity)).toFixed(2)} ${
-              l.cost_currency ?? ccy
-            }`
+          ? money(Number(l.cost_per_unit) * Number(l.current_quantity), l.cost_currency ?? ccy)
           : '—',
       ],
-      [t('inventory.receiptValue'), money(l.total_original_cost, l.cost_currency)],
+      [t('inventory.receiptValue'), cost(l.total_original_cost, l.cost_currency)],
       [t('inventory.expiry'), l.expiration_date ? plainDate(l.expiration_date.slice(0, 10)) : '—'],
       [t('inventory.received'), formatNumericDate(parseTs(l.created_at))],
       [t('inventory.createdBy'), l.created_by_uuid ?? '—'],
@@ -248,7 +247,7 @@ export default function LotDetailScreen() {
                     <ThemedText style={styles.moveMeta}>
                       {formatMonthDayTime(parseTs(m.created_at))}
                       {m.cost_per_unit != null
-                        ? ` · ${Number(m.cost_per_unit).toFixed(2)} ${m.currency ?? ''}`
+                        ? ` · ${money(m.cost_per_unit, m.currency)}`
                         : ''}
                     </ThemedText>
                   </View>

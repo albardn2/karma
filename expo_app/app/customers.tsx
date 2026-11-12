@@ -15,6 +15,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { takeListFlash } from '@/utils/listRefresh';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { formatAmount, money } from '@/utils/money';
 
 interface Customer {
   uuid: string;
@@ -292,10 +293,10 @@ export default function CustomersScreen() {
     const formatBalances = () => {
       const balances = Object.entries(customer.balance_per_currency || {})
         .filter(([_, amount]) => amount !== 0)
-        .map(([currency, amount]) => `${amount.toFixed(2)} ${currency}`)
+        .map(([currency, amount]) => money(amount, currency))
         .slice(0, 1); // Show max 1 currency to save space
 
-      if (balances.length === 0) return '0.00';
+      if (balances.length === 0) return formatAmount(0);
       return balances[0];
     };
 

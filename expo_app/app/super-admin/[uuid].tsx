@@ -7,6 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatNumericDate, parseTs } from '@/utils/date';
+import { money, perCurrency } from '@/utils/money';
 
 interface Account {
   uuid: string;
@@ -70,15 +71,6 @@ export default function SuperAdminAccountScreen() {
   const chargesFailed = chargesQuery.isError;
   const charges: Charge[] | null = chargesFailed ? [] : (chargesQuery.data?.charges ?? null);
   const outstanding: Record<string, number> = chargesQuery.data?.total_outstanding ?? {};
-
-  const money = (n?: number | null, c?: string | null) =>
-    n == null ? '—' : `${Number(n).toFixed(2)}${c ? ` ${c}` : ''}`;
-
-  const perCurrency = (b?: Record<string, number> | null) => {
-    const entries = Object.entries(b ?? {});
-    if (!entries.length) return '—';
-    return entries.map(([cur, v]) => `${Number(v).toFixed(2)} ${cur}`).join(' · ');
-  };
 
   /** One field, one PUT. */
   // returns the write, so the detail screen holds the buttons busy until it lands

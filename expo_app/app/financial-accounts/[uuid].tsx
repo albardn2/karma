@@ -2,9 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
-
-const money = (n?: number | null, c?: string | null) =>
-  n == null ? '—' : `${Number(n).toFixed(2)}${c ? ` ${c}` : ''}`;
+import { money } from '@/utils/money';
 
 interface FinancialAccount {
   uuid: string;

@@ -8,9 +8,7 @@ import { useHasModule } from '@/hooks/useModuleAccess';
 import { apiCall, apiErrorText, isOk } from '@/utils/api';
 import { formatNumericDate, parseTs } from '@/utils/date';
 import { markListsStale } from '@/utils/listRefresh';
-
-const money = (n?: number | null, c?: string | null) =>
-  n == null ? '—' : `${Number(n).toFixed(2)}${c ? ` ${c}` : ''}`;
+import { money } from '@/utils/money';
 
 interface Expense {
   uuid: string;

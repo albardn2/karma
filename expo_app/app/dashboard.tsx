@@ -19,6 +19,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { plainMonthDay } from '@/utils/date';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { money } from '@/utils/money';
 
 /** A per-day point. `t` is a naive "YYYY-MM-DD", `v` a count or an amount. */
 interface Point {
@@ -59,9 +60,6 @@ const RANGES = [
 
 /** At most this many marks across a phone-width chart. */
 const MAX_MARKS = 30;
-
-const money = (n?: number | null) =>
-  n == null ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
 const tick = (iso: string) => plainMonthDay(iso);
 

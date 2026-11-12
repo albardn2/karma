@@ -91,7 +91,7 @@ export function ProfitabilityScreenImpl({ embedded = false }: { embedded?: boole
   const inner = (
     <>
           <View style={styles.controls}>
-            <ScrollingChipRow>
+            <ScrollingChipRow inset={20}>
               {GRANS.map(([g, label]) => (
                 <FilterChip key={g} label={label} active={gran === g} onPress={() => setGran(g)} testID={`prof-gran-${g}`} />
               ))}

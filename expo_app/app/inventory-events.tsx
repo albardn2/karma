@@ -6,6 +6,7 @@ import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime, parseTs } from '@/utils/date';
+import { money } from '@/utils/money';
 
 interface InventoryEvent {
   uuid: string;
@@ -85,7 +86,7 @@ export default function InventoryEventsScreen() {
                       material are indistinguishable rows */}
                   {formatMonthDayTime(parseTs(e.created_at))}
                   {e.cost_per_unit != null
-                    ? ` · ${Number(e.cost_per_unit).toFixed(2)} ${e.currency ?? ''}`
+                    ? ` · ${money(e.cost_per_unit, e.currency)}`
                     : ''}
                 </ThemedText>
                 <View style={styles.tags}>

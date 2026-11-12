@@ -171,7 +171,7 @@ export default function ServiceAreaBoundaryScreen() {
               testIDPrefix="sa-boundary"
             />
 
-            <ScrollingChipRow>
+            <ScrollingChipRow inset={20}>
               <FilterChip
                 label={t('serviceAreas.drawNewShape')}
                 active={false}

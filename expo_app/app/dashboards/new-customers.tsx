@@ -77,7 +77,7 @@ export function NewCustomersScreenImpl({ mine = false, embedded = false }: { min
   const inner = (
     <>
           <View style={styles.controls}>
-            <ScrollingChipRow>
+            <ScrollingChipRow inset={20}>
               {GRANS.map(([g, label]) => (
                 <FilterChip key={g} label={label} active={gran === g} onPress={() => setGran(g)} testID={`nc-gran-${g}`} />
               ))}

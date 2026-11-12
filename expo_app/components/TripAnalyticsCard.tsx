@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 import { ThemedText } from '@/components/ThemedText';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { money } from '@/utils/money';
 
 // Analytics for one trip, computed from /trip/<uuid>/activity — the app
 // counterpart of the web Analytics tab: stop-outcome donut, revenue per
@@ -188,7 +189,7 @@ export function TripAnalyticsCard({ activity }: { activity?: TripAnalyticsActivi
                         {mat}
                       </ThemedText>
                       <ThemedText style={styles.barValue}>
-                        {fmtNum(amount)} {cur}
+                        {money(amount, cur)}
                       </ThemedText>
                     </View>
                     <View style={styles.barTrack}>

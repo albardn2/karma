@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatNumericDate, parseTs } from '@/utils/date';
+import { perCurrency } from '@/utils/money';
 
 interface Account {
   uuid: string;
@@ -41,11 +42,10 @@ export default function SuperAdminScreen() {
   const router = useRouter();
   const { t, tef } = useLanguage();
 
-  const money = (b?: Record<string, number> | null) => {
+  /** The non-zero currencies only, so the row's one-line summary stays short. */
+  const nonZero = (b?: Record<string, number> | null) => {
     const entries = Object.entries(b ?? {}).filter(([, v]) => Number(v) !== 0);
-    if (!entries.length) return null;
-    // one figure per currency; adding SYP to USD would be meaningless
-    return entries.map(([cur, v]) => `${Number(v).toFixed(2)} ${cur}`).join(' · ');
+    return entries.length ? perCurrency(Object.fromEntries(entries)) : null;
   };
 
   return (
@@ -57,7 +57,7 @@ export default function SuperAdminScreen() {
       pagesKey="total_pages"
       keyExtractor={(a) => a.uuid}
       renderItem={(a) => {
-        const bal = money(a.balances);
+        const bal = nonZero(a.balances);
         return (
           <TouchableOpacity
             style={styles.row}

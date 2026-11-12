@@ -21,6 +21,7 @@ import { TripAnalyticsCard } from '@/components/TripAnalyticsCard';
 import { TripTagFunnels, type TripFunnels } from '@/components/TripTagFunnels';
 import type { TripMapStop } from '@/components/TripMap';
 import { STATUS_BADGE } from '../trips';
+import { formatAmount, money } from '@/utils/money';
 
 // Admin-only trip detail — mirrors the web page: summary, money totals,
 // stops with outcomes, activity (orders / fulfilled / paid), inventory
@@ -184,7 +185,7 @@ export default function TripDetailScreen() {
   }, [uuid, isAdmin]);
 
   // money totals per currency (same math as the web analytics tab)
-  const money = useMemo(() => {
+  const orderTotals = useMemo(() => {
     const revenue: Record<string, number> = {};
     const collected: Record<string, number> = {};
     const debt: Record<string, number> = {};
@@ -452,9 +453,9 @@ export default function TripDetailScreen() {
         {/* money totals */}
         <View style={styles.card}>
           <ThemedText style={styles.cardTitle}>{t('trips.money')}</ThemedText>
-          <MoneyRow label={t('trips.revenue')} totals={money.revenue} />
-          <MoneyRow label={t('trips.collected')} totals={money.collected} />
-          <MoneyRow label={t('trips.debt')} totals={money.debt} highlightNonZero />
+          <MoneyRow label={t('trips.revenue')} totals={orderTotals.revenue} />
+          <MoneyRow label={t('trips.collected')} totals={orderTotals.collected} />
+          <MoneyRow label={t('trips.debt')} totals={orderTotals.debt} highlightNonZero />
         </View>
 
         {/* analytics */}
@@ -470,7 +471,7 @@ export default function TripDetailScreen() {
               <Row
                 key={e.uuid}
                 label={`${te(e.category)}${e.description ? ` · ${e.description}` : ''}`}
-                value={`${fmtNum(e.amount)} ${te(e.currency)}${
+                value={`${money(e.amount, te(e.currency))}${
                   e.is_paid ? '' : ` · ${t('trips.expenseUnpaid')}`
                 }`}
               />
@@ -541,10 +542,10 @@ export default function TripDetailScreen() {
                 </View>
                 <ThemedText style={styles.activityValue}>
                   {activityTab === 'orders'
-                    ? `${fmtNum(r.total || 0)} ${r.currency || ''}`
+                    ? money(r.total || 0, r.currency)
                     : activityTab === 'fulfillments'
                     ? fmtNum(r.quantity || 0)
-                    : `${fmtNum(r.amount || 0)} ${r.currency || ''}`}
+                    : money(r.amount || 0, r.currency)}
                 </ThemedText>
               </View>
             ))
@@ -555,7 +556,7 @@ export default function TripDetailScreen() {
               <ThemedText style={styles.debtTotalValue}>
                 {Object.entries(debtTotals)
                   .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([cur, v]) => `${fmtNum(v)} ${cur}`)
+                  .map(([cur, v]) => money(v, cur))
                   .join(' · ')}
               </ThemedText>
             </View>
@@ -656,7 +657,7 @@ function CashRow({
         ]}
         testID={testID}
       >
-        {empty ? '—' : `${sign ? `${sign} ` : ''}${fmtNum(amount)}`}
+        {empty ? '—' : `${sign ? `${sign} ` : ''}${formatAmount(amount)}`}
       </ThemedText>
     </View>
   );
@@ -681,7 +682,7 @@ function MoneyRow({
           highlightNonZero && entries.length > 0 && { color: '#DC2626', fontWeight: '700' },
         ]}
       >
-        {entries.length === 0 ? '0' : entries.map(([c, v]) => `${fmtNum(v)} ${c}`).join(' · ')}
+        {entries.length === 0 ? '0' : entries.map(([c, v]) => money(v, c)).join(' · ')}
       </ThemedText>
     </View>
   );

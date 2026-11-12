@@ -9,6 +9,7 @@ import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
 import { daysUntilPlain, plainDate } from '@/utils/date';
+import { money } from '@/utils/money';
 
 interface InventoryLot {
   uuid: string;
@@ -179,14 +180,13 @@ export default function InventoryScreen() {
                   recorded cost of 0.00 is a fact, and "not recorded" is a different one */}
               <ThemedText style={styles.costLine} numberOfLines={1}>
                 {l.cost_per_unit != null
-                  ? `${Number(l.cost_per_unit).toFixed(2)} ${l.cost_currency ?? ccy}${
-                      l.unit ? `/${l.unit}` : ''
-                    }`
+                  ? `${money(l.cost_per_unit, l.cost_currency ?? ccy)}${l.unit ? `/${l.unit}` : ''}`
                   : t('inventory.costUnknown')}
                 {l.cost_per_unit != null && Number(l.current_quantity) > 0
-                  ? ` · ${t('inventory.valueOnHand')} ${(
-                      Number(l.cost_per_unit) * Number(l.current_quantity)
-                    ).toFixed(2)} ${l.cost_currency ?? ccy}`
+                  ? ` · ${t('inventory.valueOnHand')} ${money(
+                      Number(l.cost_per_unit) * Number(l.current_quantity),
+                      l.cost_currency ?? ccy,
+                    )}`
                   : ''}
                 {` · ${l.lot_id}`}
               </ThemedText>

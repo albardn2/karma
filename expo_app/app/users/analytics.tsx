@@ -178,7 +178,7 @@ export default function UserAnalyticsScreen() {
             />
           }
         >
-          <ScrollingChipRow>
+          <ScrollingChipRow inset={16}>
             {RANGE_CHIPS.map(([k, label]) => (
               <FilterChip
                 key={k}

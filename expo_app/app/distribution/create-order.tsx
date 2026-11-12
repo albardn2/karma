@@ -16,6 +16,7 @@ import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
 import { PickerField } from '@/components/PickerField';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { money } from '@/utils/money';
 
 const CURRENCIES = ['SYP', 'USD'];
 
@@ -226,7 +227,7 @@ export default function CreateOrderScreen() {
             </View>
             <View style={styles.totalWrap}>
               <ThemedText style={styles.totalLabel}>{t('createorder.total')}</ThemedText>
-              <ThemedText style={styles.totalValue}>{total.toFixed(2)} {te(currency)}</ThemedText>
+              <ThemedText style={styles.totalValue}>{money(total, te(currency))}</ThemedText>
             </View>
           </View>
 

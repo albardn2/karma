@@ -10,6 +10,7 @@ import {
 import { ThemedText } from '@/components/ThemedText';
 import { apiCall } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { formatAmount } from '@/utils/money';
 
 // Cash and stock rolled up over the trips selected in the list. Same endpoint
 // and same vocabulary as the web summary, laid out for a phone: cash as a block
@@ -55,7 +56,6 @@ interface Summary {
 // 3 dp, matching what the endpoint rounds to — at 2 a real 0.001 variance
 // would be flagged as nonzero and then printed as "-0"
 const fmtNum = (n: number) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 3 });
-const fmtMoney = (n: number) => Number(n).toFixed(2);
 
 export function TripSummarySheet({
   visible,
@@ -195,7 +195,7 @@ export function TripSummarySheet({
                     <View style={styles.cashTotal}>
                       <SheetRow
                         label={t('trips.shouldReturn')}
-                        value={fmtMoney(row.net)}
+                        value={formatAmount(row.net)}
                         bold
                         tone={row.net < 0 ? '#DC2626' : undefined}
                       />
@@ -203,7 +203,7 @@ export function TripSummarySheet({
                     {row.expenses_unpaid > 0 && (
                       <SheetRow
                         label={t('trips.unpaidSpendNotDeducted')}
-                        value={fmtMoney(row.expenses_unpaid)}
+                        value={formatAmount(row.expenses_unpaid)}
                         muted
                       />
                     )}
@@ -295,7 +295,7 @@ export function TripSummarySheet({
 /** A statement amount: a dash for none, else the sign then the money, so the
  *  arithmetic reads off the sheet (revenue, + debt, - spend). */
 const signed = (n: number, sign?: '+' | '-') =>
-  !n ? '—' : `${sign ? `${sign} ` : ''}${fmtMoney(n)}`;
+  !n ? '—' : `${sign ? `${sign} ` : ''}${formatAmount(n)}`;
 
 function SheetRow({
   label,

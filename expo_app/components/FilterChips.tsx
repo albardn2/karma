@@ -51,7 +51,13 @@ export function FilterChip({
  * something further along and taps to scroll, so the overflow is not left to be
  * discovered by swiping.
  */
-export function ScrollingChipRow({ children }: { children: React.ReactNode }) {
+/**
+ * `inset` is the horizontal padding of the container the row sits in. The row then
+ * reaches out to the screen edges, so chips scroll edge to edge, while the first chip
+ * lines up with the rest of the content. Without it the row is assumed to span the
+ * screen and pads its own content by 16.
+ */
+export function ScrollingChipRow({ children, inset }: { children: React.ReactNode; inset?: number }) {
   const scrollRef = useRef<ScrollView>(null);
   const geometry = useRef({ content: 0, viewport: 0, offset: 0 });
   const [hasMore, setHasMore] = useState(false);
@@ -62,12 +68,12 @@ export function ScrollingChipRow({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, inset != null && { marginHorizontal: -inset }]}>
       <ScrollView
         ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, inset != null && { paddingHorizontal: inset }]}
         onContentSizeChange={(w) => {
           geometry.current.content = w;
           recompute();

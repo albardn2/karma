@@ -101,12 +101,12 @@ export function RevenueOverTimeScreenImpl({ mine = false, embedded = false }: { 
   const inner = (
     <>
           <View style={styles.controls}>
-            <ScrollingChipRow>
+            <ScrollingChipRow inset={20}>
               {MODES.map(([m, label]) => (
                 <FilterChip key={m} label={label} active={mode === m} onPress={() => setMode(m)} testID={`rot-mode-${m}`} />
               ))}
             </ScrollingChipRow>
-            <ScrollingChipRow>
+            <ScrollingChipRow inset={20}>
               {GRANS.map(([g, label]) => (
                 <FilterChip key={g} label={label} active={gran === g} onPress={() => setGran(g)} testID={`rot-gran-${g}`} />
               ))}

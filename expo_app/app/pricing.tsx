@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { money } from '@/utils/money';
 
 interface Pricing {
   uuid: string;
@@ -18,9 +19,6 @@ interface Pricing {
 
 /** The currencies the pricing DTO accepts; anything else 422s the list. */
 const CURRENCIES = ['SYP', 'USD'];
-
-const price = (n?: number | null) =>
-  n == null ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
 /**
  * The price list — what a material sells for.
@@ -58,7 +56,7 @@ export default function PricingScreen() {
               {!!r.material_sku && <ThemedText style={styles.sku}>{r.material_sku}</ThemedText>}
             </View>
             <ThemedText style={styles.price}>
-              {price(r.price_per_unit)} {r.currency}
+              {money(r.price_per_unit, r.currency)}
               {r.unit ? <ThemedText style={styles.per}>{` / ${r.unit}`}</ThemedText> : null}
             </ThemedText>
           </View>
