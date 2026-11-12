@@ -19,6 +19,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
 import { money } from '@/utils/money';
 import { parseTs } from '@/utils/date';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 interface Line {
   uuid: string;
@@ -295,7 +296,7 @@ export default function PurchaseOrderAnalyticsScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="analytics-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle}>{t('purchaseOrders.analytics')}</ThemedText>
           <View style={styles.backSpacer} />

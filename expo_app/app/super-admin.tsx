@@ -7,6 +7,7 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { BACK_GLYPH, FORWARD_GLYPH } from '@/utils/rtl';
 
 interface Entry {
   route: string;
@@ -78,7 +79,7 @@ export default function SuperAdminHubScreen() {
 
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="super-admin-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {t('menu.superAdmin')}
@@ -100,7 +101,7 @@ export default function SuperAdminHubScreen() {
                 <ThemedText style={styles.cardTitle}>{t(e.titleKey)}</ThemedText>
                 <ThemedText style={styles.cardBlurb}>{t(e.blurbKey)}</ThemedText>
               </View>
-              <ThemedText style={styles.chevron}>›</ThemedText>
+              <ThemedText style={styles.chevron}>{FORWARD_GLYPH}</ThemedText>
             </TouchableOpacity>
           ))}
         </ScrollView>

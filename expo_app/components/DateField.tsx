@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { BottomSheetModal } from '@/components/BottomSheetModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { plainDate, todayPlain } from '@/utils/date';
+import { BACK_GLYPH, FORWARD_GLYPH } from '@/utils/rtl';
 
 interface DateFieldProps {
   /** a date-only YYYY-MM-DD, or '' for none */
@@ -64,13 +65,13 @@ export function DateField({ value, onChange, title, testID }: DateFieldProps) {
       <BottomSheetModal visible={open} onClose={() => setOpen(false)} title={title}>
         <View style={styles.monthRow}>
           <TouchableOpacity onPress={() => shift(-1)} hitSlop={12} testID={testID ? `${testID}-prev` : undefined}>
-            <ThemedText style={styles.nav}>‹</ThemedText>
+            <ThemedText style={styles.nav}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.month}>
             {pad(view.month + 1)}/{view.year}
           </ThemedText>
           <TouchableOpacity onPress={() => shift(1)} hitSlop={12} testID={testID ? `${testID}-next` : undefined}>
-            <ThemedText style={styles.nav}>›</ThemedText>
+            <ThemedText style={styles.nav}>{FORWARD_GLYPH}</ThemedText>
           </TouchableOpacity>
         </View>
         <View style={styles.week}>

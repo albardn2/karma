@@ -29,6 +29,7 @@ import {
   EPS,
   Lot,
 } from '@/utils/fifo';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 interface InLine {
   /** from a counter, never the array index — removing a card must not re-key the rest */
@@ -635,7 +636,7 @@ export default function ProcessCreateScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="form-cancel">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {t('processes.create')}

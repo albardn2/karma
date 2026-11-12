@@ -1600,9 +1600,9 @@ export const translations: Record<Lang, Record<string, string>> = {
   'roles.resetConfirm': 'إعادة {role} إلى الافتراضي المولّد؟ سيتم إلغاء أي تخصيص لهذا الدور.',
   'roles.resetFailed': 'تعذّرت إعادة تعيين هذا الدور',
 
-  'tracking.tripCadence': 'أثناء الرحلة، التخزين كل … ثانية (١–٣٦٠٠)',
-  'tracking.historyCadence': 'خارج الرحلة، التخزين كل … ثانية (١–٨٦٤٠٠)',
-  'tracking.retention': 'الاحتفاظ بسجل غير الرحلات … يوم (١–٣٦٥)',
+  'tracking.tripCadence': 'أثناء الرحلة، التخزين كل … ثانية (1–3600)',
+  'tracking.historyCadence': 'خارج الرحلة، التخزين كل … ثانية (1–86400)',
+  'tracking.retention': 'الاحتفاظ بسجل غير الرحلات … يوم (1–365)',
   'tracking.note': 'ينطبق على حسابك أنت — لا يوجد مسار لتعيين معدل مستأجر آخر. المعدل الأقصر يخزّن صفوفاً أكثر، والاحتفاظ الأطول يبقيها لمدة أطول. القيم خارج النطاقات المذكورة تُرفض ولا تُقرَّب، والصفر غير مقبول بمعنى «إيقاف». ترك أي حقل دون تغيير يبقيه كما هو.',
 
   'tracking.loadFailed': 'تعذّر تحميل الإعدادات الحالية، لذا لا يُعرض النموذج — تعبئة حقول فارغة ستستبدل القيم الفعلية.',
@@ -1964,10 +1964,10 @@ export const translations: Record<Lang, Record<string, string>> = {
 
   'pricing.searchPlaceholder': 'ابحث عن مادة أو رمز',
 
-  'dashboard.range.7d': '٧ أيام',
-  'dashboard.range.30d': '٣٠ يوماً',
-  'dashboard.range.90d': '٩٠ يوماً',
-  'dashboard.range.12m': '١٢ شهراً',
+  'dashboard.range.7d': '7 أيام',
+  'dashboard.range.30d': '30 يوماً',
+  'dashboard.range.90d': '90 يوماً',
+  'dashboard.range.12m': '12 شهراً',
   'dashboard.revenue': 'الإيرادات',
   'dashboard.collected': 'المحصّل',
   'dashboard.outstanding': 'المتبقي',
@@ -2667,7 +2667,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   'users.trackingOff': 'متوقف',
   'users.permissions': 'الصلاحيات',
   'users.fullAccess': 'وصول كامل — المديرون غير مقيّدين',
-  'users.permissionsWeb': 'قائمة الصلاحيات لكل مستخدم تُضبط على الويب: ٢٩ عنصر قائمة و٣٨ مورداً × ٤ إجراءات ليست نموذجاً لهاتف.',
+  'users.permissionsWeb': 'قائمة الصلاحيات لكل مستخدم تُضبط على الويب: 29 عنصر قائمة و38 مورداً × 4 إجراءات ليست نموذجاً لهاتف.',
   'users.deactivate': 'تعطيل هذا المستخدم',
   'users.deactivateConfirm': 'سيتم إخراجه من التطبيق عند أول طلب تالٍ ولن يستطيع تسجيل الدخول حتى إعادة تنشيطه. يمكن لأي مدير التراجع عن ذلك.',
   'users.reactivate': 'إعادة تنشيط هذا المستخدم',
@@ -2681,10 +2681,10 @@ export const translations: Record<Lang, Record<string, string>> = {
   'ua.paid': 'المدفوع',
   'ua.unpaid': 'غير المدفوع',
   'ua.revenueOverTime': 'الإيرادات عبر الزمن',
-  'ua.r30d': '٣٠ يوماً',
-  'ua.r90d': '٩٠ يوماً',
-  'ua.r6m': '٦ أشهر',
-  'ua.r12m': '١٢ شهراً',
+  'ua.r30d': '30 يوماً',
+  'ua.r90d': '90 يوماً',
+  'ua.r6m': '6 أشهر',
+  'ua.r12m': '12 شهراً',
   'ua.rAll': 'كل الفترات',
   'users.trackOn': 'تتبّع هذا المستخدم',
   'users.enabled': 'مفعّل',
@@ -2713,7 +2713,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   'account.paid': 'مسدّد',
   'account.due': 'مستحق',
   'account.settles': 'تسدّد {range}',
-  'account.truncated': 'يتم عرض أحدث ١٠٠ حركة. السجل الكامل على الويب.',
+  'account.truncated': 'يتم عرض أحدث 100 حركة. السجل الكامل على الويب.',
   'account.readOnly': 'للعرض فقط. بيانات شركتك واشتراكك ودفعاتك يسجّلها مالك المنصة — لا يوجد ما يمكن تغييره هنا.',
 
   // customer-orders parity (create, notes, void, unfulfil, per-invoice payment)
@@ -2780,7 +2780,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   'inventoryEvents.deleteFailed': 'فشل حذف الحركة',
 
   // vehicles parity (delete, stock writes, chart material filter)
-  'vehicles.range7d': '٧ أيام',
+  'vehicles.range7d': '7 أيام',
   'vehicles.deleteConfirm': 'حذف هذه المركبة؟ ستبقى رحلاتها وأي مخزون محمّل عليها في النظام لكن لن تعود تابعة لأي مركبة. ولا يمكن استخدام رقم اللوحة مرة أخرى.',
   'vehicles.deleteStillHas': 'ما زالت تحمل {materials} بنداً من المواد ولها {trips} رحلة.',
   'vehicles.deleteFailed': 'تعذر حذف هذه المركبة',

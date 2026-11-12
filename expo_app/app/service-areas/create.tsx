@@ -31,6 +31,7 @@ import {
   ringsEqual,
   ringToWkt,
 } from '@/utils/wkt';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 /** The repo's existing map fallback centre. */
 const DAMASCUS = { latitude: 33.5138, longitude: 36.2765 };
@@ -252,7 +253,7 @@ export default function ServiceAreaCreateScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="form-cancel">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {t('serviceAreas.createTitle')}

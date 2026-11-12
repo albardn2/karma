@@ -15,6 +15,7 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 interface Preset {
   modules?: string[];
@@ -102,7 +103,7 @@ export default function RolePresetsScreen() {
 
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="roles-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {t('superAdmin.tabRoles')}

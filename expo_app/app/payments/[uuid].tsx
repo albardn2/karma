@@ -21,6 +21,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { formatNumericDate, parseTs } from '@/utils/date';
 import { markListsStale } from '@/utils/listRefresh';
 import { money } from '@/utils/money';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 interface Payment {
   uuid: string;
@@ -146,7 +147,7 @@ export default function PaymentDetailScreen() {
 
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} testID="payment-back" hitSlop={12}>
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {t('menu.payments')}

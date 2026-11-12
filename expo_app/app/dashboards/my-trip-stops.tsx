@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 interface Group {
   period_label: string;
@@ -160,7 +161,7 @@ export function MyTripStopsScreenImpl({ embedded = false }: { embedded?: boolean
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="mts-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle}>{t('dashboards.myTripStops')}</ThemedText>
           <View style={styles.backSpacer} />

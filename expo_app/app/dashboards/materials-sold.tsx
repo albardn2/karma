@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { BACK_GLYPH, FORWARD_GLYPH } from '@/utils/rtl';
 
 interface MaterialRow {
   material_uuid: string;
@@ -126,7 +127,7 @@ export function MaterialsSoldScreenImpl({
                 hitSlop={8}
                 testID="ms-prev"
               >
-                <ThemedText style={styles.periodBtnText}>‹</ThemedText>
+                <ThemedText style={styles.periodBtnText}>{BACK_GLYPH}</ThemedText>
               </TouchableOpacity>
               <ThemedText style={styles.periodLabel} testID="ms-period">
                 {data?.period_label ?? '…'}
@@ -138,7 +139,7 @@ export function MaterialsSoldScreenImpl({
                 hitSlop={8}
                 testID="ms-next"
               >
-                <ThemedText style={styles.periodBtnText}>›</ThemedText>
+                <ThemedText style={styles.periodBtnText}>{FORWARD_GLYPH}</ThemedText>
               </TouchableOpacity>
             </View>
           </View>
@@ -246,7 +247,7 @@ export function MaterialsSoldScreenImpl({
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="ms-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle}>
             {t(mine ? 'dashboards.myMaterialsSold' : 'dashboards.materialsSold')}

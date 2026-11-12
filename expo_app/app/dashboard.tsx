@@ -20,6 +20,7 @@ import { useApiQuery } from '@/hooks/useApiQuery';
 import { plainMonthDay } from '@/utils/date';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { money } from '@/utils/money';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 /** A per-day point. `t` is a naive "YYYY-MM-DD", `v` a count or an amount. */
 interface Point {
@@ -283,7 +284,7 @@ export function DashboardScreenImpl({ embedded = false }: { embedded?: boolean }
 
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="dashboard-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {t('menu.dashboard')}

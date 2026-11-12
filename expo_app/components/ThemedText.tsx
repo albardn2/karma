@@ -21,6 +21,7 @@ export function ThemedText({
     <Text
       style={[
         { color },
+        styles.base,
         type === 'default' ? styles.default : undefined,
         type === 'title' ? styles.title : undefined,
         type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,
@@ -34,6 +35,12 @@ export function ThemedText({
 }
 
 const styles = StyleSheet.create({
+  /**
+   * React Native swaps left and right in a right-to-left layout, so 'left' means
+   * "the start of the line" in both directions. Left unset, iOS aligns each text by
+   * its own content instead, and labels drift to the wrong side of a mirrored row.
+   */
+  base: { textAlign: 'left' },
   default: {
     fontSize: 16,
     lineHeight: 24,

@@ -19,6 +19,7 @@ import { useApiQuery } from '@/hooks/useApiQuery';
 import { plainMonthDay, plainMonthYear } from '@/utils/date';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { money } from '@/utils/money';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 interface Bucket {
   period: string;
@@ -98,7 +99,7 @@ export default function ExpenseAnalyticsScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="analytics-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle}>{t('expenses.analytics')}</ThemedText>
           <View style={styles.backSpacer} />

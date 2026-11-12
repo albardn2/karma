@@ -8,6 +8,7 @@ import { ModuleForm, FormField } from '@/components/ModuleForm';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 interface Config {
   trip_cadence_seconds?: number | null;
@@ -101,7 +102,7 @@ export default function TrackingConfigScreen() {
           <Stack.Screen options={{ headerShown: false }} />
           <View style={styles.topBar}>
             <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="tracking-back">
-              <ThemedText style={styles.back}>‹</ThemedText>
+              <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
             </TouchableOpacity>
             <ThemedText style={styles.topTitle} numberOfLines={1}>
               {t('superAdmin.tabTracking')}

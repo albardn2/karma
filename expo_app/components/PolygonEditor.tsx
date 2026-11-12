@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   Alert,
-  I18nManager,
   Platform,
   StyleSheet,
   TouchableOpacity,
@@ -28,6 +27,7 @@ import {
   type LatLng,
   type RingProblem,
 } from '@/utils/wkt';
+import { BACK_GLYPH, FORWARD_GLYPH } from '@/utils/rtl';
 
 /**
  * Hand-authoring and hand-editing of a service-area boundary.
@@ -355,8 +355,8 @@ export function PolygonEditor({
 
   // glyphs do not mirror under forceRTL, so they are chosen by direction; the LABELS
   // are "previous"/"next", never "left"/"right"
-  const prevGlyph = I18nManager.isRTL ? '›' : '‹';
-  const nextGlyph = I18nManager.isRTL ? '‹' : '›';
+  const prevGlyph = BACK_GLYPH;
+  const nextGlyph = FORWARD_GLYPH;
 
   return (
     <View>

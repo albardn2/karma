@@ -20,6 +20,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { money } from '@/utils/money';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 interface Group {
   period_label: string;
@@ -228,7 +229,7 @@ export function RevenueOverTimeScreenImpl({ mine = false, embedded = false }: { 
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="rot-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle}>
             {t(mine ? 'dashboards.myRevenue' : 'dashboards.revenueOverTime')}

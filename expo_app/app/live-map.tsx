@@ -14,6 +14,7 @@ import { apiCall, isOk } from '@/utils/api';
 // and expo-router reports the route as "This screen does not exist" — which sends you
 // looking for a routing problem instead of an import one.
 import { MqttSubscriber, type MqttMessage } from '@/utils/mqttSubscriber';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 interface ClientConfig {
   broker_ws_url: string;
@@ -231,7 +232,7 @@ export default function LiveMapScreen() {
 
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="live-map-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
+            <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
             {t('menu.liveMap')}

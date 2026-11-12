@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Platform, RefreshControl } from 'react-native';
 import { StyleSheet, ScrollView, TouchableOpacity, View, Alert } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
@@ -14,6 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Lang, LANGUAGE_LABELS } from '@/i18n/translations';
 import { useGrantedModules } from '@/hooks/useModuleAccess';
+import { rememberTabForReload, takeTabAfterReload } from '@/utils/tabAfterReload';
 
 interface MenuItem {
   id: number;
@@ -105,6 +106,12 @@ export default function HomeScreen() {
   // modules navigate back here with ?tab=menu so the menu view is restored
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<'home' | 'menu'>(tab === 'menu' ? 'menu' : 'home');
+
+  useEffect(() => {
+    takeTabAfterReload().then((restored) => {
+      if (restored) setActiveTab(restored);
+    });
+  }, []);
   const insets = useSafeAreaInsets();
 
   const granted = useGrantedModules();
@@ -266,7 +273,10 @@ export default function HomeScreen() {
                         <TouchableOpacity
                           key={l}
                           style={[styles.langChip, lang === l && styles.langChipActive]}
-                          onPress={() => setLang(l)}
+                          onPress={async () => {
+                            await rememberTabForReload('menu');
+                            await setLang(l);
+                          }}
                           testID={`lang-${l}`}
                         >
                           <ThemedText style={[styles.langChipText, lang === l && styles.langChipTextActive]}>
