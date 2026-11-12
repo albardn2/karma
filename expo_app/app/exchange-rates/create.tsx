@@ -1,9 +1,9 @@
 import React from 'react';
 import { ModuleForm, FormField } from '@/components/ModuleForm';
+import { todayPlain } from '@/utils/date';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 /** Today, as the naive YYYY-MM-DD the API wants — no zone suffix. */
-const today = () => new Date().toISOString().slice(0, 10);
 
 /**
  * Record a rate by hand.
@@ -45,7 +45,7 @@ export default function ExchangeRateCreateScreen() {
       options: ['USD', 'SYP'].map((v) => ({ value: v, label: tef(v) })),
     },
     { name: 'rate', label: t('exchangeRates.rate'), required: true, kind: 'number' },
-    { name: 'rate_date', label: t('exchangeRates.date'), required: true },
+    { name: 'rate_date', label: t('exchangeRates.date'), required: true, kind: 'date' },
     { name: 'buy_rate', label: t('exchangeRates.buy'), kind: 'number' },
     { name: 'sell_rate', label: t('exchangeRates.sell'), kind: 'number' },
     { name: 'notes', label: t('exchangeRates.notes'), kind: 'multiline' },
@@ -58,7 +58,7 @@ export default function ExchangeRateCreateScreen() {
       note={t('exchangeRates.upsertNote')}
       fields={fields}
       // a manual entry is the point of this screen, and the server stamps the source
-      initial={{ from_currency: 'USD', to_currency: 'SYP', rate_date: today() }}
+      initial={{ from_currency: 'USD', to_currency: 'SYP', rate_date: todayPlain() }}
       method="POST"
       endpoint="/exchange-rate/"
     />

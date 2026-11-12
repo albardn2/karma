@@ -72,6 +72,9 @@ class InventoryRead(InventoryBase):
     material_name: Optional[str] = Field(
         None,
         validation_alias=AliasChoices("material_name", AliasPath("material", "name")))
+    warehouse_name: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("warehouse_name", AliasPath("warehouse", "name")))
 
 class InventoryListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")

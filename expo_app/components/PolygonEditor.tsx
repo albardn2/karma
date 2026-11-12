@@ -196,13 +196,29 @@ export function PolygonEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fit = useCallback(() => {
-    if (ring.length < 2) return;
-    mapRef.current?.fitToCoordinates(ring, {
-      edgePadding: { top: 48, right: 48, bottom: 48, left: 48 },
-      animated: true,
-    });
-  }, [ring]);
+  // The add bar is drawn over the map's bottom edge, so the fit keeps the ring above it.
+  const [barHeight, setBarHeight] = useState(0);
+  const [mapReady, setMapReady] = useState(false);
+  const fitRing = useCallback(
+    (animated: boolean) => {
+      if (ring.length < 2) return;
+      mapRef.current?.fitToCoordinates(ring, {
+        edgePadding: { top: 48, right: 48, bottom: 48 + barHeight, left: 48 },
+        animated,
+      });
+    },
+    [ring, barHeight],
+  );
+  const fit = useCallback(() => fitRing(true), [fitRing]);
+
+  // initialRegion frames the ring on the whole map frame; once the bar's height is
+  // known, frame it once more on the part the bar leaves visible
+  const framedOnce = useRef(false);
+  useEffect(() => {
+    if (framedOnce.current || !mapReady || !barHeight) return;
+    framedOnce.current = true;
+    fitRing(false);
+  }, [mapReady, barHeight, fitRing]);
 
   const showVertex = useCallback((i: number) => {
     const p = ring[i];
@@ -361,6 +377,7 @@ export function PolygonEditor({
               pendingTap.current = null;
             }
           }}
+          onMapReady={() => setMapReady(true)}
           onLayout={(e) => {
             widthRef.current = e.nativeEvent.layout.width;
             setMpp(metresPerPoint(regionRef.current, widthRef.current));
@@ -471,6 +488,7 @@ export function PolygonEditor({
             forceRTL, never under a fingertip, and it cannot mis-fire on a pan */}
         <TouchableOpacity
           style={styles.primary}
+          onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
           onPress={addAtCrosshair}
           testID={`${testIDPrefix}-add`}
         >

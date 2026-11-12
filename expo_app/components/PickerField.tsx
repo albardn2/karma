@@ -38,7 +38,8 @@ export interface PickerSpec {
 interface PickerFieldProps {
   spec: PickerSpec;
   value: string;
-  onChange: (value: string, label: string) => void;
+  /** `row` is the picked record, for callers that need more of it than the label */
+  onChange: (value: string, label: string, row: any) => void;
   /**
    * Label for a value that arrived already chosen — an edit form seeded from a record
    * holds the uuid but not the name, and without this the field reads as a raw uuid
@@ -109,9 +110,11 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
     return () => clearTimeout(id);
   }, [open, load, query]);
 
-  // with no server-side search param, filter what we have rather than lie about it
+  // rows the server did not search (caller-supplied, or no search param) are filtered
+  // here rather than shown unfiltered under a search box
+  const searchedServerSide = !!spec.searchParam && !spec.rows;
   const shown =
-    spec.searchParam || !query.trim()
+    searchedServerSide || !query.trim()
       ? rows
       : rows.filter((r) => spec.label(r).toLowerCase().includes(query.trim().toLowerCase()));
 
@@ -164,7 +167,7 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
                     style={[styles.row, v === value && styles.rowOn]}
                     onPress={() => {
                       setChosen({ value: v, label: spec.label(r) });
-                      onChange(v, spec.label(r));
+                      onChange(v, spec.label(r), r);
                       setOpen(false);
                       setQuery('');
                     }}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,7 +14,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useApiQuery } from '@/hooks/useApiQuery';
+import { ApiQueryError, useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export type DetailRow = [label: string, value: string];
@@ -30,7 +30,12 @@ export interface DetailSection<T> {
 
 export interface DetailAction<T> {
   label: string;
-  onPress: (item: T) => void;
+  /**
+   * Return the write's promise to have the screen disable every action and show a
+   * spinner on this one until the write settles and the record has refetched, so the
+   * result is on screen before another tap is possible.
+   */
+  onPress: (item: T) => void | Promise<unknown>;
   /** destructive actions get a confirm and red styling */
   destructive?: boolean;
   testID?: string;
@@ -124,6 +129,8 @@ export function ModuleDetailScreen<T>({
   const item = record.data ?? null;
   const loading = record.isPending;
   const failed = record.isError;
+  // a deleted or never-existing record is not a load failure: retrying cannot help
+  const gone = record.error instanceof ApiQueryError && record.error.status === 404;
 
   // the mount already fetched; only a later bump asks for another
   const seenReloadKey = useRef(reloadKey);
@@ -133,6 +140,19 @@ export function ModuleDetailScreen<T>({
     seenReloadKey.current = reloadKey;
     refetch();
   }, [reloadKey, refetch]);
+
+  const [running, setRunning] = useState<string | null>(null);
+  const run = async (a: DetailAction<T>, target: T) => {
+    const result = a.onPress(target);
+    if (!(result instanceof Promise)) return;
+    setRunning(a.label);
+    try {
+      await result;
+      await refetch();
+    } finally {
+      setRunning(null);
+    }
+  };
 
   // an action with no `visible` predicate always shows; one with a predicate is asked
   const shownActions = item
@@ -162,11 +182,17 @@ export function ModuleDetailScreen<T>({
           <View style={styles.centre}>
             <ThemedText style={styles.stateIcon}>⚠️</ThemedText>
             <ThemedText style={styles.stateText} testID="detail-error">
-              {t('moduleList.failed')}
+              {gone ? t('moduleDetail.gone') : t('moduleDetail.failed')}
             </ThemedText>
-            <TouchableOpacity style={styles.retry} onPress={() => record.refetch()}>
-              <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
-            </TouchableOpacity>
+            {gone ? (
+              <TouchableOpacity style={styles.retry} onPress={() => router.back()} testID="detail-gone-back">
+                <ThemedText style={styles.retryText}>{t('moduleDetail.goBack')}</ThemedText>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.retry} onPress={() => record.refetch()}>
+                <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <ScrollView
@@ -185,10 +211,15 @@ export function ModuleDetailScreen<T>({
                 {shownActions.map((a) => (
                   <TouchableOpacity
                     key={a.label}
-                    style={[styles.action, a.destructive && styles.actionDestructive]}
+                    style={[
+                      styles.action,
+                      a.destructive && styles.actionDestructive,
+                      !!running && styles.actionBusy,
+                    ]}
                     testID={a.testID}
+                    disabled={!!running}
                     onPress={() => {
-                      if (!a.destructive) return a.onPress(item);
+                      if (!a.destructive) return run(a, item);
                       // a destructive action always asks first: these screens are
                       // used one-handed in a van, and a mis-tap should not delete
                       const body =
@@ -197,15 +228,19 @@ export function ModuleDetailScreen<T>({
                           : a.confirmText;
                       Alert.alert(a.label, body ?? t('detail.confirmDestructive'), [
                         { text: t('common.cancel'), style: 'cancel' },
-                        { text: a.label, style: 'destructive', onPress: () => a.onPress(item) },
+                        { text: a.label, style: 'destructive', onPress: () => run(a, item) },
                       ]);
                     }}
                   >
-                    <ThemedText
-                      style={[styles.actionText, a.destructive && styles.actionTextDestructive]}
-                    >
-                      {a.label}
-                    </ThemedText>
+                    {running === a.label ? (
+                      <ActivityIndicator color={a.destructive ? '#dc2626' : '#fff'} />
+                    ) : (
+                      <ThemedText
+                        style={[styles.actionText, a.destructive && styles.actionTextDestructive]}
+                      >
+                        {a.label}
+                      </ThemedText>
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -270,6 +305,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionDestructive: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#fecaca' },
+  actionBusy: { opacity: 0.6 },
   actionText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   actionTextDestructive: { color: '#dc2626' },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },

@@ -249,3 +249,59 @@ def test_list_pricings_multi_page(client, return_dicts):
     expected = {pr.uuid for pr in all_pages[20:]}
     returned = {item["uuid"] for item in data["pricings"]}
     assert returned == expected
+
+
+# --- LIST: material name and search (QA SAL-R-2) ---
+
+MATERIAL_NAME = "Sugar 1kg"
+MATERIAL_SKU = "SUG-1"
+SEARCH_TERM = "sug"
+
+
+def _priced_material(name: str, sku: str) -> PricingModel:
+    material = MaterialModel(uuid=str(uuid.uuid4()), created_at=datetime.utcnow())
+    material.name = name
+    material.sku = sku
+    material.measure_unit = UnitOfMeasure.KG.value
+    pricing = PricingModel(
+        uuid=str(uuid.uuid4()),
+        material_uuid=material.uuid,
+        price_per_unit=1.0,
+        currency="USD",
+        created_at=datetime.utcnow(),
+        is_deleted=False,
+    )
+    pricing.material = material
+    return pricing
+
+
+def test_list_pricings_returns_material_name_and_sku(client, return_dicts, admin_headers):
+    """SAL-R-2: each row names its material, so a client can page without joining."""
+    _, return_all = return_dicts
+    return_all["pricing"] = [_priced_material(MATERIAL_NAME, MATERIAL_SKU)]
+
+    resp = client.get("/pricing/", headers=admin_headers)
+
+    assert resp.status_code == 200, resp.get_json()
+    row = resp.get_json()["pricings"][0]
+    assert row["material_name"] == MATERIAL_NAME, row
+    assert row["material_sku"] == MATERIAL_SKU, row
+
+
+def _compiled_filters(dummy_uow_class) -> list[str]:
+    filters = dummy_uow_class.last_instance.pricing_repository.last_filters
+    return [str(f.compile(compile_kwargs={"literal_binds": True})).lower() for f in filters]
+
+
+@pytest.mark.parametrize("column", ["material.name", "material.sku"])
+def test_list_pricings_searches_material_name_and_sku(client, return_dicts, dummy_uow_class, admin_headers, column):
+    """SAL-R-2: the price list is searchable on the server by material name or SKU."""
+    _, return_all = return_dicts
+    return_all["pricing"] = [_priced_material(MATERIAL_NAME, MATERIAL_SKU)]
+
+    resp = client.get(f"/pricing/?material_query={SEARCH_TERM}", headers=admin_headers)
+
+    assert resp.status_code == 200, resp.get_json()
+    compiled = _compiled_filters(dummy_uow_class)
+    matching = [c for c in compiled if column in c and SEARCH_TERM in c]
+    assert matching, f"no {column} search among {compiled}"

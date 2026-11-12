@@ -16,7 +16,12 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      retry: 1,
+      // a 4xx (missing record, no permission, bad params) answers the same on retry
+      retry: (failures, error) => {
+        const status = (error as { status?: unknown }).status;
+        if (typeof status === 'number' && status >= 400 && status < 500) return false;
+        return failures < 1;
+      },
     },
   },
 });

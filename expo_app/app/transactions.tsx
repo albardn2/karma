@@ -1,11 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { PickerField } from '@/components/PickerField';
+import { FilterChip } from '@/components/FilterChips';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatNumericDate } from '@/utils/date';
 
 interface Transaction {
@@ -29,15 +31,7 @@ interface Account {
 
 const PER_PAGE = 100;
 
-/**
- * Above this many accounts the chips stop helping.
- *
- * Each account needs two — "out of" and "into" — so the row count grows at 2N and a
- * tenant with ten accounts would push the list itself off the screen. Past the cap the
- * filters are dropped rather than rendered unusable: the list is still newest-first and
- * paginated, which is the thing people actually came for.
- */
-const MAX_FILTERABLE_ACCOUNTS = 4;
+type Direction = 'out' | 'in';
 
 const money = (n?: number | null, c?: string | null) =>
   n == null ? null : `${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}${c ? ` ${c}` : ''}`;
@@ -54,50 +48,33 @@ const money = (n?: number | null, c?: string | null) =>
  * start_date, end_date, uuid, page and per_page — nothing else — so `searchParam` is
  * omitted rather than pointed at something that would 422 the request.
  *
- * The account filter chips set ONE side each, never both. The two params are ANDed
+ * The account filter is a picker plus an "out of / into" choice, so it works for any
+ * number of accounts. It sets ONE side, never both: the two params are ANDed
  * server-side, so setting both would ask for "moved from A *and* into A", which is not
  * what anyone means by filtering on an account. "Either side" would need two requests
- * merged client-side; until someone asks for it, the honest offering is one side at a
- * time with the chip saying which.
+ * merged client-side.
  */
 export default function TransactionsScreen() {
   const router = useRouter();
   const { t } = useLanguage();
-  const [accounts, setAccounts] = useState<Record<string, Account>>({});
-  const [filters, setFilters] = useState<
-    Array<{ id: string; label: string; params: Record<string, string> }>
-  >([]);
-
-  const loadAccounts = useCallback(async () => {
-    const res = await apiCall<{ accounts: Account[] }>(`/financial-account/?per_page=${PER_PAGE}`);
-    if (!isOk(res.status)) return;
-    const rows = res.data?.accounts ?? [];
+  const accountsQuery = useApiQuery<{ accounts: Account[] }>(
+    `/financial-account/?per_page=${PER_PAGE}`,
+  );
+  const accounts = useMemo(() => {
     const map: Record<string, Account> = {};
-    for (const a of rows) map[a.uuid] = a;
-    setAccounts(map);
-    if (rows.length > MAX_FILTERABLE_ACCOUNTS) {
-      setFilters([]);
-      return;
-    }
-    setFilters(
-      rows.flatMap((a): Array<{ id: string; label: string; params: Record<string, string> }> => [
-        {
-          id: `out-${a.uuid}`,
-          label: t('transactions.outOf', { account: a.account_name ?? '—' }),
-          params: { from_account_uuid: a.uuid },
-        },
-        {
-          id: `in-${a.uuid}`,
-          label: t('transactions.into', { account: a.account_name ?? '—' }),
-          params: { to_account_uuid: a.uuid },
-        },
-      ]),
-    );
-  }, [t]);
+    for (const a of accountsQuery.data?.accounts ?? []) map[a.uuid] = a;
+    return map;
+  }, [accountsQuery.data]);
+  const [account, setAccount] = useState<{ uuid: string; label: string }>({ uuid: '', label: '' });
+  const [direction, setDirection] = useState<Direction>('out');
 
-  useEffect(() => {
-    loadAccounts();
-  }, [loadAccounts]);
+  // stable per selection: ModuleListScreen dep-tracks `params` by identity
+  const params = useMemo((): Record<string, string> | undefined => {
+    if (!account.uuid) return undefined;
+    return direction === 'out'
+      ? { from_account_uuid: account.uuid }
+      : { to_account_uuid: account.uuid };
+  }, [account.uuid, direction]);
 
   const nameOf = (u?: string | null) => (u && accounts[u]?.account_name) || null;
 
@@ -108,7 +85,49 @@ export default function TransactionsScreen() {
         title={t('menu.transactions')}
         endpoint="/transaction/"
         itemsKey="transactions"
-        filters={filters}
+        params={params}
+        header={
+          <View style={styles.accountFilter}>
+            <ThemedText style={styles.filterLabel}>{t('transactions.filterAccount')}</ThemedText>
+            <PickerField
+              spec={{
+                endpoint: '/financial-account/',
+                itemsKey: 'accounts',
+                params: { per_page: String(PER_PAGE) },
+                label: (a) => a.account_name || a.uuid,
+                sublabel: (a) => a.currency || undefined,
+                value: (a) => a.uuid,
+              }}
+              value={account.uuid}
+              onChange={(uuid, label) => setAccount({ uuid, label })}
+              initialLabel={account.label || undefined}
+              testID="transactions-account-filter"
+            />
+            {!!account.uuid && (
+              <View style={styles.directionRow}>
+                <FilterChip
+                  label={t('transactions.outOf', { account: account.label })}
+                  active={direction === 'out'}
+                  onPress={() => setDirection('out')}
+                  testID="transactions-direction-out"
+                />
+                <FilterChip
+                  label={t('transactions.into', { account: account.label })}
+                  active={direction === 'in'}
+                  onPress={() => setDirection('in')}
+                  testID="transactions-direction-in"
+                />
+                <TouchableOpacity
+                  style={styles.clearBtn}
+                  onPress={() => setAccount({ uuid: '', label: '' })}
+                  testID="transactions-account-clear"
+                >
+                  <ThemedText style={styles.clearText}>{t('transactions.allAccounts')}</ThemedText>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        }
         keyExtractor={(x) => x.uuid}
         renderItem={(x) => {
           const out = money(x.from_amount, x.from_currency);
@@ -157,4 +176,9 @@ const styles = StyleSheet.create({
   route: { fontSize: 12, opacity: 0.6, marginTop: 2 },
   notes: { fontSize: 11, opacity: 0.5, marginTop: 2 },
   when: { fontSize: 11, opacity: 0.5 },
+  accountFilter: { marginBottom: 8 },
+  filterLabel: { fontSize: 12, fontWeight: '600', opacity: 0.6, marginBottom: 6 },
+  directionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 8 },
+  clearBtn: { paddingVertical: 6, paddingHorizontal: 4 },
+  clearText: { fontSize: 13, fontWeight: '600', color: '#5469D4' },
 });

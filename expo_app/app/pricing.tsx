@@ -1,293 +1,80 @@
-import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { ModuleGuard } from '@/components/ModuleGuard';
+import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiGet, useCachedQuery } from '@/hooks/useApiQuery';
-import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 interface Pricing {
   uuid: string;
   material_uuid: string;
+  material_name?: string | null;
+  material_sku?: string | null;
   price_per_unit: number;
   currency: string;
   unit?: string | null;
 }
 
-interface Material {
-  uuid: string;
-  name?: string | null;
-  sku?: string | null;
-  measure_unit?: string | null;
-}
+/** The currencies the pricing DTO accepts; anything else 422s the list. */
+const CURRENCIES = ['SYP', 'USD'];
 
-/** The DTO ceiling. 101 is a 422, not a clamp. */
-const PER_PAGE = 100;
-/** Stop after this many pages so a huge catalogue cannot hang the screen. */
-const MAX_PAGES = 6;
-
-/** Page through a list endpoint up to MAX_PAGES; the flag says whether rows were left over. */
-async function drain<T>(path: string, key: string): Promise<[T[], boolean]> {
-  const out: T[] = [];
-  let page = 1;
-  let more = true;
-  while (more && page <= MAX_PAGES) {
-    const sep = path.includes('?') ? '&' : '?';
-    const data = await apiGet<Record<string, any>>(`${path}${sep}page=${page}&per_page=${PER_PAGE}`);
-    out.push(...((data[key] as T[]) ?? []));
-    more = page < Number(data.pages ?? 1);
-    page += 1;
-  }
-  return [out, more];
-}
-
-/** Every price, and the materials they name, keyed by uuid for the join below. */
-async function loadPriceList() {
-  const [[prices, truncated], [mats]] = await Promise.all([
-    drain<Pricing>('/pricing/', 'pricings'),
-    drain<Material>('/material/', 'materials'),
-  ]);
-  const materials: Record<string, Material> = {};
-  for (const m of mats) materials[m.uuid] = m;
-  return { prices, materials, truncated };
-}
+const price = (n?: number | null) =>
+  n == null ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
 /**
  * The price list — what a material sells for.
  *
- * This is the one screen in the app a salesperson standing in a shop actually needs,
- * and until now they had none: distribution/create-order.tsx asks them to type a price
- * from memory. All four field roles (sales, sales_manager, sales_associate, driver)
- * hold pricing read, so unlike the dashboard this one reaches its audience.
+ * All four field roles (sales, sales_manager, sales_associate, driver) hold pricing
+ * read, so a salesperson in a shop can look a price up here.
  *
  * It is NOT a pricing engine. One row is (material, price, currency) — no customer
- * dimension, no tier, no price list, no effective or expiry date. The web page's
- * TypeScript claims material_name, material_sku, effective_date and expiry_date, and
- * the API returns none of them; that type is aspirational, so nothing here is built on
- * it.
+ * dimension, no tier, no effective or expiry date.
  *
- * WHY THIS IS NOT A ModuleListScreen. A pricing row carries material_uuid and no name,
- * and PricingListParams has no name param — `?name=` is a 422. So the only way to offer
- * "type sugar, see the price" is to resolve names client-side and search over the
- * join. Server-side paging cannot do it, which is why the catalogue is pulled up to
- * MAX_PAGES and filtered here.
+ * Paged and searched server-side: each row carries its material's name and SKU, and
+ * `material_query` searches name and SKU, so a catalogue of any size is reachable.
  */
 export default function PricingScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const [query, setQuery] = useState('');
-  const [currency, setCurrency] = useState<string | null>(null);
-
-  const priceList = useCachedQuery('pricing:price-list', loadPriceList);
-  const { refreshing, onRefresh } = usePullToRefresh(priceList.refetch);
-  const rows = priceList.data?.prices ?? null;
-  const materials = priceList.data?.materials ?? {};
-  const truncated = priceList.data?.truncated ?? false;
-  const loading = priceList.isPending;
-  const failed = priceList.isError;
-
-  const currencies = useMemo(
-    () => Array.from(new Set((rows ?? []).map((r) => r.currency).filter(Boolean))).sort(),
-    [rows],
-  );
-
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return (rows ?? [])
-      .filter((r) => (currency ? r.currency === currency : true))
-      .map((r) => {
-        const m = materials[r.material_uuid];
-        return {
-          ...r,
-          name: m?.name ?? t('inventory.unknownMaterial'),
-          sku: m?.sku ?? '',
-          shownUnit: r.unit || m?.measure_unit || '',
-        };
-      })
-      .filter((r) => !q || r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [rows, materials, query, currency, t]);
-
-  const price = (n?: number | null) =>
-    n == null ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
   return (
-    <ModuleGuard module="pricing">
-      <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={12} testID="pricing-back">
-            <ThemedText style={styles.back}>‹</ThemedText>
-          </TouchableOpacity>
-          <ThemedText style={styles.topTitle} numberOfLines={1}>
-            {t('menu.pricing')}
-          </ThemedText>
-          <View style={styles.backSpacer} />
-        </View>
-
-        <View style={styles.searchWrap}>
-          <TextInput
-            style={styles.search}
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t('pricing.searchPlaceholder')}
-            placeholderTextColor="#9ca3af"
-            autoCorrect={false}
-            testID="pricing-search"
-          />
-        </View>
-
-        {currencies.length > 1 && (
-          <View style={styles.chips}>
-            <TouchableOpacity
-              style={[styles.chip, !currency && styles.chipOn]}
-              onPress={() => setCurrency(null)}
-              testID="pricing-currency-all"
-            >
-              <ThemedText style={[styles.chipText, !currency && styles.chipTextOn]}>
-                {t('moduleList.all')}
+    <View style={styles.root}>
+      <ModuleListScreen<Pricing>
+        module="pricing"
+        title={t('menu.pricing')}
+        endpoint="/pricing/"
+        itemsKey="pricings"
+        searchParam="material_query"
+        searchPlaceholder={t('pricing.searchPlaceholder')}
+        filters={CURRENCIES.map((c) => ({ id: c, label: c, params: { currency: c } }))}
+        keyExtractor={(r) => r.uuid}
+        renderItem={(r) => (
+          <View style={styles.row} testID={`price-${r.uuid}`}>
+            <View style={styles.rowLeft}>
+              <ThemedText style={styles.name} numberOfLines={1}>
+                {r.material_name || t('inventory.unknownMaterial')}
               </ThemedText>
-            </TouchableOpacity>
-            {currencies.map((c) => (
-              <TouchableOpacity
-                key={c}
-                style={[styles.chip, currency === c && styles.chipOn]}
-                onPress={() => setCurrency(c)}
-                testID={`pricing-currency-${c}`}
-              >
-                <ThemedText style={[styles.chipText, currency === c && styles.chipTextOn]}>
-                  {c}
-                </ThemedText>
-              </TouchableOpacity>
-            ))}
+              {!!r.material_sku && <ThemedText style={styles.sku}>{r.material_sku}</ThemedText>}
+            </View>
+            <ThemedText style={styles.price}>
+              {price(r.price_per_unit)} {r.currency}
+              {r.unit ? <ThemedText style={styles.per}>{` / ${r.unit}`}</ThemedText> : null}
+            </ThemedText>
           </View>
         )}
-
-        {loading ? (
-          <View style={styles.centre}>
-            <ActivityIndicator size="large" color="#5469D4" />
-          </View>
-        ) : (
-          <ScrollView
-            contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-          >
-            {failed ? (
-              <View style={styles.centre}>
-                <ThemedText style={styles.stateText} testID="pricing-error">
-                  {t('moduleList.failed')}
-                </ThemedText>
-                <TouchableOpacity style={styles.retry} onPress={() => priceList.refetch()}>
-                  <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
-                </TouchableOpacity>
-              </View>
-            ) : !shown.length ? (
-              <View style={styles.centre}>
-                <ThemedText style={styles.stateText}>
-                  {query ? t('moduleList.noMatches') : t('pricing.empty')}
-                </ThemedText>
-              </View>
-            ) : (
-              <>
-                <ThemedText style={styles.count}>
-                  {t('moduleList.count', { count: shown.length })}
-                </ThemedText>
-                <View style={styles.card}>
-                  {shown.map((r) => (
-                    <View key={r.uuid} style={styles.row} testID={`price-${r.uuid}`}>
-                      <View style={styles.rowLeft}>
-                        <ThemedText style={styles.name} numberOfLines={1}>
-                          {r.name}
-                        </ThemedText>
-                        {!!r.sku && <ThemedText style={styles.sku}>{r.sku}</ThemedText>}
-                      </View>
-                      <ThemedText style={styles.price}>
-                        {price(r.price_per_unit)} {r.currency}
-                        {r.shownUnit ? (
-                          <ThemedText style={styles.per}>{` / ${r.shownUnit}`}</ThemedText>
-                        ) : null}
-                      </ThemedText>
-                    </View>
-                  ))}
-                </View>
-                {truncated && (
-                  <ThemedText style={styles.note}>
-                    {t('pricing.truncated', { shown: MAX_PAGES * PER_PAGE })}
-                  </ThemedText>
-                )}
-              </>
-            )}
-          </ScrollView>
-        )}
-        <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
-      </ThemedView>
-    </ModuleGuard>
+      />
+      <BottomNavigation activeTab="menu" onTabPress={() => router.replace('/(tabs)?tab=menu')} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
-  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 },
-  back: { fontSize: 30, lineHeight: 34, color: '#5469D4', fontWeight: '700' },
-  backSpacer: { width: 24 },
-  topTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600' },
-  searchWrap: { paddingHorizontal: 20, paddingBottom: 8 },
-  search: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 15,
-    color: '#1f2937',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
-  },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingBottom: 10 },
-  chip: {
-    // the trips filter-chip design — one look for every filter bar
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  chipOn: { backgroundColor: '#5469D4', borderColor: '#5469D4' },
-  chipText: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
-  chipTextOn: { color: '#fff' },
-  body: { paddingHorizontal: 20 },
-  count: { fontSize: 12, opacity: 0.55, marginBottom: 8 },
-  card: { backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 6 },
+  root: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11 },
   rowLeft: { flex: 1 },
   name: { fontSize: 15, fontWeight: '600', color: '#1f2937' },
   sku: { fontSize: 11, opacity: 0.5, marginTop: 1 },
   price: { fontSize: 15, fontWeight: '700', color: '#1f2937' },
   per: { fontSize: 12, fontWeight: '500', opacity: 0.55 },
-  note: { fontSize: 11, opacity: 0.5, marginTop: 10 },
-  centre: { alignItems: 'center', justifyContent: 'center', padding: 40, gap: 10 },
-  stateText: { fontSize: 14, opacity: 0.6, textAlign: 'center' },
-  retry: {
-    backgroundColor: '#5469D4',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  retryText: { color: '#fff', fontWeight: '600' },
 });

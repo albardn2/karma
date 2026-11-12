@@ -326,3 +326,28 @@ def test_list_inventories_filter_params(client, return_dicts, monkeypatch):
     assert inv['warehouse_uuid'] == m.warehouse_uuid
     assert inv['is_active'] is True
     assert inv['currency'] == 'USD'
+
+
+WAREHOUSE_NAME = "Main warehouse"
+
+
+def test_inventory_read_carries_warehouse_name():
+    """STK-PUR-7: a lot names its warehouse, so a lot picker is more than a timestamp."""
+    from models.common import Warehouse as WarehouseModel
+
+    warehouse = WarehouseModel(uuid=str(uuid.uuid4()), name=WAREHOUSE_NAME)
+    model = InventoryModel(
+        uuid=str(uuid.uuid4()),
+        material_uuid="matX",
+        warehouse_uuid=warehouse.uuid,
+        lot_id="2026-11-09-03:56:16",
+        unit=UnitOfMeasure.KG.value,
+        is_active=True,
+        created_at=datetime.utcnow(),
+        is_deleted=False,
+    )
+    model.warehouse = warehouse
+
+    dto = InventoryRead.model_validate(model)
+
+    assert dto.warehouse_name == WAREHOUSE_NAME, dto

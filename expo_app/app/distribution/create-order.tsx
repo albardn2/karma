@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -29,9 +28,20 @@ interface Material {
 
 interface LineItem {
   material_uuid: string;
+  /** kept from the picked row: a searched material may lie outside the loaded page */
+  material_name: string;
+  measure_unit: string;
   quantity: string;
   price_per_unit: string;
 }
+
+const EMPTY_ITEM: LineItem = {
+  material_uuid: '',
+  material_name: '',
+  measure_unit: '',
+  quantity: '',
+  price_per_unit: '',
+};
 
 export default function CreateOrderScreen() {
   const router = useRouter();
@@ -50,7 +60,7 @@ export default function CreateOrderScreen() {
   const standalone = !tripStopUuid;
 
   const [currency, setCurrency] = useState('SYP');
-  const [items, setItems] = useState<LineItem[]>([{ material_uuid: '', quantity: '', price_per_unit: '' }]);
+  const [items, setItems] = useState<LineItem[]>([EMPTY_ITEM]);
   const [customerSel, setCustomerSel] = useState<{ uuid: string; label: string }>({
     uuid: customerUuid ?? '',
     label: customerName ?? '',
@@ -63,15 +73,13 @@ export default function CreateOrderScreen() {
 
   const [allMaterials, setAllMaterials] = useState<Material[]>([]);
   const [loadedUuids, setLoadedUuids] = useState<string[]>([]);
-  const [pickerRow, setPickerRow] = useState<number | null>(null);
 
   // load materials + the trip's start inventory (to offer only what's on the truck)
   useEffect(() => {
     (async () => {
-      const mats = await apiCall<{ materials: Material[] }>('/material/?page=1&per_page=100');
-      setAllMaterials(mats.data?.materials || []);
-
       if (tripStopUuid) {
+        const mats = await apiCall<{ materials: Material[] }>('/material/?page=1&per_page=100');
+        setAllMaterials(mats.data?.materials || []);
         const stop = await apiCall<any>(`/trip-stop/${tripStopUuid}`);
         const tripUuid = stop.data?.trip_uuid;
         if (tripUuid) {
@@ -85,14 +93,28 @@ export default function CreateOrderScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // only materials that were on the truck at trip start; fall back to all if no snapshot
-  const materials = useMemo(
-    () => (loadedUuids.length > 0 ? allMaterials.filter((m) => loadedUuids.includes(m.uuid)) : allMaterials),
+  // only materials that were on the truck at trip start
+  const truckMaterials = useMemo(
+    () => allMaterials.filter((m) => loadedUuids.includes(m.uuid)),
     [allMaterials, loadedUuids]
   );
 
-  const materialOf = (uuid: string) => allMaterials.find((m) => m.uuid === uuid);
-  const unitOf = (uuid: string) => materialOf(uuid)?.measure_unit || '';
+  // On a trip stop the choice is the truck's load, already in hand; otherwise the
+  // whole catalogue, searched server-side so materials past the first page are reachable.
+  const materialSpec = useMemo(
+    () => ({
+      endpoint: '/material/',
+      itemsKey: 'materials',
+      searchParam: 'name',
+      params: { per_page: '100' },
+      rows: truckMaterials.length > 0 ? truckMaterials : undefined,
+      label: (m: Material) => m.name ?? '—',
+      // the unit stays out of the label: "name (unit)" in one string flips under bidi
+      sublabel: (m: Material) => [m.sku, m.measure_unit].filter(Boolean).join(' · ') || undefined,
+      value: (m: Material) => m.uuid,
+    }),
+    [truckMaterials],
+  );
 
   const total = items.reduce(
     (sum, it) => sum + (parseFloat(it.quantity) || 0) * (parseFloat(it.price_per_unit) || 0),
@@ -101,7 +123,7 @@ export default function CreateOrderScreen() {
 
   const setItem = (i: number, patch: Partial<LineItem>) =>
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
-  const addItem = () => setItems((prev) => [...prev, { material_uuid: '', quantity: '', price_per_unit: '' }]);
+  const addItem = () => setItems((prev) => [...prev, EMPTY_ITEM]);
   const removeItem = (i: number) => setItems((prev) => prev.filter((_, idx) => idx !== i));
 
   const validItems = items.filter((it) => it.material_uuid && parseInt(it.quantity, 10) > 0 && it.price_per_unit !== '');
@@ -211,40 +233,41 @@ export default function CreateOrderScreen() {
           {/* line items */}
           <ThemedText style={styles.sectionLabel}>{t('createorder.items')}</ThemedText>
           {items.map((it, i) => (
-            <View key={i} style={styles.itemRow}>
-              <TouchableOpacity
-                style={styles.materialSelect}
-                onPress={() => setPickerRow(i)}
+            <View key={i} style={styles.itemCard}>
+              <PickerField
+                spec={materialSpec}
+                value={it.material_uuid}
+                onChange={(uuid, label, m: Material) =>
+                  setItem(i, { material_uuid: uuid, material_name: label, measure_unit: m?.measure_unit || '' })
+                }
+                initialLabel={it.material_name || undefined}
                 testID={`select-material-${i}`}
-              >
-                <ThemedText style={[styles.materialSelectText, !it.material_uuid && styles.placeholder]} numberOfLines={1}>
-                  {it.material_uuid ? materialOf(it.material_uuid)?.name || t('createorder.material') : t('createorder.selectMaterialPlaceholder')}
-                </ThemedText>
-              </TouchableOpacity>
-              <View style={styles.qtyWrap}>
+              />
+              <View style={styles.itemRow}>
                 <TextInput
-                  style={styles.smallInput}
-                  keyboardType="numeric"
+                  style={[styles.smallInput, styles.qtyInput]}
+                  keyboardType="number-pad"
                   placeholder={t('createorder.qtyPlaceholder')}
                   placeholderTextColor="#9ca3af"
                   value={it.quantity}
                   onChangeText={(t) => setItem(i, { quantity: t })}
                   testID={`qty-${i}`}
                 />
-                {!!unitOf(it.material_uuid) && <ThemedText style={styles.unit}>{te(unitOf(it.material_uuid))}</ThemedText>}
+                {/* a suffix beside the box, so the value keeps the box's full width */}
+                {!!it.measure_unit && <ThemedText style={styles.unit}>{te(it.measure_unit)}</ThemedText>}
+                <TextInput
+                  style={[styles.smallInput, styles.priceInput]}
+                  keyboardType="decimal-pad"
+                  placeholder={t('createorder.pricePlaceholder')}
+                  placeholderTextColor="#9ca3af"
+                  value={it.price_per_unit}
+                  onChangeText={(t) => setItem(i, { price_per_unit: t })}
+                  testID={`price-${i}`}
+                />
+                <TouchableOpacity onPress={() => removeItem(i)} disabled={items.length === 1} style={styles.removeBtn}>
+                  <ThemedText style={[styles.removeText, items.length === 1 && styles.removeDisabled]}>✕</ThemedText>
+                </TouchableOpacity>
               </View>
-              <TextInput
-                style={[styles.smallInput, styles.priceInput]}
-                keyboardType="numeric"
-                placeholder={t('createorder.pricePlaceholder')}
-                placeholderTextColor="#9ca3af"
-                value={it.price_per_unit}
-                onChangeText={(t) => setItem(i, { price_per_unit: t })}
-                testID={`price-${i}`}
-              />
-              <TouchableOpacity onPress={() => removeItem(i)} disabled={items.length === 1} style={styles.removeBtn}>
-                <ThemedText style={[styles.removeText, items.length === 1 && styles.removeDisabled]}>✕</ThemedText>
-              </TouchableOpacity>
             </View>
           ))}
           <TouchableOpacity style={styles.addItem} onPress={addItem} testID="add-item">
@@ -287,35 +310,6 @@ export default function CreateOrderScreen() {
         </ScrollView>
       )}
 
-      {/* material picker modal */}
-      <Modal visible={pickerRow !== null} transparent animationType="slide" onRequestClose={() => setPickerRow(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>{t('createorder.selectMaterial')}</ThemedText>
-              <TouchableOpacity onPress={() => setPickerRow(null)}><ThemedText style={styles.modalClose}>✕</ThemedText></TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalList}>
-              {materials.length === 0 ? (
-                <ThemedText style={styles.modalEmpty}>{t('createorder.noMaterials')}</ThemedText>
-              ) : (
-                materials.map((m) => (
-                  <TouchableOpacity
-                    key={m.uuid}
-                    style={styles.modalOption}
-                    onPress={() => { if (pickerRow !== null) setItem(pickerRow, { material_uuid: m.uuid }); setPickerRow(null); }}
-                    testID={`material-opt-${m.uuid}`}
-                  >
-                    <ThemedText style={styles.modalOptionText}>
-                      {m.name}{m.measure_unit ? ` (${m.measure_unit})` : ''}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </ThemedView>
   );
 }
@@ -335,17 +329,18 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 12, opacity: 0.6 },
   totalValue: { fontSize: 18, fontWeight: '700' },
   sectionLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  materialSelect: {
-    flex: 1, borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 10, backgroundColor: '#fff', minWidth: 90,
+  itemCard: {
+    gap: 8, marginBottom: 10, padding: 10, borderRadius: 10,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)', backgroundColor: '#fafafa',
   },
-  materialSelectText: { fontSize: 13, color: '#111827' },
-  placeholder: { color: '#9ca3af' },
-  qtyWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 8, backgroundColor: '#fff', paddingRight: 6 },
-  smallInput: { width: 54, paddingHorizontal: 8, paddingVertical: 10, fontSize: 13, color: '#111827' },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  smallInput: {
+    paddingHorizontal: 10, paddingVertical: 10, fontSize: 14, color: '#111827',
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 8, backgroundColor: '#fff',
+  },
+  qtyInput: { flex: 1 },
   unit: { fontSize: 11, color: '#6b7280' },
-  priceInput: { width: 64, borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 8, backgroundColor: '#fff' },
+  priceInput: { flex: 1 },
   removeBtn: { padding: 6 },
   removeText: { fontSize: 16, color: '#dc2626' },
   removeDisabled: { color: '#d1d5db' },
@@ -365,13 +360,4 @@ const styles = StyleSheet.create({
   submit: { marginTop: 16, backgroundColor: '#5469D4', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   submitDisabled: { opacity: 0.5 },
   submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
-  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '70%', paddingBottom: 24 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.1)' },
-  modalTitle: { fontSize: 16, fontWeight: '700' },
-  modalClose: { fontSize: 18, color: '#6b7280' },
-  modalList: { paddingHorizontal: 8 },
-  modalEmpty: { padding: 16, opacity: 0.6 },
-  modalOption: { paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.06)' },
-  modalOptionText: { fontSize: 15, color: '#111827' },
 });
