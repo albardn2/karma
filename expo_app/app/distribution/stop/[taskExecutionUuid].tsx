@@ -17,7 +17,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatMonthDayTime } from '@/utils/date';
+import { formatMonthDayTime, parseTs } from '@/utils/date';
 import { findSaleOption, hasRevenueOrderAtStop } from '@/utils/tripStopOutcome';
 
 interface Field {
@@ -46,7 +46,7 @@ const HISTORY_PER_PAGE = 5;
 
 const toDate = (s?: string | null) => {
   if (!s) return null;
-  const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z');
+  const d = parseTs(s);
   return isNaN(d.getTime()) ? null : d;
 };
 const fmt = (s?: string | null) => {

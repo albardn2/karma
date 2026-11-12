@@ -15,7 +15,7 @@ import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall, isOk } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatMonthDayTime } from '@/utils/date';
+import { formatMonthDayTime, parseTs } from '@/utils/date';
 import { TripTrackingMap } from '@/components/TripTrackingMap';
 import { TripAnalyticsCard } from '@/components/TripAnalyticsCard';
 import { TripTagFunnels, type TripFunnels } from '@/components/TripTagFunnels';
@@ -94,7 +94,7 @@ interface TripActivity {
 
 const toDate = (s?: string | null) => {
   if (!s) return null;
-  const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z');
+  const d = parseTs(s);
   return isNaN(d.getTime()) ? null : d;
 };
 const fmt = (s?: string | null) => {

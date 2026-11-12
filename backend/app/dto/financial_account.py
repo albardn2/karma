@@ -1,6 +1,6 @@
 from pydantic import field_validator, BaseModel, ConfigDict, Field
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 from app.dto.common_enums import Currency
 
@@ -39,7 +39,7 @@ class FinancialAccountRead(FinancialAccountBase):
 
     uuid:            str
     created_by_uuid: Optional[str] = None
-    created_at:      datetime
+    created_at:      UtcDateTime
     balance: float
     is_deleted:      bool
 

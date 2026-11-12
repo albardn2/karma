@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from enum import Enum
 
 class WorkflowTags(str, Enum):
@@ -40,7 +40,7 @@ class WorkflowRead(WorkflowBase):
 
     uuid: str
     created_by_uuid: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool = False
 # DTO for reading a Workflow with additional fields
 

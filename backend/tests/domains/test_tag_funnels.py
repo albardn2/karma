@@ -291,7 +291,7 @@ def test_payload_routes_each_key_to_its_funnel_and_describes_the_period():
         moves_after=[], created=2, created_after=0,
     )
     assert p["period"] == period
-    assert p["history_from"] == "2026-08-15T00:00:00"
+    assert p["history_from"] == "2026-08-15T00:00:00Z"
     assert p["total_customers"] == 2 and p["new_customers"] == 2
     # nothing happened after the period, so its end looks like today
     assert p["total_at_period_end"] == 2

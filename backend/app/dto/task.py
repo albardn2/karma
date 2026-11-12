@@ -3,7 +3,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Union
 from uuid import UUID
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.dto.task_execution import OperatorType
 
 from app.dto.customer import CustomerCategory
@@ -89,7 +89,7 @@ class TaskRead(TaskBase):
 
     uuid: str
     created_by_uuid: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDateTime
     workflow_uuid: Optional[str] = None  # Workflow this task belongs to
     is_deleted: bool = False  # Indicates if the task is deleted
     parent_task_uuid: Optional[str] = None  # Parent task UUID if this is a child task

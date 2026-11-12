@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 
 interface Account {
   uuid: string;
@@ -85,7 +85,7 @@ export default function SuperAdminScreen() {
                 </ThemedText>
               ) : (
                 <ThemedText style={styles.when}>
-                  {a.created_at ? formatNumericDate(new Date(a.created_at)) : ''}
+                  {a.created_at ? formatNumericDate(parseTs(a.created_at)) : ''}
                 </ThemedText>
               )}
             </View>

@@ -1,7 +1,7 @@
 ## app/dto/pricing.py
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 from app.dto.common_enums import UnitOfMeasure
 
@@ -37,7 +37,7 @@ class PricingRead(BaseModel):
     material_uuid: str
     price_per_unit: float
     currency: Currency
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool
     unit: Optional[UnitOfMeasure] = None
     material_name: Optional[str] = None

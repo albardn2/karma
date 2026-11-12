@@ -4,6 +4,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
+from app.dto.utc_datetime import CalendarDay, UtcDateTime
 
 from app.dto.common_enums import Currency
 
@@ -28,7 +29,7 @@ class PurchaseOrderBase(BaseModel):
     vendor_uuid: str
     currency: Currency
     notes: Optional[str] = None
-    payout_due_date: Optional[datetime] = None
+    payout_due_date: Optional[CalendarDay] = None
 
 class PurchaseOrderCreate(PurchaseOrderBase):
     """Fields required to create a new purchase order."""
@@ -56,7 +57,7 @@ class PurchaseOrderUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     notes: Optional[str] = None
-    payout_due_date: Optional[datetime] = None
+    payout_due_date: Optional[CalendarDay] = None
     # corrections to existing lines; lines not listed are left alone
     purchase_order_items: Optional[List[PurchaseOrderItemEdit]] = None
 
@@ -70,10 +71,10 @@ class PurchaseOrderRead(BaseModel):
     vendor_name:      str
     currency:         Currency
     status:           PurchaseOrderStatus
-    created_at:       datetime
+    created_at:       UtcDateTime
     is_deleted:       bool
     notes:            Optional[str] = None
-    payout_due_date:  Optional[datetime] = None
+    payout_due_date:  Optional[CalendarDay] = None
 
     total_amount:     float
     total_adjusted_amount: float
@@ -82,7 +83,7 @@ class PurchaseOrderRead(BaseModel):
     is_paid:          bool
     is_overdue:       Optional[bool] = None
     is_fulfilled:     bool
-    fulfilled_at:     Optional[datetime] = None
+    fulfilled_at:     Optional[UtcDateTime] = None
     purchase_order_items: List[PurchaseOrderItemRead]
 
 class PurchaseOrderListParams(BaseModel):
@@ -93,8 +94,8 @@ class PurchaseOrderListParams(BaseModel):
     vendor_uuid: Optional[str] = None
     status:      Optional[PurchaseOrderStatus] = None
     is_paid: Optional[bool] = None
-    start_date:  Optional[datetime] = Field(None, description="Filter orders created *after* this datetime")
-    end_date:    Optional[datetime] = Field(None, description="Filter orders created *before* this datetime")
+    start_date:  Optional[UtcDateTime] = Field(None, description="Filter orders created *after* this datetime")
+    end_date:    Optional[UtcDateTime] = Field(None, description="Filter orders created *before* this datetime")
     is_fulfilled: Optional[bool] = None
 
     page:     int = Field(1, gt=0, description="Page number (>=1)")

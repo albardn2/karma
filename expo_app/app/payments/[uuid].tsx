@@ -18,7 +18,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, apiErrorText, isOk } from '@/utils/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 import { markListsStale } from '@/utils/listRefresh';
 
 interface Payment {
@@ -134,7 +134,7 @@ export default function PaymentDetailScreen() {
               ? t('payments.againstDebitNote')
               : t('payments.unlinked'),
         ],
-        [t('payments.received'), formatNumericDate(new Date(payment.created_at))],
+        [t('payments.received'), formatNumericDate(parseTs(payment.created_at))],
       ]
     : [];
 

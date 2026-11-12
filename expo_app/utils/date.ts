@@ -21,14 +21,45 @@ export const formatNumericDate = (d: Date): string =>
  *
  * Timestamps are different and may be parsed — `created_at` carries a time.
  */
+/** [year, month, day] from the YYYY-MM-DD prefix of a date or timestamp, read as written. */
+const plainParts = (s?: string | null): [number, number, number] | null => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s ?? ''));
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+};
+
 export const plainDate = (s?: string | null): string => {
-  const p = String(s ?? '').split('-');
-  return p.length === 3 ? `${p[1]}/${p[2]}/${p[0]}` : '—';
+  const p = plainParts(s);
+  return p ? `${pad(p[1])}/${pad(p[2])}/${p[0]}` : '—';
+};
+
+/**
+ * "11/1" for a calendar bucket key (a date, or a bucket start the server truncated
+ * to midnight). Read as written: parsing it as a Date would put a date-only key at
+ * UTC midnight, which is the previous day anywhere west of UTC.
+ */
+export const plainMonthDay = (s?: string | null): string => {
+  const p = plainParts(s);
+  return p ? `${p[1]}/${p[2]}` : '';
+};
+
+/** "11/26" (month/short year) for a month bucket key, read as written. */
+export const plainMonthYear = (s?: string | null): string => {
+  const p = plainParts(s);
+  return p ? `${p[1]}/${String(p[0]).slice(2)}` : '';
+};
+
+/** Whole days from today (local) to a date-only value; negative once it has passed. */
+export const daysUntilPlain = (s?: string | null): number | null => {
+  const p = plainParts(s);
+  if (!p) return null;
+  const now = new Date();
+  const target = Date.UTC(p[0], p[1] - 1, p[2]);
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target - today) / 86_400_000);
 };
 
 /** The day-of-month from a date-only string, for "day 18 of each month". 0 if unparseable. */
-export const plainDayOfMonth = (s?: string | null): number =>
-  Number(String(s ?? '').split('-')[2] ?? 0) || 0;
+export const plainDayOfMonth = (s?: string | null): number => plainParts(s)?.[2] ?? 0;
 
 /**
  * Today as a local YYYY-MM-DD, so a string comparison against a date-only field happens

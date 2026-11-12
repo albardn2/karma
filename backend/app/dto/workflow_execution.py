@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.dto.workflow import WorkflowTags
 from app.dto.task_execution import TaskExecutionRead
 
@@ -23,8 +23,8 @@ class WorkflowExecutionBase(BaseModel):
     result: Optional[Dict[str, Any]] = {}  # Store results as a dictionary
     parameters: Optional[Dict[str, Any]] = {}  # Store parameters as a dictionary
     error_message: Optional[str] = None  # Error message, if any
-    start_time: Optional[datetime] = None  # Start time of the execution
-    end_time: Optional[datetime] = None  # End time of the execution
+    start_time: Optional[UtcDateTime] = None  # Start time of the execution
+    end_time: Optional[UtcDateTime] = None  # End time of the execution
 
 
 # DTO for creating a new WorkflowExecution
@@ -44,8 +44,8 @@ class WorkflowExecutionUpdate(WorkflowExecutionBase):
     result: Optional[Dict[str, Any]] = None
     parameters: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[UtcDateTime] = None
+    end_time: Optional[UtcDateTime] = None
 
 
 # DTO for reading a WorkflowExecution
@@ -55,7 +55,7 @@ class WorkflowExecutionRead(WorkflowExecutionBase):
     uuid: str  # UUID of the workflow execution
     workflow_uuid: str  # UUID of the related workflow
     created_by_uuid: Optional[str] = None  # UUID of the user who created the execution
-    created_at: datetime  # Time when the workflow execution was created
+    created_at: UtcDateTime  # Time when the workflow execution was created
     tags : Optional[List[WorkflowTags]] = []  # Tags associated with the workflow execution
     name : Optional[str] = None  # Name of the workflow execution, if applicable
     # The trip's own name, so the execution lists can label a run the way the user
@@ -81,8 +81,8 @@ class WorkflowExecutionListParams(BaseModel):
     # admin-only: restrict to trips assigned to (or created by) a specific user
     # (accepts a username or a user uuid). Ignored for non-admins.
     assigned_user_uuid: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[UtcDateTime] = None
+    end_time: Optional[UtcDateTime] = None
     tags : Optional[List[WorkflowTags]] = None  # Filter by tags associated with the workflow execution
 
     page: int = Field(1, gt=0, description="Page number (>=1)")

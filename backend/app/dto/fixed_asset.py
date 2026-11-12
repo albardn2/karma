@@ -1,13 +1,13 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import CalendarDay, UtcDateTime
 
 class FixedAssetBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name:                         str
     description:                  Optional[str] = None
-    purchase_date:                Optional[datetime] = None
+    purchase_date:                Optional[CalendarDay] = None
     annual_depreciation_rate:     float  # percentage
     purchase_order_item_uuid:     Optional[str] = None
     material_uuid:                Optional[str] = None
@@ -27,7 +27,7 @@ class FixedAssetUpdate(BaseModel):
 
     name:                         Optional[str]     = None
     description:                  Optional[str]     = None
-    purchase_date:                Optional[datetime] = None
+    purchase_date:                Optional[CalendarDay] = None
     annual_depreciation_rate:     Optional[float]   = None
     quantity:                     Optional[float]   = None
     price_per_unit:              Optional[float]   = None
@@ -36,7 +36,7 @@ class FixedAssetRead(FixedAssetBase):
     model_config = ConfigDict(from_attributes=True,extra="forbid")
     uuid:            str
     created_by_uuid: Optional[str] = None
-    created_at:      datetime
+    created_at:      UtcDateTime
     is_deleted:      bool
     unit:           str
     quantity:        float

@@ -1,4 +1,5 @@
 # app/entrypoint/routes/trip/routes.py
+from app.utils.time_utils import utc_iso
 from flask import Blueprint, g, request, jsonify
 from sqlalchemy import func
 from shapely import wkt as shapely_wkt
@@ -321,8 +322,8 @@ def get_trip_activity(uuid: str):
                 "outcome": stop.outcome,
                 "notes": stop.notes,
                 "coordinates": latlon,  # "lat,lon"
-                "created_at": stop.created_at.isoformat() if stop.created_at else None,
-                "completed_at": task_exe.end_time.isoformat() if task_exe and task_exe.end_time else None,
+                "created_at": utc_iso(stop.created_at),
+                "completed_at": utc_iso(task_exe.end_time) if task_exe else None,
             })
         stops.sort(key=lambda s: (s["index"] is None, s["index"], s["created_at"] or ""))
 
@@ -347,7 +348,7 @@ def get_trip_activity(uuid: str):
                     })
                 orders.append({
                     "uuid": o.uuid,
-                    "created_at": o.created_at.isoformat() if o.created_at else None,
+                    "created_at": utc_iso(o.created_at),
                     "customer_name": customer_name(o.customer),
                     "total": o.total_adjusted_amount,
                     "amount_due": o.net_amount_due,
@@ -389,7 +390,7 @@ def get_trip_activity(uuid: str):
                 # the row keeps the SALE's timestamp — that is when it was
                 # delivered; an edit later does not move it on the timeline
                 if is_sale or row["created_at"] is None:
-                    row["created_at"] = ev.created_at.isoformat() if ev.created_at else None
+                    row["created_at"] = utc_iso(ev.created_at)
                 row["quantity"] -= ev.quantity  # negative deltas; report the positive net
             fulfillments.extend(r for r in delivered.values() if r["quantity"] > 0)
             for p in stop.payments:
@@ -403,7 +404,7 @@ def get_trip_activity(uuid: str):
                     order, stop_uuids, delivered_order_uuids
                 )
                 payments.append({
-                    "created_at": p.created_at.isoformat() if p.created_at else None,
+                    "created_at": utc_iso(p.created_at),
                     "amount": p.amount,
                     "currency": p.currency,
                     "customer_name": customer_name(order.customer) if order else None,
@@ -414,14 +415,14 @@ def get_trip_activity(uuid: str):
                     # A payment that pays no order (a debit note, say) still has
                     # a customer: the one whose stop it was collected at.
                     debt_collected.append({
-                        "created_at": p.created_at.isoformat() if p.created_at else None,
+                        "created_at": utc_iso(p.created_at),
                         "amount": p.amount,
                         "currency": p.currency,
                         "customer_name": customer_name(order.customer if order else stop.customer),
                         "customer_order_uuid": order.uuid if order else None,
                         # when the debt was run up: the order being paid off
                         "order_created_at": (
-                            order.created_at.isoformat() if order and order.created_at else None
+                            utc_iso(order.created_at) if order else None
                         ),
                     })
 

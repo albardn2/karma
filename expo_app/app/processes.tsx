@@ -8,7 +8,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { apiCall, isOk } from '@/utils/api';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 
 interface ProcessRow {
   uuid: string;
@@ -116,7 +116,7 @@ export default function ProcessesScreen() {
               )}
             </View>
             <ThemedText style={styles.when}>
-              {p.created_at ? formatNumericDate(new Date(p.created_at)) : ''}
+              {p.created_at ? formatNumericDate(parseTs(p.created_at)) : ''}
             </ThemedText>
           </TouchableOpacity>
         )}

@@ -1,5 +1,6 @@
 # app/entrypoint/routes/trip_stop/routes.py
 
+from app.utils.time_utils import utc_iso
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -664,7 +665,7 @@ def analytics_user_sales():
             items.append(
                 {
                     "uuid": o.uuid,
-                    "created_at": o.created_at.isoformat() if o.created_at else None,
+                    "created_at": utc_iso(o.created_at),
                     "customer_uuid": o.customer_uuid,
                     "customer_name": customer_names.get(o.customer_uuid),
                     "trip_stop_uuid": o.trip_stop_uuid,

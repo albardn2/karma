@@ -8,7 +8,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { PickerField } from '@/components/PickerField';
 import { FilterChip } from '@/components/FilterChips';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 
 interface Transaction {
   uuid: string;
@@ -157,7 +157,7 @@ export default function TransactionsScreen() {
                 )}
               </View>
               <ThemedText style={styles.when}>
-                {x.created_at ? formatNumericDate(new Date(x.created_at)) : ''}
+                {x.created_at ? formatNumericDate(parseTs(x.created_at)) : ''}
               </ThemedText>
             </TouchableOpacity>
           );

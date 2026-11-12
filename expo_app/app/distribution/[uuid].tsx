@@ -20,7 +20,7 @@ import { TripTrackingMap } from '@/components/TripTrackingMap';
 import { useAuth } from '@/contexts/AuthContext';
 import { StopsSheet } from '@/components/StopsSheet';
 import { parseWktPolygons } from '@/utils/wkt';
-import { formatMonthDayTime } from '@/utils/date';
+import { formatMonthDayTime, parseTs } from '@/utils/date';
 import { markListsStale } from '@/utils/listRefresh';
 
 interface TaskExecution {
@@ -86,7 +86,7 @@ const STATUS_STYLES: Record<string, { bg: string; fg: string; label: string }> =
 
 const toDate = (s?: string | null) => {
   if (!s) return null;
-  const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z');
+  const d = parseTs(s);
   return isNaN(d.getTime()) ? null : d;
 };
 const fmt = (s?: string | null) => {

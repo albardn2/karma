@@ -1,6 +1,8 @@
+from app.utils.time_utils import utc_iso
 from flask import Blueprint, request, jsonify
 from app.adapters.repositories.inventory_repository import INVENTORY_SERIALIZATION_LOADERS
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+from app.entrypoint.routes.common.analytics import parse_dt
 from app.entrypoint.routes.common.errors import NotFoundError, BadRequestError
 from app.dto.inventory import (
     InventoryCreate,
@@ -298,20 +300,6 @@ _STATE_SCOPES = (
 )
 
 
-def _inv_parse_dt(value, end_of_day=False):
-    from datetime import datetime as _dt, timedelta as _td
-    if not value:
-        return None
-    try:
-        parsed = _dt.fromisoformat(value)
-    except ValueError:
-        raise BadRequestError(f"Invalid date: {value}")
-    # a date-only end bound means "through that day", not "up to its midnight"
-    if end_of_day and len(value) == 10:
-        parsed = parsed + _td(days=1) - _td(microseconds=1)
-    return parsed
-
-
 def _scoped_material_uuids(uow, material_uuids):
     """Keep only materials this tenant owns. The caller supplies these uuids,
     so they must be filtered before they reach ANY query — otherwise another
@@ -425,7 +413,7 @@ def inventory_warehouse_state():
                 "unit": unit,
                 "quantity": round(float(qty or 0), 3),
                 "lots": int(lots or 0),
-                "last_event_at": last.isoformat() if last else None,
+                "last_event_at": utc_iso(last),
             }
             for m_uuid, name, sku, unit, qty, lots, last in rows
         ]
@@ -457,8 +445,8 @@ def inventory_warehouse_over_time():
     if not warehouse_uuid:
         raise BadRequestError("warehouse_uuid is required")
     bucket = _inv_bucket_arg()
-    start = _inv_parse_dt(request.args.get("start_date"))
-    end = _inv_parse_dt(request.args.get("end_date"), end_of_day=True)
+    start = parse_dt(request.args.get("start_date"))
+    end = parse_dt(request.args.get("end_date"), end_of_day=True)
     raw_materials = request.args.get("material_uuids")
     material_uuids = [m for m in raw_materials.split(",") if m] if raw_materials else []
     if len(material_uuids) > 50:

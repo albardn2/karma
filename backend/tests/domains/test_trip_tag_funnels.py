@@ -192,10 +192,10 @@ def test_a_finished_trip_rewinds_what_happened_to_its_customers_since():
 
 def test_the_window_is_reported_and_a_running_trip_is_marked():
     p = _payload(start=STARTED, end=NOW, is_open=True)
-    assert p["period"] == {"start": STARTED.isoformat(), "end": NOW.isoformat(),
+    assert p["period"] == {"start": STARTED.isoformat() + "Z", "end": NOW.isoformat() + "Z",
                            "is_current": True, "estimated": False}
     assert _payload(estimated=True)["period"]["estimated"] is True
-    assert p["history_from"] == "2025-12-25T00:00:00"
+    assert p["history_from"] == "2025-12-25T00:00:00Z"
 
 
 def test_a_trip_with_nothing_worked_is_an_empty_payload_not_an_error():

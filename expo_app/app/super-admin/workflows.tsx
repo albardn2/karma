@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 
 interface Workflow {
   uuid: string;
@@ -96,7 +96,7 @@ export default function WorkflowsScreen() {
             )}
           </View>
           <ThemedText style={styles.when}>
-            {w.created_at ? formatNumericDate(new Date(w.created_at)) : ''}
+            {w.created_at ? formatNumericDate(parseTs(w.created_at)) : ''}
           </ThemedText>
         </View>
       )}

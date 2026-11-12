@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,7 +17,7 @@ class ProcessTemplateRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
     created_by_uuid: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDateTime
     name: str
     type: str
     notes: Optional[str] = None

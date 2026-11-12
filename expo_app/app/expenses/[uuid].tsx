@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasModule } from '@/hooks/useModuleAccess';
 import { apiCall, apiErrorText, isOk } from '@/utils/api';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 import { markListsStale } from '@/utils/listRefresh';
 
 const money = (n?: number | null, c?: string | null) =>
@@ -142,7 +142,7 @@ export default function ExpensesDetailScreen() {
         [t('expenses.stillOwed'), money(x.amount_due, x.currency)],
         [t('expenses.category'), x.category ? tef(x.category) : '—'],
         [t('expenses.status'), x.status ? tef(x.status) : '—'],
-        [t('expenses.when'), formatNumericDate(new Date(x.created_at))],
+        [t('expenses.when'), formatNumericDate(parseTs(x.created_at))],
       ]}
       actions={actions}
     />

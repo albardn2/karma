@@ -1,7 +1,7 @@
 # app/dto/process.py
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, Any, Dict, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.dto.common_enums import UnitOfMeasure, Currency
 from enum import Enum
@@ -122,15 +122,15 @@ class ProcessUpdate(BaseModel):
 class ProcessRead(ProcessBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool
 
 class ProcessListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
     uuid : Optional[str] = None
     type: Optional[ProcessType] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    start_date: Optional[UtcDateTime] = None
+    end_date: Optional[UtcDateTime] = None
     created_by_uuid: Optional[str] = None
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)

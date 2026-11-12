@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from typing import Optional, List
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -14,7 +14,7 @@ class LocationTrackingConfigRead(BaseModel):
     trip_cadence_seconds: int
     history_cadence_seconds: int
     history_retention_days: int
-    updated_at: Optional[datetime] = None
+    updated_at: Optional[UtcDateTime] = None
 
 
 class LocationTrackingConfigUpdate(BaseModel):
@@ -31,7 +31,7 @@ class LocationPingRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     coordinates: str  # "lat,lon"
-    recorded_at: datetime
+    recorded_at: UtcDateTime
     speed: Optional[float] = None
     heading: Optional[float] = None
     accuracy: Optional[float] = None
@@ -53,7 +53,7 @@ class LocationHistoryParams(BaseModel):
     """Query window for a user's stored history."""
     model_config = ConfigDict(extra="forbid")
 
-    from_time: Optional[datetime] = None
-    to_time: Optional[datetime] = None
+    from_time: Optional[UtcDateTime] = None
+    to_time: Optional[UtcDateTime] = None
     # cap a single response; playback UIs can page or widen cadence instead
     limit: int = Field(5000, gt=0, le=20000)

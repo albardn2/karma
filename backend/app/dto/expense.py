@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 from app.dto.common_enums import Currency
 from app.dto.invoice import InvoiceStatus
@@ -62,9 +62,9 @@ class ExpenseRead(ExpenseBase):
     is_paid: bool
     amount_due: float
     amount_paid: float
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool
-    paid_at: Optional[datetime] = None
+    paid_at: Optional[UtcDateTime] = None
 
 class ExpenseReadList(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -81,8 +81,8 @@ class ExpenseListParams(BaseModel):
     category:    Optional[ExpenseCategory] = None
     status :    Optional[InvoiceStatus] = None
     is_paid:    Optional[bool] = None
-    start:       Optional[datetime] = None  # ISO timestamps in query
-    end:         Optional[datetime] = None
+    start:       Optional[UtcDateTime] = None  # ISO timestamps in query
+    end:         Optional[UtcDateTime] = None
     page:        int = 1
     per_page:    int = 20
 

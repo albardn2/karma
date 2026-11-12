@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.dto.common_enums import Currency
 from pydantic_core import ValidationError
 from app.entrypoint.routes.common.errors import BadRequestError
@@ -47,7 +47,7 @@ class PayoutRead(PayoutBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
     financial_account_uuid: str
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool
 
 class PayoutListParams(BaseModel):

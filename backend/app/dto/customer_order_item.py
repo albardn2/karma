@@ -1,7 +1,7 @@
 # app/dto/customer_order_item.py
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.dto.common_enums import UnitOfMeasure
 from app.dto.invoice_item import InvoiceItemCreate
 from app.dto.invoice_item import InvoiceItemBulkCreate
@@ -31,8 +31,8 @@ class CustomerOrderItemRead(BaseModel):
     uuid: str
     is_fulfilled: bool
     is_deleted: bool
-    fulfilled_at: Optional[datetime]
-    created_at: datetime
+    fulfilled_at: Optional[UtcDateTime]
+    created_at: UtcDateTime
 
 
 class FulfillItem(BaseModel):

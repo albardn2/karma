@@ -8,7 +8,7 @@ import { PickerField } from '@/components/PickerField';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasModule } from '@/hooks/useModuleAccess';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs, plainMonthDay, plainMonthYear } from '@/utils/date';
 
 interface Warehouse {
   uuid: string;
@@ -51,13 +51,8 @@ const RANGES = [
 /** Naive ISO — the backend rejects a zone suffix outright with "Invalid date". */
 const naiveIso = (d: Date) => d.toISOString().replace(/\.\d+Z$/, '').replace(/Z$/, '');
 
-const tick = (iso: string, bucket: string) => {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  return bucket === 'month'
-    ? `${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)}`
-    : `${d.getMonth() + 1}/${d.getDate()}`;
-};
+const tick = (iso: string, bucket: string) =>
+  bucket === 'month' ? plainMonthYear(iso) : plainMonthDay(iso);
 
 /**
  * A warehouse, what is in it, and how that changed.
@@ -146,7 +141,7 @@ export default function WarehousesDetailScreen() {
                     </ThemedText>
                     <ThemedText style={styles.stockMeta}>
                       {t('warehouses.lots', { count: s.lots })}
-                      {s.last_event_at ? ` · ${formatNumericDate(new Date(s.last_event_at))}` : ''}
+                      {s.last_event_at ? ` · ${formatNumericDate(parseTs(s.last_event_at))}` : ''}
                     </ThemedText>
                   </View>
                   <ThemedText

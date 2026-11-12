@@ -1,7 +1,7 @@
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.dto.common_enums import Currency
 from app.dto.invoice import InvoiceStatus
 from app.entrypoint.routes.common.errors import BadRequestError
@@ -59,11 +59,11 @@ class CreditNoteItemRead(CreditNoteItemBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
     status: InvoiceStatus
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool
     amount_paid: float
     amount_due: float
-    paid_at: Optional[datetime]
+    paid_at: Optional[UtcDateTime]
     is_paid: bool
 
 

@@ -37,6 +37,7 @@ from app.dto.customer import (
 )
 from app.domains.customer.tag_history import record_tag_changes
 from app.domains.customer.auto_tags import with_default_sale_tag
+from app.entrypoint.routes.common.analytics import parse_dt
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.entrypoint.routes.common.errors import NotFoundError
 
@@ -721,15 +722,6 @@ def list_customer_categories():
 # Read-only aggregates for the Customers > Analytics tab. Raw session
 # queries here MUST scope by uow.account_uuid (they bypass the repos).
 
-def _parse_dt(value):
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        raise BadRequestError(f"Invalid date: {value}")
-
-
 def _csv_arg(name):
     raw = request.args.get(name)
     return [v for v in raw.split(",") if v] if raw else []
@@ -833,8 +825,8 @@ def _sales_join(uow, start, end, material_uuids):
                  PermissionScope.DRIVER.value)
 def analytics_new_customers():
     bucket = _bucket_arg()
-    start = _parse_dt(request.args.get("start_date"))
-    end = _parse_dt(request.args.get("end_date"))
+    start = parse_dt(request.args.get("start_date"))
+    end = parse_dt(request.args.get("end_date"))
     with SqlAlchemyUnitOfWork() as uow:
         base = [
             CustomerModel.account_uuid == uow.account_uuid,
@@ -882,8 +874,8 @@ def analytics_customers_sold():
         CustomerOrderItem as COI,
     )
     bucket = _bucket_arg()
-    start = _parse_dt(request.args.get("start_date"))
-    end = _parse_dt(request.args.get("end_date"))
+    start = parse_dt(request.args.get("start_date"))
+    end = parse_dt(request.args.get("end_date"))
     material_uuids = _csv_arg("material_uuids")
     categories = _csv_arg("categories")
     with SqlAlchemyUnitOfWork() as uow:
@@ -934,8 +926,8 @@ def analytics_sold_customers():
         Trip as TR,
         TripStop as TS,
     )
-    start = _parse_dt(request.args.get("start_date"))
-    end = _parse_dt(request.args.get("end_date"))
+    start = parse_dt(request.args.get("start_date"))
+    end = parse_dt(request.args.get("end_date"))
     material_uuids = _csv_arg("material_uuids")
     categories = _csv_arg("categories")
     outcome = request.args.get("outcome")

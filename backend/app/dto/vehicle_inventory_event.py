@@ -2,6 +2,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 from app.dto.common_enums import Currency
 from app.entrypoint.routes.common.errors import BadRequestError
@@ -64,7 +65,7 @@ class VehicleInventoryEventRead(BaseModel):
     customer_order_item_uuid: Optional[str] = None
     trip_stop_uuid: Optional[str] = None
     is_deleted: bool
-    created_at: datetime
+    created_at: UtcDateTime
 
 
 class VehicleInventoryEventListParams(BaseModel):
@@ -72,8 +73,8 @@ class VehicleInventoryEventListParams(BaseModel):
     uuid: Optional[str] = None
     vehicle_inventory_uuid: Optional[str] = None
     event_type: Optional[VehicleInventoryEventType] = None
-    start_date: Optional[datetime] = Field(None, description="On or after this datetime")
-    end_date: Optional[datetime] = Field(None, description="On or before this datetime")
+    start_date: Optional[UtcDateTime] = Field(None, description="On or after this datetime")
+    end_date: Optional[UtcDateTime] = Field(None, description="On or before this datetime")
     page: int = Field(1, gt=0)
     per_page: int = Field(20, gt=0, le=100)
 

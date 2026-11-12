@@ -1,7 +1,7 @@
 # app/dto/service_area.py
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from shapely import wkb
 from shapely import wkt as shapely_wkt
 from geoalchemy2.elements import WKBElement, WKTElement
@@ -83,7 +83,7 @@ class ServiceAreaRead(BaseModel):
 
     uuid: str
     created_by_uuid: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDateTime
     name: str
     description: Optional[str] = None
     geometry: str

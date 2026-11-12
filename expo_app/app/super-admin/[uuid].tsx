@@ -6,7 +6,7 @@ import { ModuleDetailScreen, DetailRow, DetailAction } from '@/components/Module
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 
 interface Account {
   uuid: string;
@@ -150,7 +150,7 @@ export default function SuperAdminAccountScreen() {
         [t('superAdmin.phone'), a.phone_number || '—'],
         [
           t('superAdmin.created'),
-          a.created_at ? formatNumericDate(new Date(a.created_at)) : '—',
+          a.created_at ? formatNumericDate(parseTs(a.created_at)) : '—',
         ],
       ]}
       sections={[

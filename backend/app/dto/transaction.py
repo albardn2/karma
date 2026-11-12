@@ -2,6 +2,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 from app.dto.common_enums import Currency
 
@@ -36,7 +37,7 @@ class TransactionRead(TransactionBase):
 
     uuid:            str
     created_by_uuid: Optional[str] = None
-    created_at:      datetime
+    created_at:      UtcDateTime
     is_deleted:      bool
 
 
@@ -46,10 +47,10 @@ class TransactionListParams(BaseModel):
 
     from_account_uuid: Optional[str] = None
     to_account_uuid:   Optional[str] = None
-    start_date:        Optional[datetime] = Field(
+    start_date:        Optional[UtcDateTime] = Field(
         None, description="Filter on or after this datetime"
     )
-    end_date:          Optional[datetime] = Field(
+    end_date:          Optional[UtcDateTime] = Field(
         None, description="Filter on or before this datetime"
     )
     uuid : Optional[str] = None

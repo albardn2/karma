@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall } from '@/utils/api';
 import { MqttSubscriber } from '@/utils/mqttSubscriber';
+import { parseTs } from '@/utils/date';
 import type { TripMapStop } from '@/components/TripMap';
 
 // Admin-only live + playback tracking for a trip's assigned user. Mirrors the
@@ -33,10 +34,7 @@ const DEFAULT_REGION: Region = {
 
 const SPEEDS = [1, 4, 10, 30];
 
-const toMs = (s: string) => {
-  const hasTz = /[zZ]|[+-]\d{2}:?\d{2}$/.test(s);
-  return new Date(hasTz ? s : s + 'Z').getTime();
-};
+const toMs = (s: string) => parseTs(s).getTime();
 
 const parseLatLng = (s: unknown): LatLng | null => {
   if (typeof s !== 'string') return null;

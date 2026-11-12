@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 const money = (n?: number | null, c?: string | null) =>
   n == null ? '—' : `${Number(n).toFixed(2)}${c ? ` ${c}` : ''}`;
 
@@ -51,7 +51,7 @@ export default function PayoutsScreen() {
             </View>
             <View style={styles.cardBottom}>
               <ThemedText style={styles.subtitle} numberOfLines={1}>
-                {formatNumericDate(new Date(x.created_at))}
+                {formatNumericDate(parseTs(x.created_at))}
               </ThemedText>
               <ThemedText style={styles.badge}>
                 {x.expense_uuid

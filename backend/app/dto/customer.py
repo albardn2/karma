@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.dto.common_enums import Currency
 
 from app.utils.geom_utils import lat_lon_to_wkt
@@ -221,14 +221,14 @@ class CustomerRead(CustomerBase):
     model_config = ConfigDict(extra="forbid")
 
     uuid: str
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool
     balance_per_currency: dict[Currency, float]
     # Derived from trip stops, never accepted from a client — they are absent
     # from CustomerCreate/CustomerUpdate on purpose, and those DTOs forbid
     # extras, so an attempt to set them is a 400 rather than a silent overwrite.
-    last_stop: Optional[datetime] = None
-    last_effective_stop: Optional[datetime] = None
+    last_stop: Optional[UtcDateTime] = None
+    last_effective_stop: Optional[UtcDateTime] = None
 
     @field_validator("coordinates", mode="before")
     def _wkb_or_wkt_to_latlon(cls, v):
@@ -406,8 +406,8 @@ class TagTransitionParams(_TransitionSideFilters):
     key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
     # inclusive ISO datetimes bounding when the change was recorded; both
     # optional (omit for all-time)
-    date_from: Optional[datetime] = None
-    date_to: Optional[datetime] = None
+    date_from: Optional[UtcDateTime] = None
+    date_to: Optional[UtcDateTime] = None
 
 
 class TagTransition(BaseModel):
@@ -440,7 +440,7 @@ class CustomerTagHistoryItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     uuid: str
-    created_at: datetime
+    created_at: UtcDateTime
     created_by_uuid: Optional[str] = None
     change_group_uuid: str
     key: str
@@ -465,8 +465,8 @@ class TagTransitionCustomersParams(_TransitionSideFilters):
     model_config = ConfigDict(extra="forbid")
 
     key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
-    date_from: Optional[datetime] = None
-    date_to: Optional[datetime] = None
+    date_from: Optional[UtcDateTime] = None
+    date_to: Optional[UtcDateTime] = None
     page: int = Field(1, gt=0, le=1_000_000)
     per_page: int = Field(20, gt=0, le=100)
 
@@ -479,7 +479,7 @@ class TagTransitionCustomer(BaseModel):
     full_name: str
     # when this customer last made the transition in the window (a customer who
     # flip-flopped shows their most recent crossing)
-    changed_at: datetime
+    changed_at: UtcDateTime
 
 
 class TagTransitionCustomersPage(BaseModel):
@@ -516,8 +516,8 @@ class TagDeltaParams(BaseModel):
     value: Optional[str] = None
     # the two instants to compare state at. as_of_start omitted = before all
     # history (nobody held it); as_of_end omitted = now.
-    as_of_start: Optional[datetime] = None
-    as_of_end: Optional[datetime] = None
+    as_of_start: Optional[UtcDateTime] = None
+    as_of_end: Optional[UtcDateTime] = None
 
 
 class TagDeltaResult(BaseModel):
@@ -525,8 +525,8 @@ class TagDeltaResult(BaseModel):
 
     key: str
     value: Optional[str] = None
-    as_of_start: Optional[datetime] = None
-    as_of_end: datetime
+    as_of_start: Optional[UtcDateTime] = None
+    as_of_end: UtcDateTime
     count_start: int
     count_end: int
     net_delta: int           # count_end - count_start (== added_count - removed_count)
@@ -540,8 +540,8 @@ class TagDeltaCustomersParams(BaseModel):
 
     key: str = Field(..., min_length=1, max_length=MAX_TAG_LENGTH)
     value: Optional[str] = None
-    as_of_start: Optional[datetime] = None
-    as_of_end: Optional[datetime] = None
+    as_of_start: Optional[UtcDateTime] = None
+    as_of_end: Optional[UtcDateTime] = None
     # which side of the delta to list
     direction: str = Field(..., pattern="^(added|removed)$")
     page: int = Field(1, gt=0, le=1_000_000)

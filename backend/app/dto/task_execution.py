@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 class OperatorType(str, Enum):
 
@@ -27,8 +27,8 @@ class TaskExecutionBase(BaseModel):
     status: str  # e.g., in_progress, completed, failed
     result: Optional[Dict[str, Any]] = {}  # Store results as a dictionary
     error_message: Optional[str] = None  # Error message, if any
-    start_time: Optional[datetime] = None  # Start time of the execution
-    end_time: Optional[datetime] = None  # End time of the execution
+    start_time: Optional[UtcDateTime] = None  # Start time of the execution
+    end_time: Optional[UtcDateTime] = None  # End time of the execution
     depends_on: Optional[List[str]] = []  # List of task_execution_uuids this execution depends on
 
 # DTO for creating a new TaskExecution
@@ -47,8 +47,8 @@ class TaskExecutionUpdate(TaskExecutionBase):
     status: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[UtcDateTime] = None
+    end_time: Optional[UtcDateTime] = None
     depends_on: Optional[List[str]] = None
 
 # DTO for reading a TaskExecution
@@ -59,7 +59,7 @@ class TaskExecutionRead(TaskExecutionBase):
     task_uuid: str  # str of the associated task
     workflow_execution_uuid: str  # str of the associated workflow execution
     created_by_uuid: Optional[str] = None  # str of the user who created the execution
-    created_at: datetime  # Time when the task execution was created
+    created_at: UtcDateTime  # Time when the task execution was created
     parent_task_execution_uuid: Optional[str] = None  # Parent task execution str if this is a child task
     name: Optional[str] = None  # Name of the task execution, if applicable
     operator: Optional[str] = None  # Operator of the underlying task
@@ -76,8 +76,8 @@ class TaskExecutionListParams(BaseModel):
     parent_task_execution_uuid: Optional[str] = None  # Filter by parent task execution str
     status: Optional[str] = None  # Filter by execution status (e.g., in_progress, completed)
     created_by_uuid: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[UtcDateTime] = None
+    end_time: Optional[UtcDateTime] = None
     name: Optional[str] = None  # Filter by task execution name
 
     page: int = Field(1, gt=0, description="Page number (>=1)")

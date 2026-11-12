@@ -1,3 +1,4 @@
+from app.utils.time_utils import utc_iso
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -251,8 +252,8 @@ def overview():
         )
 
         result = {
-            "from": start.isoformat(),
-            "to": now.isoformat(),
+            "from": utc_iso(start),
+            "to": utc_iso(now),
             "days": days_window,
             "currencies": currencies,
             # what the converted figures below are denominated in, echoed back so

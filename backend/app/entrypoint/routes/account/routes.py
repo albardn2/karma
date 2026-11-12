@@ -14,6 +14,7 @@ is right — a company's subscription cost is not operational data.
 Everything reads `g.account_uuid`, so an impersonating platform owner sees the tenant
 they are impersonating rather than their own (empty) account.
 """
+from app.utils.time_utils import utc_iso
 from flask import g, jsonify
 from flask_jwt_extended import jwt_required
 
@@ -87,7 +88,7 @@ def my_billing():
                 "period_start": e.period_start.isoformat() if e.period_start else None,
                 "period_end": e.period_end.isoformat() if e.period_end else None,
                 "notes": e.notes,
-                "created_at": e.created_at.isoformat(),
+                "created_at": utc_iso(e.created_at),
             }
             if e.entry_type == "charge":
                 got = paid.get(e.uuid, 0.0)

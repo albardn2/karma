@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 from app.dto.common_enums import Currency
 
 from app.entrypoint.routes.common.errors import BadRequestError
@@ -52,7 +52,7 @@ class PaymentUpdate(BaseModel):
 class PaymentRead(PaymentBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool
 
 class PaymentListParams(BaseModel):

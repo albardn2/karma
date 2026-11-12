@@ -1,7 +1,7 @@
 # app/dto/customer_order.py
 from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import CalendarDay, UtcDateTime
 
 from app.dto.payment import PaymentMethod
 from app.entrypoint.routes.common.errors import BadRequestError
@@ -39,9 +39,9 @@ class CustomerOrderUpdate(BaseModel):
 class CustomerOrderRead(CustomerOrderBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
-    created_at: datetime
+    created_at: UtcDateTime
     is_fulfilled: bool
-    fulfilled_at: Optional[datetime]
+    fulfilled_at: Optional[UtcDateTime]
     is_deleted: bool
     total_adjusted_amount: float
     is_overdue: bool
@@ -49,7 +49,7 @@ class CustomerOrderRead(CustomerOrderBase):
     net_amount_due: Optional[float] = None
     net_amount_paid: Optional[float] = None
     trip_stop_uuid: Optional[str] = None
-    trip_stop_date: Optional[datetime] = None  # enriched by the list route
+    trip_stop_date: Optional[CalendarDay] = None  # enriched by the list route
     # display names resolved from the customer relationship
     customer_company_name: Optional[str] = Field(
         None,
@@ -99,7 +99,7 @@ class CustomerOrderWithItemsAndInvoiceCreate(BaseModel):
     currency: Currency
     trip_stop_uuid: Optional[str] = None
     notes: Optional[str] = None
-    due_date: Optional[datetime]
+    due_date: Optional[CalendarDay]
     items: List[CustomerOrderAndInvoiceItemCreate]
 
     def to_customer_order_create(self):
@@ -176,7 +176,7 @@ class CustomerOrderCheckoutCreate(BaseModel):
     currency: Currency
     trip_stop_uuid: Optional[str] = None
     notes: Optional[str] = None
-    due_date: Optional[datetime] = None
+    due_date: Optional[CalendarDay] = None
     items: List[CustomerOrderAndInvoiceItemCreate]
     fulfill: bool = True
     pay: bool = True

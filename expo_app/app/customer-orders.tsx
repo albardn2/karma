@@ -6,7 +6,7 @@ import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { PickerField } from '@/components/PickerField';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 import { money } from '@/utils/money';
 
 interface CustomerOrder {
@@ -138,7 +138,7 @@ export default function CustomerOrdersScreen() {
             </View>
 
             <View style={styles.cardBottom}>
-              <ThemedText style={styles.date}>{formatNumericDate(new Date(o.created_at))}</ThemedText>
+              <ThemedText style={styles.date}>{formatNumericDate(parseTs(o.created_at))}</ThemedText>
               <View style={styles.badges}>
                 <ThemedText
                   style={[styles.badge, o.is_fulfilled ? styles.badgeOk : styles.badgePending]}

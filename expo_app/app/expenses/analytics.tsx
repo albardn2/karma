@@ -16,6 +16,7 @@ import { BarChart, ChartLegend, SERIES_COLOURS } from '@/components/Chart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
+import { plainMonthDay, plainMonthYear } from '@/utils/date';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 interface Bucket {
@@ -46,13 +47,8 @@ const RANGES = [
   { id: 'all', days: 0, bucket: 'month' },
 ] as const;
 
-const label = (iso: string, bucket: string) => {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  return bucket === 'day' || bucket === 'week'
-    ? `${d.getMonth() + 1}/${d.getDate()}`
-    : `${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)}`;
-};
+const label = (iso: string, bucket: string) =>
+  bucket === 'day' || bucket === 'week' ? plainMonthDay(iso) : plainMonthYear(iso);
 
 /**
  * Expense analytics.

@@ -1,3 +1,4 @@
+from app.utils.time_utils import utc_iso
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from pydantic import ValidationError
@@ -166,7 +167,7 @@ def material_inventory_summary(uuid: str):
             .all()
         )
         events = [
-            {"t": r[0].isoformat() if r[0] else None, "quantity": r[1]}
+            {"t": utc_iso(r[0]), "quantity": r[1]}
             for r in rows
         ]
 
@@ -191,7 +192,7 @@ def material_inventory_summary(uuid: str):
                 # every cost above is converted into the requested currency —
                 # no more guessing a label from the first costed event
                 "currency": cost_currency.value,
-                "created_at": inv.created_at.isoformat() if inv.created_at else None,
+                "created_at": utc_iso(inv.created_at),
                 "expiration_date": inv.expiration_date.isoformat() if inv.expiration_date else None,
             })
         lots.sort(key=lambda l: l["created_at"] or "")

@@ -3,7 +3,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ModuleDetailScreen, DetailRow, DetailAction } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
-import { formatNumericDate } from '@/utils/date';
+import { formatNumericDate, parseTs } from '@/utils/date';
 
 interface Transaction {
   uuid: string;
@@ -112,7 +112,7 @@ export default function TransactionDetailScreen() {
           t('transactions.rate'),
           x.usd_to_syp_exchange_rate != null ? String(x.usd_to_syp_exchange_rate) : '—',
         ],
-        [t('transactions.when'), x.created_at ? formatNumericDate(new Date(x.created_at)) : '—'],
+        [t('transactions.when'), x.created_at ? formatNumericDate(parseTs(x.created_at)) : '—'],
         [t('transactions.notes'), x.notes || '—'],
       ]}
       actions={actions}

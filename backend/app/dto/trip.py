@@ -3,7 +3,7 @@ from enum import Enum
 
 from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List
-from datetime import datetime
+from app.dto.utc_datetime import UtcDateTime
 
 from shapely import wkt as shapely_wkt
 from shapely.geometry import shape
@@ -52,8 +52,8 @@ class TripCreate(BaseModel):
     status: TripStatus  # e.g., planned, in_progress, completed, cancelled
     start_warehouse_uuid: Optional[str] = None
     end_warehouse_uuid: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[UtcDateTime] = None
+    end_time: Optional[UtcDateTime] = None
     start_point: Optional[str] = None  # POINT WKT
     end_point: Optional[str] = None  # POINT WKT
     data: Optional[dict] = None
@@ -115,8 +115,8 @@ class TripUpdate(BaseModel):
     status: Optional[TripStatus] = None
     start_warehouse_uuid: Optional[str] = None
     end_warehouse_uuid: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[UtcDateTime] = None
+    end_time: Optional[UtcDateTime] = None
     start_point: Optional[str] = None
     end_point: Optional[str] = None
     data: Optional[dict] = None
@@ -174,7 +174,7 @@ class TripRead(BaseModel):
     # every client keeps its old fallback (plate, or a truncated uuid)
     name: Optional[str] = None
     created_by_uuid: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDateTime
     vehicle_uuid: str
     service_area_uuid: Optional[str] = None
     distribution_area: Optional[str] = None
@@ -182,8 +182,8 @@ class TripRead(BaseModel):
     status: TripStatus
     start_warehouse_uuid: Optional[str] = None
     end_warehouse_uuid: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[UtcDateTime] = None
+    end_time: Optional[UtcDateTime] = None
     start_point: Optional[str] = None
     end_point: Optional[str] = None
     data: Optional[dict] = None
@@ -209,7 +209,7 @@ class TripRead(BaseModel):
     # flag and the timestamp cannot disagree. audited_by_username is resolved by
     # the routes, like assigned_username.
     is_audited: bool = False
-    audited_at: Optional[datetime] = None
+    audited_at: Optional[UtcDateTime] = None
     audited_by_uuid: Optional[str] = None
     audited_by_username: Optional[str] = None
 

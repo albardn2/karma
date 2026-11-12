@@ -1,4 +1,5 @@
-from datetime import date, datetime
+from datetime import date
+from app.dto.utc_datetime import UtcDateTime
 from typing import Optional, List
 
 import pydantic
@@ -85,7 +86,7 @@ class LedgerEntryRead(BaseModel):
     settles_period_end: Optional[date] = None
     notes: Optional[str]
     created_by_uuid: Optional[str]
-    created_at: datetime
+    created_at: UtcDateTime
 
 
 class AccountRead(BaseModel):
@@ -94,12 +95,12 @@ class AccountRead(BaseModel):
     company_name: str
     email: Optional[str]
     phone_number: Optional[str]
-    created_at: datetime
+    created_at: UtcDateTime
     is_deleted: bool
     is_blocked: bool
     is_verified: bool
     # when the account was admitted; also its billing anchor
-    verified_at: Optional[datetime] = None
+    verified_at: Optional[UtcDateTime] = None
     subscription_rate: Optional[float]
     subscription_currency: Optional[str]
     subscription_type: Optional[str] = 'flat'

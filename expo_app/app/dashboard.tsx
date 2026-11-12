@@ -17,6 +17,7 @@ import { BarChart, LineChart } from '@/components/Chart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
+import { plainMonthDay } from '@/utils/date';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 /** A per-day point. `t` is a naive "YYYY-MM-DD", `v` a count or an amount. */
@@ -62,10 +63,7 @@ const MAX_MARKS = 30;
 const money = (n?: number | null) =>
   n == null ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-const tick = (iso: string) => {
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}/${d.getDate()}`;
-};
+const tick = (iso: string) => plainMonthDay(iso);
 
 /**
  * Collapse a long daily series into at most MAX_MARKS marks by SUMMING.
