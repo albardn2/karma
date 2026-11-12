@@ -19,7 +19,7 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { PolygonEditor, useRingEditor } from '@/components/PolygonEditor';
 import {
   canonicalRing,
@@ -237,7 +237,7 @@ export default function ServiceAreaCreateScreen() {
             ? t('serviceAreas.notAllowed')
           : // res.error is raw response TEXT — for a 500 it is an HTML page, so it is
             // truncated and never parsed
-            String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+            apiErrorText(res.error, t('form.tryAgain')),
       );
     } catch {
       Alert.alert(t('form.saveFailed'), t('form.tryAgain'));
@@ -262,12 +262,15 @@ export default function ServiceAreaCreateScreen() {
 
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={insets.top + 50}
+          // iOS: the ScrollView insets itself by the keyboard's overlap; padding the
+          // view as well would leave a dead band above the keyboard
+          behavior={Platform.OS === 'ios' ? undefined : 'height'}
         >
           <ScrollView
             contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
+            automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
           >
             <ScrollingChipRow>
               <FilterChip

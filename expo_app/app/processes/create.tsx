@@ -19,7 +19,7 @@ import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import {
   availableOf,
   fifoPlan,
@@ -438,7 +438,7 @@ export default function ProcessCreateScreen() {
         return;
       }
       // raw response TEXT, never JSON.parse: a 500 here is an HTML page
-      const raw = String(res.error ?? '').slice(0, 300);
+      const raw = apiErrorText(res.error);
       let msg = raw || t('form.tryAgain');
       if (res.status === 403) msg = t('processes.forbiddenCreate');
       else if (res.status === 409) msg = t('processes.warehouseMissing');
@@ -577,7 +577,7 @@ export default function ProcessCreateScreen() {
       }
       Alert.alert(
         t('processes.recipeSaveFailed'),
-        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+        apiErrorText(res.error, t('form.tryAgain')),
       );
     } finally {
       setSavingRecipe(false);
@@ -645,12 +645,15 @@ export default function ProcessCreateScreen() {
 
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={insets.top + 50}
+          // iOS: the ScrollView insets itself by the keyboard's overlap; padding the
+          // view as well would leave a dead band above the keyboard
+          behavior={Platform.OS === 'ios' ? undefined : 'height'}
         >
           <ScrollView
             contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
+            automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
           >
             <ThemedText style={styles.note}>{t('processes.createNote')}</ThemedText>
 

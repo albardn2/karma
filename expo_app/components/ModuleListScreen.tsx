@@ -253,7 +253,8 @@ export function ModuleListScreen<T>({
           </ScrollingChipRow>
         )}
 
-        {!body && header}
+        {/* the same gutter as the rows below, which every caller's header assumed */}
+        {!body && !!header && <View style={styles.header}>{header}</View>}
 
         {body ? (
           body
@@ -370,6 +371,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.08)',
   },
+  header: { paddingHorizontal: 20 },
   list: { paddingHorizontal: 20, paddingTop: 6 },
   listEmpty: { flexGrow: 1 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },

@@ -207,7 +207,17 @@ export function apiErrorText(error: unknown, fallback = ''): string {
   try {
     const parsed = JSON.parse(raw);
     const msg = parsed?.error || parsed?.msg || parsed?.message;
-    if (typeof msg === 'string' && msg) return msg;
+    // a 422 says "Validation error" and puts the useful part in pydantic's details:
+    // which field, and what is wrong with it
+    const fields = Array.isArray(parsed?.details)
+      ? parsed.details
+          .map((d: any) => {
+            const where = Array.isArray(d?.loc) ? d.loc.filter((p: unknown) => p !== 'body').join('.') : '';
+            return [where, d?.msg].filter(Boolean).join(': ');
+          })
+          .filter(Boolean)
+      : [];
+    if (typeof msg === 'string' && msg) return fields.length ? `${msg}\n${fields.join('\n')}` : msg;
   } catch {
     // not JSON — a plain-text body
   }

@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { formatNumericDate, parseTs } from '@/utils/date';
 import { round6 } from '@/utils/fifo';
 
@@ -140,7 +140,7 @@ export default function ProcessDetailScreen() {
       router.back();
       return;
     }
-    const raw = String(res.error ?? '').slice(0, 300);
+    const raw = apiErrorText(res.error);
     Alert.alert(
       t('processes.deleteTitle'),
       // a 404 here almost always means the produced lot has already been drawn from,

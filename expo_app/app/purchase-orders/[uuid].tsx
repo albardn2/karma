@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { money } from '@/utils/money';
 import { formatNumericDate, parseTs, plainDate } from '@/utils/date';
@@ -141,7 +141,7 @@ export default function PurchaseOrdersDetailScreen() {
         ? t('purchaseOrders.deleteBlocked')
         : res.status === 403
           ? t('purchaseOrders.forbidden')
-          : String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+          : apiErrorText(res.error, t('form.tryAgain')),
     );
   };
 

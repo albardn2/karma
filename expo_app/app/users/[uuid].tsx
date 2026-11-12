@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 import { LANGUAGE_LABELS } from '@/i18n/translations';
 
@@ -89,7 +89,7 @@ export default function UserDetailScreen() {
       body: JSON.stringify({ is_active: value }),
     });
     if (isOk(res.status)) setReloadKey((k) => k + 1);
-    else Alert.alert(label, String(res.error ?? '').slice(0, 300) || t('form.tryAgain'));
+    else Alert.alert(label, apiErrorText(res.error, t('form.tryAgain')));
   };
 
   const rows = (u: User): DetailRow[] => [

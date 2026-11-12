@@ -14,7 +14,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 
 interface Preset {
   modules?: string[];
@@ -86,7 +86,7 @@ export default function RolePresetsScreen() {
     // the response carries the resolved presets, but a refetch is cheaper to reason about
     // than trusting one payload to be the whole truth after a cache invalidation
     if (isOk(res.status)) load(true);
-    else Alert.alert(t('roles.resetFailed'), String(res.error ?? '').slice(0, 300));
+    else Alert.alert(t('roles.resetFailed'), apiErrorText(res.error));
   };
 
   const confirmReset = (role: string) =>

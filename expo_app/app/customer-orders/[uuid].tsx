@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Alert,
-  Modal,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -10,6 +9,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
+import { BottomSheetModal } from '@/components/BottomSheetModal';
+import { KEYBOARD_DONE_BAR_ID } from '@/components/KeyboardDoneBar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
@@ -183,7 +184,7 @@ export default function CustomerOrderDetailScreen() {
     else
       Alert.alert(
         t('detail.delete'),
-        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+        apiErrorText(res.error, t('form.tryAgain')),
       );
   };
 
@@ -193,7 +194,7 @@ export default function CustomerOrderDetailScreen() {
     else
       Alert.alert(
         t('customerOrders.void'),
-        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+        apiErrorText(res.error, t('form.tryAgain')),
       );
   };
 
@@ -211,7 +212,7 @@ export default function CustomerOrderDetailScreen() {
     } else {
       Alert.alert(
         t('customerOrders.editNotes'),
-        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+        apiErrorText(res.error, t('form.tryAgain')),
       );
     }
   };
@@ -231,7 +232,7 @@ export default function CustomerOrderDetailScreen() {
           if (!isOk(res.status))
             Alert.alert(
               t('customerOrders.unfulfil'),
-              String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+              apiErrorText(res.error, t('form.tryAgain')),
             );
         },
       },
@@ -441,12 +442,14 @@ export default function CustomerOrderDetailScreen() {
             label: t('detail.delete'),
             destructive: true,
             testID: 'order-delete',
-            // the server refuses this cascade once the order is fulfilled, paid, or
-            // has no live items (with a misleading message on the empty case) — so
-            // only offer it where it can succeed
+            // the server refuses this cascade once the order is fulfilled, has any
+            // payment on it, or has no live items (with a misleading message on the
+            // empty case) — so only offer it where it can succeed. Partly paid counts:
+            // is_paid is only true once the whole amount is in.
             visible: (d) =>
               !d.customer_order.is_fulfilled &&
               !d.customer_order.is_paid &&
+              Number(d.customer_order.net_amount_paid ?? 0) <= 0 &&
               liveItems(d.customer_order).length > 0,
             onPress: remove,
           },
@@ -463,137 +466,118 @@ export default function CustomerOrderDetailScreen() {
         ]}
       />
 
-      <Modal
+      <BottomSheetModal
         visible={notesOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setNotesOpen(false)}
+        onClose={() => setNotesOpen(false)}
+        busy={notesSaving}
+        title={t('customerOrders.editNotes')}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <ThemedText style={styles.modalTitle}>{t('customerOrders.editNotes')}</ThemedText>
-            <TextInput
-              style={styles.notesInput}
-              value={notesDraft}
-              onChangeText={setNotesDraft}
-              placeholder={t('customerOrders.notesPlaceholder')}
-              placeholderTextColor="#9ca3af"
-              multiline
-              autoFocus
-              testID="order-notes-input"
-            />
-            <View style={styles.modalRow}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setNotesOpen(false)}
-                disabled={notesSaving}
-              >
-                <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSave, notesSaving && styles.modalSaveOff]}
-                onPress={saveNotes}
-                disabled={notesSaving}
-                testID="order-notes-save"
-              >
-                <ThemedText style={styles.modalSaveText}>
-                  {notesSaving ? t('custdetail.saving') : t('form.save')}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
+        <TextInput
+          style={styles.notesInput}
+          value={notesDraft}
+          onChangeText={setNotesDraft}
+          placeholder={t('customerOrders.notesPlaceholder')}
+          placeholderTextColor="#9ca3af"
+          multiline
+          autoFocus
+          testID="order-notes-input"
+        />
+        <View style={styles.modalRow}>
+          <TouchableOpacity
+            style={styles.modalCancel}
+            onPress={() => setNotesOpen(false)}
+            disabled={notesSaving}
+          >
+            <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modalSave, notesSaving && styles.modalSaveOff]}
+            onPress={saveNotes}
+            disabled={notesSaving}
+            testID="order-notes-save"
+          >
+            <ThemedText style={styles.modalSaveText}>
+              {notesSaving ? t('custdetail.saving') : t('form.save')}
+            </ThemedText>
+          </TouchableOpacity>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
-      <Modal
+      <BottomSheetModal
         visible={!!priceItem}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPriceItem(null)}
+        onClose={() => setPriceItem(null)}
+        busy={priceSaving}
+        title={`${t('customerOrders.editPrice')}${priceItem?.material_name ? ` — ${priceItem.material_name}` : ''}`}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <ThemedText style={styles.modalTitle}>
-              {t('customerOrders.editPrice')}
-              {priceItem?.material_name ? ` — ${priceItem.material_name}` : ''}
+        <TextInput
+          style={styles.priceInput}
+          value={priceDraft}
+          onChangeText={setPriceDraft}
+          keyboardType="decimal-pad"
+          inputAccessoryViewID={KEYBOARD_DONE_BAR_ID}
+          placeholder={t('customerOrders.newPricePerUnit')}
+          placeholderTextColor="#9ca3af"
+          autoFocus
+          testID="order-price-input"
+        />
+        <View style={styles.modalRow}>
+          <TouchableOpacity
+            style={styles.modalCancel}
+            onPress={() => setPriceItem(null)}
+            disabled={priceSaving}
+          >
+            <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modalSave, priceSaving && styles.modalSaveOff]}
+            onPress={savePrice}
+            disabled={priceSaving}
+            testID="order-price-save"
+          >
+            <ThemedText style={styles.modalSaveText}>
+              {priceSaving ? t('custdetail.saving') : t('form.save')}
             </ThemedText>
-            <TextInput
-              style={styles.priceInput}
-              value={priceDraft}
-              onChangeText={setPriceDraft}
-              keyboardType="decimal-pad"
-              placeholder={t('customerOrders.newPricePerUnit')}
-              placeholderTextColor="#9ca3af"
-              autoFocus
-              testID="order-price-input"
-            />
-            <View style={styles.modalRow}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setPriceItem(null)}
-                disabled={priceSaving}
-              >
-                <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSave, priceSaving && styles.modalSaveOff]}
-                onPress={savePrice}
-                disabled={priceSaving}
-                testID="order-price-save"
-              >
-                <ThemedText style={styles.modalSaveText}>
-                  {priceSaving ? t('custdetail.saving') : t('form.save')}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </TouchableOpacity>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
-      <Modal
+      <BottomSheetModal
         visible={!!quantityItem}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setQuantityItem(null)}
+        onClose={() => setQuantityItem(null)}
+        busy={quantitySaving}
+        title={`${t('customerOrders.editQuantity')}${quantityItem?.material_name ? ` — ${quantityItem.material_name}` : ''}`}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <ThemedText style={styles.modalTitle}>
-              {t('customerOrders.editQuantity')}
-              {quantityItem?.material_name ? ` — ${quantityItem.material_name}` : ''}
+        <TextInput
+          style={styles.priceInput}
+          value={quantityDraft}
+          onChangeText={setQuantityDraft}
+          keyboardType="number-pad"
+          inputAccessoryViewID={KEYBOARD_DONE_BAR_ID}
+          placeholder={t('customerOrders.newQuantity')}
+          placeholderTextColor="#9ca3af"
+          autoFocus
+          testID="order-quantity-input"
+        />
+        <View style={styles.modalRow}>
+          <TouchableOpacity
+            style={styles.modalCancel}
+            onPress={() => setQuantityItem(null)}
+            disabled={quantitySaving}
+          >
+            <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modalSave, quantitySaving && styles.modalSaveOff]}
+            onPress={saveQuantity}
+            disabled={quantitySaving}
+            testID="order-quantity-save"
+          >
+            <ThemedText style={styles.modalSaveText}>
+              {quantitySaving ? t('custdetail.saving') : t('form.save')}
             </ThemedText>
-            <TextInput
-              style={styles.priceInput}
-              value={quantityDraft}
-              onChangeText={setQuantityDraft}
-              keyboardType="number-pad"
-              placeholder={t('customerOrders.newQuantity')}
-              placeholderTextColor="#9ca3af"
-              autoFocus
-              testID="order-quantity-input"
-            />
-            <View style={styles.modalRow}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setQuantityItem(null)}
-                disabled={quantitySaving}
-              >
-                <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSave, quantitySaving && styles.modalSaveOff]}
-                onPress={saveQuantity}
-                disabled={quantitySaving}
-                testID="order-quantity-save"
-              >
-                <ThemedText style={styles.modalSaveText}>
-                  {quantitySaving ? t('custdetail.saving') : t('form.save')}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </TouchableOpacity>
         </View>
-      </Modal>
+      </BottomSheetModal>
     </>
   );
 }
@@ -624,14 +608,18 @@ const styles = StyleSheet.create({
   invoiceTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   invoiceAmount: { flex: 1, fontSize: 14, fontWeight: '700', color: '#1f2937' },
   invoiceMeta: { fontSize: 12, opacity: 0.6, marginTop: 2 },
+  // wraps, so the edit buttons drop to their own line and the material's name
+  // keeps its full width
   invoiceLine: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 8,
+    columnGap: 8,
+    rowGap: 2,
     marginTop: 4,
     paddingLeft: 6,
   },
-  invoiceLineName: { flex: 1, fontSize: 12, opacity: 0.75 },
+  invoiceLineName: { flexGrow: 1, flexBasis: '50%', fontSize: 12, opacity: 0.75 },
   invoiceLineFigures: { fontSize: 12, opacity: 0.6 },
   editPrice: { fontSize: 12, fontWeight: '700', color: '#5469D4' },
   priceNote: { fontSize: 11, color: '#B45309', lineHeight: 15, marginTop: 6 },
@@ -655,15 +643,6 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   payBtnText: { fontSize: 12, fontWeight: '700', color: '#5469D4' },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
-  modalSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-    paddingBottom: 32,
-  },
-  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
   notesInput: {
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.15)',

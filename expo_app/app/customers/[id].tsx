@@ -1173,7 +1173,12 @@ export default function CustomerDetailScreen() {
                     colors={deleting ? ["#f87171", "#ef4444"] : ["#ef4444", "#dc2626"]}
                     style={styles.deleteModalConfirmButton}
                   >
-                    <ThemedText style={styles.deleteModalConfirmText}>
+                    <ThemedText
+                      style={styles.deleteModalConfirmText}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                    >
                       {deleting ? t('custdetail.deleting') : t('custdetail.deleteCustomer')}
                     </ThemedText>
                   </LinearGradient>
@@ -1649,7 +1654,8 @@ const styles = StyleSheet.create({
   deleteModalConfirmButton: {
     flex: 1,
     paddingVertical: 14,
-    paddingHorizontal: 20,
+    // a half-width button on a phone leaves ~90pt for "Delete Customer" at 20pt padding
+    paddingHorizontal: 8,
     borderRadius: 12,
     alignItems: "center",
   },

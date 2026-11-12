@@ -166,6 +166,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     'tracking.noDriver': 'No assigned driver',
     // common
     'common.cancel': 'Cancel',
+    'common.done': 'Done',
     'common.error': 'Error',
     'common.ok': 'OK',
     // menu
@@ -1553,6 +1554,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     'tracking.noDriver': 'لا يوجد سائق معيّن',
     // common
     'common.cancel': 'إلغاء',
+    'common.done': 'تم',
     'common.error': 'خطأ',
     'common.ok': 'حسناً',
     // menu
