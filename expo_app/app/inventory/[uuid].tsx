@@ -6,7 +6,7 @@ import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/Module
 import { CostCurrencyToggle, CostCcy } from '@/components/CostCurrencyToggle';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatMonthDayTime, formatNumericDate, parseTs, plainDate } from '@/utils/date';
 
@@ -111,7 +111,7 @@ export default function LotDetailScreen() {
           } else {
             Alert.alert(
               t('materials.zeroOutFailed'),
-              String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+              apiErrorText(res.error, t('form.tryAgain')),
             );
           }
         },
@@ -132,7 +132,7 @@ export default function LotDetailScreen() {
     else
       Alert.alert(
         t('inventory.deleteFailed'),
-        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+        apiErrorText(res.error, t('form.tryAgain')),
       );
   };
 

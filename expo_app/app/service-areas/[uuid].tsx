@@ -8,7 +8,7 @@ import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/Module
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { formatNumericDate } from '@/utils/date';
 import {
   formatKm2,
@@ -86,7 +86,7 @@ export default function ServiceAreaDetailScreen() {
     }
     Alert.alert(
       t('detail.delete'),
-      String(res.error ?? '').slice(0, 300) || t('serviceAreas.deleteFailed'),
+      apiErrorText(res.error, t('serviceAreas.deleteFailed')),
     );
   };
 

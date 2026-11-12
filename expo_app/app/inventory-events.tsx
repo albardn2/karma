@@ -110,7 +110,8 @@ export default function InventoryEventsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  tags: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  // wraps: two pills and a long type label exceed one line on a phone
+  tags: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, flexShrink: 1 },
   affects: {
     fontSize: 10,
     fontWeight: '700',

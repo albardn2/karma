@@ -291,7 +291,8 @@ export default function LiveMapScreen() {
           )}
         </View>
 
-        <View style={[styles.list, { paddingBottom: 12 + insets.bottom }]}>
+        {/* the bottom nav is drawn over the screen's foot: clear it as ModuleListScreen does */}
+        <View style={[styles.list, { paddingBottom: 90 + insets.bottom }]}>
           {drivers.slice(0, 6).map((d) => (
             <View key={d.userUuid} style={styles.row}>
               <ThemedText style={[styles.name, isStale(d) && styles.dim]} numberOfLines={1}>

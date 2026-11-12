@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ModuleDetailScreen, DetailAction, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { formatMonthDayTime, parseTs } from '@/utils/date';
 
 interface InventoryEvent {
@@ -67,7 +67,7 @@ export default function MovementDetailScreen() {
     else
       Alert.alert(
         t('inventoryEvents.deleteFailed'),
-        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+        apiErrorText(res.error, t('form.tryAgain')),
       );
   };
 

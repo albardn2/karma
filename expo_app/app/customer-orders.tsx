@@ -91,6 +91,7 @@ export default function CustomerOrdersScreen() {
               }}
               value={customer.uuid}
               onChange={(uuid, label) => setCustomer({ uuid, label })}
+              initialLabel={customer.label || undefined}
               testID="orders-customer-filter"
             />
             {!!customer.uuid && (

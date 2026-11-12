@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall, isOk } from '@/utils/api';
@@ -146,28 +146,38 @@ export function PickerField({ spec, value, onChange, initialLabel, testID }: Pic
           ) : !shown.length ? (
             <ThemedText style={styles.note}>{t('moduleList.noMatches')}</ThemedText>
           ) : (
-            shown.map((r) => {
-              const v = spec.value(r);
-              const sub = spec.sublabel?.(r);
-              return (
-                <TouchableOpacity
-                  key={v}
-                  style={[styles.row, v === value && styles.rowOn]}
-                  onPress={() => {
-                    setChosen({ value: v, label: spec.label(r) });
-                    onChange(v, spec.label(r));
-                    setOpen(false);
-                    setQuery('');
-                  }}
-                  testID={testID ? `${testID}-opt-${v}` : undefined}
-                >
-                  <ThemedText style={styles.rowLabel} numberOfLines={1}>
-                    {spec.label(r)}
-                  </ThemedText>
-                  {!!sub && <ThemedText style={styles.rowSub}>{sub}</ThemedText>}
-                </TouchableOpacity>
-              );
-            })
+            // The rows scroll inside the panel, which clips at maxHeight so they never
+            // draw over the fields below. nestedScrollEnabled: Android does not
+            // otherwise scroll a ScrollView inside the form's own.
+            <ScrollView
+              style={styles.rows}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              testID={testID ? `${testID}-rows` : undefined}
+            >
+              {shown.map((r) => {
+                const v = spec.value(r);
+                const sub = spec.sublabel?.(r);
+                return (
+                  <TouchableOpacity
+                    key={v}
+                    style={[styles.row, v === value && styles.rowOn]}
+                    onPress={() => {
+                      setChosen({ value: v, label: spec.label(r) });
+                      onChange(v, spec.label(r));
+                      setOpen(false);
+                      setQuery('');
+                    }}
+                    testID={testID ? `${testID}-opt-${v}` : undefined}
+                  >
+                    <ThemedText style={styles.rowLabel} numberOfLines={1}>
+                      {spec.label(r)}
+                    </ThemedText>
+                    {!!sub && <ThemedText style={styles.rowSub}>{sub}</ThemedText>}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           )}
         </View>
       )}
@@ -197,7 +207,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.08)',
     paddingVertical: 6,
     maxHeight: 260,
+    overflow: 'hidden',
   },
+  rows: { flexGrow: 0 },
   search: {
     marginHorizontal: 8,
     marginBottom: 4,

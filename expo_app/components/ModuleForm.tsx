@@ -16,8 +16,9 @@ import { ThemedView } from '@/components/ThemedView';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, apiErrorText, isOk } from '@/utils/api';
 import { PickerField, PickerSpec } from '@/components/PickerField';
+import { KEYBOARD_DONE_BAR_ID, KeyboardDoneBar } from '@/components/KeyboardDoneBar';
 
 export interface FormField {
   name: string;
@@ -118,9 +119,9 @@ interface ModuleFormProps {
  * several reject fields the read model happily returns, so echoing the whole record
  * back 422s. Sending the diff also avoids clobbering a field someone else changed.
  *
- * EMPTY MEANS OMITTED, not empty-string. Several list and update DTOs reject an
- * empty value for a typed field, so a cleared optional input must disappear from
- * the payload rather than be sent as "".
+ * EMPTY IS NEVER SENT AS "". Several list and update DTOs reject an empty value for a
+ * typed field. An empty input is omitted, except on an edit that empties a field that
+ * had a value: that is sent as null, which clears it.
  */
 export function ModuleForm({
   module,
@@ -169,7 +170,13 @@ export function ModuleForm({
         found[f.name] = t('form.required');
         continue;
       }
-      if (!raw) continue;
+      if (!raw) {
+        // an edit that empties a field that had a value clears it on the server;
+        // omitting it would leave the old value and report the save as done
+        const had = initial?.[f.name];
+        if (method === 'PUT' && had != null && String(had).trim() !== '') body[f.name] = null;
+        continue;
+      }
 
       let parsed: any = raw;
       if (f.kind === 'number') {
@@ -230,8 +237,7 @@ export function ModuleForm({
         // and hiding that behind "something went wrong" makes it unfixable
         Alert.alert(
           t('form.saveFailed'),
-          errorMessages?.[res.status] ??
-            (String(res.error ?? '').slice(0, 300) || t('form.tryAgain')),
+          errorMessages?.[res.status] ?? apiErrorText(res.error, t('form.tryAgain')),
         );
       }
     } catch (e) {
@@ -257,10 +263,20 @@ export function ModuleForm({
 
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={insets.top + 50}
+          // iOS insets the scroll view itself (automaticallyAdjustKeyboardInsets): it
+          // reserves exactly the keyboard's overlap and scrolls the focused field into
+          // view. Padding the whole view as well would count the safe area twice and
+          // leave a dead band above the keyboard, with the lower fields and Save behind it.
+          behavior={Platform.OS === 'ios' ? undefined : 'height'}
         >
-          <ScrollView contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}>
+          <ScrollView
+            contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
+            automaticallyAdjustKeyboardInsets
+            // a tap on another field, a chip or Save acts on the first tap while the
+            // keyboard is up
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+          >
             {!!note && <ThemedText style={styles.note}>{note}</ThemedText>}
             {shownFields.map((f) => (
               <View key={f.name} style={styles.field}>
@@ -308,7 +324,13 @@ export function ModuleForm({
                     placeholderTextColor="#9ca3af"
                     multiline={f.kind === 'multiline'}
                     keyboardType={
-                      f.keyboardType ?? (f.kind === 'number' ? 'numeric' : 'default')
+                      f.keyboardType ?? (f.kind === 'number' ? 'decimal-pad' : 'default')
+                    }
+                    // number pads have no return key; this is their way out
+                    inputAccessoryViewID={
+                      f.kind === 'number' || f.keyboardType === 'numeric' || f.keyboardType === 'phone-pad'
+                        ? KEYBOARD_DONE_BAR_ID
+                        : undefined
                     }
                     autoCapitalize={f.keyboardType === 'email-address' ? 'none' : 'sentences'}
                     testID={`form-${f.name}`}
@@ -335,6 +357,7 @@ export function ModuleForm({
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
+        <KeyboardDoneBar />
       </ThemedView>
     </ModuleGuard>
   );

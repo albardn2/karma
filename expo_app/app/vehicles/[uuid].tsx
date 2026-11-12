@@ -10,7 +10,7 @@ import { CostCurrencyToggle, type CostCcy } from '@/components/CostCurrencyToggl
 import { money } from '@/utils/money';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { useApiQuery, useCachedQuery } from '@/hooks/useApiQuery';
 import { formatNumericDate, parseTs } from '@/utils/date';
 
@@ -533,7 +533,7 @@ export default function VehiclesDetailScreen() {
             }
             Alert.alert(
               t('vehicles.deleteFailed'),
-              String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+              apiErrorText(res.error, t('form.tryAgain')),
             );
           },
         },

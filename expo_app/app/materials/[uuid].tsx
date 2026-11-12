@@ -6,7 +6,7 @@ import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { LineChart } from '@/components/Chart';
 import { CostCurrencyToggle, CostCcy } from '@/components/CostCurrencyToggle';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatMonthDayTime, formatNumericDate, parseTs, plainDate } from '@/utils/date';
 
@@ -132,7 +132,7 @@ export default function MaterialDetailScreen() {
             if (!isOk(res.status))
               Alert.alert(
                 t('materials.zeroOutFailed'),
-                String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+                apiErrorText(res.error, t('form.tryAgain')),
               );
           },
         },
@@ -155,7 +155,7 @@ export default function MaterialDetailScreen() {
     } else {
       Alert.alert(
         t('materials.deleteFailed'),
-        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
+        apiErrorText(res.error, t('form.tryAgain')),
       );
     }
   };

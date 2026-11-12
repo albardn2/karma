@@ -17,7 +17,7 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { PickerField } from '@/components/PickerField';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { money } from '@/utils/money';
 
 const CURRENCIES = ['USD', 'SYP'];
@@ -164,7 +164,7 @@ export default function PurchaseOrderCreateScreen() {
         else router.back();
         return;
       }
-      const raw = String(res.error ?? '').slice(0, 300);
+      const raw = apiErrorText(res.error);
       Alert.alert(
         t('form.saveFailed'),
         res.status === 403
@@ -198,12 +198,15 @@ export default function PurchaseOrderCreateScreen() {
 
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={insets.top + 50}
+          // iOS: the ScrollView insets itself by the keyboard's overlap; padding the
+          // view as well would leave a dead band above the keyboard
+          behavior={Platform.OS === 'ios' ? undefined : 'height'}
         >
           <ScrollView
             contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}
+            automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
           >
             <ThemedText style={styles.note}>{t('purchaseOrders.frozenNote')}</ThemedText>
 

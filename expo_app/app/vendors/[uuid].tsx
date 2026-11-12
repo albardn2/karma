@@ -4,7 +4,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 
 interface Vendor {
   uuid: string;
@@ -60,7 +60,7 @@ export default function VendorsDetailScreen() {
     // The backend refuses to delete a vendor that still has purchase orders, notes
     // or a non-zero balance. Show its reason rather than a generic failure — the
     // reason is the actionable part.
-    Alert.alert(t('detail.delete'), String(res.error ?? '').slice(0, 300) || t('form.tryAgain'));
+    Alert.alert(t('detail.delete'), apiErrorText(res.error, t('form.tryAgain')));
   };
 
   return (

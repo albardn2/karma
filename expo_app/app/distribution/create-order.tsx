@@ -180,6 +180,7 @@ export default function CreateOrderScreen() {
                 }}
                 value={customerSel.uuid}
                 onChange={(uuid, label) => setCustomerSel({ uuid, label })}
+                initialLabel={customerSel.label || undefined}
                 testID="create-order-customer"
               />
             </View>

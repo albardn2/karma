@@ -4,7 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow, DetailAction } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatNumericDate } from '@/utils/date';
 
@@ -87,7 +87,7 @@ export default function SuperAdminAccountScreen() {
       body: JSON.stringify({ [field]: value }),
     });
     // on success the write itself refreshes the account and its charges
-    if (!isOk(res.status)) Alert.alert(label, String(res.error ?? '').slice(0, 300) || t('form.tryAgain'));
+    if (!isOk(res.status)) Alert.alert(label, apiErrorText(res.error, t('form.tryAgain')));
   };
 
   // DetailAction.visible was added for exactly this: which levers apply depends on the
