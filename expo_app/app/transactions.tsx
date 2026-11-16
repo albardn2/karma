@@ -10,6 +10,7 @@ import { FilterChip } from '@/components/FilterChips';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatNumericDate, parseTs } from '@/utils/date';
 import { money } from '@/utils/money';
+import { useHasEndpoint } from '@/hooks/useModuleAccess';
 
 interface Transaction {
   uuid: string;
@@ -53,6 +54,7 @@ type Direction = 'out' | 'in';
  * merged client-side.
  */
 export default function TransactionsScreen() {
+  const canCreate = useHasEndpoint('transaction', 'create');
   const router = useRouter();
   const { t } = useLanguage();
   const accountsQuery = useApiQuery<{ accounts: Account[] }>(
@@ -83,6 +85,8 @@ export default function TransactionsScreen() {
         title={t('menu.transactions')}
         endpoint="/transaction/"
         itemsKey="transactions"
+        // admin, super admin and accountant; the server is the gate either way
+        onCreate={canCreate ? () => router.push('/transactions/create') : undefined}
         params={params}
         header={
           <View style={styles.accountFilter}>
