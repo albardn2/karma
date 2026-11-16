@@ -17,7 +17,8 @@ interface Entry {
 }
 
 /**
- * The four sections of the web console, in the order it presents them.
+ * The web console's sections that work on a phone, in the order it presents them.
+ * Dashboards per role is web-only: it is a grid of role × dashboard toggles.
  *
  * Kept as data so the hub and the routes cannot drift: every entry is a real file under
  * app/super-admin/, and the route deriving from it is the file name.

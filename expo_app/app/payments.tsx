@@ -17,18 +17,13 @@ interface Payment {
   invoice_uuid?: string | null;
   debit_note_item_uuid?: string | null;
   notes?: string | null;
+  payer_name?: string | null;
 }
 
 /**
- * Money collected.
- *
- * The list deliberately does NOT show who paid. PaymentRead carries no customer
- * field — the payer is two hops away, through the invoice — so putting a name on
- * every row would mean two extra requests per row. The detail screen spends those
- * for one record instead, which is where the question actually gets asked.
- *
- * What a row can honestly answer is how much, in what currency, when, and what it
- * was applied to, so that is what it shows.
+ * Money collected: who paid, how much, when, and what it was applied to. The payer's
+ * name comes on the payment itself (`payer_name`), resolved server-side through the
+ * invoice's order or the debit note.
  */
 export default function PaymentsScreen() {
   const router = useRouter();
@@ -60,6 +55,11 @@ export default function PaymentsScreen() {
                 <ThemedText style={styles.method}>{tef(p.payment_method)}</ThemedText>
               )}
             </View>
+            {!!p.payer_name && (
+              <ThemedText style={styles.payer} numberOfLines={1}>
+                {p.payer_name}
+              </ThemedText>
+            )}
             <View style={styles.cardBottom}>
               <ThemedText style={styles.date}>
                 {formatNumericDate(parseTs(p.created_at))}
@@ -112,6 +112,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  payer: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 4 },
   date: { fontSize: 13, opacity: 0.55 },
   against: { fontSize: 12, opacity: 0.5 },
 });

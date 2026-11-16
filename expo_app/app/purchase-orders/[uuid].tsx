@@ -211,6 +211,7 @@ export default function PurchaseOrdersDetailScreen() {
       // the web offers six copyable uuids in a sidebar; one is the only one anyone
       // actually needs, and a row cannot be tapped so it is an action
       label: t('purchaseOrders.orderUuid'),
+      secondary: true,
       testID: 'po-copy',
       onPress: copyUuid,
     },

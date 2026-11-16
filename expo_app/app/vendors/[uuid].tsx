@@ -47,9 +47,11 @@ export default function VendorsDetailScreen() {
   const balanceRows = (v: Vendor): DetailRow[] =>
     Object.entries(v.balance_per_currency ?? {}).map(([currency, amount]) => [
       t('vendors.balanceIn', { currency }),
-      Number(amount) < 0
-        ? t('vendors.owed', { amount: formatAmount(Math.abs(Number(amount))) })
-        : t('vendors.credit', { amount: formatAmount(Number(amount)) }),
+      Math.abs(Number(amount)) < 0.005
+        ? t('vendors.settled')
+        : Number(amount) < 0
+          ? t('vendors.owed', { amount: formatAmount(Math.abs(Number(amount))) })
+          : t('vendors.credit', { amount: formatAmount(Number(amount)) }),
     ]);
 
   const remove = async () => {
@@ -74,10 +76,12 @@ export default function VendorsDetailScreen() {
       rows={(x): DetailRow[] => [
         [t('vendors.contact'), x.full_name || '—'],
         [t('vendors.phone'), x.phone_number || '—'],
-        [t('vendors.email'), x.email_address || '—'],
+        // full width: a long address would otherwise break mid-word in a half column
+        [t('vendors.email'), x.email_address || '—', 'text'],
         [t('vendors.category'), x.category ? tef(x.category) : '—'],
         [t('vendors.address'), x.full_address || '—', 'text'],
         ...balanceRows(x),
+        [t('vendors.notes'), x.notes || '—', 'text'],
       ]}
       actions={[
         {

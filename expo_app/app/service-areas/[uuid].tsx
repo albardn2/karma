@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { Alert, Platform, StyleSheet, View } from 'react-native';
 import MapView, { Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -181,11 +181,18 @@ function AreaMap({ geometry }: { geometry: string }) {
     () => regionFor(rings.flatMap((r) => r.coordinates)),
     [rings],
   );
+  const mapRef = useRef<MapView>(null);
+  // initialRegion applies only on mount; a boundary edited elsewhere comes back here
+  // as a new region, and the map follows it
+  useEffect(() => {
+    if (region) mapRef.current?.animateToRegion(region, 300);
+  }, [region]);
   if (!region) return null;
 
   return (
     <View style={styles.mapWrap}>
       <MapView
+        ref={mapRef}
         style={styles.map}
         provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
         initialRegion={region}

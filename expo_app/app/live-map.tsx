@@ -16,6 +16,9 @@ import { apiCall, isOk } from '@/utils/api';
 import { MqttSubscriber, type MqttMessage } from '@/utils/mqttSubscriber';
 import { BACK_GLYPH } from '@/utils/rtl';
 
+/** Syria, before any position has arrived: where the fleet drives. */
+const DEFAULT_REGION = { latitude: 34.8, longitude: 38.5, latitudeDelta: 6, longitudeDelta: 6 };
+
 interface ClientConfig {
   broker_ws_url: string;
   topic_prefix: string;
@@ -120,6 +123,7 @@ export default function LiveMapScreen() {
   const [failed, setFailed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const clientRef = useRef<MqttSubscriber | null>(null);
+  const mapRef = useRef<MapView>(null);
   const attemptRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const disposedRef = useRef(false);
@@ -215,6 +219,13 @@ export default function LiveMapScreen() {
     // only re-fit when the set of drivers changes, not on every age tick
   }, [drivers.length, positions]);
 
+  // initialRegion applies only on mount, so a driver who appears later is framed
+  // here; keyed on the count, so a driver moving does not yank the view around
+  useEffect(() => {
+    if (region) mapRef.current?.animateToRegion(region, 400);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drivers.length]);
+
   const age = (p: Position) => {
     const secs = Math.max(0, Math.round((now - p.receivedAt) / 1000));
     if (secs < 60) return t('liveMap.secondsAgo', { n: secs });
@@ -263,11 +274,13 @@ export default function LiveMapScreen() {
         </View>
 
         <View style={styles.mapWrap}>
-          {region ? (
-            <MapView
+          {/* always a map, as on the web, with the waiting note over it until the
+              first position arrives */}
+          <MapView
+              ref={mapRef}
               style={StyleSheet.absoluteFill}
               provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-              initialRegion={region}
+              initialRegion={region ?? DEFAULT_REGION}
             >
               {/* first-seen order, not the sorted `drivers`: MapView children must
                   only ever be appended (see PolygonEditor's "always mounted" note),
@@ -283,8 +296,8 @@ export default function LiveMapScreen() {
                 />
               ))}
             </MapView>
-          ) : (
-            <View style={styles.centre}>
+          {!region && (
+            <View style={styles.waitingPill} pointerEvents="none">
               <ThemedText style={styles.stateText}>
                 {failed ? t('moduleList.failed') : t('liveMap.waiting')}
               </ThemedText>
@@ -337,6 +350,15 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 12, opacity: 0.7 },
   mapWrap: { flex: 1, marginHorizontal: 20, borderRadius: 12, overflow: 'hidden', backgroundColor: '#fff' },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  waitingPill: {
+    position: 'absolute',
+    top: 12,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
   stateText: { fontSize: 14, opacity: 0.6, textAlign: 'center' },
   list: { paddingHorizontal: 20, paddingTop: 10, gap: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },

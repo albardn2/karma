@@ -59,6 +59,8 @@ export default function PayoutCreateScreen() {
     <ModuleForm
       module="payouts"
       title={t('payouts.record')}
+      // the server pays from the tenant's one internal account in this currency
+      note={t('payouts.paidFromNote', { currency: currency ?? '' })}
       fields={fields}
       initial={{ amount: amount_due ?? '' }}
       extra={{ ...link, currency }}

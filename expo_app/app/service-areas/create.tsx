@@ -495,7 +495,8 @@ const styles = StyleSheet.create({
   },
   crossV: { position: 'absolute', width: 2, height: 26, backgroundColor: '#1f2937', opacity: 0.75 },
   crossH: { position: 'absolute', width: 26, height: 2, backgroundColor: '#1f2937', opacity: 0.75 },
-  hintWrap: { position: 'absolute', left: 0, right: 0, bottom: 10, alignItems: 'center' },
+  // clear of the map's Legal link in the bottom corner, which Apple requires to stay visible
+  hintWrap: { position: 'absolute', left: 0, right: 0, bottom: 36, alignItems: 'center' },
   hint: {
     fontSize: 11,
     fontWeight: '600',

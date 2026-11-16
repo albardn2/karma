@@ -31,6 +31,7 @@ import { formatNumericDate, parseTs } from '@/utils/date';
 import { TagInput } from '@/components/TagInput';
 import { useTagCatalog } from '@/utils/tagCatalog';
 import { formatAmount } from '@/utils/money';
+import { customerBalanceColor } from '@/utils/customerBalance';
 
 interface Customer {
   uuid: string;
@@ -527,11 +528,6 @@ export default function CustomerDetailScreen() {
     );
   };
 
-  const getBalanceColor = (balance: number) => {
-    if (balance > 0) return "#10b981";
-    if (balance < 0) return "#ef4444";
-    return "#6b7280";
-  };
 
   const categoryColors: Record<string, string> = {
     restaurant: "#5469D4",
@@ -1083,7 +1079,7 @@ export default function CustomerDetailScreen() {
                       <ThemedText
                         style={[
                           styles.currencyAmount,
-                          { color: getBalanceColor(amount) },
+                          { color: customerBalanceColor(amount) },
                         ]}
                       >
                         {formatAmount(amount)}

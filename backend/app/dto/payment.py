@@ -52,6 +52,7 @@ class PaymentUpdate(BaseModel):
 class PaymentRead(PaymentBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
+    payer_name: Optional[str] = None
     created_at: UtcDateTime
     is_deleted: bool
 

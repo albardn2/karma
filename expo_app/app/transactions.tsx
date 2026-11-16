@@ -133,7 +133,8 @@ export default function TransactionsScreen() {
           const from = nameOf(x.from_account_uuid);
           const to = nameOf(x.to_account_uuid);
           // a transfer shows both sides; a one-sided movement shows only the side it has
-          const amount = out && into ? `${out} → ${into}` : (out ?? into ?? '—');
+          // a same-currency move carries the same amount on both sides; say it once
+          const amount = out && into ? (out === into ? out : `${out} → ${into}`) : (out ?? into ?? '—');
           const route = from && to ? `${from} → ${to}` : (from ?? to ?? '—');
           return (
             <TouchableOpacity

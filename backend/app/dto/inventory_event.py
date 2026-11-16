@@ -79,6 +79,10 @@ class InventoryEventRead(InventoryEventBase):
     material_name: Optional[str] = Field(
         None,
         validation_alias=AliasChoices("material_name", AliasPath("material", "name")))
+    # the lot number a person recognises, from the lot this movement belongs to
+    lot_id: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("lot_id", AliasPath("inventory", "lot_id")))
 
 
 class InventoryEventListParams(BaseModel):

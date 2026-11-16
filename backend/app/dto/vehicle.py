@@ -46,6 +46,7 @@ class VehicleRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     uuid: str
+    created_by_name: Optional[str] = None
     created_by_uuid: Optional[str] = None
     created_at: UtcDateTime
     plate_number: str

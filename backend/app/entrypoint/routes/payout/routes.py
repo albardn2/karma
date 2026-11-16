@@ -1,4 +1,6 @@
 # app/entrypoint/routes/payout/routes.py
+from sqlalchemy.orm import selectinload
+from models.common import CreditNoteItem, PurchaseOrder
 from flask import Blueprint, request, jsonify
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.common.errors import NotFoundError
@@ -110,7 +112,15 @@ def list_payouts():
         page_obj = uow.payout_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
-            per_page=params.per_page
+            per_page=params.per_page,
+            # the read names what each payout paid for and from which account
+            options=[
+                selectinload(PayoutModel.financial_account),
+                selectinload(PayoutModel.expense),
+                selectinload(PayoutModel.purchase_order).selectinload(PurchaseOrder.vendor),
+                selectinload(PayoutModel.employee),
+                selectinload(PayoutModel.credit_note_item).selectinload(CreditNoteItem.customer),
+            ],
         )
         items = [PayoutRead.from_orm(p).model_dump(mode='json') for p in page_obj.items]
         result = PayoutPage(

@@ -20,6 +20,7 @@ import { plainMonthDay, plainMonthYear } from '@/utils/date';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { money } from '@/utils/money';
 import { BACK_GLYPH } from '@/utils/rtl';
+import { FilterChip, ScrollingChipRow } from '@/components/FilterChips';
 
 interface Bucket {
   period: string;
@@ -114,20 +115,17 @@ export default function ExpenseAnalyticsScreen() {
             />
           }
         >
-          <View style={styles.chips}>
+          <ScrollingChipRow inset={20}>
             {RANGES.map((r) => (
-              <TouchableOpacity
+              <FilterChip
                 key={r.id}
-                style={[styles.chip, range === r.id && styles.chipOn]}
+                label={t(`expenses.range.${r.id}`)}
+                active={range === r.id}
                 onPress={() => setRange(r.id)}
                 testID={`range-${r.id}`}
-              >
-                <ThemedText style={[styles.chipText, range === r.id && styles.chipTextOn]}>
-                  {t(`expenses.range.${r.id}`)}
-                </ThemedText>
-              </TouchableOpacity>
+              />
             ))}
-          </View>
+          </ScrollingChipRow>
 
           {loading ? (
             <View style={styles.centre}>

@@ -29,6 +29,7 @@ interface Lot {
   is_active: boolean;
   created_at: string;
   created_by_uuid?: string | null;
+  created_by_name?: string | null;
 }
 
 interface Movement {
@@ -141,7 +142,7 @@ export default function LotDetailScreen() {
       [t('inventory.receiptValue'), cost(l.total_original_cost, l.cost_currency)],
       [t('inventory.expiry'), l.expiration_date ? plainDate(l.expiration_date.slice(0, 10)) : '—'],
       [t('inventory.received'), formatNumericDate(parseTs(l.created_at))],
-      [t('inventory.createdBy'), l.created_by_uuid ?? '—'],
+      [t('inventory.createdBy'), l.created_by_name || '—'],
       [t('inventory.notes'), l.notes || '—', 'text'],
       [t('materials.uuid'), l.uuid],
     ];

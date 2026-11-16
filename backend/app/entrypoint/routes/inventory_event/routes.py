@@ -1,3 +1,4 @@
+from sqlalchemy.orm import selectinload
 from flask import Blueprint, request, jsonify
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.common.errors import NotFoundError
@@ -128,7 +129,9 @@ def list_inventory_events():
         page = uow.inventory_event_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
-            per_page=params.per_page
+            per_page=params.per_page,
+            # the read names the material and the lot; one query each for the page
+            options=[selectinload(InventoryEventModel.material), selectinload(InventoryEventModel.inventory)],
         )
         items = [InventoryEventRead.from_orm(e).model_dump(mode='json') for e in page.items]
         result = InventoryEventPage(

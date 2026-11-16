@@ -31,6 +31,9 @@ export default function MaterialFormScreen() {
     {
       name: 'measure_unit',
       label: t('materials.unit'),
+      // every stock line and order line is counted in it; a material without one
+      // cannot be ordered
+      required: !editing,
       kind: 'select',
       options: ['kg', 'liters', 'meters', 'pcs'].map((v) => ({ value: v, label: tef(v) })),
     },

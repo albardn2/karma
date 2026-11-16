@@ -13,6 +13,7 @@ interface InventoryEvent {
   uuid: string;
   event_type?: string | null;
   material_name?: string | null;
+  lot_id?: string | null;
   quantity: number;
   created_at: string;
   notes?: string | null;
@@ -43,7 +44,6 @@ export default function MovementDetailScreen() {
   const router = useRouter();
   const { t, tef } = useLanguage();
   const { isAdmin } = useAuth();
-  const [lotId, setLotId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useFocusEffect(
@@ -52,12 +52,6 @@ export default function MovementDetailScreen() {
     }, []),
   );
 
-  // the event carries only inventory_uuid; the lot number is what a person recognises
-  const resolveLot = useCallback(async (id?: string | null) => {
-    if (!id) return;
-    const res = await apiCall<{ lot_id?: string }>(`/inventory/${id}`);
-    if (isOk(res.status)) setLotId(res.data?.lot_id ?? null);
-  }, []);
 
   const qty = (n?: number | null) =>
     n == null ? '—' : Number.isInteger(n) ? String(n) : Number(n).toFixed(2);
@@ -73,11 +67,10 @@ export default function MovementDetailScreen() {
   };
 
   const rows = (e: InventoryEvent): DetailRow[] => {
-    if (e.inventory_uuid && lotId === null) resolveLot(e.inventory_uuid);
     return [
       [t('inventoryEvents.type'), e.event_type ? tef(e.event_type) : '—'],
       [t('inventory.material'), e.material_name || t('inventory.unknownMaterial')],
-      [t('inventory.lotId'), lotId ?? '—'],
+      [t('inventory.lotId'), e.lot_id || '—'],
       [
         t('inventoryEvents.costPerUnit'),
         e.cost_per_unit != null

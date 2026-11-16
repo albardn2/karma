@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime
 
 from app.dto.common_enums import Currency
@@ -49,7 +50,12 @@ class InventoryDomain:
 
     @staticmethod
     def generate_lot_id_dashed() -> str:
-        return datetime.utcnow().strftime("%Y-%m-%d-%H:%M:%S")
+        """A readable lot number: when it was added, plus a short random suffix.
+
+        lot_id is unique across every tenant and forever, so a bare timestamp would
+        collide for two lots added in the same second.
+        """
+        return f"{datetime.utcnow():%Y-%m-%d-%H:%M:%S}-{secrets.token_hex(2)}"
 
     @staticmethod
     def new_cost_context(currency: Currency = DEFAULT_COST_CURRENCY) -> dict:
