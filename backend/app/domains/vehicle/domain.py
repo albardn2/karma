@@ -30,6 +30,18 @@ class VehicleDomain:
         if not vehicle:
             raise NotFoundError('Vehicle not found')
 
+        # a deleted vehicle 404s, so stock still recorded on it could never be
+        # unloaded or corrected again
+        held = [
+            line for line in uow.vehicle_inventory_repository.find_all(vehicle_uuid=uuid, is_deleted=False)
+            if abs(line.current_quantity) > 1e-9
+        ]
+        if held:
+            raise BadRequestError(
+                f"This vehicle still has stock recorded on {len(held)} material(s). "
+                "Remove each material from the vehicle before deleting it."
+            )
+
         vehicle.is_deleted = True
         uow.vehicle_repository.save(model=vehicle, commit=False)
         return VehicleRead.from_orm(vehicle)

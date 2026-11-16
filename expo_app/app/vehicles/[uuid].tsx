@@ -138,9 +138,32 @@ export default function VehiclesDetailScreen() {
     ? []
     : (stockQuery.data?.vehicle_inventories ?? null);
 
-  // DELETE /vehicle/ has no server guard — it flips is_deleted and leaves the
-  // vehicle's stock rows live under a vehicle that then 404s. The confirm says what
-  // is about to be orphaned, which is the only place that can be said.
+  // the server refuses to delete a vehicle while any line holds stock, which would
+  // otherwise be stranded under a vehicle that 404s
+  const heldLines = (lots ?? []).filter((l) => Math.abs(Number(l.current_quantity ?? 0)) > 1e-9).length;
+
+  const removeLine = (l: VehicleLot) =>
+    Alert.alert(
+      t('vehicles.removeLine'),
+      t('vehicles.removeLineConfirm', {
+        material: l.material_name ?? '—',
+        qty: `${qty(Number(l.current_quantity ?? 0))}${l.unit ? ` ${l.unit}` : ''}`,
+      }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('vehicles.removeLine'),
+          style: 'destructive',
+          onPress: async () => {
+            const res = await apiCall(`/vehicle-inventory/${l.uuid}/remove`, { method: 'POST' });
+            if (!isOk(res.status)) {
+              Alert.alert(t('vehicles.removeLineFailed'), apiErrorText(res.error, t('form.tryAgain')));
+            }
+          },
+        },
+      ],
+    );
+
   const tripCountQuery = useApiQuery<{ total_count?: number }>(
     `/trip/?vehicle_uuid=${uuid}&per_page=1`,
   );
@@ -295,8 +318,20 @@ export default function VehiclesDetailScreen() {
                     {qty(Number(l.current_quantity ?? 0))}
                     {l.unit ? ` ${l.unit}` : ''}
                   </ThemedText>
+                  {l.is_active !== false && (
+                    <TouchableOpacity
+                      onPress={() => removeLine(l)}
+                      hitSlop={8}
+                      testID={`veh-lot-remove-${l.uuid}`}
+                    >
+                      <ThemedText style={styles.removeLine}>{t('vehicles.remove')}</ThemedText>
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
               ))}
+              {isAdmin && heldLines > 0 && (
+                <ThemedText style={styles.stockMeta}>{t('vehicles.removeBeforeDelete')}</ThemedText>
+              )}
             </>
           ),
         },
@@ -508,21 +543,14 @@ export default function VehiclesDetailScreen() {
           label: t('detail.delete'),
           destructive: true,
           testID: 'vehicle-delete',
-          // admin-only server-side. There is NO server guard beyond that: the route
-          // flips is_deleted and leaves this vehicle's stock rows live under a
-          // vehicle that then 404s, and its trips keep pointing at it. Nothing can
-          // stop that from here, so the confirm at least says what is about to be
-          // orphaned — and that the plate is gone for good, since plate_number is
-          // unique across every tenant with no exemption for deleted rows.
-          visible: () => isAdmin,
+          // admin-only server-side, and refused while any line holds stock, so it is
+          // offered only once the van is empty. Its trips keep pointing at it, and the
+          // plate is gone for good: plate_number is unique across every tenant with no
+          // exemption for deleted rows.
+          visible: () => isAdmin && lots !== null && heldLines === 0,
           confirmText:
             t('vehicles.deleteConfirm') +
-            (lots?.length || tripCount
-              ? ` ${t('vehicles.deleteStillHas', {
-                  materials: lots?.length ?? 0,
-                  trips: tripCount ?? 0,
-                })}`
-              : ''),
+            (tripCount ? ` ${t('vehicles.deleteHasTrips', { trips: tripCount })}` : ''),
           onPress: async (x) => {
             const res = await apiCall(`/vehicle/${x.uuid}`, { method: 'DELETE' });
             // back to the list underneath, which refreshes on focus; replacing would
@@ -556,6 +584,7 @@ const styles = StyleSheet.create({
   stockMeta: { fontSize: 11, opacity: 0.55, marginTop: 1 },
   stockQty: { fontSize: 14, fontWeight: '700', color: '#1f2937' },
   stockQtyBad: { color: '#991b1b' },
+  removeLine: { fontSize: 12, fontWeight: '600', color: '#dc2626' },
   chips: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   // the trips filter-chip design — one look for every filter bar
   chip: {

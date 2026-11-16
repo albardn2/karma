@@ -70,6 +70,19 @@ def update_vehicle_inventory(uuid: str):
     return jsonify(result), 200
 
 
+@vehicle_inventory_blueprint.route('/<string:uuid>/remove', methods=['POST'])
+@jwt_required()
+@scopes_required(*_ALL_SCOPES)
+def remove_vehicle_inventory(uuid: str):
+    with SqlAlchemyUnitOfWork() as uow:
+        VehicleInventoryDomain.remove_line(uow=uow, uuid=uuid, user_uuid=get_jwt_identity())
+        uow.commit()
+        # read back after the commit, so the balance includes the unload just recorded
+        inv = uow.vehicle_inventory_repository.find_one(uuid=uuid, is_deleted=False)
+        result = VehicleInventoryRead.from_orm(inv).model_dump(mode='json')
+    return jsonify(result), 200
+
+
 @vehicle_inventory_blueprint.route('/<string:uuid>', methods=['DELETE'])
 @jwt_required()
 @scopes_required(PermissionScope.ADMIN.value, PermissionScope.SUPER_ADMIN.value)
