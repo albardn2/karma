@@ -23,6 +23,7 @@ interface Lot {
   total_original_cost?: number | null;
   cost_currency?: string | null;
   warehouse_uuid?: string | null;
+  warehouse_name?: string | null;
   expiration_date?: string | null;
   notes?: string | null;
   is_active: boolean;
@@ -83,41 +84,28 @@ export default function LotDetailScreen() {
   const moves: Movement[] | null = movesQuery.isError ? [] : (movesQuery.data?.events ?? null);
   // the same read ModuleDetailScreen makes below, so this shares its cache entry
   const lotQuery = useApiQuery<Lot>(`/inventory/${uuid}?cost_currency=${ccy}`);
-  const warehouseUuid = lotQuery.data?.warehouse_uuid;
-  const warehouseQuery = useApiQuery<{ name?: string }>(
-    warehouseUuid ? `/warehouse/${warehouseUuid}` : null,
-  );
-  const whName = warehouseQuery.data?.name ?? null;
+  // the lot carries its warehouse's name, so it changes with the lot and never lags it
+  const whName = lotQuery.data?.warehouse_name ?? null;
 
   const moveCount = (moves ?? []).length;
 
-  const zeroOut = (l: Lot) =>
-    Alert.alert(t('materials.zeroOut'), t('materials.zeroOutConfirm', { lot: l.lot_id }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('materials.zeroOut'),
-        style: 'destructive',
-        onPress: async () => {
-          // the delta is computed server-side from the lot's own events, so a stale
-          // screen cannot overshoot — and a negative lot is corrected upward
-          const res = await apiCall(`/inventory/${uuid}/zero-out`, {
-            method: 'POST',
-            body: JSON.stringify({}),
-          });
-          // on success the write itself refreshes the lot and its movements
-          if (isOk(res.status)) {
-            return;
-          } else if (res.status === 400) {
-            Alert.alert(t('materials.zeroOut'), t('inventory.alreadyZero'));
-          } else {
-            Alert.alert(
-              t('materials.zeroOutFailed'),
-              apiErrorText(res.error, t('form.tryAgain')),
-            );
-          }
-        },
-      },
-    ]);
+  // the confirm is the detail screen's, worded by the action's confirmText: one
+  // dialog, not a generic one followed by this action's own
+  const zeroOut = async () => {
+    // the delta is computed server-side from the lot's own events, so a stale
+    // screen cannot overshoot, and a negative lot is corrected upward
+    const res = await apiCall(`/inventory/${uuid}/zero-out`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    // on success the write itself refreshes the lot and its movements
+    if (isOk(res.status)) return;
+    if (res.status === 400) {
+      Alert.alert(t('materials.zeroOut'), t('inventory.alreadyZero'));
+      return;
+    }
+    Alert.alert(t('materials.zeroOutFailed'), apiErrorText(res.error, t('form.tryAgain')));
+  };
 
   const remove = async () => {
     const res = await apiCall(`/inventory/${uuid}`, { method: 'DELETE' });
@@ -195,6 +183,7 @@ export default function LotDetailScreen() {
       label: t('materials.zeroOut'),
       destructive: true,
       testID: 'lot-zero-out',
+      confirmText: (l) => t('materials.zeroOutConfirm', { lot: l.lot_id }),
       // `!== 0`, not `> 0`: the same call corrects a negative lot upward
       visible: (l) => Number(l.current_quantity) !== 0,
       onPress: zeroOut,

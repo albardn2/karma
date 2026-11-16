@@ -105,6 +105,8 @@ export default function SuperAdminAccountScreen() {
       label: t('superAdmin.block'),
       destructive: true,
       testID: 'account-block',
+      // a block is reversible, so the generic "cannot be undone" would be false
+      confirmText: t('superAdmin.blockConfirm'),
       visible: (a) => !a.is_blocked,
       onPress: () => setFlag('is_blocked', true, t('superAdmin.block')),
     },

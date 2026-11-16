@@ -231,7 +231,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   'superAdmin.verify': 'Verify this account',
   'superAdmin.block': 'Block this account',
   'superAdmin.unblock': 'Unblock this account',
-  'superAdmin.blockConfirm': 'Everyone in this company will be locked out until it is unblocked.',
+  'superAdmin.blockConfirm': 'Everyone in this company is signed out and can\'t sign in until the account is unblocked. You can unblock it here at any time; no data is deleted.',
 
   'exchangeRates.latest': 'Latest rate',
   'exchangeRates.none': 'No rate recorded yet',
@@ -1406,8 +1406,13 @@ export const translations: Record<Lang, Record<string, string>> = {
 
   // vehicles parity (delete, stock writes, chart material filter)
   'vehicles.range7d': '7 days',
-  'vehicles.deleteConfirm': 'Delete this vehicle? Its trips and any stock still loaded on it stay in the system but will no longer belong to a vehicle. The plate number can never be used again.',
-  'vehicles.deleteStillHas': 'It still carries {materials} material line(s) and has {trips} trip(s).',
+  'vehicles.deleteConfirm': 'Delete this vehicle? Its trips stay in the system but will no longer belong to a vehicle. The plate number can never be used again.',
+  'vehicles.deleteHasTrips': 'It has {trips} trip(s).',
+  'vehicles.remove': 'Remove',
+  'vehicles.removeLine': 'Remove from vehicle',
+  'vehicles.removeLineConfirm': 'Remove {material} from this vehicle? The {qty} on board is recorded as unloaded, and the line stays in the history as inactive.',
+  'vehicles.removeLineFailed': "Couldn't remove this material",
+  'vehicles.removeBeforeDelete': 'To delete this vehicle, first remove every material that still has stock on board.',
   'vehicles.deleteFailed': 'Couldn\'t delete this vehicle',
   'vehicles.plateTaken': 'That plate number or VIN is already registered. Both are unique across the whole system, not just your company.',
   'vehicles.addMaterial': 'Add a material',
@@ -1635,7 +1640,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   'superAdmin.verify': 'توثيق هذا الحساب',
   'superAdmin.block': 'حجب هذا الحساب',
   'superAdmin.unblock': 'إلغاء حجب هذا الحساب',
-  'superAdmin.blockConfirm': 'سيُمنع جميع مستخدمي هذه الشركة حتى إلغاء الحجب.',
+  'superAdmin.blockConfirm': 'يُسجَّل خروج جميع مستخدمي هذه الشركة ولا يمكنهم الدخول حتى إلغاء حجب الحساب. يمكنك إلغاء الحجب من هنا في أي وقت، ولا تُحذف أي بيانات.',
 
   'exchangeRates.latest': 'أحدث سعر',
   'exchangeRates.none': 'لا يوجد سعر مسجل بعد',
@@ -2803,8 +2808,13 @@ export const translations: Record<Lang, Record<string, string>> = {
 
   // vehicles parity (delete, stock writes, chart material filter)
   'vehicles.range7d': '7 أيام',
-  'vehicles.deleteConfirm': 'حذف هذه المركبة؟ ستبقى رحلاتها وأي مخزون محمّل عليها في النظام لكن لن تعود تابعة لأي مركبة. ولا يمكن استخدام رقم اللوحة مرة أخرى.',
-  'vehicles.deleteStillHas': 'ما زالت تحمل {materials} بنداً من المواد ولها {trips} رحلة.',
+  'vehicles.deleteConfirm': 'حذف هذه المركبة؟ ستبقى رحلاتها في النظام لكن لن تعود تابعة لأي مركبة. ولا يمكن استخدام رقم اللوحة مرة أخرى.',
+  'vehicles.deleteHasTrips': 'لها {trips} رحلة.',
+  'vehicles.remove': 'إزالة',
+  'vehicles.removeLine': 'إزالة من المركبة',
+  'vehicles.removeLineConfirm': 'إزالة {material} من هذه المركبة؟ تُسجَّل الكمية المحمّلة ({qty}) كتفريغ، ويبقى البند في السجل كغير نشط.',
+  'vehicles.removeLineFailed': 'تعذّرت إزالة هذه المادة',
+  'vehicles.removeBeforeDelete': 'لحذف هذه المركبة، أزل أولاً كل مادة ما زال لها مخزون محمّل.',
   'vehicles.deleteFailed': 'تعذر حذف هذه المركبة',
   'vehicles.plateTaken': 'رقم اللوحة أو رقم الهيكل مُسجَّل مسبقاً. كلاهما فريد على مستوى النظام بالكامل، وليس على مستوى شركتك فقط.',
   'vehicles.addMaterial': 'إضافة مادة',

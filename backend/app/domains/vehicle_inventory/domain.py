@@ -2,6 +2,8 @@ from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWo
 from app.dto.vehicle_inventory import VehicleInventoryCreate, VehicleInventoryRead
 from app.entrypoint.routes.common.errors import NotFoundError, BadRequestError
 from models.common import VehicleInventory as VehicleInventoryModel
+from app.domains.vehicle_inventory_event.domain import VehicleInventoryEventDomain
+from app.dto.vehicle_inventory_event import VehicleInventoryEventCreate, VehicleInventoryEventType
 
 
 class VehicleInventoryDomain:
@@ -92,6 +94,39 @@ class VehicleInventoryDomain:
             ),
             allow_negative=True,
         )
+
+    @staticmethod
+    def remove_line(uow: SqlAlchemyUnitOfWork, uuid: str, user_uuid: str) -> None:
+        """Take a material off a vehicle: unload whatever is left, then deactivate the line.
+
+        A line with movements cannot be deleted, and every real line has them, so this
+        is how a van stops carrying a material while its history stays intact. An
+        overdrawn line is refused rather than silently corrected: a negative balance
+        means sales outran recorded loads, and that needs a correction someone chooses.
+        """
+        line = uow.vehicle_inventory_repository.find_one(uuid=uuid, is_deleted=False)
+        if not line:
+            raise NotFoundError("Vehicle inventory not found")
+
+        balance = line.current_quantity
+        if balance < 0:
+            raise BadRequestError(
+                f"This line is overdrawn (balance {balance:g}). Record a correction "
+                "before removing it from the vehicle."
+            )
+        if balance > 0:
+            VehicleInventoryEventDomain.create_event(
+                uow=uow,
+                payload=VehicleInventoryEventCreate(
+                    vehicle_inventory_uuid=line.uuid,
+                    event_type=VehicleInventoryEventType.UNLOAD,
+                    quantity=balance,
+                    created_by_uuid=user_uuid,
+                ),
+            )
+
+        line.is_active = False
+        uow.vehicle_inventory_repository.save(model=line, commit=False)
 
     @staticmethod
     def delete_vehicle_inventory(uow: SqlAlchemyUnitOfWork, uuid: str) -> VehicleInventoryRead:
