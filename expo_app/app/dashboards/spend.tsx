@@ -125,7 +125,7 @@ export function SpendScreenImpl({ embedded = false }: { embedded?: boolean }) {
               </View>
 
               {!!data && !data.disclosure.salaries_backed && (
-                <ThemedText style={styles.caveat}>{t('dashboards.beforeSalaries')}</ThemedText>
+                <ThemedText style={styles.caveat}>{t('dashboards.spendWithoutSalaries')}</ThemedText>
               )}
               {!!data && data.disclosure.unconverted_count > 0 && (
                 <ThemedText style={styles.caveat}>

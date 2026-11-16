@@ -209,9 +209,11 @@ const styles = StyleSheet.create({
   table: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginTop: 16 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 10 },
   rowLabel: { width: 74, fontSize: 12, fontWeight: '700', color: '#111827' },
-  rowVals: { flex: 1, flexDirection: 'row', justifyContent: 'space-between' },
-  rowVal: { fontSize: 12, color: '#374151', fontVariant: ['tabular-nums'] },
-  head: { color: '#9ca3af', fontWeight: '700', fontSize: 10 },
+  // equal, end-aligned columns, so figures line up down the table and the header
+  // sits over its column
+  rowVals: { flex: 1, flexDirection: 'row', gap: 6 },
+  rowVal: { flex: 1, textAlign: 'right', fontSize: 12, color: '#374151', fontVariant: ['tabular-nums'] },
+  head: { color: '#9ca3af', fontWeight: '700', fontSize: 10, lineHeight: 13 },
   centre: { alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
   stateText: { fontSize: 14, color: '#6B7280', textAlign: 'center' },
   retry: { backgroundColor: '#5469D4', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },

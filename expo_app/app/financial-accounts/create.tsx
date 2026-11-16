@@ -22,15 +22,20 @@ export default function FinancialAccountFormScreen() {
   const { t, tef } = useLanguage();
   const editing = !!uuid;
 
+  // Currency is set once. Payments, payouts and transfers are recorded in it, so
+  // switching it later would restate the balance in another currency; the API refuses
+  // that for an account with history, and the form does not offer it.
+  const currencyField: FormField = {
+    name: 'currency',
+    label: t('financialAccounts.currency'),
+    required: true,
+    kind: 'select',
+    options: ['USD', 'SYP'].map((v) => ({ value: v, label: tef(v) })),
+  };
+
   const fields: FormField[] = [
     { name: 'account_name', label: t('financialAccounts.name'), required: !editing },
-    {
-      name: 'currency',
-      label: t('financialAccounts.currency'),
-      required: !editing,
-      kind: 'select',
-      options: ['USD', 'SYP'].map((v) => ({ value: v, label: tef(v) })),
-    },
+    ...(editing ? [] : [currencyField]),
     {
       name: 'is_external',
       label: t('financialAccounts.kind'),

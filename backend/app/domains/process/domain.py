@@ -170,6 +170,16 @@ class ProcessDomain:
 
 
     @staticmethod
+    def read_with_costs(uow: SqlAlchemyUnitOfWork, process: ProcessModel, cost_ctx: dict) -> ProcessRead:
+        """The run with every input and output cost recomputed in cost_ctx's currency.
+
+        The stored snapshot is denominated in whatever currency was the default when the
+        run was written; this works on a copy so a read never rewrites it.
+        """
+        data = ProcessDomain._compute_cost_data(uow, copy.deepcopy(process.data), cost_ctx)
+        return ProcessRead.from_orm(process).model_copy(update={"data": ProcessData.model_validate(data)})
+
+    @staticmethod
     def _calculate_cost_per_unit(uow, process: ProcessModel) -> ProcessModel:
         """Stamp current input/output costs into process.data (write paths)."""
         for output in process.data["outputs"]:

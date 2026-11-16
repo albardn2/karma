@@ -97,7 +97,7 @@ export function ProfitabilityScreenImpl({ embedded = false }: { embedded?: boole
                 <FilterChip key={g} label={label} active={gran === g} onPress={() => setGran(g)} testID={`prof-gran-${g}`} />
               ))}
             </ScrollingChipRow>
-            <CostCurrencyToggle value={ccy} onChange={setCcy} testIDPrefix="prof-ccy" />
+            <CostCurrencyToggle value={ccy} onChange={setCcy} label={t('dashboards.amountsIn')} testIDPrefix="prof-ccy" />
           </View>
 
           {loading ? (
