@@ -46,6 +46,18 @@ class FinancialAccountDomain:
 
 
     @staticmethod
+    def _changes_sensitive_field(acc: FinancialAccount, updates: dict) -> bool:
+        """True when an update would CHANGE a frozen field, not merely restate it.
+
+        A client may send the whole record back on a rename; the same currency in
+        that payload is not a conversion and must not trip the history guard.
+        """
+        return any(
+            field in updates and updates[field] != getattr(getattr(acc, field), 'value', getattr(acc, field))
+            for field in FinancialAccountDomain.UPDATE_SENSITIVE_FIELDS
+        )
+
+    @staticmethod
     def update_financial_account(uow:SqlAlchemyUnitOfWork, uuid: str, payload: FinancialAccountUpdate) -> FinancialAccountRead:
         """
         Update a financial account in the database.
@@ -55,8 +67,11 @@ class FinancialAccountDomain:
             raise NotFoundError('Financial account not found')
 
         updates = payload.model_dump(exclude_unset=True,mode='json')
-        if any(field in FinancialAccountDomain.UPDATE_SENSITIVE_FIELDS for field in updates.keys()) and not FinancialAccountDomain.validate_no_relation_exists(uow,acc):
-            raise BadRequestError('Cannot update currency, relations exist')
+        if FinancialAccountDomain._changes_sensitive_field(acc, updates) and not FinancialAccountDomain.validate_no_relation_exists(uow,acc):
+            raise BadRequestError(
+                "This account's currency can't be changed: payments, payouts or "
+                "transfers already use it. Create a new account in the other currency."
+            )
 
         # an update can walk into the internal slot two ways: switching currency,
         # or flipping external -> internal

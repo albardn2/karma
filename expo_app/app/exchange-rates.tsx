@@ -52,6 +52,9 @@ export default function ExchangeRatesScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { t, tef } = useLanguage();
+  // the same words as the source filter chips, not the raw slug
+  const sourceLabel = (source: string) =>
+    source === 'sp-today' ? t('exchangeRates.scraped') : source === 'manual' ? t('exchangeRates.manual') : tef(source);
   const latestQuery = useApiQuery<Rate>('/exchange-rate/latest');
   const trendQuery = useApiQuery<{ exchange_rates: Rate[] }>(
     `/exchange-rate/?from_currency=USD&to_currency=SYP&per_page=${TREND_POINTS}`,
@@ -91,7 +94,7 @@ export default function ExchangeRatesScreen() {
                   (latest.rate_date
                     ? ` · ${plainDate(latest.rate_date)}`
                     : '') +
-                  (latest.source ? ` · ${tef(latest.source)}` : '')
+                  (latest.source ? ` · ${sourceLabel(latest.source)}` : '')
                 : ''}
             </ThemedText>
             {(latest?.buy_rate != null || latest?.sell_rate != null) && (
@@ -109,7 +112,7 @@ export default function ExchangeRatesScreen() {
       {!!series.length && (
         <View style={styles.chartCard}>
           <ThemedText style={styles.chartTitle}>{t('exchangeRates.trend')}</ThemedText>
-          <LineChart series={series} width={width - 72} />
+          <LineChart series={series} width={width - 72} yRange="data" />
         </View>
       )}
     </View>
@@ -138,7 +141,7 @@ export default function ExchangeRatesScreen() {
               <ThemedText style={styles.rate}>{num(r.rate)}</ThemedText>
               <ThemedText style={styles.pair}>
                 {r.from_currency} → {r.to_currency}
-                {r.source ? ` · ${tef(r.source)}` : ''}
+                {r.source ? ` · ${sourceLabel(r.source)}` : ''}
               </ThemedText>
             </View>
             <ThemedText style={styles.date}>

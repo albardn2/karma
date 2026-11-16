@@ -36,14 +36,24 @@ const niceStep = (raw: number) => {
 };
 
 /**
- * Evenly spaced ticks that always include zero.
- *
- * Positive and negative sides share one step, so a small dip below zero gets a full
- * step of room and its label never lands on top of the zero label.
+ * Whether a y-axis starts from zero or hugs the data. Amounts and counts read from
+ * zero, so bar heights compare honestly; a level that only moves within a narrow
+ * band, such as an exchange rate, is flattened into a line by a zero baseline.
  */
-export function axisTicks(lo: number, hi: number): { min: number; max: number; ticks: number[] } {
-  const low = Math.min(lo, 0);
-  const high = Math.max(hi, 0) === low ? low + 1 : Math.max(hi, 0);
+export type YAxisRange = 'zero' | 'data';
+
+/**
+ * Evenly spaced ticks on one shared step.
+ *
+ * With 'zero' the range always includes zero, and positive and negative sides share
+ * the step, so a small dip below zero gets a full step of room and its label never
+ * lands on top of the zero label. With 'data' the range is snapped around the data.
+ */
+export function axisTicks(lo: number, hi: number, range: YAxisRange): { min: number; max: number; ticks: number[] } {
+  const low = range === 'zero' ? Math.min(lo, 0) : lo;
+  const top = range === 'zero' ? Math.max(hi, 0) : hi;
+  // a flat series still needs a band to draw in
+  const high = top === low ? low + (range === 'zero' ? 1 : Math.max(Math.abs(low) * 0.01, 1)) : top;
   const step = niceStep((high - low) / TARGET_INTERVALS);
   const min = Math.floor(low / step + 1e-9) * step;
   const max = Math.ceil(high / step - 1e-9) * step;
@@ -197,7 +207,7 @@ interface GroupedBarChartProps {
 export function GroupedBarChart({ groups, series, width, formatValue = defaultFormat }: GroupedBarChartProps) {
   if (!groups.length || !series.length) return null;
   const all = groups.flatMap((g) => g.values);
-  const { min, max, ticks } = axisTicks(Math.min(...all), Math.max(...all));
+  const { min, max, ticks } = axisTicks(Math.min(...all), Math.max(...all), 'zero');
   const span = max - min;
   const plotW = width - PAD_L - 8;
   const plotH = CHART_H - PAD_T - PAD_B;
@@ -277,7 +287,7 @@ export function StackedBarChart({ data, series, width, colours, formatValue = de
   if (!data.length || !series.length) return null;
   const palette = colours ?? SERIES_COLOURS;
   const totals = data.map((d) => d.segments.reduce((s, v) => s + Math.max(v, 0), 0));
-  const { max, ticks } = axisTicks(0, Math.max(...totals));
+  const { max, ticks } = axisTicks(0, Math.max(...totals), 'zero');
   const plotW = width - PAD_L - 8;
   const plotH = CHART_H - PAD_T - PAD_B;
   const y = (v: number) => PAD_T + plotH * (1 - v / max);
@@ -328,7 +338,7 @@ interface BarChartProps {
 
 export function BarChart({ data, width, colour = SERIES_COLOURS[0], formatValue = defaultFormat }: BarChartProps) {
   if (!data.length) return null;
-  const { max, ticks } = axisTicks(0, Math.max(...data.map((d) => d.value)));
+  const { max, ticks } = axisTicks(0, Math.max(...data.map((d) => d.value)), 'zero');
   const plotW = width - PAD_L - 8;
   const plotH = CHART_H - PAD_T - PAD_B;
   const y = (v: number) => PAD_T + plotH * (1 - v / max);
@@ -377,15 +387,17 @@ interface LineChartProps {
   colours?: string[];
   /** tooltip figures; plain grouped numbers when omitted */
   formatValue?: (n: number) => string;
+  /** 'zero' unless the series is a level that moves within a narrow band */
+  yRange?: YAxisRange;
 }
 
-export function LineChart({ series, width, step, colours, formatValue = defaultFormat }: LineChartProps) {
+export function LineChart({ series, width, step, colours, formatValue = defaultFormat, yRange = 'zero' }: LineChartProps) {
   const palette = colours ?? SERIES_COLOURS;
   const withPoints = series.filter((s) => s.points.length);
   if (!withPoints.length) return null;
 
   const all = withPoints.flatMap((s) => s.points.map((p) => p.value));
-  const { min, max, ticks } = axisTicks(Math.min(...all), Math.max(...all));
+  const { min, max, ticks } = axisTicks(Math.min(...all), Math.max(...all), yRange);
   const span = max - min;
   const n = Math.max(...withPoints.map((s) => s.points.length));
   const plotW = width - PAD_L - 8;
@@ -456,7 +468,7 @@ export function LineChart({ series, width, step, colours, formatValue = defaultF
 }
 
 export function ChartLegend({ names, colours }: { names: string[]; colours?: string[] }) {
-  if (names.length < 2) return null;
+  if (!names.length) return null;
   const palette = colours ?? SERIES_COLOURS;
   return (
     <View style={styles.legend}>

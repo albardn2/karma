@@ -16,19 +16,8 @@ from models.common import Inventory as InventoryModel
 from app.domains.inventory.domain import InventoryDomain
 from app.dto.common_enums import Currency
 from app.entrypoint.routes.inventory import inventory_blueprint
+from app.entrypoint.routes.common.params import cost_currency_arg
 
-
-def _cost_currency_arg():
-    """The validated ?cost_currency= query arg, or None for the default."""
-    raw = request.args.get('cost_currency')
-    if not raw:
-        return None
-    try:
-        return Currency(raw)
-    except ValueError:
-        raise BadRequestError(
-            f"cost_currency must be one of {[c.value for c in Currency]}"
-        )
 
 from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required
@@ -65,7 +54,7 @@ def create_inventory():
                  PermissionScope.SALES.value,
                  PermissionScope.DRIVER.value)
 def get_inventory(uuid: str):
-    cost_currency = _cost_currency_arg()
+    cost_currency = cost_currency_arg()
     with SqlAlchemyUnitOfWork() as uow:
         inv = uow.inventory_repository.find_one(uuid=uuid, is_deleted=False)
         if not inv:

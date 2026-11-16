@@ -181,7 +181,7 @@ export function DashboardScreenImpl({ embedded = false }: { embedded?: boolean }
                   [t('dashboard.outstanding'), money(cur ? data.totals?.window_debt?.[cur] : null)],
                 ].map(([k, v]) => (
                   <View key={k} style={styles.card} testID={`dash-stat-${k}`}>
-                    <ThemedText style={styles.cardLabel}>
+                    <ThemedText style={styles.cardLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                       {k}
                       {cur ? ` (${cur})` : ''}
                     </ThemedText>
@@ -287,7 +287,7 @@ export function DashboardScreenImpl({ embedded = false }: { embedded?: boolean }
             <ThemedText style={styles.back}>{BACK_GLYPH}</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.topTitle} numberOfLines={1}>
-            {t('menu.dashboard')}
+            {t('dashboards.businessOverview')}
           </ThemedText>
           <View style={styles.backSpacer} />
         </View>

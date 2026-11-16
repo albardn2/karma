@@ -254,9 +254,6 @@ export function ModuleListScreen<T>({
           </ScrollingChipRow>
         )}
 
-        {/* the same gutter as the rows below, which every caller's header assumed */}
-        {!body && !!header && <View style={styles.header}>{header}</View>}
-
         {body ? (
           body
         ) : loading ? (
@@ -284,6 +281,9 @@ export function ModuleListScreen<T>({
               { paddingBottom: 90 + insets.bottom },
             ]}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            // inside the list, so a tall header (a chart, a summary card) scrolls away
+            // with the rows and shares their gutter
+            ListHeaderComponent={header ? <>{header}</> : null}
             ListEmptyComponent={
               <View style={styles.centre}>
                 <ThemedText style={styles.stateIcon}>📭</ThemedText>
@@ -372,7 +372,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.08)',
   },
-  header: { paddingHorizontal: 20 },
   list: { paddingHorizontal: 20, paddingTop: 6 },
   listEmpty: { flexGrow: 1 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },

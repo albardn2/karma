@@ -112,6 +112,10 @@ export function NewCustomersScreenImpl({ mine = false, embedded = false }: { min
 
               {/* the numbers behind the bars, newest first */}
               <View style={styles.table}>
+                <View style={styles.row}>
+                  <ThemedText style={[styles.rowLabel, styles.head]}>{t('dashboards.period')}</ThemedText>
+                  <ThemedText style={[styles.rowVal, styles.head]}>{t('dashboards.newCustomersCount')}</ThemedText>
+                </View>
                 {[...groups].reverse().map((g) => (
                   <View key={g.period_start} style={styles.row}>
                     <ThemedText style={styles.rowLabel}>{g.period_label}</ThemedText>
@@ -186,6 +190,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
   rowLabel: { fontSize: 12, fontWeight: '700', color: '#111827' },
   rowVal: { fontSize: 12, color: '#6B7280', fontVariant: ['tabular-nums'] },
+  head: { color: '#9ca3af', fontWeight: '700', fontSize: 10, lineHeight: 13 },
   centre: { alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
   stateText: { fontSize: 14, color: '#6B7280', textAlign: 'center' },
   retry: { backgroundColor: '#5469D4', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },

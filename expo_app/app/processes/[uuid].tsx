@@ -9,6 +9,8 @@ import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { apiCall, isOk, apiErrorText } from '@/utils/api';
 import { formatNumericDate, parseTs } from '@/utils/date';
 import { round6 } from '@/utils/fifo';
+import { money } from '@/utils/money';
+import { CostCurrencyToggle, CostCcy } from '@/components/CostCurrencyToggle';
 
 interface Line {
   material_uuid?: string | null;
@@ -76,6 +78,7 @@ export default function ProcessDetailScreen() {
   const [materials, setMaterials] = useState<Record<string, Material>>({});
   const [warehouse, setWarehouse] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [ccy, setCcy] = useState<CostCcy>('USD');
 
   const canUpdate = useHasEndpoint('process', 'update');
   const canDelete = useHasEndpoint('process', 'delete');
@@ -192,7 +195,20 @@ export default function ProcessDetailScreen() {
     return warehouse ?? String(id).slice(0, 8);
   };
 
-  const lines = (rows: Line[] | undefined, currency?: string | null, costKey: 'cost_per_unit' | 'total_cost' = 'cost_per_unit') => (
+  /**
+   * Consumed lines carry the lot's cost per unit; produced lines carry the batch's
+   * total cost. Both are labelled, since the two read alike as bare numbers.
+   */
+  const costLabel = (l: Line, currency: string | null | undefined, costKey: 'cost_per_unit' | 'total_cost') => {
+    const value = l[costKey];
+    if (value == null) return t('processes.noCost');
+    const amount = money(value, currency);
+    return costKey === 'total_cost'
+      ? t('processes.costTotal', { amount })
+      : t('processes.costPerUnit', { amount, unit: unitOf(l.material_uuid) || t('processes.unit') });
+  };
+
+  const lines = (rows: Line[] | undefined, currency: string | null | undefined, costKey: 'cost_per_unit' | 'total_cost') => (
     <>
       {(rows ?? []).map((l, i) => (
         <View key={`${l.material_uuid}-${l.inventory_uuid ?? i}`} style={styles.line}>
@@ -200,11 +216,7 @@ export default function ProcessDetailScreen() {
             <ThemedText style={styles.name} numberOfLines={1}>
               {nameOf(l.material_uuid)}
             </ThemedText>
-            <ThemedText style={styles.cost}>
-              {l[costKey] != null
-                ? `${qty(l[costKey])}${currency ? ` ${currency}` : ''}`
-                : t('processes.noCost')}
-            </ThemedText>
+            <ThemedText style={styles.cost}>{costLabel(l, currency, costKey)}</ThemedText>
           </View>
           <ThemedText style={styles.qty}>
             {qty(l.quantity)}
@@ -219,7 +231,8 @@ export default function ProcessDetailScreen() {
     <ModuleDetailScreen<Process>
       module="processes"
       title={t('menu.processes')}
-      endpoint={`/process/${uuid}`}
+      endpoint={`/process/${uuid}?cost_currency=${ccy}`}
+      subheading={() => <CostCurrencyToggle value={ccy} onChange={setCcy} testIDPrefix="process-ccy" />}
       heading={(p) => (p.type ? tef(p.type) : t('menu.processes'))}
       rows={(p): DetailRow[] => [
         [
@@ -227,7 +240,6 @@ export default function ProcessDetailScreen() {
           p.workflow_execution_uuid ? t('processes.fromWorkflow') : t('processes.manual'),
         ],
         [t('processes.when'), p.created_at ? formatNumericDate(parseTs(p.created_at)) : '—'],
-        [t('processes.costCurrency'), p.data?.cost_currency || '—'],
         [t('processes.warehouse'), warehouseRow(p)],
         [t('processes.notes'), p.notes || '—', 'text'],
       ]}

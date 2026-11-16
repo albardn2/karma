@@ -11,6 +11,9 @@ from app.dto.process import (
 )
 from models.common import Process as ProcessModel
 from app.domains.process.domain import ProcessDomain
+from app.domains.inventory.domain import InventoryDomain
+from app.dto.common_enums import Currency
+from app.entrypoint.routes.common.params import cost_currency_arg
 
 from app.entrypoint.routes.process import process_blueprint
 from app.dto.process import ProcessType
@@ -47,11 +50,16 @@ def create_process():
                  PermissionScope.OPERATION_MANAGER
                  )
 def get_process(uuid: str):
+    cost_currency = cost_currency_arg()
     with SqlAlchemyUnitOfWork() as uow:
         m = uow.process_repository.find_one(uuid=uuid, is_deleted=False)
         if not m:
             raise NotFoundError("Process not found")
-        dto = ProcessRead.from_orm(m).model_dump(mode="json")
+        cost_ctx = InventoryDomain.new_cost_context(currency=cost_currency or Currency.SYP)
+        dto = ProcessDomain.read_with_costs(uow=uow, process=m, cost_ctx=cost_ctx).model_dump(mode="json")
+        # rates pulled on the spot for missing days should outlive this read
+        if cost_ctx["rates_ingested"]:
+            uow.commit()
     return jsonify(dto), 200
 
 

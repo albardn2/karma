@@ -84,9 +84,9 @@ export default function ServiceAreaBoundaryScreen() {
   const canSave = !problem && changed && !saving;
 
   const confirmReplace = (then: () => void) =>
-    Alert.alert(t('serviceAreas.replaceConfirm', { name }), undefined, [
+    Alert.alert(t('serviceAreas.replaceConfirm'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('detail.edit'), style: 'destructive', onPress: then },
+      { text: t('serviceAreas.startNewShape'), style: 'destructive', onPress: then },
     ]);
 
   const save = useCallback(async () => {
@@ -119,7 +119,7 @@ export default function ServiceAreaBoundaryScreen() {
     if (!changed) return router.back();
     Alert.alert(t('serviceAreas.discardBoundary'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('detail.delete'), style: 'destructive', onPress: () => router.back() },
+      { text: t('serviceAreas.discardChanges'), style: 'destructive', onPress: () => router.back() },
     ]);
   }, [changed, router, t]);
 
