@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { ModuleForm, FormField } from '@/components/ModuleForm';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { EMPLOYEE_ROLES } from '@/constants/employeeRoles';
 
 /**
  * Create or edit an employee. One screen for both — a `uuid` param means edit.
@@ -23,7 +24,11 @@ export default function EmployeeFormScreen() {
       name: 'role',
       label: t('employees.role'),
       kind: 'select',
-      options: ['driver', 'sales', 'accountant', 'manager', 'employee', 'admin'].map((v) => ({ value: v, label: tef(v) })),
+      // the empty option clears the role; the form sends null for a cleared field
+      options: [
+        { value: '', label: t('employees.noRole') },
+        ...EMPLOYEE_ROLES.map((v) => ({ value: v, label: tef(v) })),
+      ],
     },
     { name: 'full_address', label: t('employees.address') },
     { name: 'identification', label: t('employees.identification') },

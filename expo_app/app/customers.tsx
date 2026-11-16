@@ -17,6 +17,7 @@ import { useApiQuery } from '@/hooks/useApiQuery';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { formatAmount, money } from '@/utils/money';
 import { BACK_GLYPH, FORWARD_GLYPH } from '@/utils/rtl';
+import { customerBalanceColor } from '@/utils/customerBalance';
 
 interface Customer {
   uuid: string;
@@ -291,25 +292,10 @@ export default function CustomersScreen() {
   );
 
   const CustomerCard = ({ customer }: { customer: Customer }) => {
-    const formatBalances = () => {
-      const balances = Object.entries(customer.balance_per_currency || {})
-        .filter(([_, amount]) => amount !== 0)
-        .map(([currency, amount]) => money(amount, currency))
-        .slice(0, 1); // Show max 1 currency to save space
-
-      if (balances.length === 0) return formatAmount(0);
-      return balances[0];
-    };
-
-    const getTotalBalance = () => {
-      return Object.values(customer.balance_per_currency || {}).reduce((sum, amount) => sum + amount, 0);
-    };
-
-    const getBalanceColor = (balance: number) => {
-      if (balance > 0) return '#059669';
-      if (balance < 0) return '#dc2626';
-      return '#6b7280';
-    };
+    // one currency fits the row; the coloured figure is that same currency's, since
+    // a SYP and a USD balance are never added together
+    const shown = Object.entries(customer.balance_per_currency || {}).find(([, amount]) => amount !== 0);
+    const formatBalances = () => (shown ? money(shown[1], shown[0]) : formatAmount(0));
 
     return (
       <TouchableOpacity
@@ -343,7 +329,7 @@ export default function CustomersScreen() {
 
         {/* Balance Column */}
         <View style={styles.balanceColumn}>
-          <ThemedText style={[styles.balanceValue, { color: getBalanceColor(getTotalBalance()) }]}>
+          <ThemedText style={[styles.balanceValue, { color: customerBalanceColor(shown?.[1] ?? 0) }]}>
             {formatBalances()}
           </ThemedText>
         </View>
@@ -405,8 +391,9 @@ export default function CustomersScreen() {
           styles.banner,
           banner.type === 'success' ? styles.successBanner : styles.errorBanner,
           // below the status bar: at top 0 it sat behind the clock and notch
-          { top: insets.top },
-          { opacity: bannerAnimation, transform: [{ translateY: bannerAnimation.interpolate({ inputRange: [0,1], outputRange: [-100,0] }) }] }
+          // above the bottom navigation, clear of the header's Filters and Add buttons
+          { bottom: 90 + insets.bottom },
+          { opacity: bannerAnimation, transform: [{ translateY: bannerAnimation.interpolate({ inputRange: [0,1], outputRange: [100,0] }) }] }
         ]}>
           <ThemedText style={styles.bannerText}>{banner.message}</ThemedText>
         </Animated.View>
@@ -429,10 +416,9 @@ export default function CustomersScreen() {
           <ThemedText style={styles.backChevron}>{BACK_GLYPH}</ThemedText>
         </TouchableOpacity>
 
-        {/* No spacer and no title: styles.header is already justifyContent:
-            'space-between', so with just these two children the chevron sits left and
-            the actions sit right on their own. The menu tile tapped to get here
-            already said "Customers". */}
+        <ThemedText style={styles.listTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+          {t('menu.customers')}
+        </ThemedText>
         <View style={styles.headerActions}>
           {/* Filters Button for Mobile */}
           {(isMobileWeb || isNative) && (
@@ -844,6 +830,7 @@ const styles = StyleSheet.create({
   mobileTitle: {
     fontSize: 24,
   },
+  listTitle: { flex: 1, fontSize: 22, lineHeight: 28, fontWeight: '700', color: '#1f2937' },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1260,9 +1247,9 @@ const styles = StyleSheet.create({
   },
   banner: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    left: 16,
+    right: 16,
+    borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 20,
     zIndex: 1000,

@@ -1,4 +1,5 @@
 # app/entrypoint/routes/vehicle/routes.py
+from sqlalchemy.orm import selectinload
 from flask import Blueprint, request, jsonify
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.common.errors import NotFoundError
@@ -119,6 +120,8 @@ def list_vehicles():
             filters=filters,
             page=params.page,
             per_page=params.per_page,
+            # VehicleRead names the creator; one query for the page, not one per row
+            options=[selectinload(VehicleModel.created_by)],
         )
         items = [
             VehicleRead.from_orm(m).model_dump(mode="json") for m in page.items

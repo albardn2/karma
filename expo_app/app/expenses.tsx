@@ -60,7 +60,9 @@ export default function ExpensesScreen() {
               <ThemedText style={styles.subtitle} numberOfLines={1}>
                 {formatNumericDate(parseTs(x.created_at))}
               </ThemedText>
-              {!!x.status && <ThemedText style={styles.badge}>{tef(x.status)}</ThemedText>}
+              {!!x.status && (
+                <ThemedText style={[styles.badge, STATUS_TONE[x.status]]}>{tef(x.status)}</ThemedText>
+              )}
             </View>
           </TouchableOpacity>
         )}
@@ -69,6 +71,13 @@ export default function ExpensesScreen() {
     </View>
   );
 }
+
+/** pending is the one that needs action, so it stands out; void is struck through */
+const STATUS_TONE: Record<string, object> = {
+  pending: { color: '#92400e', backgroundColor: '#fef3c7' },
+  paid: { color: '#065f46', backgroundColor: '#d1fae5' },
+  void: { color: '#6b7280', backgroundColor: '#f3f4f6', textDecorationLine: 'line-through' },
+};
 
 const styles = StyleSheet.create({
   root: { flex: 1 },

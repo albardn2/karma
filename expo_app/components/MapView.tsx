@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { apiCall } from '@/utils/api';
 import { money } from '@/utils/money';
 import * as Location from 'expo-location';
+import { customerBalanceColor } from '@/utils/customerBalance';
 
 interface Customer {
   uuid: string;
@@ -606,7 +607,7 @@ export const MapViewComponent: React.FC<MapViewComponentProps> = ({
               .map(([currency, amount]) => (
                 <ThemedText
                   key={currency}
-                  style={[styles.infoPopupBalance, { color: amount > 0 ? '#10b981' : '#ef4444' }]}
+                  style={[styles.infoPopupBalance, { color: customerBalanceColor(amount) }]}
                 >
                   Balance: {amount > 0 ? '+' : ''}
                   {money(amount, currency)}

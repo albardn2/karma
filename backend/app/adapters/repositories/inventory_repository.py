@@ -31,6 +31,7 @@ from app.entrypoint.routes.common.errors import BadRequestError
 INVENTORY_SERIALIZATION_LOADERS = [
     selectinload(Inventory.material),
     selectinload(Inventory.warehouse),
+    selectinload(Inventory.created_by),
     selectinload(Inventory.inventory_events).selectinload(InventoryEvent.process),
     selectinload(Inventory.inventory_events)
     .selectinload(InventoryEvent.purchase_order_item)

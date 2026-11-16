@@ -7,7 +7,8 @@ import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatNumericDate, parseTs } from '@/utils/date';
 import { money } from '@/utils/money';
-interface Payout {
+import { PayoutLinks, payoutKindKey } from '@/utils/payout';
+interface Payout extends PayoutLinks {
   uuid: string;
   amount?: number | null;
   currency?: string | null;
@@ -15,10 +16,15 @@ interface Payout {
   created_at: string;
   expense_uuid?: string | null;
   purchase_order_uuid?: string | null;
+  employee_uuid?: string | null;
+  credit_note_item_uuid?: string | null;
+  paid_for?: string | null;
 }
 
+
 /**
- * Money paid out, against an expense or a purchase order.
+ * Money paid out, against an expense, a purchase order, an employee or a credit note.
+ * Each row says what it paid for (`paid_for`, named server-side).
  *
  * The mirror of Payments, and like it there is nothing user-pickable to filter on —
  * every accepted param is a uuid — so the list is a plain chronological ledger.
@@ -47,17 +53,16 @@ export default function PayoutsScreen() {
                 {money(x.amount, x.currency)}
               </ThemedText>
             </View>
+            {!!x.paid_for && (
+              <ThemedText style={styles.paidFor} numberOfLines={1}>
+                {x.paid_for}
+              </ThemedText>
+            )}
             <View style={styles.cardBottom}>
               <ThemedText style={styles.subtitle} numberOfLines={1}>
                 {formatNumericDate(parseTs(x.created_at))}
               </ThemedText>
-              <ThemedText style={styles.badge}>
-                {x.expense_uuid
-                  ? t('payouts.forExpense')
-                  : x.purchase_order_uuid
-                    ? t('payouts.forPurchaseOrder')
-                    : t('payouts.unlinked')}
-              </ThemedText>
+              <ThemedText style={styles.badge}>{t(payoutKindKey(x))}</ThemedText>
             </View>
           </TouchableOpacity>
         )}
@@ -69,6 +74,7 @@ export default function PayoutsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  paidFor: { fontSize: 14, fontWeight: '600', color: '#374151', marginTop: 2, marginBottom: 4 },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,

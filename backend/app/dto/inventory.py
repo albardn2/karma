@@ -63,6 +63,7 @@ class InventoryUpdate(BaseModel):
 class InventoryRead(InventoryBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
+    created_by_name: Optional[str] = None
     created_at: UtcDateTime
     is_deleted: bool
     total_original_cost: Optional[float] = None

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from app.dto.utc_datetime import UtcDateTime
 from app.dto.common_enums import Currency
@@ -47,6 +47,10 @@ class PayoutRead(PayoutBase):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     uuid: str
     financial_account_uuid: str
+    paid_for: Optional[str] = None
+    financial_account_name: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("financial_account_name", AliasPath("financial_account", "account_name")))
     created_at: UtcDateTime
     is_deleted: bool
 

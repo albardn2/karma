@@ -126,13 +126,16 @@ export function ServiceAreasMap({ footerOffset = 0 }: { footerOffset?: number })
   const shapeSet = useMemo(() => shapes.map((s) => s.uuid).join(','), [shapes]);
   const undrawable = areas.length - new Set(shapes.map((s) => s.uuid)).size;
 
-  const fit = useCallback(() => {
-    if (!allPoints.length) return;
-    mapRef.current?.fitToCoordinates(allPoints, {
-      edgePadding: { top: 60, right: 40, bottom: 60, left: 40 },
-      animated: false,
-    });
-  }, [allPoints]);
+  const fit = useCallback(
+    (animated: boolean) => {
+      if (!allPoints.length) return;
+      mapRef.current?.fitToCoordinates(allPoints, {
+        edgePadding: { top: 60, right: 40, bottom: 60, left: 40 },
+        animated,
+      });
+    },
+    [allPoints],
+  );
 
   if (loading) {
     return (
@@ -166,7 +169,7 @@ export function ServiceAreasMap({ footerOffset = 0 }: { footerOffset?: number })
         ref={mapRef}
         style={styles.flex}
         provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-        onLayout={fit}
+        onLayout={() => fit(false)}
         showsUserLocation={!!me}
         testID="sa-map"
       >
@@ -188,6 +191,11 @@ export function ServiceAreasMap({ footerOffset = 0 }: { footerOffset?: number })
           />
         ))}
       </MapView>
+
+      {/* back to every area after a pinch or a pan */}
+      <TouchableOpacity style={styles.fitBtn} onPress={() => fit(true)} testID="sa-map-fit">
+        <ThemedText style={styles.fitText}>{t('serviceAreas.showAll')}</ThemedText>
+      </TouchableOpacity>
 
       {/* floated over the map rather than laid out below it: the host's bottom
           navigation is position:absolute, so a footer in normal flow sits underneath it.
@@ -212,6 +220,20 @@ export function ServiceAreasMap({ footerOffset = 0 }: { footerOffset?: number })
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  fitBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#fff',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  fitText: { fontSize: 13, fontWeight: '600', color: '#5469D4' },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
   stateText: { fontSize: 14, color: '#6B7280', textAlign: 'center' },
   retry: {

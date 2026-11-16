@@ -127,8 +127,18 @@ export default function PurchaseOrderCreateScreen() {
   );
   const canSubmit = !!vendor && valid.length > 0 && !saving;
 
+  // a line with something typed into it that is not yet complete; saving would drop
+  // it without a word, so Save refuses until it is finished or removed
+  const incomplete = lines.filter(
+    (l) => !valid.includes(l) && (!!l.material_uuid || l.quantity.trim() !== '' || l.price_per_unit.trim() !== ''),
+  );
+
   const submit = async () => {
     if (!vendor) return;
+    if (incomplete.length) {
+      Alert.alert(t('purchaseOrders.create'), t('purchaseOrders.incompleteLine'));
+      return;
+    }
     if (!valid.length) {
       Alert.alert(t('purchaseOrders.create'), t('purchaseOrders.needALine'));
       return;

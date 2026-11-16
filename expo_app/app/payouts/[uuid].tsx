@@ -4,7 +4,8 @@ import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatNumericDate, parseTs } from '@/utils/date';
 import { money } from '@/utils/money';
-interface Payout {
+import { PayoutLinks, payoutKindKey } from '@/utils/payout';
+interface Payout extends PayoutLinks {
   uuid: string;
   amount?: number | null;
   currency?: string | null;
@@ -12,6 +13,8 @@ interface Payout {
   created_at: string;
   expense_uuid?: string | null;
   purchase_order_uuid?: string | null;
+  paid_for?: string | null;
+  financial_account_name?: string | null;
 }
 
 export default function PayoutsDetailScreen() {
@@ -26,7 +29,9 @@ export default function PayoutsDetailScreen() {
       heading={(x) => money(x.amount, x.currency)}
       rows={(x): DetailRow[] => [
         [t('payouts.amount'), money(x.amount, x.currency)],
-        [t('payouts.appliedTo'), x.expense_uuid ? t('payouts.forExpense') : x.purchase_order_uuid ? t('payouts.forPurchaseOrder') : t('payouts.unlinked')],
+        [t('payouts.appliedTo'), t(payoutKindKey(x))],
+        [t('payouts.paidFor'), x.paid_for || '—', 'text'],
+        [t('payouts.paidFrom'), x.financial_account_name || '—'],
         [t('payouts.when'), formatNumericDate(parseTs(x.created_at))],
         [t('payouts.notes'), x.notes || '—', 'text'],
       ]}

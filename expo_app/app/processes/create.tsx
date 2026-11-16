@@ -830,11 +830,16 @@ export default function ProcessCreateScreen() {
                           ? t('processes.onHandUnknown')
                           : have <= 0
                             ? t('processes.onHandNone')
-                            : t('processes.onHand', {
-                                qty: String(round6(have)),
-                                unit: l.unit || '',
-                                lots: String(l.lots.filter((x) => x.current_quantity > 0).length),
-                              })}
+                            : t(
+                                l.lots.filter((x) => x.current_quantity > 0).length === 1
+                                  ? 'processes.onHandOneLot'
+                                  : 'processes.onHand',
+                                {
+                                  qty: String(round6(have)),
+                                  unit: l.unit || '',
+                                  lots: String(l.lots.filter((x) => x.current_quantity > 0).length),
+                                },
+                              )}
                     </ThemedText>
                   )}
 

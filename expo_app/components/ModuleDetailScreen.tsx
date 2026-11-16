@@ -47,6 +47,11 @@ export interface DetailAction<T> {
   onPress: (item: T) => void | Promise<unknown>;
   /** destructive actions get a confirm and red styling */
   destructive?: boolean;
+  /**
+   * A small text link under the main buttons, for a utility such as copying an id
+   * that does not merit a full-width button.
+   */
+  secondary?: boolean;
   testID?: string;
   /**
    * Hide the action for records it does not apply to — e.g. no "record a payout" on
@@ -215,9 +220,9 @@ export function ModuleDetailScreen<T>({
             </ThemedText>
             {subheading?.(item)}
 
-            {!!shownActions.length && (
+            {shownActions.some((a) => !a.secondary) && (
               <View style={styles.actions}>
-                {shownActions.map((a) => (
+                {shownActions.filter((a) => !a.secondary).map((a) => (
                   <TouchableOpacity
                     key={a.label}
                     style={[
@@ -250,6 +255,21 @@ export function ModuleDetailScreen<T>({
                         {a.label}
                       </ThemedText>
                     )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {shownActions.some((a) => a.secondary) && (
+              <View style={styles.secondaryActions}>
+                {shownActions.filter((a) => a.secondary).map((a) => (
+                  <TouchableOpacity
+                    key={a.label}
+                    onPress={() => run(a, item)}
+                    disabled={!!running}
+                    hitSlop={8}
+                    testID={a.testID}
+                  >
+                    <ThemedText style={styles.secondaryText}>{a.label}</ThemedText>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -318,6 +338,8 @@ const styles = StyleSheet.create({
   // above the record, not below it: what you came to DO should be in reach
   // without scrolling past everything there is to read
   actions: { marginTop: 18, gap: 10 },
+  secondaryActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 12 },
+  secondaryText: { fontSize: 14, fontWeight: '600', color: '#5469D4' },
   action: {
     backgroundColor: '#5469D4',
     borderRadius: 12,

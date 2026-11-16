@@ -18,10 +18,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
  * soft-deleted rows, a throwaway lot burns that number permanently. manual-add writes the
  * lot and its opening movement in one transaction.
  *
- * lot_id is REQUIRED here even though the server can generate one, because the generator
- * stamps a whole second of resolution into a globally unique column: two lots added in the
- * same second collide with a bare 409. Typing a lot number is the escape hatch, so it is
- * the field rather than the fallback.
+ * lot_id is optional, as everywhere else: left empty, the server generates one that is
+ * unique even for two lots added in the same second.
  */
 export default function InventoryAddStockScreen() {
   const { material_uuid, material_name, warehouse_uuid, warehouse_name } =
@@ -66,7 +64,7 @@ export default function InventoryAddStockScreen() {
     },
     { name: 'quantity', label: t('inventory.quantity'), required: true, kind: 'number', min: 0.0001 },
     // required, not optional: see the docstring — the generated ids collide
-    { name: 'lot_id', label: t('inventory.lotId'), required: true },
+    { name: 'lot_id', label: t('inventory.lotId') },
     { name: 'cost_per_unit', label: t('inventory.costPerUnit'), kind: 'number', min: 0 },
     {
       name: 'currency',

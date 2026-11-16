@@ -124,7 +124,7 @@ export default function ProcessDetailScreen() {
       t('processes.deleteReturns', {
         qty: String(round6(Number(l.quantity ?? 0))),
         unit: unitOf(l.material_uuid),
-        lot: String(l.inventory_uuid ?? '').slice(0, 8),
+        material: nameOf(l.material_uuid),
       }),
     );
     const gone = (p.data?.outputs ?? []).map((l) =>
@@ -168,6 +168,7 @@ export default function ProcessDetailScreen() {
     },
     {
       label: t('processes.uuid'),
+      secondary: true,
       testID: 'process-copy',
       onPress: async (p) => {
         await Clipboard.setStringAsync(p.uuid);

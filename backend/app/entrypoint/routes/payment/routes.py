@@ -1,3 +1,5 @@
+from sqlalchemy.orm import selectinload
+from models.common import CustomerOrder, DebitNoteItem, Invoice
 from flask import Blueprint, request, jsonify
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.entrypoint.routes.common.errors import NotFoundError
@@ -109,7 +111,12 @@ def list_payments():
         page_obj = uow.payment_repository.find_all_by_filters_paginated(
             filters=filters,
             page=params.page,
-            per_page=params.per_page
+            per_page=params.per_page,
+            # PaymentRead names the payer two hops away; load them per page, not per row
+            options=[
+                selectinload(PaymentModel.invoice).selectinload(Invoice.customer_order).selectinload(CustomerOrder.customer),
+                selectinload(PaymentModel.debit_note_item).selectinload(DebitNoteItem.customer),
+            ],
         )
         items = [PaymentRead.from_orm(p).model_dump(mode='json') for p in page_obj.items]
         result = PaymentPage(

@@ -842,6 +842,21 @@ class Payment(Base):
     debit_note_item = relationship("DebitNoteItem", back_populates="payments")
     trip_stop = relationship("TripStop", backref="payments")
 
+    @property
+    def payer_name(self):
+        """Who paid: the customer behind the invoice's order, or behind the debit note.
+
+        A company name wins over a person's name, as on the payment's detail screen.
+        """
+        customer = None
+        if self.invoice is not None and self.invoice.customer_order is not None:
+            customer = self.invoice.customer_order.customer
+        elif self.debit_note_item is not None:
+            customer = self.debit_note_item.customer
+        if customer is None:
+            return None
+        return customer.company_name or customer.full_name or None
+
     def __repr__(self):
         return (
             f"<Payment(uuid={self.uuid}, amount={self.amount}, "
@@ -1384,6 +1399,21 @@ class Payout(Base):
     employee = relationship("Employee", back_populates="payouts")
     credit_note_item = relationship("CreditNoteItem", back_populates="payouts")
 
+    @property
+    def paid_for(self):
+        """What this payout paid for, in words: the expense, the PO's vendor, the
+        employee, or the credit note's customer."""
+        if self.expense is not None:
+            return self.expense.description or self.expense.category
+        if self.purchase_order is not None and self.purchase_order.vendor is not None:
+            return self.purchase_order.vendor.company_name
+        if self.employee is not None:
+            return self.employee.full_name
+        if self.credit_note_item is not None and self.credit_note_item.customer is not None:
+            customer = self.credit_note_item.customer
+            return customer.company_name or customer.full_name
+        return None
+
     def __repr__(self):
         return f"<Payout(uuid={self.uuid}, amount={self.amount}, currency={self.currency})>"
 
@@ -1635,6 +1665,13 @@ class Inventory(Base):
     material = relationship("Material", back_populates="inventory")
     warehouse = relationship("Warehouse", back_populates="inventories")
     inventory_events = relationship("InventoryEvent", back_populates="inventory")
+    created_by = relationship("User", foreign_keys=[created_by_uuid])
+
+    @property
+    def created_by_name(self):
+        """The creator's display name, for screens that would otherwise show a raw id."""
+        u = self.created_by
+        return f"{u.first_name} {u.last_name}".strip() if u else None
 
     @hybrid_property
     def original_quantity(self):
@@ -2120,6 +2157,13 @@ class Vehicle(Base):
 
     # relations
     trips = relationship("Trip", back_populates="vehicle")
+    created_by = relationship("User", foreign_keys=[created_by_uuid])
+
+    @property
+    def created_by_name(self):
+        """The creator's display name, for screens that would otherwise show a raw id."""
+        u = self.created_by
+        return f"{u.first_name} {u.last_name}".strip() if u else None
 
 
 

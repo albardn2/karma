@@ -192,6 +192,9 @@ export default function HomeScreen() {
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
+        // one scroller for both tabs; re-keyed per tab so each opens at its top rather
+        // than at the offset the other tab was left at
+        key={activeTab}
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}

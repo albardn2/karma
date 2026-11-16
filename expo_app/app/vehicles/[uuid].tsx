@@ -26,6 +26,7 @@ interface Vehicle {
   notes?: string | null;
   created_at?: string | null;
   created_by_uuid?: string | null;
+  created_by_name?: string | null;
 }
 
 /** A material line carried on this vehicle. `current_quantity` is derived, not stored. */
@@ -269,12 +270,8 @@ export default function VehiclesDetailScreen() {
         [t('vehicles.color'), x.color || '—'],
         [t('vehicles.vin'), x.vin || '—'],
         // parseTs, not new Date: created_at is naive UTC
-        [
-          t('inventory.received'),
-          x.created_at ? formatNumericDate(parseTs(x.created_at)) : '—',
-        ],
-        [t('inventory.createdBy'), x.created_by_uuid ?? '—'],
-        [t('materials.uuid'), x.uuid],
+        [t('vehicles.added'), x.created_at ? formatNumericDate(parseTs(x.created_at)) : '—'],
+        [t('inventory.createdBy'), x.created_by_name || '—'],
       ]}
       sections={[
         {

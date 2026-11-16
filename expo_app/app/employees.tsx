@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ModuleListScreen } from '@/components/ModuleListScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { EMPLOYEE_ROLES } from '@/constants/employeeRoles';
 
 interface Employee {
   uuid: string;
@@ -33,12 +34,7 @@ export default function EmployeesScreen() {
         onCreate={() => router.push('/employees/create')}
         searchParam="full_name"
         searchPlaceholder={t('employees.searchPlaceholder')}
-        filters={[
-          { id: 'driver', label: tef('driver'), params: { role: 'driver' } },
-          { id: 'sales', label: tef('sales'), params: { role: 'sales' } },
-          { id: 'accountant', label: tef('accountant'), params: { role: 'accountant' } },
-          { id: 'manager', label: tef('manager'), params: { role: 'manager' } },
-        ]}
+        filters={EMPLOYEE_ROLES.map((role) => ({ id: role, label: tef(role), params: { role } }))}
         keyExtractor={(x) => x.uuid}
         renderItem={(x) => (
           <TouchableOpacity

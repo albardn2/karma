@@ -6,6 +6,9 @@ import { apiCall, isOk } from '@/utils/api';
 import { formatNumericDate, parseTs } from '@/utils/date';
 import { money } from '@/utils/money';
 
+/** up to 4 decimals: a USD→SYP rate is quoted to the eighth (144.875) */
+const RATE = new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 });
+
 interface Transaction {
   uuid: string;
   from_amount?: number | null;
@@ -108,7 +111,7 @@ export default function TransactionDetailScreen() {
         [t('transactions.toAmount'), x.to_amount != null ? money(x.to_amount, x.to_currency) : '—'],
         [
           t('transactions.rate'),
-          x.usd_to_syp_exchange_rate != null ? String(x.usd_to_syp_exchange_rate) : '—',
+          x.usd_to_syp_exchange_rate != null ? RATE.format(x.usd_to_syp_exchange_rate) : '—',
         ],
         [t('transactions.when'), x.created_at ? formatNumericDate(parseTs(x.created_at)) : '—'],
         [t('transactions.notes'), x.notes || '—', 'text'],
