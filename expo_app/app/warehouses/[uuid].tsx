@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Alert, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { ChartLegend, LineChart } from '@/components/Chart';
 import { PickerField } from '@/components/PickerField';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiCall, apiErrorText, isOk } from '@/utils/api';
 import { useHasModule } from '@/hooks/useModuleAccess';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatNumericDate, parseTs, plainMonthDay, plainMonthYear } from '@/utils/date';
@@ -70,6 +72,17 @@ export default function WarehousesDetailScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { t } = useLanguage();
+  const { isAdmin } = useAuth();
+
+  // admin-only; the server refuses while any lot still holds stock and says how many
+  const remove = async (x: Warehouse) => {
+    const res = await apiCall(`/warehouse/${x.uuid}`, { method: 'DELETE' });
+    if (isOk(res.status)) {
+      router.back();
+      return;
+    }
+    Alert.alert(t('warehouses.deleteFailed'), apiErrorText(res.error, t('form.tryAgain')));
+  };
   const [range, setRange] = useState<(typeof RANGES)[number]['id']>('90d');
   /** '' = let the server pick the biggest holders; otherwise one material's uuid */
   const [material, setMaterial] = useState('');
@@ -275,6 +288,14 @@ export default function WarehousesDetailScreen() {
               },
             ]
           : []),
+        {
+          label: t('detail.delete'),
+          destructive: true,
+          testID: 'warehouse-delete',
+          visible: () => isAdmin,
+          confirmText: (x: Warehouse) => t('warehouses.deleteConfirm', { name: x.name ?? '' }),
+          onPress: remove,
+        },
       ]}
     />
   );
