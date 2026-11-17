@@ -13,6 +13,7 @@ from app.dto.warehouse import (
 
 from models.common import Warehouse as WarehouseModel
 from app.entrypoint.routes.warehouse import warehouse_blueprint
+from app.domains.warehouse.domain import WarehouseDomain
 from app.entrypoint.routes.common.errors import NotFoundError
 from app.entrypoint.routes.common.errors import BadRequestError
 from app.dto.auth import PermissionScope
@@ -93,14 +94,8 @@ def update_warehouse(uuid: str):
                  )
 def delete_warehouse(uuid: str):
     with SqlAlchemyUnitOfWork() as uow:
-        wh = uow.warehouse_repository.find_one(uuid=uuid, is_deleted=False)
-        if not wh:
-            raise NotFoundError("Warehouse not found")
-        if uow.inventory_repository.find_first(warehouse_uuid=wh.uuid, is_deleted=False):
-            raise BadRequestError("Cannot delete warehouse, inventories exist")
-        wh.is_deleted = True
-        uow.warehouse_repository.save(model=wh, commit=True)
-        result = WarehouseRead.from_orm(wh).model_dump(mode='json')
+        result = WarehouseDomain.delete_warehouse(uow=uow, uuid=uuid).model_dump(mode='json')
+        uow.commit()
     return jsonify(result), 200
 
 @warehouse_blueprint.route('/', methods=['GET'])

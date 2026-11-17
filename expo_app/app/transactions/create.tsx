@@ -31,6 +31,13 @@ interface Side {
 
 const NONE: Side = { uuid: '', label: '', currency: '' };
 
+/**
+ * How far a typed rate may sit from the latest recorded one before the screen asks
+ * whether it is meant. Street rates move, so this warns rather than refuses; it is
+ * there to catch an old-pound rate (100× too big) or a slipped digit.
+ */
+const RATE_WARN_FRACTION = 0.1;
+
 /** The API compares amounts at 2 decimals; an unrounded product carries float noise. */
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -99,11 +106,26 @@ export default function TransactionCreateScreen() {
     return null;
   })();
 
-  const submit = async () => {
+  const latestRate = latest.data?.rate;
+  const rateOff =
+    needsRate && r > 0 && !!latestRate && Math.abs(r - latestRate) / latestRate > RATE_WARN_FRACTION;
+
+  const submit = () => {
     if (problem) {
       Alert.alert(t('transactions.newTitle'), problem);
       return;
     }
+    if (rateOff) {
+      Alert.alert(t('transactions.rateOffTitle'), t('transactions.rateOff', { rate: String(r), latest: String(latestRate) }), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('transactions.recordAnyway'), onPress: send },
+      ]);
+      return;
+    }
+    send();
+  };
+
+  const send = async () => {
     // only the sides actually used: a from-only transaction that also carries to_*
     // fields is refused, and vice versa
     const body: Record<string, unknown> = {};
@@ -209,6 +231,11 @@ export default function TransactionCreateScreen() {
                   inputAccessoryViewID={KEYBOARD_DONE_BAR_ID}
                   testID="tx-rate"
                 />
+                {rateOff && (
+                  <ThemedText style={styles.warn} testID="tx-rate-off">
+                    {t('transactions.rateOffHint', { latest: String(latestRate) })}
+                  </ThemedText>
+                )}
                 {seeded && (
                   <ThemedText style={styles.hint}>
                     {t('transactions.rateSeeded', { date: plainDate(latest.data!.rate_date) })}
@@ -264,6 +291,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: '600', marginBottom: 6, opacity: 0.75 },
   spaced: { marginTop: 16 },
   hint: { fontSize: 12, opacity: 0.55, marginTop: 6 },
+  warn: { fontSize: 12, fontWeight: '600', color: '#b45309', marginTop: 6 },
   clear: { fontSize: 13, fontWeight: '600', color: '#5469D4', marginTop: 6 },
   input: {
     backgroundColor: '#fff',

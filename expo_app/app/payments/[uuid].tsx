@@ -21,7 +21,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { formatNumericDate, parseTs } from '@/utils/date';
 import { markListsStale } from '@/utils/listRefresh';
 import { money } from '@/utils/money';
-import { BACK_GLYPH } from '@/utils/rtl';
+import { BACK_GLYPH, FORWARD_GLYPH } from '@/utils/rtl';
 
 interface Payment {
   uuid: string;
@@ -123,9 +123,12 @@ export default function PaymentDetailScreen() {
     );
   };
 
-  const rows: Array<[string, string]> = payment
+  const orderUuid: string | undefined = invoiceQuery.data?.customer_order_uuid;
+  // [label, value, where tapping it goes]: the payer opens the customer, the invoice
+  // opens the order it belongs to
+  const rows: Array<[string, string, string?]> = payment
     ? [
-        [t('payments.payer'), payer ?? '—'],
+        [t('payments.payer'), payer ?? '—', customerUuid ? `/customers/${customerUuid}` : undefined],
         [t('payments.method'), payment.payment_method ? tef(payment.payment_method) : '—'],
         [t('payments.account'), account ?? '—'],
         [
@@ -135,6 +138,7 @@ export default function PaymentDetailScreen() {
             : payment.debit_note_item_uuid
               ? t('payments.againstDebitNote')
               : t('payments.unlinked'),
+          orderUuid ? `/customer-orders/${orderUuid}` : undefined,
         ],
         [t('payments.received'), formatNumericDate(parseTs(payment.created_at))],
       ]
@@ -181,14 +185,29 @@ export default function PaymentDetailScreen() {
             </ThemedText>
 
             <View style={styles.card}>
-              {rows.map(([label, value]) => (
-                <View key={label} style={styles.row}>
-                  <ThemedText style={styles.rowLabel}>{label}</ThemedText>
-                  <ThemedText style={styles.rowValue} numberOfLines={2}>
-                    {value}
-                  </ThemedText>
-                </View>
-              ))}
+              {rows.map(([label, value, href]) =>
+                href ? (
+                  <TouchableOpacity
+                    key={label}
+                    style={styles.row}
+                    onPress={() => router.push(href as any)}
+                    testID={`payment-link-${label}`}
+                  >
+                    <ThemedText style={styles.rowLabel}>{label}</ThemedText>
+                    <ThemedText style={[styles.rowValue, styles.link]} numberOfLines={2}>
+                      {/* isolated, so an Arabic name cannot pull the arrow to its far side */}
+                      {`\u2068${value}\u2069 ${FORWARD_GLYPH}`}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ) : (
+                  <View key={label} style={styles.row}>
+                    <ThemedText style={styles.rowLabel}>{label}</ThemedText>
+                    <ThemedText style={styles.rowValue} numberOfLines={2}>
+                      {value}
+                    </ThemedText>
+                  </View>
+                ),
+              )}
             </View>
 
             {!!payment.notes && (
@@ -238,6 +257,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   rowLabel: { flex: 1, fontSize: 14, opacity: 0.65 },
   rowValue: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1f2937', textAlign: 'right' },
+  link: { color: '#5469D4' },
   sectionTitle: { fontSize: 15, fontWeight: '700', marginTop: 22, marginBottom: -6 },
   notes: { fontSize: 14, lineHeight: 20, opacity: 0.8 },
   // matches ModuleDetailScreen's destructive action
