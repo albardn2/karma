@@ -22,6 +22,7 @@ from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.auth import add_logged_user_to_payload
 from flask_jwt_extended import get_jwt_identity, jwt_required
+from app.entrypoint.routes.common.idempotency import idempotent
 
 @customer_order_item_blueprint.route('/bulk-create', methods=['POST'])
 @jwt_required()
@@ -102,6 +103,7 @@ def list_order_items():
                  PermissionScope.SALES.value,
                  PermissionScope.DRIVER.value,
                  PermissionScope.OPERATION_MANAGER.value)
+@idempotent
 def fulfill_order_items():
     payload = CustomerOrderItemBulkFulfill(**request.json)
     with SqlAlchemyUnitOfWork() as uow:

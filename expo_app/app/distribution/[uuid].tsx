@@ -183,6 +183,9 @@ export default function ExecutionDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // a refresh that failed while a trip is already on screen: kept as a notice,
+  // never swapped in for the map the driver is working from
+  const [refreshFailed, setRefreshFailed] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // list-mode (pre-trip: setup/route/create/trip) active-task completion
@@ -205,8 +208,15 @@ export default function ExecutionDetailScreen() {
   const fetchExecution = async (spinner = true) => {
     if (spinner) setLoading(true);
     const res = await apiCall<WorkflowExecution>(`/workflow-execution/${uuid}`);
-    if (res.data) { setExecution(res.data); setError(null); }
-    else setError(res.error || t('trip.failedToLoadTrip'));
+    if (res.data) {
+      setExecution(res.data);
+      setError(null);
+      setRefreshFailed(false);
+    } else if (execution) {
+      setRefreshFailed(true);
+    } else {
+      setError(errorMessage(res.error, t('trip.failedToLoadTrip')));
+    }
     setLoading(false);
     setRefreshing(false);
   };
@@ -591,6 +601,9 @@ export default function ExecutionDetailScreen() {
         <View style={styles.centered}>
           <ThemedText style={styles.errorTitle}>{t('trip.couldNotLoadTrip')}</ThemedText>
           <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => fetchExecution(true)} testID="trip-retry">
+            <ThemedText style={styles.retryText}>{t('moduleList.retry')}</ThemedText>
+          </TouchableOpacity>
         </View>
       </ThemedView>
     );
@@ -607,6 +620,11 @@ export default function ExecutionDetailScreen() {
       <ThemedView style={styles.container}>
         <Stack.Screen options={{ headerShown: false }} />
         <NativeHeader title={t('trip.trip')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
+        {refreshFailed && (
+          <TouchableOpacity style={styles.refreshNotice} onPress={() => fetchExecution(false)} testID="trip-refresh-failed">
+            <ThemedText style={styles.refreshNoticeText}>{t('trip.refreshFailed')}</ThemedText>
+          </TouchableOpacity>
+        )}
         <View style={styles.mapArea}>
           {trackingOn && isAdmin ? (
             <TripTrackingMap
@@ -678,6 +696,11 @@ export default function ExecutionDetailScreen() {
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <NativeHeader title={t('trip.trip')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/distribution'))} />
+      {refreshFailed && (
+        <TouchableOpacity style={styles.refreshNotice} onPress={() => fetchExecution(false)} testID="trip-refresh-failed">
+          <ThemedText style={styles.refreshNoticeText}>{t('trip.refreshFailed')}</ThemedText>
+        </TouchableOpacity>
+      )}
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchExecution(false); }} />}
@@ -779,6 +802,10 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   errorTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4, textAlign: 'center' },
   errorText: { fontSize: 14, opacity: 0.6, textAlign: 'center' },
+  retryBtn: { marginTop: 16, backgroundColor: '#5469D4', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
+  retryText: { color: '#fff', fontWeight: '600' },
+  refreshNotice: { backgroundColor: '#fef3c7', paddingHorizontal: 16, paddingVertical: 8 },
+  refreshNoticeText: { fontSize: 13, color: '#92400e', textAlign: 'center' },
   mapArea: { flex: 1 },
   stopsLoading: { position: 'absolute', top: 12, alignSelf: 'center', backgroundColor: '#fff', borderRadius: 20, padding: 8, elevation: 4 },
   expenseBtn: {

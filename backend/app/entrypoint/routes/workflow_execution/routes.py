@@ -28,6 +28,7 @@ from app.dto.workflow_execution import (
 )
 
 from models.common import WorkflowExecution as WorkflowExecutionModel
+from app.entrypoint.routes.common.idempotency import idempotent
 
 
 def _assert_execution_access(uow, workflow_exe):
@@ -186,6 +187,7 @@ def get_workflow_execution(uuid: str):
     PermissionScope.OPERATOR.value,
     PermissionScope.DRIVER.value,
     PermissionScope.SALES.value)
+@idempotent
 def add_manual_stop(uuid: str):
     """Add an ad-hoc trip stop mid-trip: picks an existing customer or creates
     a new one on the spot, then creates the stop + its trip_stop task."""

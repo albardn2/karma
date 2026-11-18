@@ -22,6 +22,7 @@ from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.auth import add_logged_user_to_payload
 from flask_jwt_extended import get_jwt_identity, jwt_required
+from app.entrypoint.routes.common.idempotency import idempotent
 
 
 # ----------------------- CUSTOMER ORDER WITH ITEMS AND INVOICES -----------------
@@ -47,6 +48,7 @@ def create_customer_order_with_items_and_invoice():
 @scopes_required(PermissionScope.ADMIN.value,
                  PermissionScope.SUPER_ADMIN.value,
                  PermissionScope.SALES.value)
+@idempotent
 def create_customer_order_checkout():
     """Create order + items + invoice, optionally fulfill + pay, in one submit."""
     current_uuid = get_jwt_identity()

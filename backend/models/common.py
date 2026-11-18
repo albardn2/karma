@@ -2707,3 +2707,28 @@ class ExchangeRate(Base):
     source = Column(String(60), nullable=False, default='manual')
     notes = Column(Text, nullable=True)
     is_deleted = Column(Boolean, default=False, nullable=False)
+
+
+class IdempotencyRecord(Base):
+    """The outcome of one client write, keyed by the Idempotency-Key it was sent with.
+
+    A driver on a weak connection can lose the response to a write that the server
+    committed, then tap again. The second request carries the same key, so the
+    server replays the stored response instead of booking the sale twice. A row is
+    'pending' while its request runs and 'done' once a 2xx response is stored; a
+    failed request deletes its row so it can be retried.
+    """
+    __tablename__ = 'idempotency_record'
+    __table_args__ = (
+        UniqueConstraint('account_uuid', 'key', name='uq_idempotency_record_account_key'),
+    )
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=False, index=True)
+    user_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True, index=True)
+    key = Column(String(80), nullable=False)
+    endpoint = Column(String(255), nullable=False)
+    state = Column(String(16), nullable=False, default='pending')
+    status_code = Column(Integer, nullable=True)
+    response_body = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

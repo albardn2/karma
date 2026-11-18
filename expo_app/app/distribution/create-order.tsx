@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +13,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
-import { apiCall } from '@/utils/api';
+import { apiCall, apiErrorText, newIdempotencyKey } from '@/utils/api';
 import { PickerField } from '@/components/PickerField';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { money } from '@/utils/money';
@@ -70,6 +70,7 @@ export default function CreateOrderScreen() {
   const [markFulfilled, setMarkFulfilled] = useState(!standalone);
   const [markPaid, setMarkPaid] = useState(!standalone);
   const [submitting, setSubmitting] = useState(false);
+  const submitKey = useRef(newIdempotencyKey());
   const [loading, setLoading] = useState(true);
 
   const [allMaterials, setAllMaterials] = useState<Material[]>([]);
@@ -155,10 +156,13 @@ export default function CreateOrderScreen() {
       if (standalone && notes.trim()) body.notes = notes.trim();
       const res = await apiCall<any>('/customer-order/with-items-and-invoice/checkout', {
         method: 'POST',
+        // the same key on every retry from this screen: a lost response then
+        // replays the first result instead of recording it twice
+        idempotencyKey: submitKey.current,
         body: JSON.stringify(body),
       });
       if (res.status !== 201 && res.status !== 200) {
-        throw new Error(res.error || t('createorder.createFailed'));
+        throw new Error(apiErrorText(res.error, t('createorder.createFailed')));
       }
       if (standalone) {
         // land on the order just made — but via a fresh GET, never this response:
