@@ -32,6 +32,8 @@ class TripDomain:
         trip = uow.trip_repository.find_one(uuid=uuid, is_deleted=False)
         if not trip:
             raise NotFoundError('Trip not found')
+        if trip.audited_at is not None:
+            raise BadRequestError('This trip has been audited. Undo the audit before editing it.')
 
         updates = payload.model_dump(exclude_unset=True)
         for field, val in updates.items():

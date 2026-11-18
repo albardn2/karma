@@ -148,6 +148,16 @@ def _require_auditor():
     )
 
 
+def _require_trip_editor():
+    """Admins and operation managers only; field roles never edit a trip directly."""
+    if getattr(g, "is_admin", False):
+        return
+    scopes = set(getattr(g, "user_scopes", set()) or set())
+    if scopes & {PermissionScope.SUPER_ADMIN.value, PermissionScope.ADMIN.value, PermissionScope.OPERATION_MANAGER.value}:
+        return
+    raise ApiError("Only an admin or operation manager can edit a trip.", status_code=403)
+
+
 @trip_blueprint.route("/<string:uuid>/audit", methods=["POST"])
 @jwt_required()
 @scopes_required(
@@ -439,15 +449,18 @@ def get_trip_activity(uuid: str):
 #
 @trip_blueprint.route("/<string:uuid>", methods=["PUT"])
 @jwt_required()
+# office roles only: drivers and sales change a trip through its stops and the
+# finish flow, never by editing it
 @scopes_required(
     PermissionScope.ADMIN.value,
     PermissionScope.SUPER_ADMIN.value,
-    PermissionScope.OPERATOR.value,
     PermissionScope.OPERATION_MANAGER.value,
-    PermissionScope.DRIVER.value,
-    PermissionScope.SALES.value,
 )
 def update_trip(uuid: str):
+    # also checked here, not only by the decorator: a per-user permission set or a
+    # platform role override can grant trip:update to a field role, and the
+    # decorator waves any such grant through
+    _require_trip_editor()
     payload = TripUpdate(**request.json)
     with SqlAlchemyUnitOfWork() as uow:
         dto = TripDomain.update_trip(uow=uow, uuid=uuid, payload=payload)
