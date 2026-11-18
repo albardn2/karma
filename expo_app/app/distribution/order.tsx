@@ -14,7 +14,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
-import { apiCall } from '@/utils/api';
+import { apiCall, apiErrorText, newIdempotencyKey } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime, parseTs } from '@/utils/date';
 
@@ -46,10 +46,19 @@ export default function OrderActionsScreen() {
     if (backTimer.current) clearTimeout(backTimer.current);
   }, []);
 
-  const load = async () => {
-    setLoading(true);
+  // One key per write, kept until that write succeeds: a retry after a lost
+  // response then replays the first result instead of fulfilling or paying twice.
+  const fulfilKey = useRef<string | null>(null);
+  const payKey = useRef<string | null>(null);
+
+  // quiet: refresh in place after a failed submit, so what is shown matches what
+  // the server now holds (items a half-done submit already delivered stop being
+  // offered) without blanking the screen
+  const load = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     setFailed(false);
     const res = await apiCall<any>(`/customer-order/with-items-and-invoice/${orderUuid}`);
+    if (quiet && !res.data) return;
     setData(res.data || null);
     if (!res.data) setFailed(true);
     const its = (res.data?.customer_order?.customer_order_items || []) as any[];
@@ -147,10 +156,13 @@ export default function OrderActionsScreen() {
   const submit = async () => {
     if (!(doFulfill && canFulfill) && !(doPay && canPay && payAmountValid)) return;
     setSubmitting(true);
+    let fulfilled = false;
     try {
       if (doFulfill && canFulfill) {
+        fulfilKey.current ??= newIdempotencyKey();
         const r = await apiCall('/customer-order-item/fulfill-items', {
           method: 'POST',
+          idempotencyKey: fulfilKey.current,
           body: JSON.stringify({
             items: unfulfilled
               .filter((i: any) => picked.has(i.uuid))
@@ -158,11 +170,16 @@ export default function OrderActionsScreen() {
             trip_stop_uuid: tripStopUuid || null,
           }),
         });
-        if (r.status !== 200 && r.status !== 201) throw new Error(r.error || t('order.failedToFulfill'));
+        if (r.status !== 200 && r.status !== 201)
+          throw new Error(apiErrorText(r.error, t('order.failedToFulfill')));
+        fulfilled = true;
+        fulfilKey.current = null;
       }
       if (doPay && canPay && payAmountValid) {
+        payKey.current ??= newIdempotencyKey();
         const r = await apiCall('/payment/', {
           method: 'POST',
+          idempotencyKey: payKey.current,
           body: JSON.stringify({
             invoice_uuid: invoice.uuid,
             financial_account_uuid: null,
@@ -174,7 +191,9 @@ export default function OrderActionsScreen() {
             trip_stop_uuid: tripStopUuid || null,
           }),
         });
-        if (r.status !== 200 && r.status !== 201) throw new Error(r.error || t('order.failedToRecordPayment'));
+        if (r.status !== 200 && r.status !== 201)
+          throw new Error(apiErrorText(r.error, t('order.failedToRecordPayment')));
+        payKey.current = null;
       }
       // Confirm what happened, then get out of the way. Whether the payment
       // settled the order or only part of it, the next step is back at the stop —
@@ -190,7 +209,11 @@ export default function OrderActionsScreen() {
         else router.replace('/distribution');
       }, 1100);
     } catch (e: any) {
-      Alert.alert(t('order.error'), e?.message || t('order.couldNotUpdateOrder'));
+      const reason = e?.message || t('order.couldNotUpdateOrder');
+      // the delivery went through and only the payment failed: say so, so the
+      // driver records the cash instead of walking away from a delivered order
+      Alert.alert(t('order.error'), fulfilled ? t('order.deliveredPaymentFailed', { reason }) : reason);
+      await load(true);
     } finally {
       setSubmitting(false);
     }

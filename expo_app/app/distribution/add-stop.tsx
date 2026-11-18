@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +13,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiCall } from '@/utils/api';
+import { apiCall, apiErrorText, newIdempotencyKey } from '@/utils/api';
 import * as Location from 'expo-location';
 
 function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
@@ -50,6 +50,7 @@ export default function AddStopScreen() {
   const [categories, setCategories] = useState<string[]>([]);
   const [newCustomer, setNewCustomer] = useState({ company_name: '', full_name: '', phone_number: '', category: '', full_address: '' });
   const [submitting, setSubmitting] = useState(false);
+  const submitKey = useRef(newIdempotencyKey());
 
   // Capture device location via expo-location (navigator.geolocation is not
   // available on native). Seeds the stop coordinates AND drives the
@@ -152,9 +153,12 @@ export default function AddStopScreen() {
       }
       const res = await apiCall<{ status?: string }>(`/workflow-execution/${executionUuid}/manual-stop`, {
         method: 'POST',
+        // the same key on every retry from this screen: a lost response then
+        // replays the first result instead of recording it twice
+        idempotencyKey: submitKey.current,
         body: JSON.stringify(body),
       });
-      if (res.status !== 201 && res.status !== 200) throw new Error(res.error || t('addstop.failedToAddStop'));
+      if (res.status !== 201 && res.status !== 200) throw new Error(apiErrorText(res.error, t('addstop.failedToAddStop')));
       // when the customer was already on the route the backend promotes the
       // existing stop instead of adding a duplicate — let the driver know.
       const outcome = res.data?.status;

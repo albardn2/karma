@@ -20,6 +20,7 @@ from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.auth import add_logged_user_to_payload
 from flask_jwt_extended import get_jwt_identity, jwt_required
+from app.entrypoint.routes.common.idempotency import idempotent
 
 @payment_blueprint.route('/', methods=['POST'])
 @jwt_required()
@@ -29,6 +30,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
                  PermissionScope.DRIVER.value,
                  PermissionScope.ACCOUNTANT.value
                  )
+@idempotent
 def create_payment():
     current_user_uuid = get_jwt_identity()
     payload = PaymentCreate(**request.json)

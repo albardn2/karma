@@ -117,19 +117,56 @@ const refreshAccessToken = (): Promise<RefreshResult> => {
   return refreshPromise;
 };
 
-const doFetch = async (endpoint: string, options: RequestInit): Promise<Response> => {
+/**
+ * How long a request may take before it is abandoned. React Native's fetch has no
+ * deadline of its own, so on a dead connection a write would otherwise spin forever.
+ * Generous, because trip routing legitimately takes tens of seconds.
+ */
+const REQUEST_TIMEOUT_MS = 60_000;
+
+/** Returned (as status 0) when a request was abandoned at REQUEST_TIMEOUT_MS. */
+export const TIMEOUT_ERROR = 'Request timed out';
+
+export interface ApiOptions extends RequestInit {
+  /**
+   * Sent as Idempotency-Key. Reuse the same key when retrying the same write: the
+   * server then replays the first result instead of recording it twice.
+   */
+  idempotencyKey?: string;
+}
+
+/** A fresh key for one user action; keep it until that action has succeeded. */
+export const newIdempotencyKey = (): string =>
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+
+const doFetch = async (endpoint: string, options: ApiOptions): Promise<Response> => {
   const token = await AsyncStorage.getItem('access_token');
 
+  const { idempotencyKey, ...init } = options;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+    ...(init.headers as Record<string, string>),
   };
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, { ...init, headers, signal: controller.signal });
+  } catch (e) {
+    if (controller.signal.aborted) throw new Error(TIMEOUT_ERROR);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   // checked here rather than in apiCall so it covers the retried request too,
   // and every caller regardless of status: a 403 is the response most likely to
   // be the first sign that permissions moved.
@@ -139,7 +176,7 @@ const doFetch = async (endpoint: string, options: RequestInit): Promise<Response
 
 export const apiCall = async <T = any>(
   endpoint: string,
-  options: RequestInit = {}
+  options: ApiOptions = {}
 ): Promise<ApiResponse<T>> => {
   try {
     let response = await doFetch(endpoint, options);

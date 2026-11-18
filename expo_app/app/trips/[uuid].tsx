@@ -12,7 +12,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { NativeHeader } from '@/components/layout/NativeHeader';
-import { apiCall, isOk } from '@/utils/api';
+import { apiCall, apiErrorText, isOk } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthDayTime, parseTs } from '@/utils/date';
@@ -127,6 +127,8 @@ export default function TripDetailScreen() {
   const [materials, setMaterials] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // the trip itself could not be read (deleted, or no connection on first load)
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activityTab, setActivityTab] = useState<'orders' | 'fulfillments' | 'payments' | 'debt'>(
     'orders'
   );
@@ -162,7 +164,14 @@ export default function TripDetailScreen() {
       apiCall<{ materials: { uuid: string; name: string }[] }>('/material/?page=1&per_page=100'),
       fetchFunnels(),
     ]);
-    if (tripRes.data) setTrip(tripRes.data);
+    if (tripRes.data) {
+      setTrip(tripRes.data);
+      setLoadError(null);
+    } else {
+      setLoadError(
+        tripRes.status === 404 ? t('trips.tripGone') : apiErrorText(tripRes.error, t('trips.couldNotLoad')),
+      );
+    }
     if (expRes.data) setTripExpenses(expRes.data.expenses || []);
     if (actRes.data) setActivity(actRes.data);
     if (matRes.data)
@@ -281,6 +290,30 @@ export default function TripDetailScreen() {
         <NativeHeader title={t('trips.title')} onBack={() => router.back()} />
         <View style={styles.centered}>
           <ThemedText style={styles.muted}>{t('trips.adminsOnly')}</ThemedText>
+        </View>
+      </ThemedView>
+    );
+  }
+
+  if (!trip && !loading && loadError) {
+    // a refresh failure keeps the trip on screen; this is only reached when there
+    // is no trip to show at all
+    return (
+      <ThemedView style={styles.container}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <NativeHeader title={t('trips.title')} onBack={() => router.back()} />
+        <View style={styles.centered}>
+          <ThemedText style={styles.loadErrorText} testID="trip-load-error">{loadError}</ThemedText>
+          <TouchableOpacity
+            style={styles.loadRetry}
+            onPress={() => {
+              setLoading(true);
+              load();
+            }}
+            testID="trip-load-retry"
+          >
+            <ThemedText style={styles.loadRetryText}>{t('moduleList.retry')}</ThemedText>
+          </TouchableOpacity>
         </View>
       </ThemedView>
     );
@@ -689,6 +722,9 @@ function MoneyRow({
 }
 
 const styles = StyleSheet.create({
+  loadErrorText: { fontSize: 15, opacity: 0.7, textAlign: 'center', marginBottom: 16 },
+  loadRetry: { backgroundColor: '#5469D4', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
+  loadRetryText: { color: '#fff', fontWeight: '600' },
   container: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingBottom: 40, gap: 12 },
