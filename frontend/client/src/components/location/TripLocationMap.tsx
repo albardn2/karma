@@ -7,6 +7,13 @@ import { apiRequest } from "@/lib/queryClient";
 import { MqttClient } from "@/lib/mqttClient";
 import { LocationPlayback, type PlaybackPoint } from "@/components/location/LocationPlayback";
 import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  driverMarkerIcon,
+  freshMinutesFrom,
+  isFresh,
+  lastSeenLabel,
+  parseRecordedAt,
+} from "@/lib/liveFreshness";
 import "leaflet/dist/leaflet.css";
 
 // leaflet default icon fix (repo convention)
@@ -24,14 +31,14 @@ interface LivePosition {
   lat: number;
   lon: number;
   username?: string;
-  recordedAt?: string;
+  recordedAt: number | null;
   speed?: number | null;
-  receivedAt: number;
 }
 
 interface ClientConfig {
   broker_ws_url: string;
   topic_prefix: string;
+  fresh_minutes?: number;
 }
 
 interface TaskExecution {
@@ -193,9 +200,8 @@ export function LiveLocationMap({
               lat: coords[0],
               lon: coords[1],
               username: typeof data.username === "string" ? data.username : undefined,
-              recordedAt: typeof data.recorded_at === "string" ? data.recorded_at : undefined,
+              recordedAt: parseRecordedAt(data.recorded_at),
               speed: typeof data.speed === "number" ? data.speed : null,
-              receivedAt: Date.now(),
             });
             setLiveTrail((trail) => {
               const last = trail[trail.length - 1];
@@ -254,8 +260,10 @@ export function LiveLocationMap({
     [points]
   );
 
-  const lastSeenSec = live ? Math.max(0, Math.round((Date.now() - live.receivedAt) / 1000)) : null;
   void tick;
+  const now = Date.now();
+  const lastSeen = live ? lastSeenLabel(live.recordedAt, now, t) : "";
+  const liveIsFresh = !!live && isFresh(live.recordedAt, now, freshMinutesFrom(clientConfig));
 
   const center: [number, number] =
     live ? [live.lat, live.lon] : storedPath[storedPath.length - 1] ?? [33.5138, 36.2765];
@@ -282,7 +290,7 @@ export function LiveLocationMap({
         {live ? (
           <span className="text-gray-600">
             {live.username ?? username ?? t("location.driver")} ·{" "}
-            {t("location.lastSeenSeconds", { sec: lastSeenSec ?? 0 })}
+            {lastSeen}
             {typeof live.speed === "number"
               ? ` · ${t("location.kmh", { speed: (live.speed * 3.6).toFixed(1) })}`
               : ""}
@@ -309,14 +317,14 @@ export function LiveLocationMap({
             <Polyline positions={liveTrail} pathOptions={{ color: "#16a34a", weight: 3 }} />
           )}
           {live && (
-            <Marker position={[live.lat, live.lon]}>
+            <Marker position={[live.lat, live.lon]} icon={driverMarkerIcon(liveIsFresh)}>
               <Popup>
                 <div className="text-sm">
                   <div className="font-semibold">{live.username ?? username ?? t("location.driver")}</div>
                   <div>
                     {live.lat.toFixed(5)}, {live.lon.toFixed(5)}
                   </div>
-                  <div>{t("location.lastSeenSeconds", { sec: lastSeenSec ?? 0 })}</div>
+                  <div>{lastSeen}</div>
                 </div>
               </Popup>
             </Marker>

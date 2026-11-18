@@ -26,6 +26,14 @@ class LocationTrackingConfigUpdate(BaseModel):
     history_retention_days: Optional[int] = Field(None, gt=0, le=365)
 
 
+class LiveWindowSetting(BaseModel):
+    """How recent a driver's last fix must be for the live maps to show it as
+    live (green) rather than stale (gray). One value for the whole platform."""
+    model_config = ConfigDict(extra="forbid")
+
+    minutes: int = Field(gt=0, le=1440)
+
+
 class LocationPingRead(BaseModel):
     """A stored sample, serialized for playback."""
     model_config = ConfigDict(from_attributes=True, extra="forbid")

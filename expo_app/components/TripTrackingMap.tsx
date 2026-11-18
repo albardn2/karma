@@ -4,6 +4,14 @@ import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native
 import { ThemedText } from '@/components/ThemedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiCall } from '@/utils/api';
+import {
+  FRESH_COLOR,
+  STALE_COLOR,
+  freshMinutesFrom,
+  isFresh,
+  lastSeenLabel,
+  parseRecordedAt,
+} from '@/utils/liveFreshness';
 import { MqttSubscriber } from '@/utils/mqttSubscriber';
 import { parseTs } from '@/utils/date';
 import type { TripMapStop } from '@/components/TripMap';
@@ -22,7 +30,8 @@ interface StoredPoint extends LatLng {
 interface LivePos extends LatLng {
   username?: string;
   speed?: number | null;
-  receivedAt: number;
+  /** when the device took the fix (epoch ms); null when the payload has no usable time */
+  recordedAt: number | null;
 }
 
 const DEFAULT_REGION: Region = {
@@ -100,7 +109,7 @@ export function TripTrackingMap({
   const [user, setUser] = useState<{ uuid: string; username: string } | null>(null);
   const [userMissing, setUserMissing] = useState(false);
   const [storedPoints, setStoredPoints] = useState<StoredPoint[]>([]);
-  const [config, setConfig] = useState<{ broker_ws_url: string; topic_prefix: string } | null>(null);
+  const [config, setConfig] = useState<{ broker_ws_url: string; topic_prefix: string; fresh_minutes?: number } | null>(null);
 
   // ---- live state ----
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
@@ -165,7 +174,7 @@ export function TripTrackingMap({
   // broker config
   useEffect(() => {
     let cancelled = false;
-    apiCall<{ broker_ws_url: string; topic_prefix: string }>('/location/client-config').then((res) => {
+    apiCall<{ broker_ws_url: string; topic_prefix: string; fresh_minutes?: number }>('/location/client-config').then((res) => {
       if (!cancelled && res.data) setConfig(res.data);
     });
     return () => { cancelled = true; };
@@ -196,7 +205,7 @@ export function TripTrackingMap({
               ...ll,
               username: typeof data.username === 'string' ? data.username : undefined,
               speed: typeof data.speed === 'number' ? data.speed : null,
-              receivedAt: Date.now(),
+              recordedAt: parseRecordedAt(data.recorded_at),
             });
             setLiveTrail((trail) => {
               const last = trail[trail.length - 1];
@@ -314,7 +323,8 @@ export function TripTrackingMap({
   const startT = storedPoints[0]?.t ?? 0;
   const endT = storedPoints[storedPoints.length - 1]?.t ?? 0;
   const progress = endT > startT ? (playhead - startT) / (endT - startT) : 0;
-  const lastSeenSec = live ? Math.max(0, Math.round((Date.now() - live.receivedAt) / 1000)) : null;
+  const now = Date.now();
+  const liveColor = live && isFresh(live.recordedAt, now, freshMinutesFrom(config)) ? FRESH_COLOR : STALE_COLOR;
   const mutedStops = stops.filter((s) => s.lat != null && s.lng != null);
 
   const setFollowBoth = (v: boolean) => { followRef.current = v; setFollow(v); };
@@ -353,9 +363,11 @@ export function TripTrackingMap({
               <Polyline coordinates={liveTrail} strokeColor="#16a34a" strokeWidth={4} />
             )}
             {live && (
-              <Marker coordinate={live} anchor={{ x: 0.5, y: 0.5 }} zIndex={999}>
-                <View style={styles.liveHalo}>
-                  <View style={styles.liveDot} />
+              // keyed on the colour: a custom-view marker does not redraw its children
+              // on its own, so a fresh/stale flip remounts it instead
+              <Marker key={liveColor} coordinate={live} anchor={{ x: 0.5, y: 0.5 }} zIndex={999}>
+                <View style={[styles.liveHalo, { backgroundColor: `${liveColor}40` }]}>
+                  <View style={[styles.liveDot, { backgroundColor: liveColor }]} />
                 </View>
               </Marker>
             )}
@@ -432,7 +444,7 @@ export function TripTrackingMap({
                       ? t('tracking.connecting')
                       : t('tracking.disconnected')
                     : live
-                    ? `${t('tracking.lastSeen', { sec: lastSeenSec ?? 0 })}${
+                    ? `${lastSeenLabel(live.recordedAt, now, t)}${
                         typeof live.speed === 'number' ? ` · ${(live.speed * 3.6).toFixed(0)} km/h` : ''
                       }`
                     : t('tracking.waiting')}

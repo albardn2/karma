@@ -15,6 +15,15 @@ import { apiCall, isOk } from '@/utils/api';
 // looking for a routing problem instead of an import one.
 import { MqttSubscriber, type MqttMessage } from '@/utils/mqttSubscriber';
 import { BACK_GLYPH } from '@/utils/rtl';
+import {
+  DEFAULT_FRESH_MINUTES,
+  FRESH_COLOR,
+  STALE_COLOR,
+  freshMinutesFrom,
+  isFresh,
+  lastSeenLabel,
+  parseRecordedAt,
+} from '@/utils/liveFreshness';
 
 /** Syria, before any position has arrived: where the fleet drives. */
 const DEFAULT_REGION = { latitude: 34.8, longitude: 38.5, latitudeDelta: 6, longitudeDelta: 6 };
@@ -23,6 +32,7 @@ interface ClientConfig {
   broker_ws_url: string;
   topic_prefix: string;
   user_uuid: string;
+  fresh_minutes?: number;
 }
 
 interface Position {
@@ -30,25 +40,12 @@ interface Position {
   username: string;
   lat: number;
   lon: number;
-  /** when the device says it took the fix */
+  /** when the device took the fix (epoch ms); null when the payload has no usable time */
   recordedAt: number | null;
   speed?: number;
-  /** when this app received it — the only clock we can trust */
-  receivedAt: number;
 }
 
 type Status = 'connecting' | 'connected' | 'closed' | 'error';
-
-/**
- * A position older than this is drawn as stale rather than current.
- *
- * The publisher sets retain = true, so the broker hands a new subscriber the LAST
- * position of every user in the tenant the instant it connects — including someone who
- * finished their shift yesterday. Without an age, a retained fix is indistinguishable
- * from a live one, and a map that confidently shows a driver who is not there is worse
- * than a map that shows nothing.
- */
-const STALE_AFTER_MS = 5 * 60 * 1000;
 
 /** Redraw ages on a timer; nothing else re-renders them. */
 const AGE_TICK_MS = 5000;
@@ -62,7 +59,7 @@ const RECONNECT_MS = [1000, 2000, 4000, 8000, 15000];
  * screens deal in, where it is "lon lat". Getting it backwards puts Damascus drivers in
  * the Indian Ocean, and nothing errors.
  */
-function parsePosition(payload: string): Omit<Position, 'receivedAt'> | null {
+function parsePosition(payload: string): Position | null {
   try {
     const data = JSON.parse(payload);
     if (!data || typeof data !== 'object') return null;
@@ -74,7 +71,6 @@ function parsePosition(payload: string): Omit<Position, 'receivedAt'> | null {
     const lon = Number(parts[1]);
     if (!isFinite(lat) || !isFinite(lon)) return null;
     if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
-    const recorded = Date.parse(String(data.recorded_at ?? ''));
     return {
       userUuid: data.user_uuid,
       username:
@@ -83,7 +79,7 @@ function parsePosition(payload: string): Omit<Position, 'receivedAt'> | null {
           : data.user_uuid.slice(0, 8),
       lat,
       lon,
-      recordedAt: Number.isFinite(recorded) ? recorded : null,
+      recordedAt: parseRecordedAt(data.recorded_at),
       speed:
         typeof data.speed === 'number' && isFinite(data.speed) && data.speed >= 0
           ? data.speed
@@ -122,6 +118,7 @@ export default function LiveMapScreen() {
   const [positions, setPositions] = useState<Record<string, Position>>({});
   const [failed, setFailed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [freshMinutes, setFreshMinutes] = useState(DEFAULT_FRESH_MINUTES);
   const clientRef = useRef<MqttSubscriber | null>(null);
   const mapRef = useRef<MapView>(null);
   const attemptRef = useRef(0);
@@ -137,7 +134,7 @@ export default function LiveMapScreen() {
   const onMessage = useCallback((msg: MqttMessage) => {
     const p = parsePosition(msg.payload);
     if (!p) return;
-    setPositions((prev) => ({ ...prev, [p.userUuid]: { ...p, receivedAt: Date.now() } }));
+    setPositions((prev) => ({ ...prev, [p.userUuid]: p }));
   }, []);
 
   const connect = useCallback(
@@ -183,6 +180,7 @@ export default function LiveMapScreen() {
         setStatus('error');
         return;
       }
+      setFreshMinutes(freshMinutesFrom(res.data));
       connect(res.data);
     })();
     return () => {
@@ -192,13 +190,17 @@ export default function LiveMapScreen() {
     };
   }, [connect]);
 
+  const isStale = useCallback(
+    (p: Position) => !isFresh(p.recordedAt, now, freshMinutes),
+    [now, freshMinutes],
+  );
+
   const drivers = useMemo(
     () =>
-      Object.values(positions).sort((a, b) => {
-        const stale = (p: Position) => (now - p.receivedAt > STALE_AFTER_MS ? 1 : 0);
-        return stale(a) - stale(b) || a.username.localeCompare(b.username);
-      }),
-    [positions, now],
+      Object.values(positions).sort(
+        (a, b) => Number(isStale(a)) - Number(isStale(b)) || a.username.localeCompare(b.username),
+      ),
+    [positions, isStale],
   );
 
   const region = useMemo(() => {
@@ -226,15 +228,7 @@ export default function LiveMapScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drivers.length]);
 
-  const age = (p: Position) => {
-    const secs = Math.max(0, Math.round((now - p.receivedAt) / 1000));
-    if (secs < 60) return t('liveMap.secondsAgo', { n: secs });
-    const mins = Math.round(secs / 60);
-    if (mins < 60) return t('liveMap.minutesAgo', { n: mins });
-    return t('liveMap.hoursAgo', { n: Math.round(mins / 60) });
-  };
-
-  const isStale = (p: Position) => now - p.receivedAt > STALE_AFTER_MS;
+  const age = (p: Position) => lastSeenLabel(p.recordedAt, now, t);
 
   return (
     <ModuleGuard module="live-map">
@@ -291,7 +285,7 @@ export default function LiveMapScreen() {
                   coordinate={{ latitude: d.lat, longitude: d.lon }}
                   title={d.username}
                   description={`${age(d)}${d.speed != null ? ` · ${Math.round(d.speed * 3.6)} km/h` : ''}`}
-                  opacity={isStale(d) ? 0.45 : 1}
+                  pinColor={isStale(d) ? STALE_COLOR : FRESH_COLOR}
                   testID={`live-marker-${d.userUuid}`}
                 />
               ))}

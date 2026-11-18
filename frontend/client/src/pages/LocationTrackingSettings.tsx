@@ -19,6 +19,7 @@ import { MapPin, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { LiveWindowCard } from "@/components/location/LiveWindowCard";
 
 interface LocationTrackingConfig {
   live_ping_seconds: number;
@@ -157,6 +158,8 @@ export function LocationTrackingPanel() {
           <p className="text-sm text-gray-600">
             {t("location.settingsNote")}
           </p>
+
+          <LiveWindowCard />
 
           <Card>
             <CardHeader>

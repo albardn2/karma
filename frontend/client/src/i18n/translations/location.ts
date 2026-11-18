@@ -17,6 +17,8 @@ export const en: Record<string, string> = {
   'location.lastSeenSecondsAgo': 'Last seen {n}s ago',
   'location.lastSeenMinutesAgo': 'Last seen {n}m ago',
   'location.lastSeenHoursAgo': 'Last seen {n}h ago',
+  'location.lastSeenDaysAgo': 'Last seen {n}d ago',
+  'location.lastSeenUnknown': 'Last seen: unknown',
   'location.kmh': '{speed} km/h',
 
   // user location history (UserLocationHistory.tsx)
@@ -51,6 +53,14 @@ export const en: Record<string, string> = {
   'location.livePingCadenceDesc':
     'How often the app publishes a live position while a user is tracked',
   'location.errMaxPing': 'Must be at most 3600 seconds',
+  'location.liveWindowTitle': 'Live map (all companies)',
+  'location.liveWindowSaved': 'Live window updated for all companies',
+  'location.liveFreshWindow': 'Live window (minutes)',
+  'location.liveFreshWindowPlaceholder': 'Enter the live window in minutes',
+  'location.liveFreshWindowDesc':
+    'One value for every company: a driver shows as live (green) on the live maps while their last position is at most this old, and as stale (gray) after that',
+  'location.errMinOneMinute': 'Must be at least 1 minute',
+  'location.errMaxFreshWindow': 'Must be at most 1440 minutes',
   'location.tripCadence': 'Trip cadence (seconds)',
   'location.tripCadencePlaceholder': 'Enter trip cadence in seconds',
   'location.tripCadenceDesc': 'Spacing of stored points during a trip',
@@ -79,7 +89,6 @@ export const en: Record<string, string> = {
   'location.resolvingDriver': 'Resolving the assigned driver…',
   'location.connectingEllipsis': 'Connecting…',
   'location.driver': 'Driver',
-  'location.lastSeenSeconds': 'last seen {sec}s ago',
   'location.waitingDriver': "Waiting for the driver's app to report…",
   'location.trailLegend':
     'Grey line: stored trip path · Green line: live movement since this page opened',
@@ -129,6 +138,8 @@ export const ar: Record<string, string> = {
   'location.lastSeenSecondsAgo': 'آخر ظهور قبل {n} ث',
   'location.lastSeenMinutesAgo': 'آخر ظهور قبل {n} د',
   'location.lastSeenHoursAgo': 'آخر ظهور قبل {n} س',
+  'location.lastSeenDaysAgo': 'آخر ظهور قبل {n} ي',
+  'location.lastSeenUnknown': 'آخر ظهور: غير معروف',
   'location.kmh': '{speed} كم/س',
 
   // user location history (UserLocationHistory.tsx)
@@ -162,6 +173,14 @@ export const ar: Record<string, string> = {
   'location.livePingCadencePlaceholder': 'أدخل وتيرة الإرسال المباشر بالثواني',
   'location.livePingCadenceDesc': 'كم مرة يرسل التطبيق الموقع المباشر أثناء تتبّع المستخدم',
   'location.errMaxPing': 'يجب ألا تتجاوز 3600 ثانية',
+  'location.liveWindowTitle': 'الخريطة المباشرة (جميع الشركات)',
+  'location.liveWindowSaved': 'تم تحديث نافذة البث المباشر لجميع الشركات',
+  'location.liveFreshWindow': 'نافذة البث المباشر (بالدقائق)',
+  'location.liveFreshWindowPlaceholder': 'أدخل نافذة البث المباشر بالدقائق',
+  'location.liveFreshWindowDesc':
+    'قيمة واحدة لجميع الشركات: يظهر السائق مباشرًا (أخضر) على الخرائط المباشرة ما دام آخر موقع له لا يتجاوز هذا العمر، ثم يظهر قديمًا (رمادي)',
+  'location.errMinOneMinute': 'يجب ألا تقل عن دقيقة واحدة',
+  'location.errMaxFreshWindow': 'يجب ألا تتجاوز 1440 دقيقة',
   'location.tripCadence': 'وتيرة الرحلة (بالثواني)',
   'location.tripCadencePlaceholder': 'أدخل وتيرة الرحلة بالثواني',
   'location.tripCadenceDesc': 'المسافة الزمنية بين النقاط المخزنة أثناء الرحلة',
@@ -190,7 +209,6 @@ export const ar: Record<string, string> = {
   'location.resolvingDriver': 'جارٍ تحديد السائق المعيّن…',
   'location.connectingEllipsis': 'جارٍ الاتصال…',
   'location.driver': 'السائق',
-  'location.lastSeenSeconds': 'آخر ظهور قبل {sec} ث',
   'location.waitingDriver': 'بانتظار إشارة تطبيق السائق…',
   'location.trailLegend':
     'الخط الرمادي: مسار الرحلة المخزّن · الخط الأخضر: الحركة المباشرة منذ فتح هذه الصفحة',
