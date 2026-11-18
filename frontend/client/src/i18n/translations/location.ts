@@ -53,10 +53,12 @@ export const en: Record<string, string> = {
   'location.livePingCadenceDesc':
     'How often the app publishes a live position while a user is tracked',
   'location.errMaxPing': 'Must be at most 3600 seconds',
+  'location.liveWindowTitle': 'Live map (all companies)',
+  'location.liveWindowSaved': 'Live window updated for all companies',
   'location.liveFreshWindow': 'Live window (minutes)',
   'location.liveFreshWindowPlaceholder': 'Enter the live window in minutes',
   'location.liveFreshWindowDesc':
-    'A driver shows as live (green) on the live maps while their last position is at most this old, and as stale (gray) after that',
+    'One value for every company: a driver shows as live (green) on the live maps while their last position is at most this old, and as stale (gray) after that',
   'location.errMinOneMinute': 'Must be at least 1 minute',
   'location.errMaxFreshWindow': 'Must be at most 1440 minutes',
   'location.tripCadence': 'Trip cadence (seconds)',
@@ -171,10 +173,12 @@ export const ar: Record<string, string> = {
   'location.livePingCadencePlaceholder': 'أدخل وتيرة الإرسال المباشر بالثواني',
   'location.livePingCadenceDesc': 'كم مرة يرسل التطبيق الموقع المباشر أثناء تتبّع المستخدم',
   'location.errMaxPing': 'يجب ألا تتجاوز 3600 ثانية',
+  'location.liveWindowTitle': 'الخريطة المباشرة (جميع الشركات)',
+  'location.liveWindowSaved': 'تم تحديث نافذة البث المباشر لجميع الشركات',
   'location.liveFreshWindow': 'نافذة البث المباشر (بالدقائق)',
   'location.liveFreshWindowPlaceholder': 'أدخل نافذة البث المباشر بالدقائق',
   'location.liveFreshWindowDesc':
-    'يظهر السائق مباشرًا (أخضر) على الخرائط المباشرة ما دام آخر موقع له لا يتجاوز هذا العمر، ثم يظهر قديمًا (رمادي)',
+    'قيمة واحدة لجميع الشركات: يظهر السائق مباشرًا (أخضر) على الخرائط المباشرة ما دام آخر موقع له لا يتجاوز هذا العمر، ثم يظهر قديمًا (رمادي)',
   'location.errMinOneMinute': 'يجب ألا تقل عن دقيقة واحدة',
   'location.errMaxFreshWindow': 'يجب ألا تتجاوز 1440 دقيقة',
   'location.tripCadence': 'وتيرة الرحلة (بالثواني)',

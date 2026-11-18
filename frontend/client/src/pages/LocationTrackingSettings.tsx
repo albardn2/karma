@@ -19,10 +19,10 @@ import { MapPin, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { LiveWindowCard } from "@/components/location/LiveWindowCard";
 
 interface LocationTrackingConfig {
   live_ping_seconds: number;
-  live_fresh_minutes: number;
   trip_cadence_seconds: number;
   history_cadence_seconds: number;
   history_retention_days: number;
@@ -38,11 +38,6 @@ const buildLocationConfigSchema = (
       .int(t("location.errMustBeWholeNumber"))
       .min(1, t("location.errMinOneSecond"))
       .max(3600, t("location.errMaxPing")),
-    live_fresh_minutes: z.coerce
-      .number({ invalid_type_error: t("location.errMustBeNumber") })
-      .int(t("location.errMustBeWholeNumber"))
-      .min(1, t("location.errMinOneMinute"))
-      .max(1440, t("location.errMaxFreshWindow")),
     trip_cadence_seconds: z.coerce
       .number({ invalid_type_error: t("location.errMustBeNumber") })
       .int(t("location.errMustBeWholeNumber"))
@@ -77,7 +72,6 @@ export function LocationTrackingPanel() {
     resolver: zodResolver(locationConfigSchema),
     defaultValues: {
       live_ping_seconds: undefined,
-      live_fresh_minutes: undefined,
       trip_cadence_seconds: undefined,
       history_cadence_seconds: undefined,
       history_retention_days: undefined,
@@ -89,7 +83,6 @@ export function LocationTrackingPanel() {
     if (config) {
       form.reset({
         live_ping_seconds: config.live_ping_seconds,
-        live_fresh_minutes: config.live_fresh_minutes,
         trip_cadence_seconds: config.trip_cadence_seconds,
         history_cadence_seconds: config.history_cadence_seconds,
         history_retention_days: config.history_retention_days,
@@ -103,7 +96,6 @@ export function LocationTrackingPanel() {
         method: "PUT",
         body: {
           live_ping_seconds: data.live_ping_seconds,
-          live_fresh_minutes: data.live_fresh_minutes,
           trip_cadence_seconds: data.trip_cadence_seconds,
           history_cadence_seconds: data.history_cadence_seconds,
           history_retention_days: data.history_retention_days,
@@ -167,6 +159,8 @@ export function LocationTrackingPanel() {
             {t("location.settingsNote")}
           </p>
 
+          <LiveWindowCard />
+
           <Card>
             <CardHeader>
               <CardTitle>{t("location.storageConfig")}</CardTitle>
@@ -193,31 +187,6 @@ export function LocationTrackingPanel() {
                         </FormControl>
                         <FormDescription>
                           {t("location.livePingCadenceDesc")}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="live_fresh_minutes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("location.liveFreshWindow")}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={1440}
-                            placeholder={t("location.liveFreshWindowPlaceholder")}
-                            {...field}
-                            value={field.value ?? ""}
-                            data-testid="input-live-fresh-minutes"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t("location.liveFreshWindowDesc")}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

@@ -15,6 +15,7 @@ from app.dto.location import (
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.errors import NotFoundError
 from app.entrypoint.routes.location import location_blueprint
+from app.entrypoint.routes.location.live_window import read_live_window_minutes
 from models.common import (
     LocationPing as LocationPingModel,
     LocationTrackingConfig as LocationTrackingConfigModel,
@@ -122,7 +123,7 @@ def client_config():
             "track_location": bool(user.track_location),
             "ping_seconds": int((config.live_ping_seconds if config else 15) or 15),
             # the live maps draw a driver as live while their last fix is this recent
-            "fresh_minutes": int((config.live_fresh_minutes if config else 5) or 5),
+            "fresh_minutes": read_live_window_minutes(uow),
             "broker_ws_url": broker["ws_url"],
             "topic": f"{broker['topic_prefix']}/{user.uuid}",
             # the live-map view subscribes to `{topic_prefix}/+`

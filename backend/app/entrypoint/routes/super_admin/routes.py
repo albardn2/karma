@@ -304,6 +304,34 @@ def create_ledger_entry(account_uuid: str):
     return jsonify(result), 201
 
 
+@super_admin_blueprint.route("/settings/live-window", methods=["GET"])
+@scopes_required(SUPER)
+def get_live_window():
+    from app.entrypoint.routes.location.live_window import read_live_window_minutes
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        result = {"minutes": read_live_window_minutes(uow)}
+    return jsonify(result), 200
+
+
+@super_admin_blueprint.route("/settings/live-window", methods=["PUT"])
+@scopes_required(SUPER)
+def set_live_window():
+    """One live-map window for every account: how recent a driver's last fix
+    must be to show as live (green) rather than stale (gray)."""
+    from app.dto.location import LiveWindowSetting
+    from app.entrypoint.routes.location.live_window import (
+        read_live_window_minutes,
+        write_live_window_minutes,
+    )
+
+    payload = LiveWindowSetting(**request.json)
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        write_live_window_minutes(uow, payload.minutes)
+        result = {"minutes": read_live_window_minutes(uow)}
+        uow.commit()
+    return jsonify(result), 200
+
+
 @super_admin_blueprint.route("/settings/default-account-permissions", methods=["GET"])
 @scopes_required(SUPER)
 def get_default_account_permissions():
