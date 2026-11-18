@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -14,6 +13,8 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
+import { BottomSheetModal } from '@/components/BottomSheetModal';
+import { KEYBOARD_DONE_BAR_ID } from '@/components/KeyboardDoneBar';
 import { apiCall, apiErrorText, newIdempotencyKey } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHasEndpoint } from '@/hooks/useModuleAccess';
@@ -78,15 +79,26 @@ export default function OrderActionsScreen() {
   const invoice = invoiceUuid
     ? (data?.invoices || []).find((i: any) => i.uuid === invoiceUuid) ?? data?.invoices?.[0]
     : data?.invoices?.[0];
-  const items = (order?.customer_order_items || []).filter((i: any) => !i.is_deleted);
+  // the server returns lines in no fixed order, so sort them to keep each row in
+  // place when the order reloads after an edit
+  const items = (order?.customer_order_items || [])
+    .filter((i: any) => !i.is_deleted)
+    .sort(
+      (a: any, b: any) =>
+        String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')) ||
+        String(a.uuid).localeCompare(String(b.uuid)),
+    );
 
-  // Price editing needs both the caller's invoice_item update grant and an order
-  // payment state that allows it ("unpaid" | "single_payment"; "locked" refuses).
+  // Each line edit needs the caller's update grant and an order payment state that
+  // allows it, as on the order detail screen. Price: "unpaid" or "single_payment".
+  // Quantity: "unpaid" only, since on a fulfilled line it also moves stock.
   // Prices live on the INVOICE lines, so map each order item to its invoice line here.
   const priceEditState: string | undefined = data?.price_edit_state;
   const canUpdatePrice = useHasEndpoint('invoice_item', 'update');
+  const canUpdateQuantity = useHasEndpoint('customer_order_item', 'update');
   const canEditPrice =
     canUpdatePrice && (priceEditState === 'unpaid' || priceEditState === 'single_payment');
+  const canEditQuantity = canUpdateQuantity && priceEditState === 'unpaid';
   const invoiceItemFor = (orderItemUuid: string) => {
     for (const inv of data?.invoices || []) {
       if (inv.is_deleted) continue;
@@ -113,12 +125,35 @@ export default function OrderActionsScreen() {
     setPriceSaving(false);
     if (res.status === 200) {
       setPriceItem(null);
-      load();
+      load(true);
     } else {
-      Alert.alert(
-        t('customerOrders.editPrice'),
-        String(res.error ?? '').slice(0, 300) || t('form.tryAgain'),
-      );
+      Alert.alert(t('customerOrders.editPrice'), apiErrorText(res.error, t('form.tryAgain')));
+    }
+  };
+
+  const [quantityItem, setQuantityItem] = useState<any>(null);
+  const [quantityDraft, setQuantityDraft] = useState('');
+  const [quantitySaving, setQuantitySaving] = useState(false);
+
+  const saveQuantity = async () => {
+    if (!quantityItem) return;
+    // whole units only: parseInt would quietly save "2.5" as 2
+    const draft = quantityDraft.trim();
+    if (!/^\d+$/.test(draft) || parseInt(draft, 10) <= 0) {
+      Alert.alert(t('customerOrders.editQuantity'), t('customerOrders.quantityWholeNumber'));
+      return;
+    }
+    setQuantitySaving(true);
+    const res = await apiCall(`/customer-order-item/${quantityItem.uuid}/quantity`, {
+      method: 'PUT',
+      body: JSON.stringify({ quantity: parseInt(draft, 10) }),
+    });
+    setQuantitySaving(false);
+    if (res.status === 200) {
+      setQuantityItem(null);
+      load(true);
+    } else {
+      Alert.alert(t('customerOrders.editQuantity'), apiErrorText(res.error, t('form.tryAgain')));
     }
   };
   const unfulfilled = items.filter((i: any) => !i.is_fulfilled);
@@ -274,23 +309,40 @@ export default function OrderActionsScreen() {
               </ThemedText>
             )}
             {items.map((i: any) => {
-              // the price lives on the matching INVOICE line; editable only
-              // when the order's payment state allows (server-decided)
+              // the price lives on the matching INVOICE line, the quantity on the order line
               const li = invoiceItemFor(i.uuid);
-              const priceRow = canEditPrice && li && (
-                <TouchableOpacity
-                  style={styles.editPriceRow}
-                  onPress={() => {
-                    setPriceDraft(String(li.price_per_unit ?? ''));
-                    setPriceItem(li);
-                  }}
-                  hitSlop={8}
-                  testID={`edit-price-${li.uuid}`}
-                >
-                  <ThemedText style={styles.editPriceText}>
-                    {round2(li.price_per_unit ?? 0)} {te(currency)} · {t('customerOrders.editPrice')}
-                  </ThemedText>
-                </TouchableOpacity>
+              const showPrice = canEditPrice && !!li;
+              const editRow = (showPrice || canEditQuantity) && (
+                <View style={styles.editRow}>
+                  {showPrice && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setPriceDraft(String(li.price_per_unit ?? ''));
+                        setPriceItem(li);
+                      }}
+                      hitSlop={8}
+                      testID={`edit-price-${li.uuid}`}
+                    >
+                      <ThemedText style={styles.editPriceText}>
+                        {round2(li.price_per_unit ?? 0)} {te(currency)} · {t('customerOrders.editPrice')}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  )}
+                  {canEditQuantity && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setQuantityDraft(String(i.quantity ?? ''));
+                        setQuantityItem(i);
+                      }}
+                      hitSlop={8}
+                      testID={`edit-quantity-${i.uuid}`}
+                    >
+                      <ThemedText style={styles.editPriceText}>
+                        {t('customerOrders.editQuantity')}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  )}
+                </View>
               );
               return i.is_fulfilled ? (
                 <View key={i.uuid}>
@@ -300,7 +352,7 @@ export default function OrderActionsScreen() {
                       {t('order.itemFulfilled')}
                     </ThemedText>
                   </View>
-                  {priceRow}
+                  {editRow}
                 </View>
               ) : (
                 // tappable: untick a line to leave it undelivered this time. All
@@ -324,7 +376,7 @@ export default function OrderActionsScreen() {
                       {t('order.itemPending')}
                     </ThemedText>
                   </TouchableOpacity>
-                  {priceRow}
+                  {editRow}
                 </View>
               );
             })}
@@ -410,50 +462,81 @@ export default function OrderActionsScreen() {
         </ScrollView>
       )}
 
-      <Modal
+      <BottomSheetModal
         visible={!!priceItem}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPriceItem(null)}
+        onClose={() => setPriceItem(null)}
+        busy={priceSaving}
+        title={`${t('customerOrders.editPrice')}${priceItem?.material_name ? ` — ${priceItem.material_name}` : ''}`}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <ThemedText style={styles.modalTitle}>
-              {t('customerOrders.editPrice')}
-              {priceItem?.material_name ? ` — ${priceItem.material_name}` : ''}
+        <TextInput
+          style={styles.priceInput}
+          value={priceDraft}
+          onChangeText={setPriceDraft}
+          keyboardType="decimal-pad"
+          inputAccessoryViewID={KEYBOARD_DONE_BAR_ID}
+          placeholder={t('customerOrders.newPricePerUnit')}
+          placeholderTextColor="#9ca3af"
+          autoFocus
+          testID="order-price-input"
+        />
+        <View style={styles.modalRow}>
+          <TouchableOpacity
+            style={styles.modalCancel}
+            onPress={() => setPriceItem(null)}
+            disabled={priceSaving}
+          >
+            <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modalSave, priceSaving && styles.modalSaveOff]}
+            onPress={savePrice}
+            disabled={priceSaving}
+            testID="order-price-save"
+          >
+            <ThemedText style={styles.modalSaveText}>
+              {priceSaving ? t('custdetail.saving') : t('form.save')}
             </ThemedText>
-            <TextInput
-              style={styles.priceInput}
-              value={priceDraft}
-              onChangeText={setPriceDraft}
-              keyboardType="decimal-pad"
-              placeholder={t('customerOrders.newPricePerUnit')}
-              placeholderTextColor="#9ca3af"
-              autoFocus
-              testID="order-price-input"
-            />
-            <View style={styles.modalRow}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setPriceItem(null)}
-                disabled={priceSaving}
-              >
-                <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSave, priceSaving && styles.modalSaveOff]}
-                onPress={savePrice}
-                disabled={priceSaving}
-                testID="order-price-save"
-              >
-                <ThemedText style={styles.modalSaveText}>
-                  {priceSaving ? t('custdetail.saving') : t('form.save')}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </TouchableOpacity>
         </View>
-      </Modal>
+      </BottomSheetModal>
+
+      <BottomSheetModal
+        visible={!!quantityItem}
+        onClose={() => setQuantityItem(null)}
+        busy={quantitySaving}
+        title={`${t('customerOrders.editQuantity')}${quantityItem?.material_name ? ` — ${quantityItem.material_name}` : ''}`}
+      >
+        <TextInput
+          style={styles.priceInput}
+          value={quantityDraft}
+          onChangeText={setQuantityDraft}
+          keyboardType="number-pad"
+          inputAccessoryViewID={KEYBOARD_DONE_BAR_ID}
+          placeholder={t('customerOrders.newQuantity')}
+          placeholderTextColor="#9ca3af"
+          autoFocus
+          testID="order-quantity-input"
+        />
+        <View style={styles.modalRow}>
+          <TouchableOpacity
+            style={styles.modalCancel}
+            onPress={() => setQuantityItem(null)}
+            disabled={quantitySaving}
+          >
+            <ThemedText style={styles.modalCancelText}>{t('common.cancel')}</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modalSave, quantitySaving && styles.modalSaveOff]}
+            onPress={saveQuantity}
+            disabled={quantitySaving}
+            testID="order-quantity-save"
+          >
+            <ThemedText style={styles.modalSaveText}>
+              {quantitySaving ? t('custdetail.saving') : t('form.save')}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      </BottomSheetModal>
     </ThemedView>
   );
 }
@@ -486,18 +569,11 @@ const styles = StyleSheet.create({
     fontSize: 11, color: '#B45309', lineHeight: 15,
     paddingHorizontal: 12, paddingTop: 8,
   },
-  editPriceRow: {
+  editRow: {
+    flexDirection: 'row', gap: 16,
     paddingHorizontal: 12, paddingBottom: 8, marginTop: -4,
-    alignSelf: 'flex-start',
   },
   editPriceText: { fontSize: 12, fontWeight: '700', color: '#5469D4' },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
-  modalSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16, borderTopRightRadius: 16,
-    padding: 16, paddingBottom: 32,
-  },
-  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
   priceInput: {
     borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)', borderRadius: 8,
     backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 10,
