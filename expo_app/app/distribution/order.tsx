@@ -16,6 +16,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { NativeHeader } from '@/components/layout/NativeHeader';
 import { apiCall, apiErrorText, newIdempotencyKey } from '@/utils/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useHasEndpoint } from '@/hooks/useModuleAccess';
 import { formatMonthDayTime, parseTs } from '@/utils/date';
 
 // money is DOUBLE PRECISION end to end; never render or send the raw float
@@ -79,11 +80,13 @@ export default function OrderActionsScreen() {
     : data?.invoices?.[0];
   const items = (order?.customer_order_items || []).filter((i: any) => !i.is_deleted);
 
-  // payment-aware price editing, same rule the order detail screen follows:
-  // the server decides ("unpaid" | "single_payment" | "locked"). Prices live
-  // on the INVOICE lines, so map each order item to its invoice line here.
+  // Price editing needs both the caller's invoice_item update grant and an order
+  // payment state that allows it ("unpaid" | "single_payment"; "locked" refuses).
+  // Prices live on the INVOICE lines, so map each order item to its invoice line here.
   const priceEditState: string | undefined = data?.price_edit_state;
-  const canEditPrice = priceEditState === 'unpaid' || priceEditState === 'single_payment';
+  const canUpdatePrice = useHasEndpoint('invoice_item', 'update');
+  const canEditPrice =
+    canUpdatePrice && (priceEditState === 'unpaid' || priceEditState === 'single_payment');
   const invoiceItemFor = (orderItemUuid: string) => {
     for (const inv of data?.invoices || []) {
       if (inv.is_deleted) continue;
