@@ -6,6 +6,14 @@ invariants a refactor could silently break — the edit is DB-coupled (FIFO lot
 selection, several repos), so it is pinned by source rather than exercised.
 """
 import inspect
+import json
+import pathlib
+
+import pytest
+
+from app.entrypoint.routes.common import permissions as pmod
+
+NON_ADMIN_ROLES = sorted(pmod.ROLE_PRESETS_BASELINE)
 
 
 def test_unfulfill_reverses_every_warehouse_sale_event():
@@ -98,21 +106,20 @@ def test_trip_delivered_quantities_net_the_compensating_adjustments():
     assert needle in inspect.getsource(troutes)
 
 
-def test_role_presets_grant_update_on_order_and_invoice_lines():
-    """For a non-admin the PRESET is the runtime gate (before_request), not
-    the route decorator. Both line edits are PUT -> 'update'; without the
-    grant every sales/driver/accountant got 403 while both clients showed
-    the editor."""
-    import json
-    import pathlib
-    from app.entrypoint.routes.common import permissions as pmod
-
+@pytest.mark.parametrize("role", NON_ADMIN_ROLES)
+@pytest.mark.parametrize("resource", ["customer_order_item", "invoice_item"])
+def test_no_default_role_may_edit_an_order_lines_quantity_or_price(role, resource):
+    """For a non-admin the role preset is the runtime gate (before_request), not
+    the route decorator. The only PUT on these resources is the quantity and the
+    price edit, so the 'update' grant is exactly that power. By default only
+    admins hold it; a platform owner can grant it per role or per user."""
     presets = json.loads(
         (pathlib.Path(pmod.__file__).parent / "role_presets.json").read_text()
     )
-    for role in ("sales", "driver", "accountant", "sales_associate", "sales_manager"):
-        assert "update" in presets[role]["endpoints"]["customer_order_item"], role
-        assert "update" in presets[role]["endpoints"]["invoice_item"], role
+
+    granted = presets[role]["endpoints"].get(resource, [])
+
+    assert "update" not in granted, (role, resource, granted)
 
 
 def test_quantity_edit_is_gated_to_fully_unpaid_orders():
