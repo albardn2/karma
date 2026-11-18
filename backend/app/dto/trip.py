@@ -104,67 +104,16 @@ class TripCreate(BaseModel):
 
 
 class TripUpdate(BaseModel):
+    """What may be edited on a trip directly: its name and notes.
+
+    Status moves only through the finish and cancel flows, which check the trip's
+    stops; vehicle, warehouses and times are set when the trip is created, since
+    its stock and funnel windows depend on them.
+    """
     model_config = ConfigDict(extra="forbid")
 
     name: Optional[str] = Field(None, max_length=120)
-
-    vehicle_uuid: Optional[str] = None
-    service_area_uuid: Optional[str] = None
-    distribution_area: Optional[str] = None
     notes: Optional[str] = None
-    status: Optional[TripStatus] = None
-    start_warehouse_uuid: Optional[str] = None
-    end_warehouse_uuid: Optional[str] = None
-    start_time: Optional[UtcDateTime] = None
-    end_time: Optional[UtcDateTime] = None
-    start_point: Optional[str] = None
-    end_point: Optional[str] = None
-    data: Optional[dict] = None
-    workflow_execution_uuid: Optional[str] = None
-
-
-    @field_validator("distribution_area", mode="before")
-    def validate_distribution_area_polygon(cls, v):
-        if v is None:
-            return v
-        if not isinstance(v, str):
-            raise ValueError("`distribution_area` must be a WKT string representing a Polygon")
-        try:
-            geom = shapely_wkt.loads(v)
-        except Exception as e:
-            raise ValueError(f"Invalid WKT format for distribution_area: {e}")
-        if geom.geom_type != "Polygon" or not geom.is_valid:
-            raise ValueError("`distribution_area` must be a valid Polygon")
-        return v
-
-    @field_validator("start_point", mode="before")
-    def validate_start_point(cls, v):
-        if v is None:
-            return v
-        if not isinstance(v, str):
-            raise ValueError("`start_point` must be a WKT string representing a Point")
-        try:
-            geom = shapely_wkt.loads(v)
-        except Exception as e:
-            raise ValueError(f"Invalid WKT format for start_point: {e}")
-        if geom.geom_type != "Point" or not geom.is_valid:
-            raise ValueError("`start_point` must be a valid Point")
-        return v
-
-    @field_validator("end_point", mode="before")
-    def validate_end_point(cls, v):
-        if v is None:
-            return v
-        if not isinstance(v, str):
-            raise ValueError("`end_point` must be a WKT string representing a Point")
-        try:
-            geom = shapely_wkt.loads(v)
-        except Exception as e:
-            raise ValueError(f"Invalid WKT format for end_point: {e}")
-        if geom.geom_type != "Point" or not geom.is_valid:
-            raise ValueError("`end_point` must be a valid Point")
-        return v
-
 
 class TripRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")

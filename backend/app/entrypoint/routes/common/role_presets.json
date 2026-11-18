@@ -251,8 +251,7 @@
             ],
             "trip": [
                 "create",
-                "read",
-                "update"
+                "read"
             ],
             "trip_stop": [
                 "create",
@@ -531,8 +530,7 @@
             ],
             "trip": [
                 "create",
-                "read",
-                "update"
+                "read"
             ],
             "trip_stop": [
                 "create",
@@ -674,8 +672,7 @@
             ],
             "trip": [
                 "create",
-                "read",
-                "update"
+                "read"
             ],
             "trip_stop": [
                 "create",
@@ -817,8 +814,7 @@
             ],
             "trip": [
                 "create",
-                "read",
-                "update"
+                "read"
             ],
             "trip_stop": [
                 "create",
@@ -960,8 +956,7 @@
             ],
             "trip": [
                 "create",
-                "read",
-                "update"
+                "read"
             ],
             "trip_stop": [
                 "create",
