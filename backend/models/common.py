@@ -2652,6 +2652,8 @@ class LocationTrackingConfig(Base):
     # how often the mobile app publishes a live position while tracking, for
     # every tracked user (moved here from per-user so it is set once, globally)
     live_ping_seconds = Column(Integer, nullable=False, default=15, server_default='15')
+    # how recent a driver's last fix must be for the live maps to show it as live
+    live_fresh_minutes = Column(Integer, nullable=False, default=5, server_default='5')
     trip_cadence_seconds = Column(Integer, nullable=False, default=30)
     history_cadence_seconds = Column(Integer, nullable=False, default=120)
     history_retention_days = Column(Integer, nullable=False, default=14)

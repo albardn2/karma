@@ -121,6 +121,8 @@ def client_config():
         result = {
             "track_location": bool(user.track_location),
             "ping_seconds": int((config.live_ping_seconds if config else 15) or 15),
+            # the live maps draw a driver as live while their last fix is this recent
+            "fresh_minutes": int((config.live_fresh_minutes if config else 5) or 5),
             "broker_ws_url": broker["ws_url"],
             "topic": f"{broker['topic_prefix']}/{user.uuid}",
             # the live-map view subscribes to `{topic_prefix}/+`

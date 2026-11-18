@@ -162,7 +162,6 @@ export const translations: Record<Lang, Record<string, string>> = {
     'tracking.connecting': 'Connecting…',
     'tracking.disconnected': 'Disconnected — retrying…',
     'tracking.waiting': "Waiting for the driver's app to report…",
-    'tracking.lastSeen': 'seen {sec}s ago',
     'tracking.noPoints': 'No recorded locations for this trip yet.',
     'tracking.recenter': 'Recenter',
     'tracking.noDriver': 'No assigned driver',
@@ -260,6 +259,8 @@ export const translations: Record<Lang, Record<string, string>> = {
   'liveMap.secondsAgo': '{n}s ago',
   'liveMap.minutesAgo': '{n}m ago',
   'liveMap.hoursAgo': '{n}h ago',
+  'liveMap.daysAgo': '{n}d ago',
+  'liveMap.lastSeenUnknown': 'last seen unknown',
   'liveMap.andMore': 'and {n} more',
 
   'menu.processes': 'Production',
@@ -1610,7 +1611,6 @@ export const translations: Record<Lang, Record<string, string>> = {
     'tracking.connecting': 'جارٍ الاتصال…',
     'tracking.disconnected': 'انقطع الاتصال — تجري إعادة المحاولة…',
     'tracking.waiting': 'بانتظار إشارة تطبيق السائق…',
-    'tracking.lastSeen': 'آخر ظهور قبل {sec} ث',
     'tracking.noPoints': 'لا توجد مواقع مسجلة لهذه الرحلة بعد.',
     'tracking.recenter': 'إعادة التمركز',
     'tracking.noDriver': 'لا يوجد سائق معيّن',
@@ -1708,6 +1708,8 @@ export const translations: Record<Lang, Record<string, string>> = {
   'liveMap.secondsAgo': 'قبل {n} ثانية',
   'liveMap.minutesAgo': 'قبل {n} دقيقة',
   'liveMap.hoursAgo': 'قبل {n} ساعة',
+  'liveMap.daysAgo': 'قبل {n} يوم',
+  'liveMap.lastSeenUnknown': 'آخر ظهور غير معروف',
   'liveMap.andMore': 'و{n} آخرين',
 
   'menu.processes': 'الإنتاج',

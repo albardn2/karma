@@ -6,18 +6,14 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { apiRequest } from "@/lib/queryClient";
 import { MqttClient, type MqttMessage } from "@/lib/mqttClient";
 import { useLanguage } from "@/contexts/LanguageContext";
-
-// Fix default marker icons in react-leaflet
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-import markerIconRetina from "leaflet/dist/images/marker-icon-2x.png";
-
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIconRetina,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
+import {
+  DEFAULT_FRESH_MINUTES,
+  driverMarkerIcon,
+  freshMinutesFrom,
+  isFresh,
+  lastSeenLabel,
+  parseRecordedAt,
+} from "@/lib/liveFreshness";
 
 const DEFAULT_CENTER: [number, number] = [33.5138, 36.2765]; // Damascus
 const DEFAULT_ZOOM = 12;
@@ -30,22 +26,13 @@ interface DriverPosition {
   lon: number;
   username: string;
   recordedAt: number | null; // epoch ms, from the payload's recorded_at
-  receivedAt: number; // epoch ms, when the message arrived here
   speed?: number; // m/s, as reported by the device
 }
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected";
 
-// Timestamps may arrive without a timezone suffix; treat those as UTC
-function parseTimestamp(value: unknown): number | null {
-  if (typeof value !== "string" || !value) return null;
-  const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(value) ? value : value + "Z";
-  const t = Date.parse(iso);
-  return isNaN(t) ? null : t;
-}
-
 // Defensively parse an MQTT payload into a driver position (null if malformed)
-function parsePosition(payload: string): Omit<DriverPosition, "receivedAt"> | null {
+function parsePosition(payload: string): DriverPosition | null {
   try {
     const data = JSON.parse(payload);
     if (!data || typeof data !== "object") return null;
@@ -67,7 +54,7 @@ function parsePosition(payload: string): Omit<DriverPosition, "receivedAt"> | nu
         typeof data.username === "string" && data.username
           ? data.username
           : data.user_uuid.substring(0, 8),
-      recordedAt: parseTimestamp(data.recorded_at),
+      recordedAt: parseRecordedAt(data.recorded_at),
       speed:
         typeof data.speed === "number" && isFinite(data.speed) && data.speed >= 0
           ? data.speed
@@ -76,19 +63,6 @@ function parsePosition(payload: string): Omit<DriverPosition, "receivedAt"> | nu
   } catch {
     return null;
   }
-}
-
-function lastSeenLabel(
-  ts: number,
-  now: number,
-  t: (key: string, vars?: Record<string, string | number>) => string
-): string {
-  const seconds = Math.max(0, Math.floor((now - ts) / 1000));
-  if (seconds < 60) return t("location.lastSeenSecondsAgo", { n: seconds });
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return t("location.lastSeenMinutesAgo", { n: minutes });
-  const hours = Math.floor(minutes / 60);
-  return t("location.lastSeenHoursAgo", { n: hours });
 }
 
 // Fit the map to the markers once, when the first positions arrive;
@@ -126,6 +100,7 @@ export default function LiveMap() {
   const [error, setError] = useState<string | null>(null);
   const [drivers, setDrivers] = useState<Map<string, DriverPosition>>(new Map());
   const [now, setNow] = useState(() => Date.now());
+  const [freshMinutes, setFreshMinutes] = useState(DEFAULT_FRESH_MINUTES);
 
   // Recompute "last seen" labels every 5 seconds
   useEffect(() => {
@@ -146,7 +121,7 @@ export default function LiveMap() {
       if (!position) return;
       setDrivers((prev) => {
         const next = new Map(prev);
-        next.set(position.userUuid, { ...position, receivedAt: Date.now() });
+        next.set(position.userUuid, position);
         return next;
       });
     };
@@ -199,6 +174,7 @@ export default function LiveMap() {
       try {
         const config = await apiRequest("/location/client-config");
         if (disposed) return;
+        setFreshMinutes(freshMinutesFrom(config));
         const brokerUrl = config?.broker_ws_url;
         const topicPrefix = config?.topic_prefix;
         if (typeof brokerUrl !== "string" || !brokerUrl || typeof topicPrefix !== "string" || !topicPrefix) {
@@ -268,7 +244,11 @@ export default function LiveMap() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             {positions.map((driver) => (
-              <Marker key={driver.userUuid} position={[driver.lat, driver.lon]}>
+              <Marker
+                key={driver.userUuid}
+                position={[driver.lat, driver.lon]}
+                icon={driverMarkerIcon(isFresh(driver.recordedAt, now, freshMinutes))}
+              >
                 <Popup>
                   <div className="text-sm space-y-1">
                     <div className="font-semibold">{driver.username}</div>
@@ -276,7 +256,7 @@ export default function LiveMap() {
                       {driver.lat.toFixed(5)}, {driver.lon.toFixed(5)}
                     </div>
                     <div className="text-gray-500">
-                      {lastSeenLabel(driver.recordedAt ?? driver.receivedAt, now, t)}
+                      {lastSeenLabel(driver.recordedAt, now, t)}
                     </div>
                     {driver.speed !== undefined && (
                       <div className="text-gray-500">

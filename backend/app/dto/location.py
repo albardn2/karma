@@ -11,6 +11,7 @@ class LocationTrackingConfigRead(BaseModel):
 
     # how often the app publishes a live position while tracking (global)
     live_ping_seconds: int
+    live_fresh_minutes: int
     trip_cadence_seconds: int
     history_cadence_seconds: int
     history_retention_days: int
@@ -21,6 +22,7 @@ class LocationTrackingConfigUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     live_ping_seconds: Optional[int] = Field(None, gt=0, le=3600)
+    live_fresh_minutes: Optional[int] = Field(None, gt=0, le=1440)
     trip_cadence_seconds: Optional[int] = Field(None, gt=0, le=3600)
     history_cadence_seconds: Optional[int] = Field(None, gt=0, le=86400)
     history_retention_days: Optional[int] = Field(None, gt=0, le=365)
