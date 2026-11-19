@@ -5,7 +5,7 @@
 // U+2068/U+2069 isolation marks so the bidi algorithm keeps it in one piece, and the domain
 // uses a non-breaking hyphen (U+2011) so it never wraps mid-word.
 
-export const SUPPORT_EMAIL = 'zaid.bardan@gmail.com';
+export const SUPPORT_EMAIL = 'zaid@karma-grp.com';
 
 export const PRIVACY_SECTION_COUNT = 10;
 export const SUPPORT_FAQ_COUNT = 5;
@@ -18,7 +18,7 @@ export const en: Record<string, string> = {
 
   'legal.privacy.title': 'Privacy Policy',
   'legal.privacy.intro':
-    'This policy explains what information the Karma Group app and website (karma-grp.com) collect, how it is used, and the choices you have. Karma Group is based in Syria. If you have any question about this policy, email us at {email}.',
+    'This policy explains what information the Karma Group app and website (crm-prod.karma-grp.com) collect, how it is used, and the choices you have. Karma Group is based in Syria. If you have any question about this policy, email us at {email}.',
 
   'legal.privacy.s1.title': 'Who we are',
   'legal.privacy.s1.body':
@@ -71,7 +71,7 @@ export const en: Record<string, string> = {
 
   'legal.support.q1': 'How do I create an account?',
   'legal.support.a1':
-    'Open the app or karma-grp.com and choose "Create a company account". You become the company\'s administrator and can add your staff afterwards.',
+    'Open the app or crm-prod.karma-grp.com and choose "Create a company account". You become the company\'s administrator and can add your staff afterwards.',
   'legal.support.q2': 'My app says "Account pending verification". What now?',
   'legal.support.a2':
     'Every new company is reviewed by our team before it can use the system. Once it is verified, tap "Check again" and the app opens. If it is taking long, email us.',
@@ -94,7 +94,7 @@ export const ar: Record<string, string> = {
 
   'legal.privacy.title': 'سياسة الخصوصية',
   'legal.privacy.intro':
-    'توضح هذه السياسة المعلومات التي يجمعها تطبيق Karma Group وموقعه (\u2068karma\u2011grp.com\u2069)، وكيفية استخدامها، والخيارات المتاحة لك. مقر Karma Group في سوريا. لأي سؤال حول هذه السياسة، راسلنا على \u2068{email}\u2069.',
+    'توضح هذه السياسة المعلومات التي يجمعها تطبيق Karma Group وموقعه (\u2068crm\u2011prod.karma\u2011grp.com\u2069)، وكيفية استخدامها، والخيارات المتاحة لك. مقر Karma Group في سوريا. لأي سؤال حول هذه السياسة، راسلنا على \u2068{email}\u2069.',
 
   'legal.privacy.s1.title': 'من نحن',
   'legal.privacy.s1.body':
@@ -146,7 +146,7 @@ export const ar: Record<string, string> = {
 
   'legal.support.q1': 'كيف أنشئ حسابًا؟',
   'legal.support.a1':
-    'افتح التطبيق أو \u2068karma\u2011grp.com\u2069 واختر "إنشاء حساب شركة". تصبح مسؤول الشركة ويمكنك إضافة موظفيك بعد ذلك.',
+    'افتح التطبيق أو \u2068crm\u2011prod.karma\u2011grp.com\u2069 واختر "إنشاء حساب شركة". تصبح مسؤول الشركة ويمكنك إضافة موظفيك بعد ذلك.',
   'legal.support.q2': 'يظهر في التطبيق "الحساب بانتظار التحقق". ماذا أفعل؟',
   'legal.support.a2':
     'يراجع فريقنا كل شركة جديدة قبل أن تتمكن من استخدام النظام. بعد التحقق، اضغط "التحقق مرة أخرى" فيُفتح التطبيق. وإن طال الأمر، راسلنا.',
