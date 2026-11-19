@@ -35,6 +35,7 @@ import * as processes from './translations/processes';
 import * as workflows from './translations/workflows';
 import * as location from './translations/location';
 import * as misc from './translations/misc';
+import * as legal from './translations/legal';
 
 export type Lang = 'en' | 'ar';
 
@@ -75,6 +76,7 @@ const modules = [
   workflows,
   location,
   misc,
+  legal,
 ];
 
 export const translations: Record<Lang, Record<string, string>> = {

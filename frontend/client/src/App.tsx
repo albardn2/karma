@@ -98,6 +98,8 @@ import WorkflowExecutionTaskDetail from "@/pages/WorkflowExecutionTaskDetail";
 import AccountSettings from "@/pages/AccountSettings";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import Support from "@/pages/Support";
 import SuperAdmin from "@/pages/SuperAdmin";
 
 function HomeRoute() {
@@ -120,6 +122,9 @@ function Router() {
       <Route path="/account-settings" component={() => <ProtectedRoute><AccountSettings /></ProtectedRoute>} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      {/* public: App Store Connect links to both */}
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/support" component={Support} />
       <Route path="/" component={HomeRoute} />
       <Route path="/dashboards" component={() => <ProtectedRoute><Dashboards /></ProtectedRoute>} />
       <Route path="/dashboards/business-overview" component={() => <ProtectedRoute><Dashboard /></ProtectedRoute>} />
