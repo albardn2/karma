@@ -1,12 +1,21 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, apiCall, setOnAuthFailure, setOnPermsChanged } from '@/utils/api';
+import { API_BASE_URL, apiCall, apiErrorText, setOnAuthFailure, setOnPermsChanged } from '@/utils/api';
+import type { SignupPayload } from '@/utils/signupForm';
 import { clearQueryCache } from '@/utils/queryClient';
+
+/** `error` is the server's reason when it gave one (e.g. a username already taken). */
+export type SignupResult = { ok: true } | { ok: false; error?: string };
 
 interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  /**
+   * Creates a company and its first admin, then signs that admin in. The new
+   * company is unverified, so the root layout shows the verification notice.
+   */
+  signup: (payload: SignupPayload) => Promise<SignupResult>;
   logout: () => Promise<void>;
   loading: boolean;
   user: any;
@@ -169,26 +178,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify(requestBody),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-
-        await AsyncStorage.setItem('access_token', data.access_token);
-        await AsyncStorage.setItem('refresh_token', data.refresh_token);
-        await AsyncStorage.setItem('user_email', email);
-
-        const userFetched = await fetchUserInfo();
-        if (userFetched) {
-          setIsAuthenticated(true);
-          return true;
-        }
-        return false;
-      } else {
-        return false;
-      }
+      if (!response.ok) return false;
+      return await startSession(await response.json(), email);
     } catch (error) {
       console.error('Error during login:', error);
       return false;
     }
+  };
+
+  /** Store the tokens /auth/login and /auth/signup return, then load the profile. */
+  const startSession = async (
+    tokens: { access_token: string; refresh_token: string },
+    identifier: string,
+  ): Promise<boolean> => {
+    // a previous user's cached data must not show in the new session
+    clearQueryCache();
+    await AsyncStorage.setItem('access_token', tokens.access_token);
+    await AsyncStorage.setItem('refresh_token', tokens.refresh_token);
+    await AsyncStorage.setItem('user_email', identifier);
+    const userFetched = await fetchUserInfo();
+    if (userFetched) setIsAuthenticated(true);
+    return userFetched;
+  };
+
+  const signup = async (payload: SignupPayload): Promise<SignupResult> => {
+    const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const error = apiErrorText(await response.text().catch(() => ''));
+      return error ? { ok: false, error } : { ok: false };
+    }
+    const started = await startSession(await response.json(), payload.username);
+    return started ? { ok: true } : { ok: false };
   };
 
   const logout = async (): Promise<void> => {
@@ -230,7 +254,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, login, logout, loading, user, isAdmin, isVerified,
+      value={{ isAuthenticated, login, signup, logout, loading, user, isAdmin, isVerified,
                refreshUser: fetchUserInfo }}
     >
       {children}

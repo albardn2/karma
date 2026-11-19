@@ -107,6 +107,16 @@ export default function LoginScreen() {
                 </ThemedText>
               </LinearGradient>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.signupLink}
+              onPress={() => router.push('/signup')}
+              disabled={isLoading}
+              hitSlop={8}
+              testID="login-signup-link"
+            >
+              <ThemedText style={styles.signupLinkText}>{t('login.createCompanyAccount')}</ThemedText>
+            </TouchableOpacity>
           </ThemedView>
         </KeyboardAvoidingView>
       </LinearGradient>
@@ -234,5 +244,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  signupLink: {
+    alignSelf: 'center',
+    paddingVertical: 4,
+  },
+  signupLinkText: {
+    fontSize: 14,
+    color: '#5469D4',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });

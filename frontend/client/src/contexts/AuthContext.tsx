@@ -247,15 +247,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false };
       }
 
-      // 400 etc. — body is {"msg": ...} or plain pydantic error text
+      // 400 etc. — body is {"error": ...} (or {"msg": ...}) or plain text
       let message: string | undefined;
       try {
         const raw = await response.text();
         message = raw || undefined;
         try {
           const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed.msg === 'string') {
-            message = parsed.msg;
+          const reason = parsed?.error ?? parsed?.msg;
+          if (typeof reason === 'string' && reason) {
+            message = reason;
           }
         } catch {
           // not JSON — keep the raw text
