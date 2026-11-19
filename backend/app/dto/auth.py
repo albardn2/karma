@@ -101,6 +101,12 @@ class SignupRequest(BaseModel):
         return values
 
 
+class AccountDeleteRequest(BaseModel):
+    """The caller re-enters their password to delete their company."""
+    model_config = ConfigDict(extra="forbid")
+    password: str = Field(min_length=1)
+
+
 class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     username: Optional[str] = None

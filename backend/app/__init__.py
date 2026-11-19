@@ -140,24 +140,27 @@ def _load_request_identity():
                 uow.session.query(
                     AccountModel.is_blocked,
                     AccountModel.permissions,
-                    # LAST on purpose — acct[2] below indexes into this tuple,
-                    # and tests mock this query's return value positionally.
                     AccountModel.is_verified,
+                    AccountModel.is_deleted,
                 )
                 .filter(AccountModel.uuid == user.account_uuid)
                 .first()
             )
-            if acct and acct[0]:
+            # A deleted company's sessions end on their next request, exactly as
+            # a blocked one's do (401 for the clients' auto-logout).
+            if acct and acct.is_deleted:
+                return jsonify({"msg": "This account has been deleted"}), 401
+            if acct and acct.is_blocked:
                 # 401 (not 403) so both clients' auto-logout machinery
                 # kicks in: web clears the token and reloads to the login
                 # page; the app fails its refresh and signs out — active
                 # sessions are revoked on their next request
                 return jsonify({"msg": "This account is blocked"}), 401
-            g.account_perms = acct[1] if acct else None
+            g.account_perms = acct.permissions if acct else None
             # No row means the account cannot be resolved, which must deny
             # rather than admit — the same fail-closed reasoning as the deleted-user
             # branch above.
-            g.account_verified = bool(acct[2]) if acct else False
+            g.account_verified = bool(acct.is_verified) if acct else False
         # impersonation: a superuser token may carry a target account —
         # the platform owner operates inside that tenant's scope
         imp_account = claims.get("imp_account_uuid")

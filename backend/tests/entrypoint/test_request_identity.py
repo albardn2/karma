@@ -20,6 +20,8 @@ while they existed and 269 (all accounts) once deleted.
 So: a readable token naming an unresolvable user must 401, and it must do so
 BEFORE anything reads flask.g.
 """
+from types import SimpleNamespace
+
 import pytest
 from flask import Flask, g
 
@@ -59,7 +61,7 @@ class _Uow:
         return self
 
     def first(self):
-        return (False, None, True)   # not blocked, no feature cap, verified
+        return SimpleNamespace(is_blocked=False, permissions=None, is_verified=True, is_deleted=False)
 
 
 class _User:

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ModuleDetailScreen, DetailRow } from '@/components/ModuleDetailScreen';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
+import { DeleteAccountButton } from '@/components/DeleteAccountButton';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { money, perCurrency } from '@/utils/money';
 import { formatNumericDate, parseTs, plainDate, plainDayOfMonth, todayPlain } from '@/utils/date';
@@ -40,9 +41,11 @@ interface Billing {
 }
 
 /**
- * What this company is paying, and what it has been billed. READ ONLY, because the API is.
+ * What this company is paying, and what it has been billed, plus the one action a company
+ * takes on its own account: deleting it (DeleteAccountButton, on /auth/account).
  *
- * The whole /account blueprint is a single GET: every write verb on it returns 405, and
+ * The billing itself is READ ONLY, because the API is. The whole /account blueprint is a
+ * single GET: every write verb on it returns 405, and
  * every editable field — the company name, the contact details, the subscription rate, the
  * verification and blocked flags — lives behind the platform-owner routes instead. So this
  * is not a screen that declined to offer writes; there are none to offer. It says so in the
@@ -189,6 +192,7 @@ export default function AccountSettingsScreen() {
             {b.entries?.length === 100 && (
               <ThemedText style={styles.footer}>{t('account.truncated')}</ThemedText>
             )}
+            <DeleteAccountButton />
           </>
         )}
       />
