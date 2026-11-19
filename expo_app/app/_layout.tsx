@@ -22,7 +22,8 @@ function NavigationContent() {
   useEffect(() => {
     if (loading) return;
 
-    const inAuthGroup = segments[0] === 'login';
+    // the screens a signed-out user may be on
+    const inAuthGroup = segments[0] === 'login' || segments[0] === 'signup';
 
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/login');
@@ -57,6 +58,7 @@ function NavigationContent() {
   return (
     <Stack>
       <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="signup" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
     </Stack>
