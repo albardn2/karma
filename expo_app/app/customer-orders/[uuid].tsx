@@ -586,7 +586,12 @@ const styles = StyleSheet.create({
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   badge: {
     fontSize: 11,
+    lineHeight: 15,
     fontWeight: '600',
+    // a pill sized to its text: stretched to the row's height, Android draws it as an oval
+    alignSelf: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,

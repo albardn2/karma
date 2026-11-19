@@ -280,14 +280,20 @@ export default function LiveMapScreen() {
                   only ever be appended (see PolygonEditor's "always mounted" note),
                   and the sort reshuffles markers whenever a driver goes stale */}
               {Object.values(positions).map((d) => (
+                // A drawn dot rather than pinColor: Android's Google Maps tints its
+                // pins by hue only, so a gray pinColor shows as a coloured pin.
+                // tracksViewChanges lets the dot repaint when a driver turns stale.
                 <Marker
                   key={d.userUuid}
                   coordinate={{ latitude: d.lat, longitude: d.lon }}
                   title={d.username}
                   description={`${age(d)}${d.speed != null ? ` · ${Math.round(d.speed * 3.6)} km/h` : ''}`}
-                  pinColor={isStale(d) ? STALE_COLOR : FRESH_COLOR}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                  tracksViewChanges
                   testID={`live-marker-${d.userUuid}`}
-                />
+                >
+                  <View style={[styles.driverDot, { backgroundColor: isStale(d) ? STALE_COLOR : FRESH_COLOR }]} />
+                </Marker>
               ))}
             </MapView>
           {!region && (
@@ -338,6 +344,18 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
+  driverDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 3,
+  },
   dotOn: { backgroundColor: '#16a34a' },
   dotWait: { backgroundColor: '#d97706' },
   dotOff: { backgroundColor: '#dc2626' },

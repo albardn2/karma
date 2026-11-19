@@ -139,7 +139,12 @@ const styles = StyleSheet.create({
   subtitle: { flex: 1, fontSize: 13, opacity: 0.55, minWidth: 90 },
   badge: {
     fontSize: 11,
+    lineHeight: 15,
     fontWeight: '600',
+    // a pill sized to its text: stretched to the row's height, Android draws it as an oval
+    alignSelf: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
     color: '#4b5563',
     backgroundColor: '#f3f4f6',
     paddingHorizontal: 8,
