@@ -211,6 +211,10 @@ jobs:
           if "$AAPT2" dump xmltree --file AndroidManifest.xml app.apk \
               | grep -A2 'com.google.android.geo.API_KEY' | grep -q 'AIza'; then
             echo "The APK has a Google Maps key."
+            # the signing certificate's fingerprint (public): the Maps key's Android
+            # restriction in Google Cloud must list it with com.karmagrp.business
+            APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+            "$APKSIGNER" verify --print-certs app.apk | grep -E 'SHA-1 digest' | sed 's/^/Signing certificate /' | tee -a "$GITHUB_STEP_SUMMARY"
           else
             echo "::error::The APK's com.google.android.geo.API_KEY is empty; maps will be blank on Android."
             exit 1
