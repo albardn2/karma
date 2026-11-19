@@ -175,6 +175,23 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Check the Google Maps key is on EAS
+        run: |
+          # Android draws its maps with Google Maps, and app.config.ts reads the key
+          # from the EAS "production" environment at build time. Without it the build
+          # still succeeds and ships a blank map, so stop before spending a build.
+          for scope in project account; do
+            # names only: everything after "=" is cut, so no value reaches the log
+            NAMES=$(eas env:list production --scope "$scope" --format short | sed -E 's/=.*//')
+            echo "EAS production variables ($scope scope): $(echo "$NAMES" | tr '\n' ' ')"
+            if echo "$NAMES" | grep -qE '(^|[[:space:]])GOOGLE_MAPS_API_KEY([[:space:]]|$)'; then
+              echo "GOOGLE_MAPS_API_KEY found in the $scope scope."
+              exit 0
+            fi
+          done
+          echo "::error::GOOGLE_MAPS_API_KEY is not set in the EAS production environment. Add it with: eas env:create --environment production --name GOOGLE_MAPS_API_KEY --visibility secret --value <key>"
+          exit 1
+
       - name: Build Android (internal distribution)
         run: |
           # pipefail so tee cannot mask a failed build
@@ -183,6 +200,25 @@ jobs:
           # internal APK. The iOS ad-hoc job still uses `preview` (dev); only the
           # Android sideload build is moved to prod, which is what gets installed.
           eas build --platform android --profile production-apk --non-interactive 2>&1 | tee build.log
+
+      - name: Check the APK carries a Maps key
+        run: |
+          # The value is never printed: only whether the manifest's Maps key is a
+          # real Google key (they start with "AIza") rather than empty.
+          URL=$(eas build:list --platform android --buildProfile production-apk --status finished --limit 1 --json --non-interactive | jq -r '.[0].artifacts.buildUrl')
+          curl -sSfL "$URL" -o app.apk
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+          if "$AAPT2" dump xmltree --file AndroidManifest.xml app.apk \
+              | grep -A2 'com.google.android.geo.API_KEY' | grep -q 'AIza'; then
+            echo "The APK has a Google Maps key."
+            # the signing certificate's fingerprint (public): the Maps key's Android
+            # restriction in Google Cloud must list it with com.karmagrp.business
+            APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+            "$APKSIGNER" verify --print-certs app.apk | grep -E 'SHA-1 digest' | sed 's/^/Signing certificate /' | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::The APK's com.google.android.geo.API_KEY is empty; maps will be blank on Android."
+            exit 1
+          fi
 
       - name: Publish install link
         if: always()
@@ -228,6 +264,23 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Check the Google Maps key is on EAS
+        run: |
+          # Android draws its maps with Google Maps, and app.config.ts reads the key
+          # from the EAS "production" environment at build time. Without it the build
+          # still succeeds and ships a blank map, so stop before spending a build.
+          for scope in project account; do
+            # names only: everything after "=" is cut, so no value reaches the log
+            NAMES=$(eas env:list production --scope "$scope" --format short | sed -E 's/=.*//')
+            echo "EAS production variables ($scope scope): $(echo "$NAMES" | tr '\n' ' ')"
+            if echo "$NAMES" | grep -qE '(^|[[:space:]])GOOGLE_MAPS_API_KEY([[:space:]]|$)'; then
+              echo "GOOGLE_MAPS_API_KEY found in the $scope scope."
+              exit 0
+            fi
+          done
+          echo "::error::GOOGLE_MAPS_API_KEY is not set in the EAS production environment. Add it with: eas env:create --environment production --name GOOGLE_MAPS_API_KEY --visibility secret --value <key>"
+          exit 1
 
       - name: Build Android (store)
         run: |
