@@ -25,6 +25,25 @@ import {
 } from '@/utils/signupForm';
 
 /**
+ * Typed-in passwords, without iOS's generated "strong password".
+ *
+ * iOS reads a username followed by two hidden fields as a sign-up form and offers
+ * a generated password, whatever content type the fields declare. Declining it
+ * clears the fields, and it comes back, wiping them again, the moment the other
+ * password field is focused, so a person cannot type a password of their own.
+ * iOS never generates passwords for one-time-code fields, so on iOS the fields
+ * are marked as such; Android's autofill keeps the new-password hint.
+ */
+const PASSWORD_INPUT: TextInputProps = {
+  secureTextEntry: true,
+  autoCapitalize: 'none',
+  autoCorrect: false,
+  ...(Platform.OS === 'ios'
+    ? { textContentType: 'oneTimeCode' as const }
+    : { autoComplete: 'new-password' as const }),
+};
+
+/**
  * Company sign-up: creates the company and its first admin, as on the web.
  *
  * A successful sign-up signs the new admin in. The company starts unverified, so
@@ -138,20 +157,8 @@ export default function SignupScreen() {
                 autoComplete: 'email',
                 textContentType: 'emailAddress',
               })}
-              {field('password', t('login.password'), t('signup.passwordPlaceholder'), {
-                secureTextEntry: true,
-                autoCapitalize: 'none',
-                autoCorrect: false,
-                autoComplete: 'new-password',
-                textContentType: 'newPassword',
-              })}
-              {field('confirmPassword', t('signup.confirmPassword'), t('signup.confirmPasswordPlaceholder'), {
-                secureTextEntry: true,
-                autoCapitalize: 'none',
-                autoCorrect: false,
-                autoComplete: 'new-password',
-                textContentType: 'newPassword',
-              })}
+              {field('password', t('login.password'), t('signup.passwordPlaceholder'), PASSWORD_INPUT)}
+              {field('confirmPassword', t('signup.confirmPassword'), t('signup.confirmPasswordPlaceholder'), PASSWORD_INPUT)}
               {field('phone', `${t('signup.phone')} (${t('signup.optional')})`, t('signup.phonePlaceholder'), {
                 keyboardType: 'phone-pad',
                 autoComplete: 'tel',
