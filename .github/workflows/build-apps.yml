@@ -182,7 +182,7 @@ jobs:
           # still succeeds and ships a blank map, so stop before spending a build.
           for scope in project account; do
             # names only: everything after "=" is cut, so no value reaches the log
-            NAMES=$(eas env:list production --scope "$scope" --format short --non-interactive | sed -E 's/=.*//')
+            NAMES=$(eas env:list production --scope "$scope" --format short | sed -E 's/=.*//')
             echo "EAS production variables ($scope scope): $(echo "$NAMES" | tr '\n' ' ')"
             if echo "$NAMES" | grep -qE '(^|[[:space:]])GOOGLE_MAPS_API_KEY([[:space:]]|$)'; then
               echo "GOOGLE_MAPS_API_KEY found in the $scope scope."
@@ -268,7 +268,7 @@ jobs:
           # still succeeds and ships a blank map, so stop before spending a build.
           for scope in project account; do
             # names only: everything after "=" is cut, so no value reaches the log
-            NAMES=$(eas env:list production --scope "$scope" --format short --non-interactive | sed -E 's/=.*//')
+            NAMES=$(eas env:list production --scope "$scope" --format short | sed -E 's/=.*//')
             echo "EAS production variables ($scope scope): $(echo "$NAMES" | tr '\n' ' ')"
             if echo "$NAMES" | grep -qE '(^|[[:space:]])GOOGLE_MAPS_API_KEY([[:space:]]|$)'; then
               echo "GOOGLE_MAPS_API_KEY found in the $scope scope."
