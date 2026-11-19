@@ -38,10 +38,9 @@ export function BottomSheetModal({ visible, onClose, title, busy = false, childr
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {/* padding on Android too: the app is edge-to-edge, which stops a Modal's
+          window from resizing for the keyboard, so nothing else lifts the sheet */}
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         <Pressable
           style={styles.backdrop}
           onPress={busy ? undefined : onClose}

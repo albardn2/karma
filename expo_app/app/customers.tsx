@@ -628,10 +628,8 @@ export default function CustomersScreen() {
           animationType="slide"
           onRequestClose={closeFilters}
         >
-          <KeyboardAvoidingView
-            style={styles.modalContainer}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          >
+          {/* padding on Android too: an edge-to-edge Modal does not resize for the keyboard */}
+          <KeyboardAvoidingView style={styles.modalContainer} behavior="padding">
             {/* tapping the dimmed area closes the sheet, as on every other sheet */}
             <Pressable style={styles.modalBackdrop} onPress={closeFilters} testID="customers-filter-backdrop" />
             <View style={[

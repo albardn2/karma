@@ -54,7 +54,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   const dynamicStyle = useMemo(() => [
     styles.bottomNavigation,
     { 
-      paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 6) : 6 
+      paddingBottom: Math.max(insets.bottom, 6) 
     }
   ], [insets.bottom]);
 

@@ -586,6 +586,7 @@ const styles = StyleSheet.create({
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   badge: {
     fontSize: 11,
+    lineHeight: 15,
     fontWeight: '600',
     paddingHorizontal: 8,
     paddingVertical: 3,

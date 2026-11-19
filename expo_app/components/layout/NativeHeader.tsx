@@ -3,6 +3,7 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BACK_GLYPH } from '@/utils/rtl';
 
 interface NativeHeaderProps {
   title: string;
@@ -29,8 +30,9 @@ export const NativeHeader: React.FC<NativeHeaderProps> = ({ title, onBack, right
 
   return (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-      <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-        <ThemedText style={styles.backText}>←</ThemedText>
+      {/* the same chevron as every other screen, mirrored in Arabic */}
+      <TouchableOpacity onPress={handleBack} style={styles.backButton} hitSlop={12} testID="header-back">
+        <ThemedText style={styles.backText}>{BACK_GLYPH}</ThemedText>
       </TouchableOpacity>
       <ThemedText style={styles.title}>{title}</ThemedText>
       <View style={styles.rightButton}>
@@ -71,7 +73,9 @@ const styles = StyleSheet.create({
     marginLeft: -8,
   },
   backText: {
-    fontSize: 28,
+    fontSize: 30,
+    lineHeight: 34,
+    fontWeight: '700',
     color: '#5469D4',
   },
   title: {

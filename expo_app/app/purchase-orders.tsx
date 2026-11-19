@@ -139,6 +139,7 @@ const styles = StyleSheet.create({
   subtitle: { flex: 1, fontSize: 13, opacity: 0.55, minWidth: 90 },
   badge: {
     fontSize: 11,
+    lineHeight: 15,
     fontWeight: '600',
     color: '#4b5563',
     backgroundColor: '#f3f4f6',
