@@ -198,8 +198,16 @@ export default function Landing() {
       <footer className="border-t border-gray-100 py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between text-sm text-gray-400">
           <span className="font-semibold brand-gradient-text">{t("misc.landing.brand")}</span>
-          <span>
-            © {new Date().getFullYear()} {t("misc.landing.footer")}
+          <span className="flex items-center gap-4">
+            <Link href="/privacy" className="hover:text-gray-700" data-testid="landing-privacy">
+              {t("legal.privacyLink")}
+            </Link>
+            <Link href="/support" className="hover:text-gray-700" data-testid="landing-support">
+              {t("legal.supportLink")}
+            </Link>
+            <span>
+              © {new Date().getFullYear()} {t("misc.landing.footer")}
+            </span>
           </span>
         </div>
       </footer>
