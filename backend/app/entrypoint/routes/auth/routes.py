@@ -12,6 +12,7 @@ from flask_jwt_extended import (
 )
 from app.entrypoint.routes.common.errors import NotFoundError
 from app.dto.auth import (
+    AccountDeleteRequest,
     RegisterRequest,
     SignupRequest,
     LoginRequest,
@@ -24,6 +25,7 @@ from app.entrypoint.routes.common.errors import BadRequestError
 from app.entrypoint.routes.common.auth import scopes_required
 from app.dto.auth import UserUpdate
 from app.domains.user.domain import UserDomain
+from app.domains.account.domain import AccountDomain
 from app.dto.auth import UserListParams
 
 from app.dto.auth import UserPage
@@ -136,9 +138,11 @@ def login():
         if not user.is_active:
             raise Unauthorized("This user has been deactivated")
 
-        # blocked accounts cannot sign in (platform owner exempt)
+        # deleted and blocked accounts cannot sign in (platform owner exempt)
         if not user.is_superuser:
             account = uow.account_repository.find_one(uuid=user.account_uuid)
+            if account and account.is_deleted:
+                raise Unauthorized("This account has been deleted")
             if account and account.is_blocked:
                 raise Unauthorized("This account is blocked")
 
@@ -175,6 +179,8 @@ def refresh():
             raise Unauthorized("This user has been deactivated")
         if not user.is_superuser:
             account = uow.account_repository.find_one(uuid=user.account_uuid)
+            if account and account.is_deleted:
+                raise Unauthorized("This account has been deleted")
             if account and account.is_blocked:
                 raise Unauthorized("This account is blocked")
         scopes = user.permission_scope.split(",")
@@ -186,6 +192,23 @@ def refresh():
     resp = jsonify({"access_token": access_token})
     set_access_cookies(resp, access_token)
     return resp, 200
+
+@auth_blueprint.route("/account", methods=["DELETE"])
+@jwt_required()
+def delete_own_account():
+    """A company admin deletes their own company (soft delete). On `auth`, not a
+    resource blueprint, so a company still awaiting verification can do it too."""
+    payload = AccountDeleteRequest(**(request.json or {}))
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        user = uow.user_repository.find_one(uuid=get_jwt_identity(), is_deleted=False)
+        if not user:
+            raise Unauthorized("User not found")
+        AccountDomain.delete_own_account(uow=uow, user=user, password=payload.password)
+        uow.commit()
+    resp = jsonify({"msg": "Account deleted"})
+    unset_jwt_cookies(resp)
+    return resp, 200
+
 
 @auth_blueprint.route("/logout", methods=["POST"])
 def logout():

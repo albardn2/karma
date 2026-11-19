@@ -17,6 +17,8 @@ These tests exercise the hook against a registered blueprint, because
 block is then skipped — the sibling tests in test_request_identity.py only reach
 the checks that run *before* it.
 """
+from collections import namedtuple
+
 import pytest
 from flask import Blueprint, Flask, g
 
@@ -54,8 +56,6 @@ class _Uow:
         return self
 
     def first(self):
-        # (is_blocked, permissions, is_verified) — positional, and the hook
-        # indexes acct[2], so the column order in that query is load-bearing
         return self._account_row
 
 
@@ -69,8 +69,9 @@ class _User:
     permissions = None
 
 
-VERIFIED = (False, None, True)
-UNVERIFIED = (False, None, False)
+AccountRow = namedtuple("AccountRow", "is_blocked permissions is_verified is_deleted")
+VERIFIED = AccountRow(is_blocked=False, permissions=None, is_verified=True, is_deleted=False)
+UNVERIFIED = AccountRow(is_blocked=False, permissions=None, is_verified=False, is_deleted=False)
 
 
 def _run(monkeypatch, account_row, path="/customer/", user=None, blueprint="customer"):
@@ -193,3 +194,26 @@ def test_g_carries_the_flag_for_routes_that_need_it_themselves(monkeypatch):
         result = _load_request_identity()
         assert result is None, "an ungated path must not be blocked by the block"
         assert g.account_verified is False, "the flag never reached g"
+
+
+DELETED = AccountRow(is_blocked=False, permissions=None, is_verified=True, is_deleted=True)
+
+
+@pytest.mark.parametrize("blueprint, path", [("customer", "/customer/"), ("auth", "/auth/")])
+def test_a_deleted_company_is_signed_out_on_its_next_request(monkeypatch, blueprint, path):
+    """A deleted company's live sessions end at once, on resource and auth routes
+    alike: 401 is what both clients turn into a sign-out."""
+    result = _run(monkeypatch, DELETED, path=path, blueprint=blueprint)
+
+    assert result is not None, "a deleted company's session was let through"
+    response, status = result
+    assert status == 401
+    assert response.get_json()["msg"] == "This account has been deleted"
+
+
+def test_the_platform_owner_is_not_signed_out_by_their_company_being_deleted(monkeypatch):
+    class _Owner(_User):
+        is_superuser = True
+        permission_scope = "superuser"
+
+    assert _run(monkeypatch, DELETED, user=_Owner()) is None

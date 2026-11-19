@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { DeleteAccountButton } from '@/components/DeleteAccountButton';
 
 /**
  * What a company sees in the app before a platform owner has verified it.
@@ -21,7 +22,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
  * would have to clear the app's data to sign in as anyone else.
  */
 export function AccountUnverifiedNotice() {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, isAdmin } = useAuth();
   const { t } = useLanguage();
   const [checking, setChecking] = useState(false);
   const company = user?.account_company_name as string | undefined;
@@ -85,6 +86,10 @@ export function AccountUnverifiedNotice() {
       <TouchableOpacity style={styles.secondaryBtn} onPress={confirmLogout} testID="button-unverified-logout">
         <ThemedText style={styles.secondaryBtnText}>{t('menu.logout')}</ThemedText>
       </TouchableOpacity>
+
+      {/* the only screen a new company sees until it is verified, so deleting it
+          has to be reachable here too */}
+      {isAdmin && <DeleteAccountButton />}
     </ThemedView>
   );
 }
