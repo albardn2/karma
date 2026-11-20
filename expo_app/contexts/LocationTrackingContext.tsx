@@ -5,6 +5,8 @@ import { apiCall } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { MqttPublisher } from '@/utils/mqttPublisher';
 import { startBackgroundTracking, stopBackgroundTracking } from '@/services/backgroundLocation';
+import { acquireLocationAccess } from '@/services/locationPermission';
+import { LocationDisclosureModal, type LocationDisclosureHandle } from '@/components/LocationDisclosureModal';
 
 interface ClientConfig {
   track_location: boolean;
@@ -36,6 +38,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   const reconnectDelayRef = useRef(RECONNECT_BASE_MS);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppedRef = useRef(true);
+  const disclosureRef = useRef<LocationDisclosureHandle | null>(null);
 
   useEffect(() => {
     stoppedRef.current = false;
@@ -111,8 +114,8 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
       if (!config?.track_location || stoppedRef.current) return;
       configRef.current = config;
 
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted' || stoppedRef.current) return;
+      const access = await acquireLocationAccess(() => disclosureRef.current?.ask() ?? Promise.resolve(false));
+      if (access === 'none' || stoppedRef.current) return;
 
       try {
         await connectPublisher(config);
@@ -131,8 +134,8 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
       );
       if (stoppedRef.current) watcherRef.current?.remove();
 
-      // keep publishing when the app is backgrounded / screen off; falls back
-      // to foreground-only when the Always permission is denied
+      // keep publishing when the app is backgrounded / screen off
+      if (access !== 'background') return;
       const bgStarted = await startBackgroundTracking({
         broker_ws_url: config.broker_ws_url,
         topic: config.topic,
@@ -175,5 +178,10 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     };
   }, [isAuthenticated, isVerified]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <LocationDisclosureModal ref={disclosureRef} />
+    </>
+  );
 }
