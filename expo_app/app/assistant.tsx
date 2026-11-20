@@ -91,6 +91,8 @@ export default function AssistantScreen() {
   const [loaded, setLoaded] = useState(false);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  // why the user can't ask right now (switched off, budget, rate limit), if so
+  const [blocked, setBlocked] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -120,6 +122,7 @@ export default function AssistantScreen() {
   const load = useCallback(async () => {
     try {
       const c = await getConversation();
+      setBlocked(c.access && !c.access.allowed ? c.access.reason : null);
       setItems(fromStored(c.items));
       setLoaded(true);
       if (c.busy) {
@@ -287,7 +290,12 @@ export default function AssistantScreen() {
         }
       }, { voice });
     } catch (e) {
-      addError(e instanceof AssistantError ? e.message : 'Could not reach the assistant. Check your connection.');
+      if (e instanceof AssistantError && (e.status === 403 || e.status === 429)) {
+        setBlocked(e.message); // switched off or over a limit: say why instead of offering the box again
+        stopVoice();
+      } else {
+        addError(e instanceof AssistantError ? e.message : 'Could not reach the assistant. Check your connection.');
+      }
     } finally {
       if (filler) clearTimeout(filler);
       update((it) => it
@@ -424,6 +432,10 @@ export default function AssistantScreen() {
             <TouchableOpacity onPress={stopVoice} style={{ padding: 6 }} accessibilityLabel="End voice mode" testID="assistant-voice-end">
               <MaterialIcons name="close" size={22} color="#334155" />
             </TouchableOpacity>
+          </View>
+        ) : blocked ? (
+          <View style={[st.inputBar, { paddingBottom: 12 + insets.bottom, paddingTop: 12 }]} testID="assistant-blocked">
+            <Text style={{ flex: 1, color: '#475569', fontSize: 14 }}>{blocked}</Text>
           </View>
         ) : (
           <View style={[st.inputBar, { paddingBottom: 8 + insets.bottom }]}>

@@ -2732,3 +2732,91 @@ class IdempotencyRecord(Base):
     status_code = Column(Integer, nullable=True)
     response_body = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+# --------------------------------------------------------------------------- in-app assistant
+#
+# Owned by the assistant service (backend/assistant), which reads and writes
+# these tables directly; the API only reads them for the super-admin console.
+# The service mirrors these definitions in assistant/db.py — keep them in step.
+# Platform-wide assistant settings (model, defaults, limits) are a
+# PlatformSetting row with key 'assistant'.
+
+class AssistantConversation(Base):
+    """A user's one assistant conversation per company, kept until they clear it.
+    `messages` is the model's history (provider wire format, pinned to model_id);
+    `transcript` is what the chat panel shows (answers, charts, cards)."""
+    __tablename__ = 'assistant_conversation'
+
+    owner_key = Column(String(80), primary_key=True)   # '<user_uuid>:<account_uuid>'
+    user_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=False, index=True)
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=True, index=True)
+    conv_id = Column(String(64), nullable=False)
+    model_id = Column(String(80), nullable=False)
+    messages = Column(JSONB, nullable=False)
+    transcript = Column(JSONB, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AssistantUsage(Base):
+    """One row per answered (or failed) question: what it cost and how long it
+    took. Drives the per-company monthly budget and the per-user rate limit."""
+    __tablename__ = 'assistant_usage'
+    __table_args__ = (
+        Index('ix_assistant_usage_account_created', 'account_uuid', 'created_at'),
+        Index('ix_assistant_usage_user_created', 'user_uuid', 'created_at'),
+    )
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=True)
+    user_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=False)
+    conv_id = Column(String(64), nullable=False)
+    model_id = Column(String(80), nullable=False)
+    outcome = Column(String(16), nullable=False)          # ok | error
+    cost_usd = Column(Float, nullable=False, default=0.0)
+    input_tokens = Column(Integer, nullable=False, default=0)
+    output_tokens = Column(Integer, nullable=False, default=0)
+    cache_read_tokens = Column(Integer, nullable=False, default=0)
+    cache_write_tokens = Column(Integer, nullable=False, default=0)
+    seconds = Column(Float, nullable=False, default=0.0)
+    model_calls = Column(Integer, nullable=False, default=0)
+    tool_calls = Column(Integer, nullable=False, default=0)
+    voice = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AssistantAction(Base):
+    """Audit log: every write the assistant proposed, the user's decision, and
+    what the API answered. The API's own records show the change; this shows it
+    came through the assistant and what the user was shown when they approved."""
+    __tablename__ = 'assistant_action'
+    __table_args__ = (
+        Index('ix_assistant_action_account_created', 'account_uuid', 'created_at'),
+    )
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=True)
+    user_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=False, index=True)
+    conv_id = Column(String(64), nullable=False)
+    tier = Column(String(16), nullable=False)             # write | strong
+    method = Column(String(8), nullable=False)
+    path = Column(String(255), nullable=False)
+    title = Column(String(255), nullable=False)
+    summary = Column(JSONB, nullable=True)                # the card's lines, as shown
+    body = Column(JSONB, nullable=True)                   # what was sent to the API
+    decision = Column(String(16), nullable=False)         # approved | declined
+    status_code = Column(Integer, nullable=True)          # the API's answer, when sent
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AssistantAccountSetting(Base):
+    """Per-company assistant switch and budget, set by a platform owner.
+    NULL means 'use the platform default' (PlatformSetting 'assistant')."""
+    __tablename__ = 'assistant_account_setting'
+
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), primary_key=True)
+    enabled = Column(Boolean, nullable=True)
+    monthly_budget_usd = Column(Float, nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

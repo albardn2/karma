@@ -114,6 +114,8 @@ function fromStored(items: StoredItem[]): Item[] {
 export function AssistantWidget() {
   const [open, setOpenState] = useState(readOpen);
   const [model, setModel] = useState<string | null>(null);
+  // why the user can't ask right now (switched off, budget, rate limit), if so
+  const [blocked, setBlocked] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [input, setInput] = useState("");
@@ -223,6 +225,7 @@ export function AssistantWidget() {
     try {
       const c = await getConversation();
       setModel(c.model.label);
+      setBlocked(c.access && !c.access.allowed ? c.access.reason : null);
       setItems(fromStored(c.items));
       setLoaded(true);
       if (c.busy) {
@@ -380,7 +383,12 @@ export function AssistantWidget() {
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       const msg = err instanceof AssistantError ? err.message : "Could not reach the assistant. Is it running?";
-      update((it) => [...it, { id: nextId++, kind: "error", text: msg }]);
+      if (err instanceof AssistantError && (err.status === 403 || err.status === 429)) {
+        setBlocked(msg); // switched off or over a limit: say why instead of offering the box again
+        stopVoice();
+      } else {
+        update((it) => [...it, { id: nextId++, kind: "error", text: msg }]);
+      }
     } finally {
       // close any bubble left streaming (e.g. the stream ended early)
       update((it) =>
@@ -564,6 +572,10 @@ export function AssistantWidget() {
             }
           }}
         />
+      ) : blocked ? (
+      <div className="border-t p-3 text-sm text-muted-foreground" data-testid="assistant-blocked">
+        {blocked}
+      </div>
       ) : (
       <div className="border-t p-2">
         <div className="flex items-end gap-2">

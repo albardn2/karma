@@ -1,46 +1,63 @@
-"""Per-user conversation storage (spike: SQLite owned by the assistant service).
+"""The assistant's storage: conversations, usage, the action log, and settings.
 
-One conversation per user per company, kept until the user clears it. Stores:
+One conversation per user per company, kept until the user clears it:
   - messages:   the model's history (provider wire format, pinned to model_id),
                 so the assistant remembers the conversation after a restart;
   - transcript: what the chat panel shows (user messages, answers with charts,
                 confirmation cards with their outcome, errors).
 
-Production plan: a tenant-scoped `assistant_conversation` table in Karma's
-Postgres. SQLite keeps the spike from touching the shared database schema.
+Tables live in Karma's Postgres (see db.py); everything here is safe to call
+from several service instances at once.
 """
 from __future__ import annotations
 
 import json
-import os
-import sqlite3
-import threading
 import time
+import uuid as uuidlib
 from dataclasses import dataclass, field
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
 
-DEFAULT_PATH = Path(__file__).with_name("data") / "assistant.sqlite3"
+from sqlalchemy import func, select
+from sqlalchemy.engine import Engine
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS conversation (
-    owner_key       TEXT PRIMARY KEY,      -- '<user_uuid>:<account_uuid>'
-    user_uuid       TEXT NOT NULL,
-    account_uuid    TEXT,
-    conv_id         TEXT NOT NULL,
-    model_id        TEXT NOT NULL,
-    messages_json   TEXT NOT NULL,
-    transcript_json TEXT NOT NULL,
-    created_at      REAL NOT NULL,
-    updated_at      REAL NOT NULL
-)
-"""
+from . import db
+
+
+def account_of(me: dict) -> str | None:
+    return me.get("impersonating_account_uuid") or me.get("account_uuid")
 
 
 def owner_key(me: dict) -> str:
     """A user's history is separate per company: a platform owner impersonating a
     tenant must not see (or carry) one tenant's conversation into another."""
-    account = me.get("impersonating_account_uuid") or me.get("account_uuid") or "-"
-    return f"{me['uuid']}:{account}"
+    return f"{me['uuid']}:{account_of(me) or '-'}"
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)   # naive UTC, like the API's columns
+
+
+def _ts(d: datetime | None) -> float:
+    return d.replace(tzinfo=timezone.utc).timestamp() if d else time.time()
+
+
+def _naive(ts: float) -> datetime:
+    return datetime.fromtimestamp(ts, timezone.utc).replace(tzinfo=None)
+
+
+def _json_safe(v):
+    """JSON columns reject what json.dumps(default=str) absorbs (dates, decimals)."""
+    return json.loads(json.dumps(v, ensure_ascii=False, default=str))
+
+
+def month_start(now: datetime | None = None) -> datetime:
+    """Budgets run per calendar month, UTC."""
+    now = now or _now()
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def hour_ago(now: datetime | None = None) -> datetime:
+    return (now or _now()) - timedelta(hours=1)
 
 
 @dataclass
@@ -57,46 +74,100 @@ class Stored:
 
 
 class Store:
-    def __init__(self, path: str | os.PathLike | None = None):
-        self.path = Path(path or os.environ.get("ASSISTANT_DB") or DEFAULT_PATH)
-        if str(self.path) != ":memory:":
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.Lock()
-        self._db = sqlite3.connect(str(self.path), check_same_thread=False)
-        self._db.execute("PRAGMA journal_mode=WAL")
-        self._db.execute(SCHEMA)
-        self._db.commit()
+    def __init__(self, engine: Engine | str | None = None):
+        if isinstance(engine, str):    # a SQLite path or ':memory:' (tests, local runs)
+            engine = db.make_engine("sqlite+pysqlite:///:memory:" if engine == ":memory:"
+                                    else f"sqlite+pysqlite:///{engine}")
+        self.engine = engine or db.make_engine()
 
     def describe(self) -> str:
-        return f"sqlite {self.path}"
+        return db.describe(self.engine)
+
+    # ------------------------------------------------------------ conversations
 
     def get(self, key: str) -> Stored | None:
-        with self._lock:
-            row = self._db.execute(
-                "SELECT owner_key, user_uuid, account_uuid, conv_id, model_id, messages_json, transcript_json,"
-                " created_at, updated_at FROM conversation WHERE owner_key = ?", (key,)).fetchone()
-        if not row:
+        t = db.conversation
+        with self.engine.connect() as c:
+            r = c.execute(select(t).where(t.c.owner_key == key)).mappings().first()
+        if not r:
             return None
-        return Stored(row[0], row[1], row[2], row[3], row[4], json.loads(row[5]), json.loads(row[6]), row[7], row[8])
+        return Stored(r["owner_key"], r["user_uuid"], r["account_uuid"], r["conv_id"], r["model_id"],
+                      list(r["messages"] or []), list(r["transcript"] or []),
+                      _ts(r["created_at"]), _ts(r["updated_at"]))
 
     def save(self, s: Stored) -> None:
-        s.updated_at = time.time()
-        with self._lock:
-            self._db.execute(
-                "INSERT INTO conversation (owner_key, user_uuid, account_uuid, conv_id, model_id, messages_json,"
-                " transcript_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)"
-                " ON CONFLICT(owner_key) DO UPDATE SET conv_id=excluded.conv_id, model_id=excluded.model_id,"
-                " messages_json=excluded.messages_json, transcript_json=excluded.transcript_json,"
-                " updated_at=excluded.updated_at",
-                (s.owner_key, s.user_uuid, s.account_uuid, s.conv_id, s.model_id,
-                 json.dumps(s.messages, ensure_ascii=False, default=str),
-                 json.dumps(s.transcript, ensure_ascii=False, default=str), s.created_at, s.updated_at))
-            self._db.commit()
+        t = db.conversation
+        now = _now()
+        s.updated_at = _ts(now)
+        values = dict(conv_id=s.conv_id, model_id=s.model_id, messages=_json_safe(s.messages),
+                      transcript=_json_safe(s.transcript), updated_at=now)
+        with self.engine.begin() as c:
+            done = c.execute(t.update().where(t.c.owner_key == s.owner_key).values(**values)).rowcount
+            if not done:
+                c.execute(t.insert().values(owner_key=s.owner_key, user_uuid=s.user_uuid,
+                                            account_uuid=s.account_uuid, created_at=_naive(s.created_at),
+                                            **values))
 
     def delete(self, key: str) -> None:
-        with self._lock:
-            self._db.execute("DELETE FROM conversation WHERE owner_key = ?", (key,))
-            self._db.commit()
+        t = db.conversation
+        with self.engine.begin() as c:
+            c.execute(t.delete().where(t.c.owner_key == key))
+
+    # ------------------------------------------------------------ usage & audit
+
+    def record_usage(self, *, me: dict, conv_id: str, model_id: str, outcome: str, cost_usd: float = 0.0,
+                     usage: dict | None = None, seconds: float = 0.0, model_calls: int = 0,
+                     tool_calls: int = 0, voice: bool = False) -> None:
+        u = usage or {}
+        with self.engine.begin() as c:
+            c.execute(db.usage.insert().values(
+                uuid=str(uuidlib.uuid4()), account_uuid=account_of(me), user_uuid=me["uuid"], conv_id=conv_id,
+                model_id=model_id, outcome=outcome, cost_usd=float(cost_usd or 0),
+                input_tokens=int(u.get("input_tokens", 0)), output_tokens=int(u.get("output_tokens", 0)),
+                cache_read_tokens=int(u.get("cache_read_input_tokens", 0)),
+                cache_write_tokens=int(u.get("cache_creation_input_tokens", 0)),
+                seconds=float(seconds or 0), model_calls=int(model_calls), tool_calls=int(tool_calls),
+                voice=bool(voice), created_at=_now()))
+
+    def record_action(self, *, me: dict, conv_id: str, record: dict) -> None:
+        with self.engine.begin() as c:
+            c.execute(db.action.insert().values(
+                uuid=str(uuidlib.uuid4()), account_uuid=account_of(me), user_uuid=me["uuid"], conv_id=conv_id,
+                tier=str(record.get("tier") or "write")[:16], method=str(record.get("method") or "")[:8],
+                path=str(record.get("path") or "")[:255], title=str(record.get("title") or "")[:255],
+                summary=_json_safe(record.get("summary")), body=_json_safe(record.get("body")),
+                decision=record.get("decision") or "declined", status_code=record.get("status_code"),
+                error=record.get("error"), created_at=_now()))
+
+    def account_spend_since(self, account_uuid: str | None, since: datetime) -> float:
+        t = db.usage
+        q = select(func.coalesce(func.sum(t.c.cost_usd), 0.0)).where(t.c.created_at >= since)
+        q = q.where(t.c.account_uuid.is_(None) if account_uuid is None else t.c.account_uuid == account_uuid)
+        with self.engine.connect() as c:
+            return float(c.execute(q).scalar() or 0.0)
+
+    def user_messages_since(self, user_uuid: str, since: datetime) -> int:
+        t = db.usage
+        with self.engine.connect() as c:
+            return int(c.execute(select(func.count()).select_from(t)
+                                 .where(t.c.user_uuid == user_uuid, t.c.created_at >= since)).scalar() or 0)
+
+    # ------------------------------------------------------------ settings
+
+    def platform_settings(self) -> dict:
+        t = db.platform_setting
+        with self.engine.connect() as c:
+            v = c.execute(select(t.c.value).where(t.c.key == "assistant")).scalar()
+        return dict(v or {})
+
+    def account_settings(self, account_uuid: str | None) -> dict:
+        if not account_uuid:
+            return {}
+        t = db.account_setting
+        with self.engine.connect() as c:
+            r = c.execute(select(t.c.enabled, t.c.monthly_budget_usd)
+                          .where(t.c.account_uuid == account_uuid)).mappings().first()
+        return dict(r) if r else {}
 
 
 class Transcript:

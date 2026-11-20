@@ -71,6 +71,8 @@ export type StoredItem =
 
 export interface ConversationState {
   model: { id: string; label: string };
+  /** off for the company, over its monthly budget, or the user's hourly limit */
+  access?: { allowed: boolean; reason: string };
   busy: boolean;
   items: StoredItem[];
 }

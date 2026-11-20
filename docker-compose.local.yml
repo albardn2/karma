@@ -78,6 +78,9 @@ services:
   # Needs an Anthropic key: put ANTHROPIC_API_KEY=... in a .env file next to
   # this compose file (gitignored; compose reads it). Without one the service
   # still starts and the chat answers that the model isn't configured.
+  #
+  # It is off for every company until switched on in Super Admin -> Assistant
+  # (one switch for all companies, or per company).
   assistant:
     build:
       context: ./backend
@@ -87,17 +90,21 @@ services:
     environment:
       KARMA_API: "http://backend:5000"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
-      ASSISTANT_DB: "/data/assistant.sqlite3"
+      # history, usage, action log and settings: Karma's database (tables from
+      # the API's migrations)
+      ASSISTANT_DATABASE_URL: "postgresql://local:local@db:5432/backend"
       # the web app's origin (the phone app isn't a browser, so needs none)
-      ASSISTANT_CORS_ORIGINS: "http://localhost:3000"
+      ASSISTANT_CORS_ORIGINS: "http://localhost:3000,http://localhost:3001"
     volumes:
       # source mounted so a restart picks up edits without a rebuild
       - ./backend/assistant:/app/assistant
-      - karma_assistant_data:/data
     ports:
       - "5077:5077"
     depends_on:
-      - backend
+      backend-migrate:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
 
   frontend:
     build:
@@ -119,4 +126,4 @@ services:
 
 volumes:
   karma_pg_data:
-  karma_assistant_data:
+

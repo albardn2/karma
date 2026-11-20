@@ -6,7 +6,7 @@ import json
 import pytest
 from starlette.testclient import TestClient
 
-from assistant import server
+from assistant import db, server
 from assistant.actions import ConfirmRequest
 from assistant.agent import TurnResult
 from assistant.store import Store, Transcript, owner_key
@@ -29,6 +29,8 @@ class FakeConversation:
     def __init__(self, client, spec, allow_writes, confirm, id=None, messages=None):
         self.client, self.confirm = client, confirm
         self.id = id or f"conv-{len(FakeConversation.instances)}"
+        self.spec = spec
+        self.executor = type("Executor", (), {"on_action": None})()
         self.messages = messages if messages is not None else []
         FakeConversation.instances.append(self)
         self.fail = False
@@ -64,7 +66,11 @@ def client(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-not-used")
     monkeypatch.setattr(server, "_who", fake_who)
     monkeypatch.setattr(server, "Conversation", FakeConversation)
-    monkeypatch.setattr(server, "STORE", Store(":memory:"))
+    store = Store(":memory:")
+    with store.engine.begin() as c:   # the platform owner has switched it on for everyone
+        c.execute(db.platform_setting.insert().values(key="assistant", value={"enabled_by_default": True}))
+    monkeypatch.setattr(server, "STORE", store)
+    monkeypatch.setattr(server, "POLICY", None)
     FakeConversation.instances.clear()
     server.LIVE.clear()
     return TestClient(server.app)

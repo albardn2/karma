@@ -7,6 +7,7 @@
 import * as accountSettings from './translations/accountSettings';
 import * as rolePresets from './translations/rolePresets';
 import * as roleDashboards from './translations/roleDashboards';
+import * as assistantAdmin from './translations/assistantAdmin';
 import * as common from './translations/common';
 import * as nav from './translations/nav';
 import * as dashboard from './translations/dashboard';
@@ -48,6 +49,7 @@ const modules = [
   accountSettings,
   rolePresets,
   roleDashboards,
+  assistantAdmin,
   common,
   nav,
   dashboard,

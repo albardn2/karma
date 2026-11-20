@@ -103,6 +103,16 @@ MODELS: dict[str, ModelSpec] = {
 
 DEFAULT_MODEL_ID = "anthropic:claude-opus-5-5"
 
+# Platform settings until a platform owner saves their own (PlatformSetting
+# 'assistant'). Shared by the service (policy.py) and the super-admin API, so
+# the console shows exactly what the service enforces.
+PLATFORM_DEFAULTS = {
+    "model_id": DEFAULT_MODEL_ID,
+    "enabled_by_default": False,      # each company is switched on deliberately
+    "monthly_budget_usd": 50.0,       # per company, per calendar month (UTC); null = no cap
+    "user_messages_per_hour": 60,     # per user; null = no cap
+}
+
 
 def resolve(model_id: str | None) -> ModelSpec:
     model_id = model_id or os.environ.get("ASSISTANT_MODEL") or DEFAULT_MODEL_ID

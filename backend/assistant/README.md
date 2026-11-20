@@ -1,8 +1,49 @@
-# Karma Assistant — spike
+# Karma Assistant
 
 A chat assistant that answers questions about a company's Karma data and carries
 out actions in it by calling Karma's own API **as the signed-in user**. Every
-change needs the user's explicit approval. Local data only.
+change needs the user's explicit approval.
+
+## Running it
+
+It is its own service (`python -m assistant.server`, port 5077), next to the API:
+a chat turn streams for 10-60 s and would tie up the API's gunicorn threads.
+
+- **Locally**: it starts with the stack (`docker-compose.local.yml`, service
+  `assistant`). Put `ANTHROPIC_API_KEY=...` in a gitignored `.env` next to the
+  compose file. Then switch it on in **Super Admin → Assistant** (it is off for
+  every company until a platform owner turns it on).
+- **Image**: `backend/assistant/Dockerfile`, built with `./backend` as context.
+
+| Variable | Meaning |
+|---|---|
+| `KARMA_API` | The Karma API it calls with each user's token (`http://backend:5000` in compose). |
+| `ANTHROPIC_API_KEY` | The model provider's key. Never stored in the database. |
+| `ASSISTANT_DATABASE_URL` | Karma's Postgres (`postgresql://…`). Unset: a local SQLite file (`ASSISTANT_DB`), for tests. |
+| `ASSISTANT_CORS_ORIGINS` | Comma-separated web origins allowed to call it. The phone app needs none. |
+| `ASSISTANT_HOST` / `ASSISTANT_PORT` | Bind address (`0.0.0.0` in the image) and port (5077). |
+| `ASSISTANT_ALLOW_PROD` | Must be `1` to run against an API whose host contains `prod`. |
+
+The tables (`assistant_conversation`, `assistant_usage`, `assistant_action`,
+`assistant_account_setting`) come from the API's Alembic migrations
+(`a7e4c2b9d1f3`); `db.py` mirrors them. Run the migrations before starting it.
+
+## Platform-owner controls (Super Admin → Assistant)
+
+- **Model**: the model for new conversations, from `registry.py`. Models that
+  haven't passed the eval are listed but can't be picked. A conversation in
+  progress keeps its model until the user clears it.
+- **On/off**: a platform default plus a per-company override (Default / On / Off).
+- **Monthly budget** per company (USD, calendar month UTC): questions stop once
+  this month's recorded cost reaches it. A per-company value overrides the default.
+- **Questions per user per hour**: rate limit.
+- **This month's cost** per company, from `assistant_usage` (one row per question).
+- **Action log**: every write the assistant proposed, what the card showed, the
+  user's decision, and the API's answer (`assistant_action`).
+
+The service re-reads these within 30 s. When a user can't ask (off, over budget,
+over the hourly limit), the web and phone chats show the reason in place of the
+input box; their history stays readable.
 
 ## Actions (writes)
 
@@ -57,17 +98,7 @@ as a confirmation card with Approve / Cancel (money, stock and deletes need
 `CONFIRM` typed — enforced by the service, not just the browser). The widget only
 renders when `VITE_ASSISTANT_URL` is set, so builds without it are unchanged.
 
-```bash
-# 1. the assistant service (port 5077; 5050 is often taken on macOS)
-cd backend && ASSISTANT_PORT=5077 ANTHROPIC_API_KEY=... \
-  uv run --no-project --python 3.12 --with-requirements assistant/requirements.txt python -m assistant.server
-
-# 2. this branch's web app on :3001, reusing the local frontend image's node_modules
-docker run --rm --name karma-assistant-web -p 3001:5000 \
-  -v "$(pwd)/frontend":/app -v /app/node_modules -e NODE_ENV=development \
-  -e VITE_API_BASE_URL=http://localhost:5000 -e VITE_ASSISTANT_URL=http://localhost:5077 \
-  karma-frontend:latest
-```
+The local stack's `frontend` service sets `VITE_ASSISTANT_URL=http://localhost:5077`.
 
 ### Voice
 
@@ -126,8 +157,8 @@ impersonating a company gets a separate history for that company. If a page is
 reloaded mid-answer, the answer still finishes and is saved (an open approval is
 cancelled, since nobody can answer it); the panel polls until it is done.
 
-Spike storage: `backend/assistant/data/assistant.sqlite3` (gitignored, override
-with `ASSISTANT_DB`). Production: a tenant-scoped table in Karma's Postgres.
+Storage: `assistant_conversation` in Karma's Postgres, one row per user per
+company, so every device and every service instance sees the same history.
 
 ### Charts
 
@@ -297,11 +328,17 @@ docker run --rm -v "$(pwd)":/karma -w /karma -e JWT_SECRET_KEY=x \
   karma-backend:local python -m assistant.gen_catalog
 ```
 
-## Known limits of the spike
+## Known limits
 
-- Confirmations are terminal prompts; the app version renders them as cards.
 - One write per confirmation (no "approve all" for multi-step tasks yet).
-- CLI only; no service, streaming endpoint, conversation storage or UI yet.
+- A pending confirmation lives in the memory of the instance running the turn.
+  Behind a load balancer, `/assistant/conversation/confirm` must reach that same
+  instance (sticky sessions), or run one instance until confirmations move to the
+  database.
+- A failed turn is recorded with cost 0: the tokens it used before failing are
+  not counted against the budget.
+- The spend check runs before a question, so one question can take a company
+  slightly past its budget.
 - `--code` (programmatic tool calling) runs in Anthropic's code-execution container:
   data there is retained up to 30 days and it is not zero-data-retention eligible.
 - Many list endpoints filter on equality only (no date ranges); `query_data` filters

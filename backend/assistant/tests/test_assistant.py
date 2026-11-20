@@ -383,6 +383,37 @@ def test_approved_write_is_sent_once_with_idempotency_key_and_no_impersonation()
     assert "created_by_uuid" not in json.dumps(body)
 
 
+def test_every_proposed_write_is_audited_with_the_decision():
+    for answer, decision in ((True, "approved"), (False, "declined")):
+        records = []
+        ex, _client = write_executor(lambda req: answer)
+        ex.on_action = records.append
+        ex.run("customer_order__create_customer_order_with_items_and_invoice", ORDER, call_id="a1")
+        assert len(records) == 1
+        r = records[0]
+        assert (r["decision"], r["method"], r["path"]) == (decision, "POST", "/customer-order/with-items-and-invoice")
+        assert r["tier"] == risk(_entry("customer_order__create_customer_order_with_items_and_invoice"))
+        assert r["summary"] and r["error"] is None
+
+
+def test_a_refused_write_is_audited_with_the_api_answer():
+    from assistant.karma_client import KarmaError
+    records = []
+    ex, client = write_executor(lambda req: True)
+    ex.on_action = records.append
+    real = client.request
+
+    def refuse(method, path, *a, **k):
+        if method == "POST":
+            raise KarmaError(409, "insufficient stock")
+        return real(method, path, *a, **k)
+
+    client.request = refuse
+    text, err = ex.run("customer_order__create_customer_order_with_items_and_invoice", ORDER, call_id="a2")
+    assert err and "409" in text
+    assert records[-1]["status_code"] == 409 and "insufficient" in records[-1]["error"]
+
+
 def test_invalid_write_is_rejected_before_asking_the_user():
     asked = []
     ex, client = write_executor(lambda req: asked.append(req) or True)

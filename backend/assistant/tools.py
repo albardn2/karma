@@ -236,6 +236,9 @@ class Executor:
         self._resolver = None
         # where charts go (the agent points this at the client's callback each turn)
         self.on_chart = lambda spec: None
+        # audit hook: called once per proposed write with what was shown, the
+        # user's decision and the API's answer (server.py stores it)
+        self.on_action = lambda record: None
         # whole-list fetches reused for a couple of minutes (joins.load); cleared on every write
         self.list_cache: dict = {}
 
@@ -259,17 +262,36 @@ class Executor:
         request.tier = spec.risk
         approved = bool(self.confirm(request))
         self.log.append({"tool": spec.name, "args": args, "confirm": request.render(), "approved": approved})
+        record = {"tier": request.tier, "method": request.method, "path": request.path,
+                  "title": request.title + (f" — {request.target}" if request.target else ""),
+                  "summary": list(request.lines), "body": args,
+                  "decision": "approved" if approved else "declined", "status_code": None, "error": None}
         if not approved:
+            self._audit(record)
             return ("The user DECLINED this action; nothing was changed. Do not retry it unless the user "
                     "asks again. Ask what they would like instead if it is unclear."), True
         key = None
         if call_id:
             conv = getattr(self.client, "conversation_id", None) or "x"
             key = f"assistant-{conv}-{call_id}"[:80]
-        out = call_endpoint(self.client, spec.entry, args, idempotency_key=key)
+        try:
+            out = call_endpoint(self.client, spec.entry, args, idempotency_key=key)
+        except KarmaError as e:
+            self._audit({**record, "status_code": e.status, "error": (e.body or "")[:2000]})
+            raise
+        except Exception as e:
+            self._audit({**record, "error": f"{type(e).__name__}: {e}"[:2000]})
+            raise
+        self._audit(record)
         self.list_cache.clear()   # the data changed: no cached list may be shown after this
         self.log[-1]["ok"] = True
         return "Done (the user confirmed). API response:\n" + to_text(out), False
+
+    def _audit(self, record: dict):
+        try:
+            self.on_action(record)
+        except Exception as e:  # the audit must never change what the user sees
+            print(f"[assistant] audit log failed: {e}", flush=True)
 
     def run(self, name: str, args: dict, call_id: str | None = None, programmatic: bool = False) -> tuple[str, bool]:
         """Returns (result_text, is_error)."""

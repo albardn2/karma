@@ -46,8 +46,9 @@ from starlette.routing import Route
 from .agent import Conversation
 from .karma_client import KarmaClient, KarmaError
 from .providers.base import Callbacks
+from .policy import Policy
 from .registry import resolve
-from .store import Store, Stored, Transcript, owner_key
+from .store import Store, Stored, Transcript, account_of, owner_key
 
 KARMA_API = os.environ.get("KARMA_API", "http://localhost:5000")
 CORS_ORIGINS = os.environ.get("ASSISTANT_CORS_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
@@ -56,6 +57,7 @@ IDLE_EXPIRY_S = 2 * 3600       # live objects only; the stored history stays
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 STORE: Store | None = None
+POLICY: Policy | None = None
 
 
 def store() -> Store:
@@ -63,6 +65,13 @@ def store() -> Store:
     if STORE is None:
         STORE = Store()
     return STORE
+
+
+def policy() -> Policy:
+    global POLICY
+    if POLICY is None or POLICY.store is not store():
+        POLICY = Policy(store())
+    return POLICY
 
 
 @dataclass
@@ -141,7 +150,9 @@ def _ensure_conversation(live: Live, client: KarmaClient) -> Conversation:
         live.convo.client.token = client.token
         return live.convo
     stored = live.stored or store().get(live.key)
-    spec = resolve(stored.model_id if stored else None)   # a conversation stays on its model
+    # a conversation stays on the model it started with; new ones get the
+    # model the platform owner selected
+    spec = resolve(stored.model_id) if stored else policy().model()
     if not spec.configured:
         raise RuntimeError(f"The assistant's model ({spec.label}) is not configured on the server.")
 
@@ -162,6 +173,8 @@ def _ensure_conversation(live: Live, client: KarmaClient) -> Conversation:
     if stored:
         kwargs.update(id=stored.conv_id, messages=list(stored.messages))
     convo = Conversation(**kwargs)
+    # audit log: every proposed write, the user's decision and the API's answer
+    convo.executor.on_action = lambda record: store().record_action(me=live.me, conv_id=convo.id, record=record)
     if stored is None:
         me = live.me
         stored = Stored(owner_key=live.key, user_uuid=me["uuid"],
@@ -169,6 +182,17 @@ def _ensure_conversation(live: Live, client: KarmaClient) -> Conversation:
                         conv_id=convo.id, model_id=spec.id)
     live.stored, live.convo = stored, convo
     return convo
+
+
+def _record_usage(live: Live, convo: Conversation, outcome: str, voice: bool, r) -> None:
+    """One row per question: the budget and the rate limit are counted from these."""
+    try:
+        store().record_usage(
+            me=live.me, conv_id=convo.id, model_id=convo.spec.id, outcome=outcome, voice=voice,
+            cost_usd=r.cost_usd if r else 0.0, usage=r.usage if r else None, seconds=r.seconds if r else 0.0,
+            model_calls=r.model_calls if r else 0, tool_calls=len(r.tool_calls) if r else 0)
+    except Exception as e:  # never lose the answer over bookkeeping
+        print(f"[assistant] usage not recorded: {e}", flush=True)
 
 
 def _deny_pending(live: Live):
@@ -180,7 +204,7 @@ def _deny_pending(live: Live):
 # --------------------------------------------------------------------------- endpoints
 
 async def health(_request: Request):
-    spec = resolve(None)
+    spec = await asyncio.to_thread(policy().model)
     return JSONResponse({"ok": True, "model": spec.label, "configured": spec.configured})
 
 
@@ -191,8 +215,12 @@ async def get_conversation(request: Request):
         return got
     live, _client = got
     stored = live.stored or await asyncio.to_thread(store().get, live.key)
+    access = await asyncio.to_thread(policy().check, live.me)
+    model_id = stored.model_id if stored else (await asyncio.to_thread(policy().model)).id
     return JSONResponse({
-        "model": _model_info(stored.model_id if stored else None),
+        "model": _model_info(model_id),
+        # the apps show `reason` instead of letting the user type into a dead end
+        "access": {"allowed": access.allowed, "reason": access.reason},
         "busy": live.busy.locked(),
         "items": stored.transcript if stored else [],
         "updated_at": stored.updated_at if stored else None,
@@ -227,6 +255,9 @@ async def post_message(request: Request):
         return _err(400, "Empty message.")
     if len(text) > 4000:
         return _err(400, "Message too long (4,000 characters max).")
+    access = await asyncio.to_thread(policy().check, live.me)
+    if not access.allowed:
+        return _err(access.status, access.reason)
     if not live.busy.acquire(blocking=False):
         return _err(409, "Still working on the previous message.")
 
@@ -263,6 +294,7 @@ async def post_message(request: Request):
                            on_status=lambda s: emit({"type": "status", "text": s}),
                            on_chart=lambda spec: emit({"type": "chart", "spec": spec}))
             r = convo.ask(text, cb, voice=voice)
+            _record_usage(live, convo, "ok", voice, r)
             emit({"type": "done", "text": r.text, "stop_reason": r.stop_reason, "cost_usd": round(r.cost_usd, 4),
                   "seconds": round(r.seconds, 1), "model_calls": r.model_calls, "tool_calls": len(r.tool_calls),
                   "timing": {k: r.timing.get(k) for k in ("model_s", "tools_s", "first_text_s")}})
@@ -274,6 +306,7 @@ async def post_message(request: Request):
             # a half-finished turn (e.g. a tool call without its result) would make
             # every later request invalid: forget it in the model's memory
             del convo.messages[start_len:]
+            _record_usage(live, convo, "error", voice, None)
             emit({"type": "error", "message": f"{type(e).__name__}: {e}"[:500]})
         finally:
             live.emit = None

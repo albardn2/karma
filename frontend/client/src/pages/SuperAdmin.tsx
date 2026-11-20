@@ -2,6 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RolePresetsAdmin } from "@/components/superadmin/RolePresetsAdmin";
 import { RoleDashboardsAdmin } from "@/components/superadmin/RoleDashboardsAdmin";
+import { AssistantAdmin } from "@/components/superadmin/AssistantAdmin";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AccountsPanel } from "@/pages/AccountsAdmin";
@@ -51,6 +52,9 @@ export default function SuperAdmin() {
                 <TabsTrigger value="role-dashboards" data-testid="superadmin-tab-role-dashboards">
                   {t("roleDashboards.tab")}
                 </TabsTrigger>
+                <TabsTrigger value="assistant" data-testid="superadmin-tab-assistant">
+                  {t("assistantAdmin.tab")}
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="accounts" className="mt-4">
                 <AccountsPanel />
@@ -66,6 +70,9 @@ export default function SuperAdmin() {
               </TabsContent>
               <TabsContent value="role-dashboards" className="mt-4">
                 <RoleDashboardsAdmin />
+              </TabsContent>
+              <TabsContent value="assistant" className="mt-4">
+                <AssistantAdmin />
               </TabsContent>
             </Tabs>
           </div>
