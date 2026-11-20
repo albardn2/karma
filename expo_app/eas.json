@@ -9,7 +9,7 @@
       "distribution": "internal",
       "android": { "buildType": "apk" },
       "ios": { "simulator": true },
-      "env": { "API_BASE_URL": "https://api-dev.karma-grp.com" },
+      "env": { "API_BASE_URL": "https://api-dev.karma-grp.com", "ASSISTANT_URL": "https://api-dev.karma-grp.com" },
       "environment": "development"
     },
     "preview": {
@@ -17,14 +17,18 @@
       "autoIncrement": true,
       "android": { "buildType": "apk" },
       "ios": { "simulator": false },
-      "env": { "API_BASE_URL": "https://api-dev.karma-grp.com" },
+      "env": { "API_BASE_URL": "https://api-dev.karma-grp.com", "ASSISTANT_URL": "https://api-dev.karma-grp.com" },
       "environment": "preview"
     },
     "production": {
       "distribution": "store",
       "autoIncrement": true,
-      "env": { "API_BASE_URL": "https://api-prod.karma-grp.com" },
+      "env": { "API_BASE_URL": "https://api-prod.karma-grp.com", "ASSISTANT_URL": "https://api-prod.karma-grp.com" },
       "environment": "production"
+    },
+    "testflight-dev": {
+      "extends": "production",
+      "env": { "API_BASE_URL": "https://api-dev.karma-grp.com", "ASSISTANT_URL": "https://api-dev.karma-grp.com" }
     },
     "production-apk": {
       "extends": "production",

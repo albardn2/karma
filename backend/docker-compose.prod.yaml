@@ -194,6 +194,45 @@ services:
     networks:
       - proxy
 
+  # The in-app assistant (chat + voice in the web and phone apps), served at
+  # https://api-prod.karma-grp.com/assistant/ — nginx-proxy routes that path
+  # here (VIRTUAL_PATH, nginx-proxy >= 1.0; prod runs 1.11) and everything else
+  # to `web`, which has no VIRTUAL_PATH and so keeps `/`. The certificate is the
+  # API's (requested by `web`). Its answers stream as text/event-stream; the
+  # service sends X-Accel-Buffering: no so nginx passes them through unbuffered. It calls the API (`web`) with each
+  # user's own token, and keeps history, usage, the action log and settings in
+  # the same database (tables from `migrate`).
+  #
+  # ONE replica: an open approval card is held in this process's memory.
+  # Off for every company until switched on in Super Admin -> Assistant.
+  assistant:
+    image: ghcr.io/albardn2/karma-assistant:latest-prod
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+    depends_on:
+      - db
+      - web
+    expose:
+      - "5077"
+    environment:
+      KARMA_API: "http://web:5000"
+      ASSISTANT_DATABASE_URL: "postgresql://local:local@db:5432/backend"
+      # from the droplet-side .env written by the deploy workflow (GitHub secret)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # the service refuses a prod API unless this is set: a deliberate opt-in
+      ASSISTANT_ALLOW_PROD: "1"
+      # the prod web app; the phone app isn't a browser, so needs no entry
+      ASSISTANT_CORS_ORIGINS: "https://crm-prod.karma-grp.com"
+      VIRTUAL_HOST: ${APP_HOST}
+      VIRTUAL_PATH: /assistant/
+      VIRTUAL_PORT: 5077
+    networks:
+      - proxy
+
   nginx-proxy:
     image: jwilder/nginx-proxy
     # Cap the json-file log. Docker's default driver grows without bound, and

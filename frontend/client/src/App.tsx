@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import Landing from "@/pages/Landing";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AssistantWidget } from "@/components/assistant/AssistantWidget";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Home from "@/pages/Home";
@@ -228,6 +229,20 @@ function Router() {
   );
 }
 
+// The assistant lives outside the router so page changes don't remount it.
+// Keyed by user (and impersonated company) so a different sign-in never sees
+// the previous user's panel; renders nothing unless VITE_ASSISTANT_URL is set.
+// Not on the sign-in / public pages, even for a signed-in user who lands there.
+const ASSISTANT_HIDDEN_PATHS = ["/login", "/signup", "/privacy", "/support"];
+
+function AssistantMount() {
+  const { user, isAuthenticated } = useAuth();
+  const [location] = useLocation();
+  if (!isAuthenticated || !user || ASSISTANT_HIDDEN_PATHS.includes(location)) return null;
+  const company = (user as any)?.impersonating_company ?? "";
+  return <AssistantWidget key={`${user.uuid}:${company}`} />;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -237,6 +252,7 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <Router />
+              <AssistantMount />
             </TooltipProvider>
           </LanguageProvider>
         </AuthProvider>

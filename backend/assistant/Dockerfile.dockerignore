@@ -1,0 +1,6 @@
+# Applies to assistant/Dockerfile only (its context is ./backend): send just the package.
+*
+!assistant/
+assistant/data/
+assistant/eval/results/
+**/__pycache__/

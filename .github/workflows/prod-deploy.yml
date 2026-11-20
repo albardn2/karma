@@ -57,6 +57,17 @@ jobs:
             ${{ env.REGISTRY_URL }}:latest-prod
             ${{ env.REGISTRY_URL }}:${{ env.SHORT_SHA }}-prod
 
+      # The in-app assistant: its own small image (backend/assistant/Dockerfile).
+      - name: Build & push assistant
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          file: ./backend/assistant/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/albardn2/karma-assistant:latest-prod
+            ghcr.io/albardn2/karma-assistant:${{ env.SHORT_SHA }}-prod
+
   migrate:
     name: Run prod migrations
     runs-on: ubuntu-latest
@@ -90,6 +101,7 @@ jobs:
             REGISTRY_URL=${REGISTRY_URL}
             EMAIL=${EMAIL}
             JWT_SECRET_KEY=${{ secrets.PROD_JWT_SECRET_KEY }}
+            ANTHROPIC_API_KEY=${{ secrets.PROD_ANTHROPIC_API_KEY }}
             EOF
             # Auth to GHCR + reclaim disk before pulling the private image.
             # Without this, expired creds or a full disk make `pull` silently
@@ -120,6 +132,7 @@ jobs:
             REGISTRY_URL=ghcr.io/albardn2/karma-backend
             EMAIL=zaid.bardan@gmail.com
             JWT_SECRET_KEY=${{ secrets.PROD_JWT_SECRET_KEY }}
+            ANTHROPIC_API_KEY=${{ secrets.PROD_ANTHROPIC_API_KEY }}
             EOF
             # Auth to GHCR + reclaim disk before pulling the private image.
             # Without this, expired creds or a full disk make `pull` silently

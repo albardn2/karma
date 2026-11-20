@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { LocationTrackingProvider } from '@/contexts/LocationTrackingContext';
 import { AccountUnverifiedNotice } from '@/components/AccountUnverifiedNotice';
+import { AssistantFab } from '@/components/assistant/AssistantFab';
 import { queryClient } from '@/utils/queryClient';
 
 function NavigationContent() {
@@ -56,12 +57,19 @@ function NavigationContent() {
   }
 
   return (
-    <Stack>
-      <Stack.Screen name="login" options={{ headerShown: false }} />
-      <Stack.Screen name="signup" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="+not-found" />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      <Stack>
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="signup" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* pushed on top of the current screen, so back returns to the same spot */}
+        <Stack.Screen name="assistant" options={{ title: 'Karma Assistant', headerBackTitle: 'Back' }} />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+      {/* above every screen; hides itself when signed out, on login/signup, on
+          the assistant screen, and when the build has no ASSISTANT_URL */}
+      {isAuthenticated && <AssistantFab />}
+    </View>
   );
 }
 

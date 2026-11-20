@@ -13,7 +13,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.karmagrp.business",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Karma shows images from your photo library only when you choose one."
       }
     },
     "android": {

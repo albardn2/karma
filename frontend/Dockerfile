@@ -14,6 +14,9 @@ COPY . .
 # Which backend the SPA talks to (read by client/src/lib/config.ts).
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+# The in-app assistant service. Empty (the default) = no assistant button.
+ARG VITE_ASSISTANT_URL=""
+ENV VITE_ASSISTANT_URL=$VITE_ASSISTANT_URL
 
 # Produces dist/public (client) and dist/index.js (bundled Express server).
 RUN npm run build
