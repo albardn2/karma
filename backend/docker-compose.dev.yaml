@@ -91,11 +91,38 @@ services:
     networks:
       - proxy
 
+  # The in-app assistant (chat + voice in the web and phone apps). Its own
+  # service: a chat turn streams for 10-60 s and would tie up web's gunicorn
+  # threads. Caddy routes https://api-dev.../assistant/* here. It calls the API
+  # (`web`) with each user's own token, and keeps its history, usage, action log
+  # and settings in the same database (tables from `migrate`).
+  #
+  # ONE replica: an open approval card is held in this process's memory.
+  # Off for every company until switched on in Super Admin -> Assistant.
+  assistant:
+    image: ghcr.io/albardn2/karma-assistant:latest-dev
+    restart: always
+    depends_on:
+      - db
+      - web
+    expose:
+      - "5077"
+    environment:
+      KARMA_API: "http://web:5000"
+      ASSISTANT_DATABASE_URL: "postgresql://local:local@db:5432/backend"
+      # from the droplet-side .env written by the deploy workflow (GitHub secret)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # the dev web app; the phone app isn't a browser, so needs no entry
+      ASSISTANT_CORS_ORIGINS: "https://crm-dev.karma-grp.com"
+    networks:
+      - proxy
+
   caddy:
     image: caddy:latest
     restart: always
     depends_on:
       - web
+      - assistant
     ports:
       - "80:80"
       - "443:443"

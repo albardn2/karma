@@ -43,3 +43,15 @@ jobs:
           tags: |
             ghcr.io/albardn2/karma-backend:latest-dev
             ghcr.io/albardn2/karma-backend:${{ env.SHORT_SHA }}
+
+      # The in-app assistant: its own small image (backend/assistant/Dockerfile,
+      # ./backend as context). Deployed next to the API by deploy-dev.yml.
+      - name: Build & push assistant image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          file: ./backend/assistant/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/albardn2/karma-assistant:latest-dev
+            ghcr.io/albardn2/karma-assistant:${{ env.SHORT_SHA }}

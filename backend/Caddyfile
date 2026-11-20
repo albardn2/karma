@@ -11,8 +11,17 @@ www.{$APP_HOST} {
 
 # Primary site
 {$APP_HOST} {
-  encode gzip
-  reverse_proxy web:5000
+  # The in-app assistant service. Its answers stream as text/event-stream,
+  # which reverse_proxy flushes as they arrive; it gets its own `handle` so
+  # gzip (below) never sits in front of the stream.
+  handle /assistant/* {
+    reverse_proxy assistant:5077
+  }
+
+  handle {
+    encode gzip
+    reverse_proxy web:5000
+  }
 
   # (Optional) Security headers:
   # header {

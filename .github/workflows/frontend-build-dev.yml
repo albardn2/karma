@@ -40,6 +40,7 @@ jobs:
           push: true
           build-args: |
             VITE_API_BASE_URL=https://api-dev.karma-grp.com
+            VITE_ASSISTANT_URL=https://api-dev.karma-grp.com
           tags: |
             ghcr.io/albardn2/karma-frontend:latest-dev
             ghcr.io/albardn2/karma-frontend:${{ env.SHORT_SHA }}-dev
