@@ -23,7 +23,7 @@
     "production": {
       "distribution": "store",
       "autoIncrement": true,
-      "env": { "API_BASE_URL": "https://api-prod.karma-grp.com", "ASSISTANT_URL": "https://assistant-prod.karma-grp.com" },
+      "env": { "API_BASE_URL": "https://api-prod.karma-grp.com", "ASSISTANT_URL": "https://api-prod.karma-grp.com" },
       "environment": "production"
     },
     "testflight-dev": {

@@ -194,11 +194,12 @@ services:
     networks:
       - proxy
 
-  # The in-app assistant (chat + voice in the web and phone apps), on its own
-  # hostname (ASSISTANT_HOST, e.g. assistant-prod.karma-grp.com) so nginx-proxy
-  # routes by host exactly as it does for the API — no path routing. Its answers
-  # stream as text/event-stream; the service sends X-Accel-Buffering: no so
-  # nginx passes them through unbuffered. It calls the API (`web`) with each
+  # The in-app assistant (chat + voice in the web and phone apps), served at
+  # https://api-prod.karma-grp.com/assistant/ — nginx-proxy routes that path
+  # here (VIRTUAL_PATH, nginx-proxy >= 1.0; prod runs 1.11) and everything else
+  # to `web`, which has no VIRTUAL_PATH and so keeps `/`. The certificate is the
+  # API's (requested by `web`). Its answers stream as text/event-stream; the
+  # service sends X-Accel-Buffering: no so nginx passes them through unbuffered. It calls the API (`web`) with each
   # user's own token, and keeps history, usage, the action log and settings in
   # the same database (tables from `migrate`).
   #
@@ -226,9 +227,8 @@ services:
       ASSISTANT_ALLOW_PROD: "1"
       # the prod web app; the phone app isn't a browser, so needs no entry
       ASSISTANT_CORS_ORIGINS: "https://crm-prod.karma-grp.com"
-      VIRTUAL_HOST: ${ASSISTANT_HOST}
-      LETSENCRYPT_HOST: ${ASSISTANT_HOST}
-      LETSENCRYPT_EMAIL: ${EMAIL}
+      VIRTUAL_HOST: ${APP_HOST}
+      VIRTUAL_PATH: /assistant/
       VIRTUAL_PORT: 5077
     networks:
       - proxy

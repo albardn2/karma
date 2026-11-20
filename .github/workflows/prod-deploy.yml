@@ -102,7 +102,6 @@ jobs:
             EMAIL=${EMAIL}
             JWT_SECRET_KEY=${{ secrets.PROD_JWT_SECRET_KEY }}
             ANTHROPIC_API_KEY=${{ secrets.PROD_ANTHROPIC_API_KEY }}
-            ASSISTANT_HOST=assistant-prod.karma-grp.com
             EOF
             # Auth to GHCR + reclaim disk before pulling the private image.
             # Without this, expired creds or a full disk make `pull` silently
@@ -134,7 +133,6 @@ jobs:
             EMAIL=zaid.bardan@gmail.com
             JWT_SECRET_KEY=${{ secrets.PROD_JWT_SECRET_KEY }}
             ANTHROPIC_API_KEY=${{ secrets.PROD_ANTHROPIC_API_KEY }}
-            ASSISTANT_HOST=assistant-prod.karma-grp.com
             EOF
             # Auth to GHCR + reclaim disk before pulling the private image.
             # Without this, expired creds or a full disk make `pull` silently
