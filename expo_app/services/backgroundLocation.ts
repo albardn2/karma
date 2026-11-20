@@ -12,7 +12,7 @@
 // reads its config from an AsyncStorage snapshot written when tracking
 // starts, opens a short-lived MQTT connection, publishes the latest point
 // (retained), and closes.
-import { AppState } from 'react-native';
+import { AppState, PermissionsAndroid, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -89,6 +89,8 @@ export async function startBackgroundTracking(config: BgConfig): Promise<boolean
   const { granted } = await Location.getBackgroundPermissionsAsync();
   if (!granted) return false;
 
+  await requestTrackingNotificationPermission();
+
   await AsyncStorage.setItem(BG_CONFIG_KEY, JSON.stringify(config));
 
   const already = await Location.hasStartedLocationUpdatesAsync(BG_LOCATION_TASK).catch(() => false);
@@ -111,6 +113,18 @@ export async function startBackgroundTracking(config: BgConfig): Promise<boolean
     },
   });
   return true;
+}
+
+/**
+ * Android 13+ hides a foreground service's notification unless the app holds
+ * POST_NOTIFICATIONS, so a tracked driver would see no sign of tracking. The
+ * service runs either way; this only decides whether its notification shows.
+ */
+async function requestTrackingNotificationPermission(): Promise<void> {
+  if (Platform.OS !== 'android' || Number(Platform.Version) < 33) return;
+  const permission = PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
+  if (await PermissionsAndroid.check(permission)) return;
+  await PermissionsAndroid.request(permission);
 }
 
 export async function stopBackgroundTracking(): Promise<void> {

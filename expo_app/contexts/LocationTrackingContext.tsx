@@ -18,6 +18,8 @@ interface ClientConfig {
 }
 
 const RECONNECT_BASE_MS = 5000;
+
+const logStartFailure = (error: unknown) => console.warn('Location tracking: start failed', error);
 const RECONNECT_MAX_MS = 120000;
 
 /**
@@ -111,11 +113,19 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     const startTracking = async () => {
       const res = await apiCall<ClientConfig>('/location/client-config');
       const config = res.data;
-      if (!config?.track_location || stoppedRef.current) return;
+      if (!config) {
+        console.warn('Location tracking: client-config failed', res.status, res.error);
+        return;
+      }
+      if (!config.track_location || stoppedRef.current) return;
       configRef.current = config;
 
       const access = await acquireLocationAccess(() => disclosureRef.current?.ask() ?? Promise.resolve(false));
-      if (access === 'none' || stoppedRef.current) return;
+      if (access === 'none') {
+        console.warn('Location tracking: no location access granted');
+        return;
+      }
+      if (stoppedRef.current) return;
 
       try {
         await connectPublisher(config);
@@ -142,7 +152,10 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
         user_uuid: config.user_uuid,
         username: config.username,
         ping_seconds: config.ping_seconds,
-      }).catch(() => false);
+      }).catch((error: unknown) => {
+        console.warn('Location tracking: background start failed', error);
+        return false;
+      });
       if (stoppedRef.current && bgStarted) stopBackgroundTracking().catch(() => {});
     };
 
@@ -150,7 +163,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     const onAppState = (state: AppStateStatus) => {
       if (!configRef.current) return;
       if (state === 'active' && stoppedRef.current === false && !watcherRef.current) {
-        startTracking().catch(() => {});
+        startTracking().catch(logStartFailure);
       } else if (state !== 'active' && watcherRef.current) {
         watcherRef.current.remove();
         watcherRef.current = null;
@@ -169,7 +182,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     // streaming location indefinitely. Adding isVerified to the deps is what makes
     // the cleanup below re-run and actually stop it.
     if (isAuthenticated && isVerified) {
-      startTracking().catch(() => {});
+      startTracking().catch(logStartFailure);
     }
 
     return () => {
