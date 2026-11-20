@@ -81,13 +81,13 @@ TaskManager.defineTask(BG_LOCATION_TASK, async ({ data, error }) => {
 });
 
 /**
- * Start background location updates. Requires the foreground permission to
- * already be granted; requests the background ("Always") permission and
- * returns false (leaving foreground-only tracking intact) if denied.
+ * Start background location updates. Never prompts: the background
+ * ("Always") permission must already be granted (see acquireLocationAccess),
+ * else returns false and leaves foreground-only tracking intact.
  */
 export async function startBackgroundTracking(config: BgConfig): Promise<boolean> {
-  const { status } = await Location.requestBackgroundPermissionsAsync();
-  if (status !== 'granted') return false;
+  const { granted } = await Location.getBackgroundPermissionsAsync();
+  if (!granted) return false;
 
   await AsyncStorage.setItem(BG_CONFIG_KEY, JSON.stringify(config));
 
