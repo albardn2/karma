@@ -7,13 +7,30 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 //   profile (dev/preview -> api-dev, production -> api-prod); .env overrides
 //   for local `expo start`. Falls back to prod so a store build can never
 //   silently point at the wrong backend.
+// - ASSISTANT_URL: the Karma Assistant service. Unset = the assistant is not
+//   shown at all (the floating button and its screen are hidden), so builds that
+//   don't set it are unchanged.
 export default ({ config }: ConfigContext): ExpoConfig =>
   ({
     ...config,
     extra: {
       ...config.extra,
       apiBaseUrl: process.env.API_BASE_URL ?? "https://api-prod.karma-grp.com",
+      assistantUrl: process.env.ASSISTANT_URL ?? "",
     },
+    plugins: [
+      ...(config.plugins ?? []),
+      // voice for the assistant: microphone + on-device / OS speech recognition
+      [
+        "expo-speech-recognition",
+        {
+          microphonePermission:
+            "Karma uses the microphone when you talk to the Karma Assistant.",
+          speechRecognitionPermission:
+            "Karma turns what you say to the Karma Assistant into text.",
+        },
+      ],
+    ],
     android: {
       ...config.android,
       config: {

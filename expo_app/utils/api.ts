@@ -228,7 +228,9 @@ export const apiCall = async <T = any>(
   }
 };
 
-export { API_BASE_URL };
+// refreshAccessToken: also used by the assistant client, whose streaming requests
+// don't go through apiCall but must renew an expired token the same way
+export { API_BASE_URL, refreshAccessToken };
 
 /**
  * Human-readable text from an apiCall error body. Domain errors come back as

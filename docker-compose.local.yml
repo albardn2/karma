@@ -1,4 +1,4 @@
-# Local full-stack preview: Postgres (PostGIS) + Flask backend + React/Vite frontend.
+# Local full-stack preview: Postgres (PostGIS) + Flask backend + assistant + React/Vite frontend.
 #
 #   docker compose -f docker-compose.local.yml up --build
 #
@@ -70,6 +70,35 @@ services:
       backend-seed:
         condition: service_completed_successfully
 
+  # The in-app assistant (chat + voice for the web and phone apps). Its own
+  # service: a chat turn streams for 10-60 s and would tie up the API's few
+  # gunicorn threads. It calls the API with each user's own token, so tenant
+  # scoping and permissions apply unchanged.
+  #
+  # Needs an Anthropic key: put ANTHROPIC_API_KEY=... in a .env file next to
+  # this compose file (gitignored; compose reads it). Without one the service
+  # still starts and the chat answers that the model isn't configured.
+  assistant:
+    build:
+      context: ./backend
+      dockerfile: assistant/Dockerfile
+    image: karma-assistant:local
+    restart: unless-stopped
+    environment:
+      KARMA_API: "http://backend:5000"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      ASSISTANT_DB: "/data/assistant.sqlite3"
+      # the web app's origin (the phone app isn't a browser, so needs none)
+      ASSISTANT_CORS_ORIGINS: "http://localhost:3000"
+    volumes:
+      # source mounted so a restart picks up edits without a rebuild
+      - ./backend/assistant:/app/assistant
+      - karma_assistant_data:/data
+    ports:
+      - "5077:5077"
+    depends_on:
+      - backend
+
   frontend:
     build:
       context: ./frontend
@@ -79,6 +108,7 @@ services:
       NODE_ENV: development
       # Read by the browser; must be reachable from the host, not the docker network.
       VITE_API_BASE_URL: "http://localhost:5000"
+      VITE_ASSISTANT_URL: "http://localhost:5077"
     ports:
       - "3000:5000"
     volumes:
@@ -89,3 +119,4 @@ services:
 
 volumes:
   karma_pg_data:
+  karma_assistant_data:

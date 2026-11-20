@@ -1,0 +1,7 @@
+anthropic>=0.80
+httpx>=0.27
+jsonschema>=4.20
+starlette>=0.37
+uvicorn>=0.30
+pyyaml>=6
+pytest>=8
