@@ -14,7 +14,7 @@ export const en: Record<string, string> = {
   'legal.brand': 'Karma Group',
   'legal.privacyLink': 'Privacy Policy',
   'legal.supportLink': 'Support',
-  'legal.lastUpdated': 'Last updated: November 19, 2026',
+  'legal.lastUpdated': 'Last updated: November 20, 2026',
 
   'legal.privacy.title': 'Privacy Policy',
   'legal.privacy.intro':
@@ -26,7 +26,7 @@ export const en: Record<string, string> = {
 
   'legal.privacy.s2.title': 'Information we collect',
   'legal.privacy.s2.body':
-    '• Account information: your company name, first and last name, username, and password. An email address and phone number are optional. Passwords are stored as a one-way hash, never in readable form.\n• Business information your company enters: customers (names, phone numbers, addresses and map locations), orders, invoices, payments, stock, vehicles, trips, expenses and notes.\n• Location: see the next section.\n• Technical information: our servers record basic request data (such as IP address, time and the page or feature requested) to keep the service secure and to fix problems.',
+    '• Account information: your company name, first and last name, username, and password. An email address and phone number are optional. Passwords are stored as a one-way hash, never in readable form.\n• Business information your company enters: customers (names, phone numbers, addresses and map locations), orders, invoices, payments, stock, vehicles, trips, expenses and notes.\n• Location: see the next section.\n• Karma Assistant: if your company has the assistant turned on, the questions you type or say to it and its answers (including charts and maps) are saved so you can come back to them. When you speak to it, your phone\'s own speech service turns your voice into text; we receive only the text, never the recording. Using the microphone is optional and needs your permission.\n• Technical information: our servers record basic request data (such as IP address, time and the page or feature requested) to keep the service secure and to fix problems.',
 
   'legal.privacy.s3.title': 'Location information',
   'legal.privacy.s3.body':
@@ -34,15 +34,15 @@ export const en: Record<string, string> = {
 
   'legal.privacy.s4.title': 'How we use information',
   'legal.privacy.s4.body':
-    '• To provide the service: accounts, orders, invoices, trips, dashboards and live maps for your company.\n• To keep the service secure and working, and to answer support requests.\n• To manage your company\'s subscription.\n\nWe do not sell your information, we do not show advertising, and we do not track you across other companies\' apps or websites.',
+    '• To provide the service: accounts, orders, invoices, trips, dashboards and live maps for your company.\n• To answer the questions you ask the Karma Assistant and, only after you approve each one, to make the changes you ask it to make.\n• To keep the service secure and working, and to answer support requests.\n• To manage your company\'s subscription.\n\nWe do not sell your information, we do not show advertising, and we do not track you across other companies\' apps or websites.',
 
   'legal.privacy.s5.title': 'Who can see your information',
   'legal.privacy.s5.body':
-    '• Users of your own company, according to the roles and permissions your administrators set.\n• Karma Group administrators, only as needed to verify companies, provide support and manage billing.\n• Service providers that run parts of the service for us: server hosting, map display (Apple Maps or Google Maps) and a real-time messaging service that relays live positions to your company\'s map. They may only use the information to provide those services.\n\nWe may disclose information if the law requires it.',
+    '• Users of your own company, according to the roles and permissions your administrators set.\n• Karma Group administrators, only as needed to verify companies, provide support and manage billing.\n• Service providers that run parts of the service for us: server hosting, map display (Apple Maps or Google Maps), a real-time messaging service that relays live positions to your company\'s map, and an AI service (Anthropic) that the Karma Assistant uses to understand your questions and write its answers. For each question, it receives the question and the business information needed to answer it. They may only use the information to provide those services.\n\nWe may disclose information if the law requires it.',
 
   'legal.privacy.s6.title': 'How long we keep information',
   'legal.privacy.s6.body':
-    'We keep your information while your company\'s account is active. Location history outside trips is deleted automatically as described above. When a company account is deleted, its users can no longer sign in and its data is no longer available in the app; business records may be kept for as long as needed for legal and accounting purposes. You can ask us to erase them by emailing {email}.',
+    'We keep your information while your company\'s account is active. Location history outside trips is deleted automatically as described above. Karma Assistant conversations are kept until you clear them in the assistant (Clear history) or your company\'s account is deleted. When a company account is deleted, its users can no longer sign in and its data is no longer available in the app; business records may be kept for as long as needed for legal and accounting purposes. You can ask us to erase them by emailing {email}.',
 
   'legal.privacy.s7.title': 'Deleting your account',
   'legal.privacy.s7.body':
@@ -90,7 +90,7 @@ export const ar: Record<string, string> = {
   'legal.brand': 'Karma Group',
   'legal.privacyLink': 'سياسة الخصوصية',
   'legal.supportLink': 'الدعم',
-  'legal.lastUpdated': 'آخر تحديث: 19 نوفمبر 2026',
+  'legal.lastUpdated': 'آخر تحديث: 20 نوفمبر 2026',
 
   'legal.privacy.title': 'سياسة الخصوصية',
   'legal.privacy.intro':
@@ -102,7 +102,7 @@ export const ar: Record<string, string> = {
 
   'legal.privacy.s2.title': 'المعلومات التي نجمعها',
   'legal.privacy.s2.body':
-    '• معلومات الحساب: اسم الشركة، والاسم الأول واسم العائلة، واسم المستخدم، وكلمة المرور. البريد الإلكتروني ورقم الهاتف اختياريان. تُحفظ كلمات المرور بتشفير أحادي الاتجاه ولا تُخزَّن أبدًا بشكل مقروء.\n• المعلومات التجارية التي تُدخلها شركتك: العملاء (الأسماء وأرقام الهواتف والعناوين ومواقعهم على الخريطة)، والطلبات، والفواتير، والدفعات، والمخزون، والمركبات، والرحلات، والمصاريف، والملاحظات.\n• الموقع: انظر القسم التالي.\n• المعلومات التقنية: تسجّل خوادمنا بيانات أساسية عن الطلبات (مثل عنوان IP والوقت والصفحة أو الميزة المطلوبة) للحفاظ على أمان الخدمة وإصلاح المشكلات.',
+    '• معلومات الحساب: اسم الشركة، والاسم الأول واسم العائلة، واسم المستخدم، وكلمة المرور. البريد الإلكتروني ورقم الهاتف اختياريان. تُحفظ كلمات المرور بتشفير أحادي الاتجاه ولا تُخزَّن أبدًا بشكل مقروء.\n• المعلومات التجارية التي تُدخلها شركتك: العملاء (الأسماء وأرقام الهواتف والعناوين ومواقعهم على الخريطة)، والطلبات، والفواتير، والدفعات، والمخزون، والمركبات، والرحلات، والمصاريف، والملاحظات.\n• الموقع: انظر القسم التالي.\n• مساعد Karma: إذا فعّلت شركتك المساعد، تُحفظ الأسئلة التي تكتبها له أو تقولها وإجاباته (بما فيها الرسوم البيانية والخرائط) لتتمكن من الرجوع إليها. عندما تتحدث إليه، تحوّل خدمة الكلام في هاتفك صوتك إلى نص؛ ولا نستلم إلا النص، ولا نستلم التسجيل الصوتي أبدًا. استخدام الميكروفون اختياري ويتطلب إذنك.\n• المعلومات التقنية: تسجّل خوادمنا بيانات أساسية عن الطلبات (مثل عنوان IP والوقت والصفحة أو الميزة المطلوبة) للحفاظ على أمان الخدمة وإصلاح المشكلات.',
 
   'legal.privacy.s3.title': 'معلومات الموقع',
   'legal.privacy.s3.body':
@@ -110,15 +110,15 @@ export const ar: Record<string, string> = {
 
   'legal.privacy.s4.title': 'كيف نستخدم المعلومات',
   'legal.privacy.s4.body':
-    '• لتقديم الخدمة: الحسابات والطلبات والفواتير والرحلات ولوحات المعلومات والخرائط المباشرة لشركتك.\n• للحفاظ على أمان الخدمة وعملها، وللرد على طلبات الدعم.\n• لإدارة اشتراك شركتك.\n\nنحن لا نبيع معلوماتك، ولا نعرض إعلانات، ولا نتتبّعك عبر تطبيقات أو مواقع شركات أخرى.',
+    '• لتقديم الخدمة: الحسابات والطلبات والفواتير والرحلات ولوحات المعلومات والخرائط المباشرة لشركتك.\n• للإجابة عن الأسئلة التي تطرحها على مساعد Karma، ولإجراء التغييرات التي تطلبها منه، وذلك فقط بعد موافقتك على كل تغيير.\n• للحفاظ على أمان الخدمة وعملها، وللرد على طلبات الدعم.\n• لإدارة اشتراك شركتك.\n\nنحن لا نبيع معلوماتك، ولا نعرض إعلانات، ولا نتتبّعك عبر تطبيقات أو مواقع شركات أخرى.',
 
   'legal.privacy.s5.title': 'من يمكنه رؤية معلوماتك',
   'legal.privacy.s5.body':
-    '• مستخدمو شركتك، حسب الأدوار والصلاحيات التي يحددها مسؤولوك.\n• مسؤولو Karma Group، فقط بالقدر اللازم للتحقق من الشركات وتقديم الدعم وإدارة الفوترة.\n• مزوّدو خدمات يشغّلون أجزاء من الخدمة لصالحنا: استضافة الخوادم، وعرض الخرائط (خرائط Apple أو خرائط Google)، وخدمة مراسلة فورية تنقل المواقع المباشرة إلى خريطة شركتك. ولا يحق لهم استخدام المعلومات إلا لتقديم تلك الخدمات.\n\nقد نفصح عن المعلومات إذا اقتضى القانون ذلك.',
+    '• مستخدمو شركتك، حسب الأدوار والصلاحيات التي يحددها مسؤولوك.\n• مسؤولو Karma Group، فقط بالقدر اللازم للتحقق من الشركات وتقديم الدعم وإدارة الفوترة.\n• مزوّدو خدمات يشغّلون أجزاء من الخدمة لصالحنا: استضافة الخوادم، وعرض الخرائط (خرائط Apple أو خرائط Google)، وخدمة مراسلة فورية تنقل المواقع المباشرة إلى خريطة شركتك، وخدمة ذكاء اصطناعي (Anthropic) يستخدمها مساعد Karma لفهم أسئلتك وكتابة إجاباته. وتستلم هذه الخدمة مع كل سؤال نصَّ السؤال والمعلومات التجارية اللازمة للإجابة عنه. ولا يحق لهم استخدام المعلومات إلا لتقديم تلك الخدمات.\n\nقد نفصح عن المعلومات إذا اقتضى القانون ذلك.',
 
   'legal.privacy.s6.title': 'مدة الاحتفاظ بالمعلومات',
   'legal.privacy.s6.body':
-    'نحتفظ بمعلوماتك ما دام حساب شركتك نشطًا. ويُحذف سجل المواقع خارج الرحلات تلقائيًا كما هو موضح أعلاه. عند حذف حساب شركة، لا يعود بإمكان مستخدميها تسجيل الدخول ولا تبقى بياناتها متاحة في التطبيق، وقد نحتفظ بالسجلات التجارية للمدة اللازمة لأغراض قانونية ومحاسبية. ويمكنك أن تطلب منا محوها بمراسلتنا على \u2068{email}\u2069.',
+    'نحتفظ بمعلوماتك ما دام حساب شركتك نشطًا. ويُحذف سجل المواقع خارج الرحلات تلقائيًا كما هو موضح أعلاه. وتُحفظ محادثات مساعد Karma إلى أن تمسحها من المساعد (مسح السجل) أو يُحذف حساب شركتك. عند حذف حساب شركة، لا يعود بإمكان مستخدميها تسجيل الدخول ولا تبقى بياناتها متاحة في التطبيق، وقد نحتفظ بالسجلات التجارية للمدة اللازمة لأغراض قانونية ومحاسبية. ويمكنك أن تطلب منا محوها بمراسلتنا على \u2068{email}\u2069.',
 
   'legal.privacy.s7.title': 'حذف حسابك',
   'legal.privacy.s7.body':
