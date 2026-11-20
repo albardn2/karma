@@ -26,6 +26,10 @@
       "env": { "API_BASE_URL": "https://api-prod.karma-grp.com" },
       "environment": "production"
     },
+    "testflight-dev": {
+      "extends": "production",
+      "env": { "API_BASE_URL": "https://api-dev.karma-grp.com", "ASSISTANT_URL": "https://api-dev.karma-grp.com" }
+    },
     "production-apk": {
       "extends": "production",
       "distribution": "internal",
