@@ -10,9 +10,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useSegments } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, StyleSheet, useWindowDimensions } from 'react-native';
+import { Animated, AppState, PanResponder, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { assistantEnabled } from '@/utils/assistant';
+import { assistantEnabled, getAccess } from '@/utils/assistant';
 
 const SIZE = 56;
 const MARGIN = 12;
@@ -27,6 +27,20 @@ export function AssistantFab() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const [ready, setReady] = useState(false);
+  // hidden until the service says this company has the assistant switched on;
+  // re-checked whenever the app comes back to the foreground
+  const [switchedOn, setSwitchedOn] = useState(false);
+
+  useEffect(() => {
+    if (!assistantEnabled()) return;
+    const check = () =>
+      getAccess()
+        .then((a) => setSwitchedOn(a.code !== 'off'))
+        .catch(() => {}); // unreachable: keep whatever we knew
+    check();
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && check());
+    return () => sub.remove();
+  }, []);
 
   const minY = insets.top + MARGIN;
   const maxY = height - insets.bottom - SIZE - MARGIN;
@@ -84,7 +98,7 @@ export function AssistantFab() {
     [width, height, minY, maxY],
   );
 
-  if (!assistantEnabled() || !ready || HIDDEN_ON.has(String(segments[0] ?? ''))) return null;
+  if (!assistantEnabled() || !switchedOn || !ready || HIDDEN_ON.has(String(segments[0] ?? ''))) return null;
 
   return (
     <Animated.View

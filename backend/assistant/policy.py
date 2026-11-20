@@ -33,6 +33,9 @@ class Access:
     allowed: bool
     status: int = 200
     reason: str = ""
+    # why not: "off" (company not switched on: the apps hide the button),
+    # "budget" or "rate" (the apps say why and keep the history readable)
+    code: str = ""
     budget_usd: float | None = None
     spent_usd: float = 0.0
 
@@ -93,15 +96,16 @@ class Policy:
         s = self.account(account_uuid)
         if not s["enabled"]:
             return Access(False, 403, "The assistant isn't switched on for your company. "
-                                      "Ask Karma support to turn it on.")
+                                      "Ask Karma support to turn it on.", code="off")
         budget = s["monthly_budget_usd"]
         spent = self.store.account_spend_since(account_uuid, month_start())
         if budget is not None and spent >= float(budget):
             return Access(False, 429, "Your company has used this month's assistant allowance. "
                                       "It resets on the 1st, or Karma support can raise it.",
-                          budget_usd=budget, spent_usd=spent)
+                          code="budget", budget_usd=budget, spent_usd=spent)
         limit = s["user_messages_per_hour"]
         if limit and self.store.user_messages_since(me["uuid"], hour_ago()) >= int(limit):
             return Access(False, 429, f"You've asked {limit} questions in the last hour, the most allowed. "
-                                      "Try again a little later.", budget_usd=budget, spent_usd=spent)
+                                      "Try again a little later.", code="rate", budget_usd=budget,
+                          spent_usd=spent)
         return Access(True, budget_usd=budget, spent_usd=spent)

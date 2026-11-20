@@ -208,6 +208,17 @@ async def health(_request: Request):
     return JSONResponse({"ok": True, "model": spec.label, "configured": spec.configured})
 
 
+async def get_access(request: Request):
+    """Cheap check the apps make before showing the assistant button at all:
+    a company that hasn't been switched on never sees it."""
+    got = await _caller(request)
+    if isinstance(got, JSONResponse):
+        return got
+    live, _client = got
+    access = await asyncio.to_thread(policy().check, live.me)
+    return JSONResponse({"allowed": access.allowed, "code": access.code, "reason": access.reason})
+
+
 async def get_conversation(request: Request):
     _purge()
     got = await _caller(request)
@@ -220,7 +231,7 @@ async def get_conversation(request: Request):
     return JSONResponse({
         "model": _model_info(model_id),
         # the apps show `reason` instead of letting the user type into a dead end
-        "access": {"allowed": access.allowed, "reason": access.reason},
+        "access": {"allowed": access.allowed, "code": access.code, "reason": access.reason},
         "busy": live.busy.locked(),
         "items": stored.transcript if stored else [],
         "updated_at": stored.updated_at if stored else None,
@@ -362,6 +373,7 @@ async def confirm(request: Request):
 app = Starlette(
     routes=[
         Route("/assistant/health", health),
+        Route("/assistant/access", get_access, methods=["GET"]),
         Route("/assistant/conversation", get_conversation, methods=["GET"]),
         Route("/assistant/conversation", clear_conversation, methods=["DELETE"]),
         Route("/assistant/conversation/messages", post_message, methods=["POST"]),

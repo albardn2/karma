@@ -72,7 +72,7 @@ export type StoredItem =
 export interface ConversationState {
   model: { id: string; label: string };
   /** off for the company, over its monthly budget, or the user's hourly limit */
-  access?: { allowed: boolean; reason: string };
+  access?: { allowed: boolean; code?: string; reason: string };
   busy: boolean;
   items: StoredItem[];
 }
@@ -114,6 +114,15 @@ async function call(path: string, init: { method?: string; body?: string; signal
 
 export async function getConversation(): Promise<ConversationState> {
   const res = await call(BASE());
+  if (!res.ok) throw await failure(res);
+  return res.json();
+}
+
+/** Is the assistant on for this user's company right now? `code` is "off" when the
+ *  company hasn't been switched on (the button is hidden), "budget"/"rate" when
+ *  it's over a limit (the button stays; the screen says why). */
+export async function getAccess(): Promise<{ allowed: boolean; code: string; reason: string }> {
+  const res = await call(`${ASSISTANT_URL}/assistant/access`);
   if (!res.ok) throw await failure(res);
   return res.json();
 }

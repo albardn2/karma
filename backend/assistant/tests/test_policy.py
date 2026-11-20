@@ -70,6 +70,10 @@ def test_a_switched_off_company_gets_a_reason_not_a_stream(client):
     assert r.status_code == 403 and "switched on" in r.json()["error"]
     got = client.get("/assistant/conversation", headers=A).json()
     assert got["access"]["allowed"] is False and got["access"]["reason"]
+    assert got["access"]["code"] == "off"
+    # the apps hide the button for a company that isn't switched on
+    assert client.get("/assistant/access", headers=A).json()["code"] == "off"
+    assert client.get("/assistant/access").status_code == 401
 
 
 # ------------------------------------------------------------------ budget & rate

@@ -116,6 +116,8 @@ export function AssistantWidget() {
   const [model, setModel] = useState<string | null>(null);
   // why the user can't ask right now (switched off, budget, rate limit), if so
   const [blocked, setBlocked] = useState<string | null>(null);
+  // the company hasn't been switched on: no button at all
+  const [off, setOff] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [input, setInput] = useState("");
@@ -226,6 +228,7 @@ export function AssistantWidget() {
       const c = await getConversation();
       setModel(c.model.label);
       setBlocked(c.access && !c.access.allowed ? c.access.reason : null);
+      setOff(c.access?.code === "off");
       setItems(fromStored(c.items));
       setLoaded(true);
       if (c.busy) {
@@ -425,6 +428,8 @@ export function AssistantWidget() {
   };
 
   const position = "fixed z-50 bottom-20 right-4 lg:bottom-6 lg:right-6";
+
+  if (off) return null;
 
   if (!open) {
     return (
