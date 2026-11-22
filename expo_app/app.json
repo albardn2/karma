@@ -51,6 +51,7 @@
           "backgroundColor": "#ffffff"
         }
       ],
+      "./plugins/withOptionalPortraitFeature",
       "expo-web-browser",
       "expo-font",
       [
