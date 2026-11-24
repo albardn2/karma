@@ -351,13 +351,29 @@ def effective_permissions(user) -> dict | None:
     return preset_for_scope(user.permission_scope)
 
 
+# Resources a workflow execution cannot be worked without: the screens that run
+# one read its workflow, its task definitions (the setup form's fields) and the
+# account's routing strategies (the setup form's dropdown). Reading executions
+# therefore implies reading these, so a permissions object that ticks
+# workflow_execution but not them — the feature cap a new account is created
+# with, for one — cannot leave the trip setup form empty. Writes still need
+# their own grant.
+WORKFLOW_EXECUTION_READ_DEPENDENCIES = frozenset({"workflow", "task", "routing_strategy"})
+
+
 def endpoint_allowed(permissions: dict, blueprint: str, method: str) -> bool:
     """Does this permissions object grant `method` on `blueprint`?"""
     action = METHOD_ACTIONS.get(method)
     if action is None:
         return False
-    allowed = (permissions.get("endpoints") or {}).get(blueprint) or []
-    return action in allowed
+    endpoints = permissions.get("endpoints") or {}
+    if action in (endpoints.get(blueprint) or []):
+        return True
+    return (
+        action == "read"
+        and blueprint in WORKFLOW_EXECUTION_READ_DEPENDENCIES
+        and "read" in (endpoints.get("workflow_execution") or [])
+    )
 
 
 def perms_version(scopes, user_acl, account_perms, account_verified, dashboards="__unset__") -> str:
