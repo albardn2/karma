@@ -27,6 +27,7 @@ import {
   clearConversation,
   getConversation,
   sendMessage,
+  type Allowance,
   type AssistantEvent,
   type ChartSpec,
   type StoredItem,
@@ -35,7 +36,7 @@ import { AssistantChart } from "./AssistantChart";
 import { Markdown } from "./Markdown";
 
 type ConfirmEvent = Extract<AssistantEvent, { type: "confirm" }>;
-type Meta = { cost_usd: number; seconds: number; tool_calls: number };
+type Meta = { seconds: number; tool_calls: number };
 
 type Item =
   | { id: number; kind: "user"; text: string; voice?: boolean }
@@ -114,8 +115,9 @@ function fromStored(items: StoredItem[]): Item[] {
 export function AssistantWidget() {
   const [open, setOpenState] = useState(readOpen);
   const [model, setModel] = useState<string | null>(null);
-  // why the user can't ask right now (switched off, budget, rate limit), if so
+  // why the user can't ask right now (switched off, allowance used up, rate limit), if so
   const [blocked, setBlocked] = useState<string | null>(null);
+  const [allowance, setAllowance] = useState<Allowance | null>(null);
   // the company hasn't been switched on: no button at all
   const [off, setOff] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -229,6 +231,7 @@ export function AssistantWidget() {
       setModel(c.model.label);
       setBlocked(c.access && !c.access.allowed ? c.access.reason : null);
       setOff(c.access?.code === "off");
+      setAllowance(c.access?.allowance ?? null);
       setItems(fromStored(c.items));
       setLoaded(true);
       if (c.busy) {
@@ -372,6 +375,9 @@ export function AssistantWidget() {
             case "done":
               // the final answer replaces what streamed in this bubble (earlier bubbles keep their narration)
               patchBubble(() => ({ text: e.text, streaming: false, status: undefined, meta: e }));
+              setAllowance(e.allowance);
+              // the answer that used the last of the allowance: show why before the next question
+              if (e.allowance && e.allowance.used_pct >= 100) void load();
               if (voice && voiceOnRef.current) speaker.flush();
               break;
             case "error":
@@ -552,7 +558,7 @@ export function AssistantWidget() {
               )}
               {item.meta && (
                 <div className="mt-1 text-[10px] text-muted-foreground/80">
-                  {item.meta.seconds}s · {item.meta.tool_calls} lookups · ${item.meta.cost_usd.toFixed(3)}
+                  {item.meta.seconds}s · {item.meta.tool_calls} lookups
                 </div>
               )}
             </div>
@@ -583,6 +589,7 @@ export function AssistantWidget() {
       </div>
       ) : (
       <div className="border-t p-2">
+        {allowance && <AllowanceMeter allowance={allowance} />}
         <div className="flex items-end gap-2">
           <Button
             size="icon"
@@ -749,6 +756,32 @@ function ConfirmCard({
           {item.error && <div className="text-xs text-destructive">{item.error}</div>}
         </div>
       )}
+    </div>
+  );
+}
+
+
+const WARN_AT_PCT = 80;
+
+/** How much of the company's plan is used this period. Never shows a dollar amount. */
+function AllowanceMeter({ allowance }: { allowance: Allowance }) {
+  const pct = Math.min(100, Math.max(0, allowance.used_pct));
+  const warn = pct >= WARN_AT_PCT;
+  const resets = new Date(allowance.resets_on + "T00:00:00").toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+  });
+  return (
+    <div className="mb-2 px-1" data-testid="assistant-allowance">
+      <div className="flex justify-between text-[11px] text-muted-foreground">
+        <span className={warn ? "text-amber-700 dark:text-amber-400" : undefined}>
+          {pct}% of this period's assistant allowance used
+        </span>
+        <span>Resets {resets}</span>
+      </div>
+      <div className="mt-1 h-1 rounded-full bg-muted" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <div className={`h-1 rounded-full ${warn ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }

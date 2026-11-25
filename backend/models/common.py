@@ -2761,7 +2761,7 @@ class AssistantConversation(Base):
 
 class AssistantUsage(Base):
     """One row per answered (or failed) question: what it cost and how long it
-    took. Drives the per-company monthly budget and the per-user rate limit."""
+    took. Drives the per-company plan allowance and the per-user rate limit."""
     __tablename__ = 'assistant_usage'
     __table_args__ = (
         Index('ix_assistant_usage_account_created', 'account_uuid', 'created_at'),
@@ -2812,11 +2812,13 @@ class AssistantAction(Base):
 
 
 class AssistantAccountSetting(Base):
-    """Per-company assistant switch and budget, set by a platform owner.
-    NULL means 'use the platform default' (PlatformSetting 'assistant')."""
+    """Per-company assistant switch and plan, set by a platform owner.
+    NULL means 'use the platform default' (PlatformSetting 'assistant').
+    See assistant/plan.py for what the price and margin mean."""
     __tablename__ = 'assistant_account_setting'
 
     account_uuid = Column(String(36), ForeignKey('account.uuid'), primary_key=True)
     enabled = Column(Boolean, nullable=True)
-    monthly_budget_usd = Column(Float, nullable=True)
+    plan_price_usd = Column(Float, nullable=True)   # per billing period
+    margin_pct = Column(Float, nullable=True)       # 0 <= margin < 100
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

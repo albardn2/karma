@@ -34,16 +34,24 @@ The tables (`assistant_conversation`, `assistant_usage`, `assistant_action`,
   haven't passed the eval are listed but can't be picked. A conversation in
   progress keeps its model until the user clears it.
 - **On/off**: a platform default plus a per-company override (Default / On / Off).
-- **Monthly budget** per company (USD, calendar month UTC): questions stop once
-  this month's recorded cost reaches it. A per-company value overrides the default.
+- **Plan** per company: a price (USD per billing period) and a margin. The
+  allowance is the price minus the margin, in model cost; questions stop once
+  the period's recorded cost reaches it (`plan.py`). The period is the company's
+  billing period, so the allowance resets on the day it is invoiced. A
+  per-company value overrides the default.
+- **Invoice plans**: when on, the daily billing job adds each company's plan
+  price to its subscription charge, converted to the subscription currency.
 - **Questions per user per hour**: rate limit.
-- **This month's cost** per company, from `assistant_usage` (one row per question).
+- **This period's cost, revenue and profit** per company, from `assistant_usage`
+  (one row per question).
 - **Action log**: every write the assistant proposed, what the card showed, the
   user's decision, and the API's answer (`assistant_action`).
 
-The service re-reads these within 30 s. When a user can't ask (off, over budget,
-over the hourly limit), the web and phone chats show the reason in place of the
-input box; their history stays readable.
+The service re-reads these within 30 s. Users see how much of the allowance is
+used as a percentage and when it resets, never a dollar amount: costs stay in
+the console. When a user can't ask (off, allowance used up, over the hourly
+limit), the web and phone chats show the reason in place of the input box; their
+history stays readable.
 
 ## Actions (writes)
 
@@ -336,9 +344,9 @@ docker run --rm -v "$(pwd)":/karma -w /karma -e JWT_SECRET_KEY=x \
   instance (sticky sessions), or run one instance until confirmations move to the
   database.
 - A failed turn is recorded with cost 0: the tokens it used before failing are
-  not counted against the budget.
+  not counted against the allowance.
 - The spend check runs before a question, so one question can take a company
-  slightly past its budget.
+  slightly past its allowance (out of the margin).
 - `--code` (programmatic tool calling) runs in Anthropic's code-execution container:
   data there is retained up to 30 days and it is not zero-data-retention eligible.
 - Many list endpoints filter on equality only (no date ranges); `query_data` filters

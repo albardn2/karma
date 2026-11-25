@@ -1,6 +1,7 @@
 """Platform-owner console for the in-app assistant: which model it runs on,
-which companies have it, what each may spend, what it has cost, and the log of
-every write it proposed. Superuser only, on an unscoped unit of work.
+which companies have it, each company's plan, what it has cost against what it
+earns, and the log of every write it proposed. Superuser only, on an unscoped
+unit of work.
 
 The assistant service (backend/assistant) enforces these settings; it reads
 them from the same tables within ~30 s of a change.
@@ -10,36 +11,25 @@ from typing import Optional
 
 from flask import jsonify, request
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+from app.domains.assistant_plan import domain as assistant_plan
+from app.domains.billing import domain as billing
 from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required
 from app.entrypoint.routes.common.errors import BadRequestError, NotFoundError
 from app.entrypoint.routes.super_admin import super_admin_blueprint
 from assistant.registry import MODELS, PLATFORM_DEFAULTS
+from billing_cycle import current_period
 from models.common import (
     Account as AccountModel,
     AssistantAccountSetting,
     AssistantAction,
-    AssistantUsage,
     PlatformSetting,
     User as UserModel,
 )
 
 SUPER = PermissionScope.SUPER_ADMIN.value
-SETTING_KEY = "assistant"
-
-
-def _month_start() -> datetime:
-    return datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-
-def _platform(uow) -> dict:
-    row = uow.session.query(PlatformSetting).filter_by(key=SETTING_KEY).one_or_none()
-    merged = dict(PLATFORM_DEFAULTS)
-    merged.update({k: v for k, v in (row.value or {}).items() if k in merged} if row else {})
-    return merged
 
 
 def _models() -> list:
@@ -57,7 +47,9 @@ class PlatformAssistantSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     model_id: str
     enabled_by_default: bool
-    monthly_budget_usd: Optional[float] = Field(default=None, ge=0)
+    plan_price_usd: Optional[float] = Field(default=None, ge=0)
+    margin_pct: float = Field(ge=0, lt=100)
+    invoice_plans: bool
     user_messages_per_hour: Optional[int] = Field(default=None, ge=1)
 
 
@@ -65,14 +57,19 @@ class AccountAssistantSettings(BaseModel):
     """null = follow the platform setting."""
     model_config = ConfigDict(extra="forbid")
     enabled: Optional[bool] = None
-    monthly_budget_usd: Optional[float] = Field(default=None, ge=0)
+    plan_price_usd: Optional[float] = Field(default=None, ge=0)
+    margin_pct: Optional[float] = Field(default=None, ge=0, lt=100)
+
+
+def _settings_response(uow) -> dict:
+    return {"settings": assistant_plan.platform_settings(uow), "defaults": PLATFORM_DEFAULTS, "models": _models()}
 
 
 @super_admin_blueprint.route("/settings/assistant", methods=["GET"])
 @scopes_required(SUPER)
 def get_assistant_settings():
     with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
-        result = {"settings": _platform(uow), "defaults": PLATFORM_DEFAULTS, "models": _models()}
+        result = _settings_response(uow)
     return jsonify(result), 200
 
 
@@ -88,64 +85,78 @@ def set_assistant_settings():
     if not model.enabled:
         raise BadRequestError(f"{model.label} isn't available yet: it hasn't passed the assistant's evaluation")
     with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
-        row = uow.session.query(PlatformSetting).filter_by(key=SETTING_KEY).one_or_none()
+        row = uow.session.query(PlatformSetting).filter_by(key=assistant_plan.SETTING_KEY).one_or_none()
         if row:
             row.value = payload.model_dump()
         else:
-            uow.session.add(PlatformSetting(key=SETTING_KEY, value=payload.model_dump()))
+            uow.session.add(PlatformSetting(key=assistant_plan.SETTING_KEY, value=payload.model_dump()))
         uow.session.flush()
-        result = {"settings": _platform(uow), "defaults": PLATFORM_DEFAULTS, "models": _models()}
+        result = _settings_response(uow)
         uow.commit()
     return jsonify(result), 200
 
 
+def _round(value: Optional[float]) -> Optional[float]:
+    return None if value is None else round(value, 4)
+
+
+def _account_row(uow, platform: dict, account: AccountModel, own: Optional[AssistantAccountSetting],
+                 today) -> dict:
+    company = assistant_plan.plan_for(platform, own)
+    plan = company.plan
+    period_start, period_end = current_period(billing.billing_anchor(account), today)
+    usage = assistant_plan.usage_since(uow, account.uuid, period_start)
+    revenue = plan.price_usd if company.enabled else None
+    return {
+        "account_uuid": account.uuid,
+        "company_name": account.company_name,
+        # the company's own settings; null = platform default
+        "enabled": own.enabled if own else None,
+        "plan_price_usd": own.plan_price_usd if own else None,
+        "margin_pct": own.margin_pct if own else None,
+        "effective_enabled": company.enabled,
+        "effective_plan_price_usd": plan.price_usd,
+        "effective_margin_pct": plan.margin_pct,
+        "cost_cap_usd": _round(plan.cost_cap_usd),
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat(),
+        "period_cost_usd": _round(usage.cost_usd),
+        "period_questions": usage.questions,
+        "used_pct": plan.used_pct(usage.cost_usd),
+        # what the plan earns this period, and what is left once the model is paid
+        "revenue_usd": revenue,
+        "profit_usd": None if revenue is None else _round(revenue - usage.cost_usd),
+    }
+
+
 def _account_rows(uow, account_uuids=None) -> list:
-    platform = _platform(uow)
-    since = _month_start()
+    platform = assistant_plan.platform_settings(uow)
+    today = billing.damascus_today()
     q = uow.session.query(AccountModel).filter(AccountModel.is_deleted.is_(False))
     if account_uuids is not None:
         q = q.filter(AccountModel.uuid.in_(account_uuids))
     accounts = q.order_by(AccountModel.company_name).all()
-    ids = [a.uuid for a in accounts]
-    own = {s.account_uuid: s for s in uow.session.query(AssistantAccountSetting)
-           .filter(AssistantAccountSetting.account_uuid.in_(ids)).all()} if ids else {}
-    spend = dict(uow.session.query(AssistantUsage.account_uuid,
-                                   func.coalesce(func.sum(AssistantUsage.cost_usd), 0.0))
-                 .filter(AssistantUsage.account_uuid.in_(ids), AssistantUsage.created_at >= since)
-                 .group_by(AssistantUsage.account_uuid).all()) if ids else {}
-    questions = dict(uow.session.query(AssistantUsage.account_uuid, func.count(AssistantUsage.uuid))
-                     .filter(AssistantUsage.account_uuid.in_(ids), AssistantUsage.created_at >= since)
-                     .group_by(AssistantUsage.account_uuid).all()) if ids else {}
-    rows = []
-    for a in accounts:
-        s = own.get(a.uuid)
-        enabled = s.enabled if s else None
-        budget = s.monthly_budget_usd if s else None
-        rows.append({
-            "account_uuid": a.uuid,
-            "company_name": a.company_name,
-            "enabled": enabled,                      # null = platform default
-            "monthly_budget_usd": budget,            # null = platform default
-            "effective_enabled": platform["enabled_by_default"] if enabled is None else enabled,
-            "effective_budget_usd": platform["monthly_budget_usd"] if budget is None else budget,
-            "month_spend_usd": round(float(spend.get(a.uuid, 0.0)), 4),
-            "month_questions": int(questions.get(a.uuid, 0)),
-        })
-    return rows
+    own = assistant_plan.own_settings(uow, [a.uuid for a in accounts])
+    return [_account_row(uow, platform, a, own.get(a.uuid), today) for a in accounts]
+
+
+def _totals(rows: list) -> dict:
+    cost = sum(r["period_cost_usd"] for r in rows)
+    revenue = sum(r["revenue_usd"] or 0.0 for r in rows)
+    return {
+        "cost_usd": round(cost, 4),
+        "revenue_usd": round(revenue, 2),
+        "profit_usd": round(revenue - cost, 4),
+    }
 
 
 @super_admin_blueprint.route("/assistant/accounts", methods=["GET"])
 @scopes_required(SUPER)
 def list_assistant_accounts():
-    """Every company: switched on?, its budget, and this month's cost."""
+    """Every company: switched on?, its plan, and this billing period's cost and profit."""
     with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
         rows = _account_rows(uow)
-        result = {
-            "accounts": rows,
-            "month_start": _month_start().isoformat(),
-            "month_spend_usd": round(sum(r["month_spend_usd"] for r in rows), 4),
-        }
-    return jsonify(result), 200
+    return jsonify({"accounts": rows, "totals": _totals(rows)}), 200
 
 
 @super_admin_blueprint.route("/accounts/<string:account_uuid>/assistant", methods=["PUT"])
@@ -160,7 +171,8 @@ def set_account_assistant(account_uuid):
             row = AssistantAccountSetting(account_uuid=account_uuid)
             uow.session.add(row)
         row.enabled = payload.enabled
-        row.monthly_budget_usd = payload.monthly_budget_usd
+        row.plan_price_usd = payload.plan_price_usd
+        row.margin_pct = payload.margin_pct
         row.updated_at = datetime.utcnow()
         uow.session.flush()
         result = _account_rows(uow, [account_uuid])[0]

@@ -20,7 +20,9 @@ const ACTIONS_URL = "/super-admin/assistant/actions?per_page=50";
 interface PlatformSettings {
   model_id: string;
   enabled_by_default: boolean;
-  monthly_budget_usd: number | null;
+  plan_price_usd: number | null;
+  margin_pct: number;
+  invoice_plans: boolean;
   user_messages_per_hour: number | null;
 }
 
@@ -36,11 +38,25 @@ interface AccountRow {
   account_uuid: string;
   company_name: string;
   enabled: boolean | null;
-  monthly_budget_usd: number | null;
+  plan_price_usd: number | null;
+  margin_pct: number | null;
   effective_enabled: boolean;
-  effective_budget_usd: number | null;
-  month_spend_usd: number;
-  month_questions: number;
+  effective_plan_price_usd: number | null;
+  effective_margin_pct: number;
+  cost_cap_usd: number | null;
+  period_start: string;
+  period_end: string;
+  period_cost_usd: number;
+  period_questions: number;
+  used_pct: number | null;
+  revenue_usd: number | null;
+  profit_usd: number | null;
+}
+
+interface Totals {
+  cost_usd: number;
+  revenue_usd: number;
+  profit_usd: number;
 }
 
 interface ActionRow {
@@ -59,6 +75,9 @@ interface ActionRow {
 
 const usd = (n: number | null | undefined) => (n == null ? "" : `${n < 1 && n > 0 ? n.toFixed(4) : n.toFixed(2)}`);
 const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
+const text = (n: number | null | undefined) => (n == null ? "" : String(n));
+const shortDate = (iso: string) =>
+  new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
 /** Platform-owner settings for the in-app assistant. */
 export function AssistantAdmin() {
@@ -80,7 +99,14 @@ function PlatformCard() {
     queryKey: [SETTINGS_URL],
     queryFn: () => apiRequest(SETTINGS_URL),
   });
-  const [form, setForm] = useState({ model_id: "", enabled_by_default: false, budget: "", rate: "" });
+  const [form, setForm] = useState({
+    model_id: "",
+    enabled_by_default: false,
+    price: "",
+    margin: "",
+    invoice_plans: false,
+    rate: "",
+  });
 
   useEffect(() => {
     if (!data) return;
@@ -88,8 +114,10 @@ function PlatformCard() {
     setForm({
       model_id: s.model_id,
       enabled_by_default: s.enabled_by_default,
-      budget: s.monthly_budget_usd == null ? "" : String(s.monthly_budget_usd),
-      rate: s.user_messages_per_hour == null ? "" : String(s.user_messages_per_hour),
+      price: text(s.plan_price_usd),
+      margin: String(s.margin_pct),
+      invoice_plans: s.invoice_plans,
+      rate: text(s.user_messages_per_hour),
     });
   }, [data]);
 
@@ -100,7 +128,9 @@ function PlatformCard() {
         body: {
           model_id: form.model_id,
           enabled_by_default: form.enabled_by_default,
-          monthly_budget_usd: numOrNull(form.budget),
+          plan_price_usd: numOrNull(form.price),
+          margin_pct: Number(form.margin || 0),
+          invoice_plans: form.invoice_plans,
           user_messages_per_hour: numOrNull(form.rate),
         },
       }),
@@ -114,6 +144,8 @@ function PlatformCard() {
   });
 
   const model = data?.models.find((m) => m.id === form.model_id);
+  const price = numOrNull(form.price);
+  const cap = price == null ? null : price * (1 - Number(form.margin || 0) / 100);
 
   return (
     <Card>
@@ -166,16 +198,31 @@ function PlatformCard() {
 
         <div className="grid gap-4 sm:grid-cols-2 max-w-2xl">
           <div className="space-y-2">
-            <Label htmlFor="assistant-budget">{t("assistantAdmin.budget")}</Label>
+            <Label htmlFor="assistant-price">{t("assistantAdmin.price")}</Label>
             <Input
-              id="assistant-budget"
+              id="assistant-price"
               type="number"
               min={0}
               step="0.01"
-              value={form.budget}
-              onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value }))}
+              value={form.price}
+              onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
             />
-            <p className="text-sm text-gray-500">{t("assistantAdmin.budgetDesc")}</p>
+            <p className="text-sm text-gray-500">{t("assistantAdmin.priceDesc")}</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="assistant-margin">{t("assistantAdmin.margin")}</Label>
+            <Input
+              id="assistant-margin"
+              type="number"
+              min={0}
+              max={99}
+              step="1"
+              value={form.margin}
+              onChange={(e) => setForm((f) => ({ ...f, margin: e.target.value }))}
+            />
+            <p className="text-sm text-gray-500">
+              {cap == null ? t("assistantAdmin.noCapDesc") : t("assistantAdmin.capDesc", { cap: usd(cap) })}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="assistant-rate">{t("assistantAdmin.rate")}</Label>
@@ -188,6 +235,18 @@ function PlatformCard() {
               onChange={(e) => setForm((f) => ({ ...f, rate: e.target.value }))}
             />
             <p className="text-sm text-gray-500">{t("assistantAdmin.rateDesc")}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Switch
+            id="assistant-invoice"
+            checked={form.invoice_plans}
+            onCheckedChange={(v) => setForm((f) => ({ ...f, invoice_plans: v }))}
+          />
+          <div>
+            <Label htmlFor="assistant-invoice">{t("assistantAdmin.invoicePlans")}</Label>
+            <p className="text-sm text-gray-500">{t("assistantAdmin.invoicePlansDesc")}</p>
           </div>
         </div>
 
@@ -204,7 +263,7 @@ function PlatformCard() {
 
 function CompaniesCard() {
   const { t } = useLanguage();
-  const { data } = useQuery<{ accounts: AccountRow[]; month_spend_usd: number }>({
+  const { data } = useQuery<{ accounts: AccountRow[]; totals: Totals }>({
     queryKey: [ACCOUNTS_URL],
     queryFn: () => apiRequest(ACCOUNTS_URL),
   });
@@ -215,7 +274,11 @@ function CompaniesCard() {
       <CardHeader>
         <CardTitle>{t("assistantAdmin.companiesTitle")}</CardTitle>
         <CardDescription>
-          {t("assistantAdmin.companiesDesc", { total: usd(data?.month_spend_usd ?? 0) })}
+          {t("assistantAdmin.companiesDesc", {
+            revenue: usd(data?.totals.revenue_usd ?? 0),
+            cost: usd(data?.totals.cost_usd ?? 0),
+            profit: usd(data?.totals.profit_usd ?? 0),
+          })}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -224,8 +287,10 @@ function CompaniesCard() {
             <TableRow>
               <TableHead>{t("assistantAdmin.company")}</TableHead>
               <TableHead>{t("assistantAdmin.access")}</TableHead>
-              <TableHead>{t("assistantAdmin.companyBudget")}</TableHead>
-              <TableHead>{t("assistantAdmin.thisMonth")}</TableHead>
+              <TableHead>{t("assistantAdmin.companyPrice")}</TableHead>
+              <TableHead>{t("assistantAdmin.companyMargin")}</TableHead>
+              <TableHead>{t("assistantAdmin.thisPeriod")}</TableHead>
+              <TableHead>{t("assistantAdmin.profit")}</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -243,23 +308,28 @@ function CompaniesCard() {
 function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSettings }) {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const [access, setAccess] = useState<string>(row.enabled == null ? "default" : row.enabled ? "on" : "off");
-  const [budget, setBudget] = useState(row.monthly_budget_usd == null ? "" : String(row.monthly_budget_usd));
+  const savedAccess = row.enabled == null ? "default" : row.enabled ? "on" : "off";
+  const [access, setAccess] = useState<string>(savedAccess);
+  const [price, setPrice] = useState(text(row.plan_price_usd));
+  const [margin, setMargin] = useState(text(row.margin_pct));
 
   useEffect(() => {
-    setAccess(row.enabled == null ? "default" : row.enabled ? "on" : "off");
-    setBudget(row.monthly_budget_usd == null ? "" : String(row.monthly_budget_usd));
-  }, [row.enabled, row.monthly_budget_usd]);
+    setAccess(savedAccess);
+    setPrice(text(row.plan_price_usd));
+    setMargin(text(row.margin_pct));
+  }, [savedAccess, row.plan_price_usd, row.margin_pct]);
 
-  const dirty =
-    access !== (row.enabled == null ? "default" : row.enabled ? "on" : "off") ||
-    budget !== (row.monthly_budget_usd == null ? "" : String(row.monthly_budget_usd));
+  const dirty = access !== savedAccess || price !== text(row.plan_price_usd) || margin !== text(row.margin_pct);
 
   const save = useMutation({
     mutationFn: () =>
       apiRequest(`/super-admin/accounts/${row.account_uuid}/assistant`, {
         method: "PUT",
-        body: { enabled: access === "default" ? null : access === "on", monthly_budget_usd: numOrNull(budget) },
+        body: {
+          enabled: access === "default" ? null : access === "on",
+          plan_price_usd: numOrNull(price),
+          margin_pct: numOrNull(margin),
+        },
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ACCOUNTS_URL] });
@@ -270,8 +340,9 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
   });
 
   const defaultState = platform?.enabled_by_default ? t("assistantAdmin.on") : t("assistantAdmin.off");
-  const defaultBudget =
-    platform?.monthly_budget_usd == null ? t("assistantAdmin.noCap") : `$${usd(platform.monthly_budget_usd)}`;
+  const defaultPrice =
+    platform?.plan_price_usd == null ? t("assistantAdmin.noCap") : `$${usd(platform.plan_price_usd)}`;
+  const defaultMargin = platform == null ? "" : `${platform.margin_pct}%`;
 
   return (
     <TableRow>
@@ -301,13 +372,47 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
           type="number"
           min={0}
           step="0.01"
-          value={budget}
-          placeholder={t("assistantAdmin.companyBudgetPlaceholder", { value: defaultBudget })}
-          onChange={(e) => setBudget(e.target.value)}
+          value={price}
+          placeholder={t("assistantAdmin.companyDefaultPlaceholder", { value: defaultPrice })}
+          onChange={(e) => setPrice(e.target.value)}
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          className="w-32"
+          type="number"
+          min={0}
+          max={99}
+          step="1"
+          value={margin}
+          placeholder={t("assistantAdmin.companyDefaultPlaceholder", { value: defaultMargin })}
+          onChange={(e) => setMargin(e.target.value)}
         />
       </TableCell>
       <TableCell className="whitespace-nowrap text-sm text-gray-600">
-        {t("assistantAdmin.spend", { spend: usd(row.month_spend_usd), count: String(row.month_questions) })}
+        <div>
+          {row.used_pct == null
+            ? t("assistantAdmin.uncapped")
+            : t("assistantAdmin.usedPct", { pct: String(row.used_pct) })}
+          {" · "}
+          {t("assistantAdmin.spend", {
+            spend: usd(row.period_cost_usd),
+            count: String(row.period_questions),
+          })}
+        </div>
+        <div className="text-xs text-gray-500">
+          {t("assistantAdmin.period", { start: shortDate(row.period_start), end: shortDate(row.period_end) })}
+        </div>
+      </TableCell>
+      <TableCell className="whitespace-nowrap text-sm">
+        {row.profit_usd == null ? (
+          "—"
+        ) : (
+          <span className={row.profit_usd < 0 ? "text-red-600" : "text-gray-700"}>
+            ${usd(row.profit_usd)}
+            <span className="text-gray-500"> / ${usd(row.revenue_usd)}</span>
+          </span>
+        )}
       </TableCell>
       <TableCell>
         <Button size="sm" variant="outline" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>

@@ -14,6 +14,7 @@ WORKDIR /app
 COPY assistant/requirements.txt assistant/requirements.txt
 RUN pip install --no-cache-dir -r assistant/requirements.txt
 
+COPY billing_cycle.py billing_cycle.py
 COPY assistant assistant
 # local chat history and eval output never ship in the image (the legacy
 # builder ignores Dockerfile.dockerignore, so don't rely on it alone)

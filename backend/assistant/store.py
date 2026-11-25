@@ -15,10 +15,12 @@ import json
 import time
 import uuid as uuidlib
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
+
+from billing_cycle import billing_anchor_of
 
 from . import db
 
@@ -48,12 +50,6 @@ def _naive(ts: float) -> datetime:
 def _json_safe(v):
     """JSON columns reject what json.dumps(default=str) absorbs (dates, decimals)."""
     return json.loads(json.dumps(v, ensure_ascii=False, default=str))
-
-
-def month_start(now: datetime | None = None) -> datetime:
-    """Budgets run per calendar month, UTC."""
-    now = now or _now()
-    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 def hour_ago(now: datetime | None = None) -> datetime:
@@ -165,9 +161,31 @@ class Store:
             return {}
         t = db.account_setting
         with self.engine.connect() as c:
-            r = c.execute(select(t.c.enabled, t.c.monthly_budget_usd)
+            r = c.execute(select(t.c.enabled, t.c.plan_price_usd, t.c.margin_pct)
                           .where(t.c.account_uuid == account_uuid)).mappings().first()
         return dict(r) if r else {}
+
+    def account_anchor(self, account_uuid: str | None) -> date | None:
+        """The day the company's billing grid starts, or None for an unknown company."""
+        if not account_uuid:
+            return None
+        t = db.account
+        with self.engine.connect() as c:
+            r = c.execute(select(t.c.verified_at, t.c.created_at)
+                          .where(t.c.uuid == account_uuid)).first()
+        return billing_anchor_of(r.verified_at, r.created_at) if r else None
+
+
+# What a user may see about an answer. Its cost is not among them: users see how
+# much of the plan's allowance is used, never what the model cost.
+USER_META_KEYS = ("seconds", "model_calls", "tool_calls", "stop_reason")
+
+
+def for_user(items: list) -> list:
+    """A stored transcript as its user may see it."""
+    return [{**it, "meta": {k: v for k, v in it["meta"].items() if k in USER_META_KEYS}}
+            if it.get("kind") == "assistant" and it.get("meta") else it
+            for it in items]
 
 
 class Transcript:
@@ -213,7 +231,7 @@ class Transcript:
         elif t == "done":
             b = self._bubble()
             b["text"] = e.get("text") or b["text"]
-            b["meta"] = {k: e.get(k) for k in ("cost_usd", "seconds", "model_calls", "tool_calls", "stop_reason")}
+            b["meta"] = {k: e.get(k) for k in USER_META_KEYS}
         elif t == "error":
             self.items.append({"kind": "error", "text": e.get("message", "Error")})
 

@@ -19,14 +19,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { AssistantChart, ConfirmCard, RichText } from '@/components/assistant/AssistantContent';
 import {
   AssistantError, answerConfirmation, clearConversation, getConversation, sendMessage,
-  type ChartSpec, type ConfirmEvent, type StoredItem,
+  type Allowance, type ChartSpec, type ConfirmEvent, type StoredItem,
 } from '@/utils/assistant';
 import { Listener, Speaker, voiceAvailable, type VoiceLang } from '@/utils/voice';
 
 type Item =
   | { id: number; kind: 'user'; text: string; voice?: boolean }
   | { id: number; kind: 'assistant'; text: string; status?: string; streaming: boolean; charts?: ChartSpec[];
-      meta?: { seconds?: number; tool_calls?: number; cost_usd?: number } | null }
+      meta?: { seconds?: number; tool_calls?: number } | null }
   | { id: number; kind: 'confirm'; event: Omit<ConfirmEvent, 'type'>; state: 'pending' | 'sending' | 'approved' | 'cancelled'; error?: string }
   | { id: number; kind: 'error'; text: string };
 
@@ -93,6 +93,7 @@ export default function AssistantScreen() {
   const [busy, setBusy] = useState(false);
   // why the user can't ask right now (switched off, budget, rate limit), if so
   const [blocked, setBlocked] = useState<string | null>(null);
+  const [allowance, setAllowance] = useState<Allowance | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -123,6 +124,7 @@ export default function AssistantScreen() {
     try {
       const c = await getConversation();
       setBlocked(c.access && !c.access.allowed ? c.access.reason : null);
+      setAllowance(c.access?.allowance ?? null);
       setItems(fromStored(c.items));
       setLoaded(true);
       if (c.busy) {
@@ -281,6 +283,9 @@ export default function AssistantScreen() {
             break;
           case 'done':
             patch(() => ({ text: e.text, streaming: false, status: undefined, meta: e }));
+            setAllowance(e.allowance);
+            // the answer that used the last of the allowance: show why before the next question
+            if (e.allowance && e.allowance.used_pct >= 100) void load();
             if (voice && voiceOnRef.current) speaker.flush();
             break;
           case 'error':
@@ -438,6 +443,8 @@ export default function AssistantScreen() {
             <Text style={{ flex: 1, color: '#475569', fontSize: 14 }}>{blocked}</Text>
           </View>
         ) : (
+          <>
+          {allowance && <AllowanceMeter allowance={allowance} />}
           <View style={[st.inputBar, { paddingBottom: 8 + insets.bottom }]}>
             <TouchableOpacity onPress={startVoice} style={st.micBtn} accessibilityLabel="Talk to the assistant" testID="assistant-mic">
               <MaterialIcons name="mic" size={22} color="#5469D4" />
@@ -449,13 +456,38 @@ export default function AssistantScreen() {
               {busy ? <ActivityIndicator color="#fff" size="small" /> : <MaterialIcons name="send" size={20} color="#fff" />}
             </TouchableOpacity>
           </View>
+          </>
         )}
       </KeyboardAvoidingView>
     </>
   );
 }
 
+const WARN_AT_PCT = 80;
+
+/** How much of the company's plan is used this period. Never shows a dollar amount. */
+function AllowanceMeter({ allowance }: { allowance: Allowance }) {
+  const pct = Math.min(100, Math.max(0, allowance.used_pct));
+  const warn = pct >= WARN_AT_PCT;
+  const resets = new Date(allowance.resets_on + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return (
+    <View style={st.meter} testID="assistant-allowance">
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <Text style={[st.meterText, warn && { color: '#b45309' }]}>{pct}% of this period's allowance used</Text>
+        <Text style={st.meterText}>Resets {resets}</Text>
+      </View>
+      <View style={st.meterTrack} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: pct }}>
+        <View style={[st.meterFill, { width: `${pct}%`, backgroundColor: warn ? '#f59e0b' : '#5469D4' }]} />
+      </View>
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
+  meter: { paddingHorizontal: 12, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#cbd5e1', backgroundColor: '#fff' },
+  meterText: { fontSize: 11, color: '#64748b' },
+  meterTrack: { height: 4, borderRadius: 2, backgroundColor: '#e2e8f0', marginTop: 4 },
+  meterFill: { height: 4, borderRadius: 2 },
   userBubble: { alignSelf: 'flex-end', maxWidth: '85%', backgroundColor: '#5469D4', borderRadius: 16, borderBottomRightRadius: 4, paddingHorizontal: 12, paddingVertical: 8 },
   error: { color: '#b91c1c', backgroundColor: '#fef2f2', borderRadius: 8, padding: 10, fontSize: 13 },
   suggestion: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 12, backgroundColor: '#fff' },

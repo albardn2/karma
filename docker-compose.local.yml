@@ -98,6 +98,7 @@ services:
     volumes:
       # source mounted so a restart picks up edits without a rebuild
       - ./backend/assistant:/app/assistant
+      - ./backend/billing_cycle.py:/app/billing_cycle.py
     ports:
       - "5077:5077"
     depends_on:

@@ -109,7 +109,11 @@ DEFAULT_MODEL_ID = "anthropic:claude-opus-5-5"
 PLATFORM_DEFAULTS = {
     "model_id": DEFAULT_MODEL_ID,
     "enabled_by_default": False,      # each company is switched on deliberately
-    "monthly_budget_usd": 50.0,       # per company, per calendar month (UTC); null = no cap
+    # per company, per billing period; null = no cap and nothing invoiced (see plan.py)
+    "plan_price_usd": 20.0,
+    "margin_pct": 20.0,               # the platform's share of the price; the rest buys model usage
+    # off: plans cap usage but are not added to invoices until an owner turns this on
+    "invoice_plans": False,
     "user_messages_per_hour": 60,     # per user; null = no cap
 }
 

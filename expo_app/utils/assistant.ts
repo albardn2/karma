@@ -48,10 +48,17 @@ export interface DoneEvent {
   type: 'done';
   text: string;
   stop_reason: string;
-  cost_usd: number;
+  allowance: Allowance | null;
   seconds: number;
   model_calls: number;
   tool_calls: number;
+}
+
+/** How much of the company's plan this billing period has used; null when uncapped. */
+export interface Allowance {
+  used_pct: number;
+  /** ISO date the allowance resets on */
+  resets_on: string;
 }
 
 export type AssistantEvent =
@@ -71,8 +78,8 @@ export type StoredItem =
 
 export interface ConversationState {
   model: { id: string; label: string };
-  /** off for the company, over its monthly budget, or the user's hourly limit */
-  access?: { allowed: boolean; code?: string; reason: string };
+  /** off for the company, its allowance used up, or the user's hourly limit */
+  access?: { allowed: boolean; code?: string; reason: string; allowance: Allowance | null };
   busy: boolean;
   items: StoredItem[];
 }
