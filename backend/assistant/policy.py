@@ -3,8 +3,8 @@
 Settings come from the super-admin console (stored by the API):
   - PlatformSetting 'assistant': {model_id, enabled_by_default, plan_price_usd,
     margin_pct, invoice_plans, user_messages_per_hour}
-  - assistant_account_setting:   per company {enabled, plan_price_usd, margin_pct};
-    NULL = the platform default
+  - assistant_account_setting:   per company {enabled, plan_price_usd, margin_pct,
+    user_messages_per_hour}; NULL = the platform default
 
 A company's allowance is its plan's model-cost cap (plan.py), counted over its
 current billing period, so it resets on the day the company is invoiced.
@@ -101,7 +101,7 @@ class Policy:
             return Access(False, 429, "Your company has used all of this period's assistant allowance. "
                                       f"It resets on {resets_on.day} {resets_on:%B %Y}.",
                           code="budget", used_pct=used_pct, resets_on=resets_on)
-        limit = self.platform().get("user_messages_per_hour")
+        limit = company.user_messages_per_hour
         if limit and self.store.user_messages_since(me["uuid"], hour_ago()) >= int(limit):
             return Access(False, 429, f"You've asked {limit} questions in the last hour, the most allowed. "
                                       "Try again a little later.", code="rate", used_pct=used_pct,

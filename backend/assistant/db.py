@@ -89,6 +89,7 @@ account_setting = Table(
     Column("enabled", Boolean, nullable=True),
     Column("plan_price_usd", Float, nullable=True),
     Column("margin_pct", Float, nullable=True),
+    Column("user_messages_per_hour", Integer, nullable=True),
     Column("updated_at", DateTime, nullable=False),
 )
 

@@ -40,9 +40,11 @@ interface AccountRow {
   enabled: boolean | null;
   plan_price_usd: number | null;
   margin_pct: number | null;
+  user_messages_per_hour: number | null;
   effective_enabled: boolean;
   effective_plan_price_usd: number | null;
   effective_margin_pct: number;
+  effective_user_messages_per_hour: number | null;
   cost_cap_usd: number | null;
   period_start: string;
   period_end: string;
@@ -75,8 +77,14 @@ interface ActionRow {
   error: string | null;
 }
 
-const usd = (n: number | null | undefined) => (n == null ? "" : `${n < 1 && n > 0 ? n.toFixed(4) : n.toFixed(2)}`);
+const usd = (n: number | null | undefined) => {
+  if (n == null) return "";
+  const abs = Math.abs(n);
+  return `${n < 0 ? "-" : ""}${abs < 1 && abs > 0 ? abs.toFixed(4) : abs.toFixed(2)}`;
+};
 const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
+/** A signed dollar amount: -$0.07, not $-0.07. */
+const money = (n: number | null | undefined) => (n == null ? "" : `${n < 0 ? "-" : ""}$${usd(Math.abs(n))}`);
 const pct = (n: number | null | undefined) => (n == null ? "—" : `${n}%`);
 const text = (n: number | null | undefined) => (n == null ? "" : String(n));
 const shortDate = (iso: string) =>
@@ -280,12 +288,13 @@ function CompaniesCard() {
           {t("assistantAdmin.companiesDesc", {
             revenue: usd(data?.totals.revenue_usd ?? 0),
             cost: usd(data?.totals.cost_usd ?? 0),
-            profit: usd(data?.totals.profit_usd ?? 0),
+            profit: money(data?.totals.profit_usd ?? 0),
             pct: pct(data?.totals.profit_pct),
           })}
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <p className="mb-3 text-sm text-gray-500">{t("assistantAdmin.overrideHint")}</p>
         <Table>
           <TableHeader>
             <TableRow>
@@ -293,6 +302,7 @@ function CompaniesCard() {
               <TableHead>{t("assistantAdmin.access")}</TableHead>
               <TableHead>{t("assistantAdmin.companyPrice")}</TableHead>
               <TableHead>{t("assistantAdmin.companyMargin")}</TableHead>
+              <TableHead>{t("assistantAdmin.companyRate")}</TableHead>
               <TableHead>{t("assistantAdmin.thisPeriod")}</TableHead>
               <TableHead>{t("assistantAdmin.profit")}</TableHead>
               <TableHead />
@@ -316,14 +326,20 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
   const [access, setAccess] = useState<string>(savedAccess);
   const [price, setPrice] = useState(text(row.plan_price_usd));
   const [margin, setMargin] = useState(text(row.margin_pct));
+  const [rate, setRate] = useState(text(row.user_messages_per_hour));
 
   useEffect(() => {
     setAccess(savedAccess);
     setPrice(text(row.plan_price_usd));
     setMargin(text(row.margin_pct));
-  }, [savedAccess, row.plan_price_usd, row.margin_pct]);
+    setRate(text(row.user_messages_per_hour));
+  }, [savedAccess, row.plan_price_usd, row.margin_pct, row.user_messages_per_hour]);
 
-  const dirty = access !== savedAccess || price !== text(row.plan_price_usd) || margin !== text(row.margin_pct);
+  const dirty =
+    access !== savedAccess ||
+    price !== text(row.plan_price_usd) ||
+    margin !== text(row.margin_pct) ||
+    rate !== text(row.user_messages_per_hour);
 
   const save = useMutation({
     mutationFn: () =>
@@ -333,6 +349,7 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
           enabled: access === "default" ? null : access === "on",
           plan_price_usd: numOrNull(price),
           margin_pct: numOrNull(margin),
+          user_messages_per_hour: numOrNull(rate),
         },
       }),
     onSuccess: () => {
@@ -347,6 +364,8 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
   const defaultPrice =
     platform?.plan_price_usd == null ? t("assistantAdmin.noCap") : `$${usd(platform.plan_price_usd)}`;
   const defaultMargin = platform == null ? "" : `${platform.margin_pct}%`;
+  const defaultRate =
+    platform?.user_messages_per_hour == null ? t("assistantAdmin.noLimit") : String(platform.user_messages_per_hour);
 
   return (
     <TableRow>
@@ -360,7 +379,7 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
       </TableCell>
       <TableCell>
         <Select value={access} onValueChange={setAccess}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-36">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -372,25 +391,36 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
       </TableCell>
       <TableCell>
         <Input
-          className="w-36"
+          className="w-24"
           type="number"
           min={0}
           step="0.01"
           value={price}
-          placeholder={t("assistantAdmin.companyDefaultPlaceholder", { value: defaultPrice })}
+          placeholder={defaultPrice}
           onChange={(e) => setPrice(e.target.value)}
         />
       </TableCell>
       <TableCell>
         <Input
-          className="w-32"
+          className="w-20"
           type="number"
           min={0}
           max={99}
           step="1"
           value={margin}
-          placeholder={t("assistantAdmin.companyDefaultPlaceholder", { value: defaultMargin })}
+          placeholder={defaultMargin}
           onChange={(e) => setMargin(e.target.value)}
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          className="w-20"
+          type="number"
+          min={1}
+          step="1"
+          value={rate}
+          placeholder={defaultRate}
+          onChange={(e) => setRate(e.target.value)}
         />
       </TableCell>
       <TableCell className="whitespace-nowrap text-sm text-gray-600">
@@ -413,7 +443,7 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
           "—"
         ) : (
           <span className={row.profit_usd < 0 ? "text-red-600" : "text-gray-700"}>
-            ${usd(row.profit_usd)} ({pct(row.profit_pct)})
+            {money(row.profit_usd)} ({pct(row.profit_pct)})
             <span className="text-gray-500"> / ${usd(row.revenue_usd)}</span>
           </span>
         )}

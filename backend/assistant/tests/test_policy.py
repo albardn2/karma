@@ -167,6 +167,15 @@ def test_hourly_rate_limit_per_user(store):
     assert Policy(store).check(USERS["tok-b"]).allowed               # someone else isn't affected
 
 
+def test_a_company_limit_overrides_the_platform_questions_per_hour(store):
+    set_platform(store, {"enabled_by_default": True, "user_messages_per_hour": 100, "plan_price_usd": None})
+    set_account(store, "acct-1", user_messages_per_hour=1)
+    spend(store, USERS["tok-a"], 0.0)
+    assert not Policy(store).check(USERS["tok-a"]).allowed, "acct-1 allows 1 question an hour"
+    spend(store, USERS["tok-s-imp"], 0.0)
+    assert Policy(store).check(USERS["tok-s-imp"]).allowed, "acct-9 follows the platform's 100"
+
+
 # ------------------------------------------------------------------ model
 
 def test_model_comes_from_the_platform_setting_and_falls_back(store, monkeypatch):

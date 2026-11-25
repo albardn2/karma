@@ -42,6 +42,7 @@ def plan_for(platform: dict, own: Optional[AssistantAccountSetting]) -> CompanyP
         "enabled": own.enabled,
         "plan_price_usd": own.plan_price_usd,
         "margin_pct": own.margin_pct,
+        "user_messages_per_hour": own.user_messages_per_hour,
     })
 
 

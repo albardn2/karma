@@ -59,6 +59,7 @@ class AccountAssistantSettings(BaseModel):
     enabled: Optional[bool] = None
     plan_price_usd: Optional[float] = Field(default=None, ge=0)
     margin_pct: Optional[float] = Field(default=None, ge=0, lt=100)
+    user_messages_per_hour: Optional[int] = Field(default=None, ge=1)
 
 
 def _settings_response(uow) -> dict:
@@ -122,9 +123,11 @@ def _account_row(uow, platform: dict, account: AccountModel, own: Optional[Assis
         "enabled": own.enabled if own else None,
         "plan_price_usd": own.plan_price_usd if own else None,
         "margin_pct": own.margin_pct if own else None,
+        "user_messages_per_hour": own.user_messages_per_hour if own else None,
         "effective_enabled": company.enabled,
         "effective_plan_price_usd": plan.price_usd,
         "effective_margin_pct": plan.margin_pct,
+        "effective_user_messages_per_hour": company.user_messages_per_hour,
         "cost_cap_usd": _round(plan.cost_cap_usd),
         "period_start": period_start.isoformat(),
         "period_end": period_end.isoformat(),
@@ -183,6 +186,7 @@ def set_account_assistant(account_uuid):
         row.enabled = payload.enabled
         row.plan_price_usd = payload.plan_price_usd
         row.margin_pct = payload.margin_pct
+        row.user_messages_per_hour = payload.user_messages_per_hour
         row.updated_at = datetime.utcnow()
         uow.session.flush()
         result = _account_rows(uow, [account_uuid])[0]

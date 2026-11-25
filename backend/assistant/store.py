@@ -161,7 +161,7 @@ class Store:
             return {}
         t = db.account_setting
         with self.engine.connect() as c:
-            r = c.execute(select(t.c.enabled, t.c.plan_price_usd, t.c.margin_pct)
+            r = c.execute(select(t.c.enabled, t.c.plan_price_usd, t.c.margin_pct, t.c.user_messages_per_hour)
                           .where(t.c.account_uuid == account_uuid)).mappings().first()
         return dict(r) if r else {}
 

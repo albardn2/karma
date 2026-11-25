@@ -6,7 +6,7 @@ import pytest
 from assistant.plan import Plan, company_plan, merge_platform
 from assistant.registry import PLATFORM_DEFAULTS
 
-PLATFORM = {"enabled_by_default": False, "plan_price_usd": 20.0, "margin_pct": 20.0}
+PLATFORM = {"enabled_by_default": False, "plan_price_usd": 20.0, "margin_pct": 20.0, "user_messages_per_hour": 60}
 
 
 @pytest.mark.parametrize("price, margin, cap", [
@@ -42,6 +42,11 @@ def test_a_company_follows_the_platform_where_it_has_no_value_of_its_own():
 def test_a_company_with_no_settings_gets_the_platform_plan():
     got = company_plan(PLATFORM, {})
     assert not got.enabled and got.plan == Plan(price_usd=20.0, margin_pct=20.0)
+    assert got.user_messages_per_hour == 60
+
+
+def test_a_company_can_override_the_questions_per_hour_limit():
+    assert company_plan(PLATFORM, {"user_messages_per_hour": 5}).user_messages_per_hour == 5
 
 
 def test_saved_platform_values_win_over_defaults_including_null():

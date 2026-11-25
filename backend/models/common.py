@@ -2821,4 +2821,5 @@ class AssistantAccountSetting(Base):
     enabled = Column(Boolean, nullable=True)
     plan_price_usd = Column(Float, nullable=True)   # per billing period
     margin_pct = Column(Float, nullable=True)       # 0 <= margin < 100
+    user_messages_per_hour = Column(Integer, nullable=True)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -1,4 +1,5 @@
-"""Assistant plans: a per-company price and margin replace the raw monthly budget.
+"""Assistant plans: a per-company price and margin replace the raw monthly budget,
+and a company may override the platform's questions-per-hour limit.
 
 Existing budgets carry over as a price with a 0% margin, so every company keeps
 exactly the model-cost cap it had. Plans are not invoiced until an owner turns
@@ -49,6 +50,8 @@ def _plan_to_budget(value: dict) -> dict:
 def upgrade():
     op.add_column("assistant_account_setting", sa.Column("plan_price_usd", sa.Float(), nullable=True))
     op.add_column("assistant_account_setting", sa.Column("margin_pct", sa.Float(), nullable=True))
+    op.add_column("assistant_account_setting",
+                  sa.Column("user_messages_per_hour", sa.Integer(), nullable=True))
     op.execute("UPDATE assistant_account_setting SET plan_price_usd = monthly_budget_usd, margin_pct = 0 "
                "WHERE monthly_budget_usd IS NOT NULL")
     op.drop_column("assistant_account_setting", "monthly_budget_usd")
@@ -60,6 +63,7 @@ def downgrade():
     op.execute("UPDATE assistant_account_setting "
                "SET monthly_budget_usd = plan_price_usd * (1 - COALESCE(margin_pct, 0) / 100) "
                "WHERE plan_price_usd IS NOT NULL")
+    op.drop_column("assistant_account_setting", "user_messages_per_hour")
     op.drop_column("assistant_account_setting", "margin_pct")
     op.drop_column("assistant_account_setting", "plan_price_usd")
     _rewrite_platform(_plan_to_budget)

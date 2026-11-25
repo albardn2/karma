@@ -49,6 +49,8 @@ class Plan:
 class CompanyPlan:
     enabled: bool
     plan: Plan
+    # per user; None = no limit
+    user_messages_per_hour: Optional[int]
 
 
 def merge_platform(saved: dict) -> dict:
@@ -60,15 +62,17 @@ def merge_platform(saved: dict) -> dict:
 
 
 def company_plan(platform: dict, own: dict) -> CompanyPlan:
-    """A company's effective plan. `own` holds its saved `enabled`,
-    `plan_price_usd` and `margin_pct`; a null one follows the platform."""
+    """A company's effective plan. `own` holds its saved `enabled`, `plan_price_usd`,
+    `margin_pct` and `user_messages_per_hour`; a null one follows the platform."""
     enabled = own.get("enabled")
     price = own.get("plan_price_usd")
     margin = own.get("margin_pct")
+    rate = own.get("user_messages_per_hour")
     return CompanyPlan(
         enabled=platform["enabled_by_default"] if enabled is None else bool(enabled),
         plan=Plan(
             price_usd=platform["plan_price_usd"] if price is None else float(price),
             margin_pct=float(platform["margin_pct"] if margin is None else margin),
         ),
+        user_messages_per_hour=platform["user_messages_per_hour"] if rate is None else int(rate),
     )

@@ -28,8 +28,8 @@ def settings(monkeypatch):
     """Platform and company settings the test can change; invoicing on, company on."""
     state = {
         "platform": {"enabled_by_default": False, "plan_price_usd": PLAN_PRICE, "margin_pct": 20.0,
-                     "invoice_plans": True},
-        "own": SimpleNamespace(enabled=True, plan_price_usd=None, margin_pct=None),
+                     "invoice_plans": True, "user_messages_per_hour": 60},
+        "own": SimpleNamespace(enabled=True, plan_price_usd=None, margin_pct=None, user_messages_per_hour=None),
         "rate": USD_SYP,
     }
     monkeypatch.setattr(assistant_plan, "platform_settings", lambda uow: dict(state["platform"]))
@@ -53,7 +53,7 @@ def test_a_syp_subscription_gets_the_plan_converted_at_the_company_rate(settings
 
 @pytest.mark.parametrize("change", [
     pytest.param(lambda s: s["platform"].update(invoice_plans=False), id="invoicing-off"),
-    pytest.param(lambda s: s.update(own=SimpleNamespace(enabled=False, plan_price_usd=None, margin_pct=None)),
+    pytest.param(lambda s: s.update(own=SimpleNamespace(enabled=False, plan_price_usd=None, margin_pct=None, user_messages_per_hour=None)),
                  id="assistant-off-for-company"),
     pytest.param(lambda s: s["platform"].update(plan_price_usd=None), id="no-price"),
     pytest.param(lambda s: s.update(own=None), id="no-company-settings-and-off-by-default"),
@@ -65,7 +65,7 @@ def test_nothing_is_added_when_there_is_no_plan_to_invoice(settings, change):
 
 
 def test_a_company_price_overrides_the_platform_price(settings):
-    settings["own"] = SimpleNamespace(enabled=True, plan_price_usd=50.0, margin_pct=None)
+    settings["own"] = SimpleNamespace(enabled=True, plan_price_usd=50.0, margin_pct=None, user_messages_per_hour=None)
     charge = billing.period_charge(UNUSED_UOW, _account("USD"), PERIOD_START)
     assert charge.amount == pytest.approx(-(SUBSCRIPTION + 50.0))
 
