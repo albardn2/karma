@@ -63,9 +63,16 @@ def billing_anchor_of(verified_at: Optional[datetime], created_at: datetime) -> 
     return (verified_at or created_at).date()
 
 
-def recent_periods(anchor: date, today: date, count: int) -> list[tuple[date, date]]:
-    """Up to `count` periods ending with the current one, oldest first, never before the anchor."""
-    start, _ = current_period(anchor, today)
-    current = (start.year - anchor.year) * 12 + start.month - anchor.month
-    first = max(0, current - count + 1)
-    return [(add_months(anchor, n), add_months(anchor, n + 1)) for n in range(first, current + 1)]
+def damascus_date(utc: datetime) -> date:
+    """The Damascus business day of a naive UTC timestamp, as the tables store them."""
+    return (utc + timedelta(hours=DAMASCUS_OFFSET_HOURS)).date()
+
+
+def periods_since(anchor: date, since: date, today: date) -> list[tuple[date, date]]:
+    """Every period from the one containing `since` (never before the anchor) to the
+    current one, oldest first."""
+    first, _ = current_period(anchor, max(since, anchor))
+    last, _ = current_period(anchor, today)
+    first_n = (first.year - anchor.year) * 12 + first.month - anchor.month
+    last_n = (last.year - anchor.year) * 12 + last.month - anchor.month
+    return [(add_months(anchor, n), add_months(anchor, n + 1)) for n in range(first_n, last_n + 1)]

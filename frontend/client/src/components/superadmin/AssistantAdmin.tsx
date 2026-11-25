@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Save } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 const SETTINGS_URL = "/super-admin/settings/assistant";
 const ACCOUNTS_URL = "/super-admin/assistant/accounts";
 const ACTIONS_URL = "/super-admin/assistant/actions?per_page=50";
-const HISTORY_URL = "/super-admin/assistant/history?months=12";
+const HISTORY_URL = "/super-admin/assistant/history";
+const HISTORY_PER_PAGE = 12;
+const companyHistoryUrl = (accountUuid: string) => `/super-admin/accounts/${accountUuid}/assistant/history`;
 
 interface PlatformSettings {
   model_id: string;
@@ -91,9 +93,11 @@ interface PlatformMonth {
   estimated: boolean;
 }
 
-interface History {
-  companies: { account_uuid: string; company_name: string; months: BillingMonth[] }[];
-  platform: PlatformMonth[];
+interface HistoryPage<T> {
+  months: T[];
+  total_count: number;
+  page: number;
+  per_page: number;
 }
 
 interface ActionRow {
@@ -182,7 +186,7 @@ function PlatformCard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [SETTINGS_URL] });
       queryClient.invalidateQueries({ queryKey: [ACCOUNTS_URL] });
-      queryClient.invalidateQueries({ queryKey: [HISTORY_URL] });
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes("/assistant/history") });
       toast({ title: t("common.success"), description: t("assistantAdmin.saved") });
     },
     onError: (e: any) =>
@@ -393,7 +397,7 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ACCOUNTS_URL] });
-      queryClient.invalidateQueries({ queryKey: [HISTORY_URL] });
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes("/assistant/history") });
       toast({ title: t("common.success"), description: t("assistantAdmin.companySaved", { company: row.company_name }) });
     },
     onError: (e: any) =>
@@ -500,8 +504,29 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
 const monthLabel = (ym: string) =>
   new Date(ym + "-01T00:00:00").toLocaleDateString(undefined, { month: "short", year: "numeric" });
 
-function useHistory() {
-  return useQuery<History>({ queryKey: [HISTORY_URL], queryFn: () => apiRequest(HISTORY_URL) });
+function useHistoryPage<T>(url: string, page: number, enabled = true) {
+  const pageUrl = `${url}?page=${page}&per_page=${HISTORY_PER_PAGE}`;
+  return useQuery<HistoryPage<T>>({ queryKey: [pageUrl], queryFn: () => apiRequest(pageUrl), enabled });
+}
+
+/** Newer / older page buttons; page 1 is the most recent. */
+function PageControls({ page, total, onPage }: { page: number; total: number; onPage: (p: number) => void }) {
+  const { t } = useLanguage();
+  const pages = Math.max(1, Math.ceil(total / HISTORY_PER_PAGE));
+  if (pages <= 1) return null;
+  return (
+    <div className="mt-3 flex items-center justify-end gap-2 text-sm text-gray-600">
+      <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        <ChevronLeft className="h-4 w-4 me-1" />
+        {t("assistantAdmin.newer")}
+      </Button>
+      <span>{t("assistantAdmin.pageOf", { page: String(page), pages: String(pages) })}</span>
+      <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => onPage(page + 1)}>
+        {t("assistantAdmin.older")}
+        <ChevronRight className="h-4 w-4 ms-1" />
+      </Button>
+    </div>
+  );
 }
 
 /** Profit in $ and %, or a dash for a month that earned nothing. */
@@ -517,8 +542,9 @@ function ProfitCell({ profit, pctValue }: { profit: number | null; pctValue: num
 /** All companies together, by the calendar month each billing month begins in. */
 function MonthlyCard() {
   const { t } = useLanguage();
-  const { data } = useHistory();
-  const months = (data?.platform ?? []).filter((m) => m.questions > 0 || m.budget_usd > 0).reverse();
+  const [page, setPage] = useState(1);
+  const { data } = useHistoryPage<PlatformMonth>(HISTORY_URL, page);
+  const months = data?.months ?? [];
 
   return (
     <Card>
@@ -560,6 +586,7 @@ function MonthlyCard() {
             </TableBody>
           </Table>
         )}
+        <PageControls page={page} total={data?.total_count ?? 0} onPage={setPage} />
         {months.some((m) => m.estimated) && (
           <p className="mt-3 text-xs text-gray-500">{t("assistantAdmin.estimatedNote")}</p>
         )}
@@ -572,8 +599,10 @@ function MonthlyCard() {
 function CompanyHistory({ accountUuid, companyName }: { accountUuid: string; companyName: string }) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
-  const { data } = useHistory();
-  const months = [...(data?.companies.find((c) => c.account_uuid === accountUuid)?.months ?? [])].reverse();
+  const [page, setPage] = useState(1);
+  // loaded only once the dialog opens: a page per company row would be wasted otherwise
+  const { data } = useHistoryPage<BillingMonth>(companyHistoryUrl(accountUuid), page, open);
+  const months = data?.months ?? [];
 
   return (
     <>
@@ -630,6 +659,7 @@ function CompanyHistory({ accountUuid, companyName }: { accountUuid: string; com
               ))}
             </TableBody>
           </Table>
+          <PageControls page={page} total={data?.total_count ?? 0} onPage={setPage} />
           {months.some((m) => m.estimated) && (
             <p className="text-xs text-gray-500">{t("assistantAdmin.estimatedNote")}</p>
           )}

@@ -1,5 +1,8 @@
 """Each company's assistant cost and profit, billing month by billing month.
 
+History starts at the assistant's first use or first recorded plan, whichever is
+earlier, and is served a page at a time, newest first.
+
 A month is priced with the plan in effect on its first day, which is also what an
 invoice for it charges. Plan changes are kept in `assistant_plan_change`; a month
 that began before the history did is priced with the oldest recorded plan, counts
@@ -13,10 +16,11 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from typing import Optional
 
+from sqlalchemy import func
+
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from assistant.plan import CompanyPlan, company_plan
-from billing_cycle import day_start_utc, recent_periods
-from models.common import Account as AccountModel
+from billing_cycle import damascus_date, day_start_utc, periods_since
 from models.common import AssistantPlanChange, AssistantUsage
 
 PLAN_FIELDS = ("enabled", "plan_price_usd", "margin_pct")
@@ -148,37 +152,15 @@ def billing_month(period: tuple[date, date], usage: MonthUsage, plan: CompanyPla
 
 
 def _usage_by_account(uow: SqlAlchemyUnitOfWork, account_uuids: list[str],
-                      since: date) -> dict[str, list[tuple[datetime, float]]]:
+                      since: date, until: date) -> dict[str, list[tuple[datetime, float]]]:
     rows = (uow.session.query(AssistantUsage.account_uuid, AssistantUsage.created_at, AssistantUsage.cost_usd)
             .filter(AssistantUsage.account_uuid.in_(account_uuids),
-                    AssistantUsage.created_at >= day_start_utc(since))
+                    AssistantUsage.created_at >= day_start_utc(since),
+                    AssistantUsage.created_at < day_start_utc(until))
             .all())
     out: dict[str, list[tuple[datetime, float]]] = defaultdict(list)
     for account_uuid, created_at, cost in rows:
         out[account_uuid].append((created_at, float(cost or 0.0)))
-    return out
-
-
-def company_months(uow: SqlAlchemyUnitOfWork, platform_now: dict, accounts: list[AccountModel],
-                   anchors: dict[str, date], today: date, count: int) -> dict[str, list[BillingMonth]]:
-    """The last `count` billing months of every company, oldest first."""
-    if not accounts:
-        return {}
-    changes = load_changes(uow)
-    started = history_start(changes)
-    periods = {a.uuid: recent_periods(anchors[a.uuid], today, count) for a in accounts}
-    since = min(p[0][0] for p in periods.values())
-    usage = _usage_by_account(uow, [a.uuid for a in accounts], since)
-    out = {}
-    for account in accounts:
-        account_periods = periods[account.uuid]
-        buckets = bucket_usage(usage.get(account.uuid, []), account_periods)
-        months = []
-        for period, month_usage in zip(account_periods, buckets):
-            begins = day_start_utc(period[0])
-            months.append(billing_month(period, month_usage, plan_at(platform_now, changes, account.uuid, begins),
-                                        today, estimated=started is None or begins < started))
-        out[account.uuid] = months
     return out
 
 
@@ -202,3 +184,90 @@ def platform_months(months_by_company: dict[str, list[BillingMonth]]) -> list[di
         out.append({**t, "cost_usd": round(t["cost_usd"], 4), "budget_usd": round(t["budget_usd"], 2),
                     "profit_usd": round(profit, 4), "profit_pct": profit_pct(t["budget_usd"], profit)})
     return out
+
+
+@dataclass(frozen=True)
+class Page:
+    items: list
+    total_count: int
+
+
+def activity_start(uow: SqlAlchemyUnitOfWork) -> Optional[date]:
+    """The first day the assistant was used or a plan was recorded: no month before it
+    has anything to show."""
+    first_use = uow.session.query(func.min(AssistantUsage.created_at)).scalar()
+    first_plan = uow.session.query(func.min(AssistantPlanChange.effective_at)).scalar()
+    firsts = [d for d in (first_use, first_plan) if d is not None]
+    return damascus_date(min(firsts)) if firsts else None
+
+
+def _page_slice(total: int, page: int, per_page: int) -> slice:
+    """Newest first: page 1 is the most recent `per_page` items of an oldest-first list."""
+    end = total - (page - 1) * per_page
+    return slice(max(0, end - per_page), max(0, end))
+
+
+def _months_for(uow: SqlAlchemyUnitOfWork, platform_now: dict, periods: dict[str, list[tuple[date, date]]],
+                today: date) -> dict[str, list[BillingMonth]]:
+    """Billing months for each company's given periods, oldest first."""
+    wanted = {uuid: p for uuid, p in periods.items() if p}
+    if not wanted:
+        return {}
+    changes = load_changes(uow)
+    started = history_start(changes)
+    since = min(p[0][0] for p in wanted.values())
+    until = max(p[-1][1] for p in wanted.values())
+    usage = _usage_by_account(uow, list(wanted), since, until)
+    out = {}
+    for account_uuid, account_periods in wanted.items():
+        months = []
+        for period, month_usage in zip(account_periods, bucket_usage(usage.get(account_uuid, []), account_periods)):
+            begins = day_start_utc(period[0])
+            months.append(billing_month(period, month_usage, plan_at(platform_now, changes, account_uuid, begins),
+                                        today, estimated=started is None or begins < started))
+        out[account_uuid] = months
+    return out
+
+
+def company_page(uow: SqlAlchemyUnitOfWork, platform_now: dict, account_uuid: str, anchor: date, today: date,
+                 page: int, per_page: int) -> Page:
+    """One page of a company's billing months since the assistant started, newest first."""
+    start = activity_start(uow)
+    if start is None:
+        return Page(items=[], total_count=0)
+    periods = periods_since(anchor, start, today)
+    chosen = periods[_page_slice(len(periods), page, per_page)]
+    months = _months_for(uow, platform_now, {account_uuid: chosen}, today).get(account_uuid, [])
+    return Page(items=list(reversed(months)), total_count=len(periods))
+
+
+def _calendar_months(first: date, last: date) -> list[str]:
+    out, (y, m) = [], (first.year, first.month)
+    while (y, m) <= (last.year, last.month):
+        out.append(f"{y:04d}-{m:02d}")
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
+
+
+def platform_page(uow: SqlAlchemyUnitOfWork, platform_now: dict, anchors: dict[str, date], today: date,
+                  page: int, per_page: int) -> Page:
+    """One page of calendar months since the assistant started, newest first, each
+    totalling every company's billing month that begins in it."""
+    start = activity_start(uow)
+    if start is None or not anchors:
+        return Page(items=[], total_count=0)
+    all_periods = {uuid: periods_since(anchor, start, today) for uuid, anchor in anchors.items()}
+    # a billing month that began before the first activity still holds it
+    first = min(p[0][0] for p in all_periods.values())
+    keys = _calendar_months(first, today)
+    chosen = set(keys[_page_slice(len(keys), page, per_page)])
+    periods = {uuid: [p for p in account_periods if p[0].strftime("%Y-%m") in chosen]
+               for uuid, account_periods in all_periods.items()}
+    by_key = {row["month"]: row for row in platform_months(_months_for(uow, platform_now, periods, today))}
+    rows = [by_key.get(key) or empty_month(key) for key in sorted(chosen, reverse=True)]
+    return Page(items=rows, total_count=len(keys))
+
+
+def empty_month(key: str) -> dict:
+    return {"month": key, "questions": 0, "cost_usd": 0.0, "budget_usd": 0.0, "companies_at_cap": 0,
+            "estimated": False, "profit_usd": 0.0, "profit_pct": None}

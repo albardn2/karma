@@ -32,8 +32,8 @@ from models.common import (
 )
 
 SUPER = PermissionScope.SUPER_ADMIN.value
-HISTORY_MONTHS_DEFAULT = 12
-HISTORY_MONTHS_MAX = 36
+HISTORY_PER_PAGE_DEFAULT = 12
+HISTORY_PER_PAGE_MAX = 60
 
 
 def _models() -> list:
@@ -193,27 +193,39 @@ def set_account_assistant(account_uuid):
     return jsonify(result), 200
 
 
+def _page_args() -> tuple[int, int]:
+    page = max(int(request.args.get("page", 1)), 1)
+    per_page = min(max(int(request.args.get("per_page", HISTORY_PER_PAGE_DEFAULT)), 1), HISTORY_PER_PAGE_MAX)
+    return page, per_page
+
+
 @super_admin_blueprint.route("/assistant/history", methods=["GET"])
 @scopes_required(SUPER)
 def assistant_history():
-    """Each company's cost and profit for its last `months` billing months, and the
-    platform's totals by calendar month."""
-    months = min(max(int(request.args.get("months", HISTORY_MONTHS_DEFAULT)), 1), HISTORY_MONTHS_MAX)
+    """All companies' assistant cost and profit by calendar month, newest first, a page at a time."""
+    page, per_page = _page_args()
     with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
-        accounts = (uow.session.query(AccountModel).filter(AccountModel.is_deleted.is_(False))
-                    .order_by(AccountModel.company_name).all())
-        by_company = history.company_months(
-            uow, assistant_plan.platform_settings(uow), accounts,
-            {a.uuid: billing.billing_anchor(a) for a in accounts}, billing.damascus_today(), months)
-        result = {
-            "companies": [{
-                "account_uuid": a.uuid,
-                "company_name": a.company_name,
-                "months": [m.to_json() for m in by_company[a.uuid]],
-            } for a in accounts],
-            "platform": history.platform_months(by_company),
-        }
-    return jsonify(result), 200
+        accounts = uow.session.query(AccountModel).filter(AccountModel.is_deleted.is_(False)).all()
+        result = history.platform_page(uow, assistant_plan.platform_settings(uow),
+                                       {a.uuid: billing.billing_anchor(a) for a in accounts},
+                                       billing.damascus_today(), page, per_page)
+    return jsonify({"months": result.items, "total_count": result.total_count, "page": page,
+                    "per_page": per_page}), 200
+
+
+@super_admin_blueprint.route("/accounts/<string:account_uuid>/assistant/history", methods=["GET"])
+@scopes_required(SUPER)
+def account_assistant_history(account_uuid):
+    """One company's billing months, newest first, a page at a time."""
+    page, per_page = _page_args()
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        account = uow.account_repository.find_one(uuid=account_uuid, is_deleted=False)
+        if not account:
+            raise NotFoundError("Account not found")
+        result = history.company_page(uow, assistant_plan.platform_settings(uow), account.uuid,
+                                      billing.billing_anchor(account), billing.damascus_today(), page, per_page)
+    return jsonify({"months": [m.to_json() for m in result.items], "total_count": result.total_count,
+                    "page": page, "per_page": per_page}), 200
 
 
 @super_admin_blueprint.route("/assistant/actions", methods=["GET"])

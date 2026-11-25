@@ -4,6 +4,8 @@ from datetime import date, datetime
 import pytest
 
 from app.domains.assistant_plan.history import (
+    _calendar_months,
+    _page_slice,
     MonthUsage,
     PlanChange,
     billing_month,
@@ -12,7 +14,7 @@ from app.domains.assistant_plan.history import (
     platform_months,
 )
 from assistant.plan import CompanyPlan, Plan
-from billing_cycle import day_start_utc, recent_periods
+from billing_cycle import day_start_utc, periods_since
 
 ANCHOR = date(2026, 1, 19)
 TODAY = date(2026, 4, 2)
@@ -25,17 +27,33 @@ def change(when, enabled=None, price=None, margin=None):
     return PlanChange(effective_at=when, enabled=enabled, plan_price_usd=price, margin_pct=margin)
 
 
-def test_recent_periods_end_with_the_current_month_and_never_precede_the_anchor():
-    assert recent_periods(ANCHOR, TODAY, 12) == [
-        (date(2026, 1, 19), date(2026, 2, 19)),
+def test_periods_run_from_the_one_containing_since_to_the_current_one():
+    assert periods_since(ANCHOR, date(2026, 3, 1), TODAY) == [
         (date(2026, 2, 19), date(2026, 3, 19)),
         (date(2026, 3, 19), date(2026, 4, 19)),
     ]
-    assert recent_periods(ANCHOR, TODAY, 1) == [(date(2026, 3, 19), date(2026, 4, 19))]
+
+
+def test_periods_never_precede_the_anchor():
+    assert periods_since(ANCHOR, date(2025, 6, 1), TODAY)[0] == (date(2026, 1, 19), date(2026, 2, 19))
+
+
+@pytest.mark.parametrize("total, page, per_page, expected", [
+    (30, 1, 12, slice(18, 30)),      # newest twelve
+    (30, 3, 12, slice(0, 6)),        # the oldest six
+    (30, 4, 12, slice(0, 0)),        # past the end: empty
+    (5, 1, 12, slice(0, 5)),
+])
+def test_pages_count_back_from_the_newest(total, page, per_page, expected):
+    assert _page_slice(total, page, per_page) == expected
+
+
+def test_calendar_months_cross_the_year_boundary():
+    assert _calendar_months(date(2026, 11, 20), date(2027, 2, 3)) == ["2026-11", "2026-12", "2027-01", "2027-02"]
 
 
 def test_usage_lands_in_the_billing_month_it_happened_in():
-    periods = recent_periods(ANCHOR, TODAY, 3)
+    periods = periods_since(ANCHOR, ANCHOR, TODAY)
     rows = [
         (day_start_utc(date(2026, 2, 19)), 1.0),                    # first moment of month 2
         (datetime(2026, 2, 18, 20, 59), 0.5),                        # last minute of month 1 (Damascus)
