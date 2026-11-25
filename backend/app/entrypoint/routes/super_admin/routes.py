@@ -223,14 +223,6 @@ def create_ledger_entry(account_uuid: str):
         auto_note = None
         period_start = period_end = None
         if payload.entry_type == "charge":
-            # The amount arithmetic lives in the billing domain so that this route
-            # and the daily job cannot drift apart — a charge computed two slightly
-            # different ways is the kind of bug nobody notices until a customer
-            # disputes it. See app/domains/billing/domain.py.
-            try:
-                amount, auto_note = billing.charge_amount(uow, account, base=payload.amount)
-            except ValueError as exc:
-                raise BadRequestError(f"amount is required ({exc})")
             # A hand-raised charge still gets a coverage window, or the daily job
             # would not see it as covering anything and would bill the same month
             # again. Takes the account's earliest UNBILLED monthly period, which is
@@ -246,6 +238,14 @@ def create_ledger_entry(account_uuid: str):
                 covered = billing.existing_charge_windows(uow, account.uuid)
                 nxt = max((e for _, e in covered), default=today)
                 period_start, period_end = nxt, billing.add_months(nxt, 1)
+            # The amount arithmetic lives in the billing domain so that this route
+            # and the daily job cannot drift apart — a charge computed two slightly
+            # different ways is the kind of bug nobody notices until a customer
+            # disputes it. See app/domains/billing/domain.py.
+            try:
+                amount, auto_note = billing.period_charge(uow, account, period_start, base=payload.amount)
+            except ValueError as exc:
+                raise BadRequestError(f"amount is required ({exc})")
         elif payload.entry_type == "payment":
             amount = abs(payload.amount)
             if payload.settles_charge_uuid:

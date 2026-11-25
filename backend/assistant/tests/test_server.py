@@ -152,7 +152,7 @@ def test_history_survives_reload_and_service_restart(client):
     assert kinds == ["user", "assistant"]
     bubble = got["items"][1]
     assert bubble["text"].startswith("Answer to: first question") and bubble["charts"][0]["title"] == "T"
-    assert bubble["meta"]["cost_usd"] == 0.01
+    assert "cost_usd" not in bubble["meta"], "users never see what an answer cost"
 
     # the model's memory is restored too: the rebuilt conversation sees the earlier turn
     ask(client, "second question")

@@ -2761,7 +2761,7 @@ class AssistantConversation(Base):
 
 class AssistantUsage(Base):
     """One row per answered (or failed) question: what it cost and how long it
-    took. Drives the per-company monthly budget and the per-user rate limit."""
+    took. Drives the per-company plan allowance and the per-user rate limit."""
     __tablename__ = 'assistant_usage'
     __table_args__ = (
         Index('ix_assistant_usage_account_created', 'account_uuid', 'created_at'),
@@ -2812,11 +2812,33 @@ class AssistantAction(Base):
 
 
 class AssistantAccountSetting(Base):
-    """Per-company assistant switch and budget, set by a platform owner.
-    NULL means 'use the platform default' (PlatformSetting 'assistant')."""
+    """Per-company assistant switch and plan, set by a platform owner.
+    NULL means 'use the platform default' (PlatformSetting 'assistant').
+    See assistant/plan.py for what the price and margin mean."""
     __tablename__ = 'assistant_account_setting'
 
     account_uuid = Column(String(36), ForeignKey('account.uuid'), primary_key=True)
     enabled = Column(Boolean, nullable=True)
-    monthly_budget_usd = Column(Float, nullable=True)
+    plan_price_usd = Column(Float, nullable=True)   # per billing period
+    margin_pct = Column(Float, nullable=True)       # 0 <= margin < 100
+    user_messages_per_hour = Column(Integer, nullable=True)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AssistantPlanChange(Base):
+    """Append-only history of the assistant plan settings, so a past billing month
+    is priced with the plan in effect when it began. A NULL account_uuid records
+    the platform defaults; otherwise the row holds that company's own values
+    (NULL fields = follow the platform), exactly as saved."""
+    __tablename__ = 'assistant_plan_change'
+    __table_args__ = (
+        Index('ix_assistant_plan_change_account_effective', 'account_uuid', 'effective_at'),
+    )
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=True)
+    enabled = Column(Boolean, nullable=True)
+    plan_price_usd = Column(Float, nullable=True)
+    margin_pct = Column(Float, nullable=True)
+    effective_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)

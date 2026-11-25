@@ -18,50 +18,31 @@ previous boundary, so a subscription started on the 31st does not drift down to 
 """
 from __future__ import annotations
 
-import calendar
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 from typing import NamedTuple, Optional
 
 from sqlalchemy import func
 
+from billing_cycle import (  # noqa: F401  (DAMASCUS_OFFSET_HOURS, damascus_today: re-exported)
+    DAMASCUS_OFFSET_HOURS, add_months, billing_anchor_of, damascus_today,
+)
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
+from app.domains.assistant_plan import domain as assistant_plan
+from app.dto.common_enums import Currency
 from models.common import MONEY_TOLERANCE
 from models.common import Account as AccountModel
 from models.common import AccountLedgerEntry as LedgerModel
+from models.common import ExchangeRate as ExchangeRateModel
 from models.common import User as UserModel
 
 log = logging.getLogger("billing")
-
-# The business runs in Damascus (UTC+3) and the servers run UTC, so "today" has to
-# be pinned to the business day or a job firing in the evening bills for yesterday.
-# Same offset the trip-name default uses.
-DAMASCUS_OFFSET_HOURS = 3
 
 # A runaway guard, not a policy: the number of periods to raise in one sweep for one
 # account. Reached only if an account's creation date is implausibly far in the past
 # (a bad import, a clock problem), and the job logs loudly rather than silently
 # stopping. Ten years of monthly periods.
 MAX_PERIODS_PER_RUN = 120
-
-
-def damascus_today() -> date:
-    return (datetime.now(timezone.utc) + timedelta(hours=DAMASCUS_OFFSET_HOURS)).date()
-
-
-def add_months(anchor: date, months: int) -> date:
-    """`anchor` shifted by `months`, clamped to the end of the target month.
-
-    Always called with the ORIGINAL anchor and an absolute offset, never chained off
-    the previous result. That is what stops the drift: an account created on the
-    31st gets Jan 31 -> Feb 28 -> Mar 31 -> Apr 30, rather than collapsing to the
-    28th of every month once one February has clamped it.
-    """
-    total = anchor.month - 1 + months
-    year = anchor.year + total // 12
-    month = total % 12 + 1
-    day = min(anchor.day, calendar.monthrange(year, month)[1])
-    return date(year, month, day)
 
 
 def billing_anchor(account: AccountModel) -> date:
@@ -77,7 +58,7 @@ def billing_anchor(account: AccountModel) -> date:
     The fallback is also what keeps an account billable if the column is ever null
     for a reason nobody anticipated, rather than silently exempting it.
     """
-    return (account.verified_at or account.created_at).date()
+    return billing_anchor_of(account.verified_at, account.created_at)
 
 
 class ChargeAmount(NamedTuple):
@@ -116,6 +97,65 @@ def charge_amount(uow: SqlAlchemyUnitOfWork, account: AccountModel,
             base = account.subscription_rate * user_count
             note = f"{user_count} users x {account.subscription_rate}"
     return ChargeAmount(amount=-abs(base), note=note)
+
+
+def assistant_plan_charge(uow: SqlAlchemyUnitOfWork, account: AccountModel,
+                          period_start: date) -> Optional[ChargeAmount]:
+    """The assistant plan's part of a period's charge, in the subscription currency,
+    or None when there is nothing to invoice: invoicing is off, the assistant is off
+    for the company, or its plan has no price.
+
+    Priced in USD, like the model it pays for, and converted at the company's own
+    latest rate on or before the period's first day.
+    """
+    platform = assistant_plan.platform_settings(uow)
+    if not platform["invoice_plans"]:
+        return None
+    own = assistant_plan.own_settings(uow, [account.uuid]).get(account.uuid)
+    company = assistant_plan.plan_for(platform, own)
+    price = company.plan.price_usd
+    if not company.enabled or not price:
+        return None
+    currency = account.subscription_currency
+    if currency == Currency.USD.value:
+        return ChargeAmount(amount=-round(price, 2), note=f"assistant plan {price:.2f} USD")
+    rate = _usd_rate(uow, account.uuid, currency, period_start)
+    if rate is None:
+        raise ValueError(f"no USD->{currency} rate on or before {period_start} to invoice the assistant plan")
+    return ChargeAmount(amount=-round(price * rate, 2), note=f"assistant plan {price:.2f} USD at {rate:g}")
+
+
+def _usd_rate(uow: SqlAlchemyUnitOfWork, account_uuid: str, currency: str, on_or_before: date) -> Optional[float]:
+    row = (
+        uow.session.query(ExchangeRateModel.rate)
+        .filter(
+            ExchangeRateModel.account_uuid == account_uuid,
+            ExchangeRateModel.is_deleted.is_(False),
+            ExchangeRateModel.from_currency == Currency.USD.value,
+            ExchangeRateModel.to_currency == currency,
+            ExchangeRateModel.rate_date <= on_or_before,
+        )
+        .order_by(ExchangeRateModel.rate_date.desc())
+        .first()
+    )
+    return float(row[0]) if row else None
+
+
+def period_charge(uow: SqlAlchemyUnitOfWork, account: AccountModel, period_start: date,
+                  base: Optional[float] = None) -> ChargeAmount:
+    """Everything one period's charge covers: the subscription and the assistant plan.
+
+    An explicit `base` is a one-off amount an owner typed, and is charged as typed.
+    """
+    subscription = charge_amount(uow, account, base=base)
+    if base is not None:
+        return subscription
+    plan = assistant_plan_charge(uow, account, period_start)
+    if plan is None:
+        return subscription
+    subscription_note = subscription.note or f"subscription {abs(subscription.amount):.2f}"
+    return ChargeAmount(amount=subscription.amount + plan.amount,
+                        note=f"{subscription_note}; {plan.note}")
 
 
 def existing_charge_windows(uow: SqlAlchemyUnitOfWork,
@@ -182,7 +222,7 @@ def create_charge(uow: SqlAlchemyUnitOfWork, account: AccountModel,
     if not account.subscription_currency:
         raise ValueError("account has no subscription currency")
 
-    amount, auto_note = charge_amount(uow, account, base=base)
+    amount, auto_note = period_charge(uow, account, period_start, base=base)
     entry = LedgerModel(
         account_uuid=account.uuid,
         entry_type="charge",

@@ -64,12 +64,19 @@ export type AssistantEvent =
       type: "done";
       text: string;
       stop_reason: string;
-      cost_usd: number;
+      allowance: Allowance | null;
       seconds: number;
       model_calls: number;
       tool_calls: number;
     }
   | { type: "error"; message: string };
+
+/** How much of the company's plan this billing period has used; null when uncapped. */
+export interface Allowance {
+  used_pct: number;
+  /** ISO date the allowance resets on */
+  resets_on: string;
+}
 
 /** One saved chat-panel entry, exactly as the service stores it (backend/assistant/store.py). */
 export type StoredItem =
@@ -78,7 +85,7 @@ export type StoredItem =
       kind: "assistant";
       text: string;
       charts?: ChartSpec[];
-      meta?: { cost_usd: number; seconds: number; model_calls: number; tool_calls: number; stop_reason: string } | null;
+      meta?: { seconds: number; model_calls: number; tool_calls: number; stop_reason: string } | null;
     }
   | {
       kind: "confirm";
@@ -90,8 +97,8 @@ export type StoredItem =
 /** The signed-in user's saved conversation (one per user per company, kept until cleared). */
 export interface ConversationState {
   model: { id: string; label: string };
-  /** off for the company, over its monthly budget, or the user's hourly limit */
-  access?: { allowed: boolean; code?: string; reason: string };
+  /** off for the company, its allowance used up, or the user's hourly limit */
+  access?: { allowed: boolean; code?: string; reason: string; allowance: Allowance | null };
   busy: boolean;
   items: StoredItem[];
   updated_at: number | null;

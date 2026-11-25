@@ -1,6 +1,8 @@
-# Applies to assistant/Dockerfile only (its context is ./backend): send just the package.
+# Applies to assistant/Dockerfile only (its context is ./backend): send just the
+# package and the billing-period module it shares with the API.
 *
 !assistant/
+!billing_cycle.py
 assistant/data/
 assistant/eval/results/
 **/__pycache__/

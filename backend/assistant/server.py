@@ -48,7 +48,7 @@ from .karma_client import KarmaClient, KarmaError
 from .providers.base import Callbacks
 from .policy import Policy
 from .registry import resolve
-from .store import Store, Stored, Transcript, account_of, owner_key
+from .store import Store, Stored, Transcript, account_of, for_user, owner_key
 
 KARMA_API = os.environ.get("KARMA_API", "http://localhost:5000")
 CORS_ORIGINS = os.environ.get("ASSISTANT_CORS_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
@@ -201,6 +201,20 @@ def _deny_pending(live: Live):
         p.event.set()
 
 
+def _access_json(access) -> dict:
+    """What the apps get about access: never a dollar amount, only the share of the
+    allowance used and when it resets."""
+    return {
+        "allowed": access.allowed,
+        "code": access.code,
+        "reason": access.reason,
+        "allowance": None if access.used_pct is None else {
+            "used_pct": access.used_pct,
+            "resets_on": access.resets_on.isoformat(),
+        },
+    }
+
+
 # --------------------------------------------------------------------------- endpoints
 
 async def health(_request: Request):
@@ -216,7 +230,7 @@ async def get_access(request: Request):
         return got
     live, _client = got
     access = await asyncio.to_thread(policy().check, live.me)
-    return JSONResponse({"allowed": access.allowed, "code": access.code, "reason": access.reason})
+    return JSONResponse(_access_json(access))
 
 
 async def get_conversation(request: Request):
@@ -231,9 +245,9 @@ async def get_conversation(request: Request):
     return JSONResponse({
         "model": _model_info(model_id),
         # the apps show `reason` instead of letting the user type into a dead end
-        "access": {"allowed": access.allowed, "code": access.code, "reason": access.reason},
+        "access": _access_json(access),
         "busy": live.busy.locked(),
-        "items": stored.transcript if stored else [],
+        "items": for_user(stored.transcript) if stored else [],
         "updated_at": stored.updated_at if stored else None,
     })
 
@@ -306,7 +320,8 @@ async def post_message(request: Request):
                            on_chart=lambda spec: emit({"type": "chart", "spec": spec}))
             r = convo.ask(text, cb, voice=voice)
             _record_usage(live, convo, "ok", voice, r)
-            emit({"type": "done", "text": r.text, "stop_reason": r.stop_reason, "cost_usd": round(r.cost_usd, 4),
+            emit({"type": "done", "text": r.text, "stop_reason": r.stop_reason,
+                  "allowance": _access_json(policy().check(live.me))["allowance"],
                   "seconds": round(r.seconds, 1), "model_calls": r.model_calls, "tool_calls": len(r.tool_calls),
                   "timing": {k: r.timing.get(k) for k in ("model_s", "tools_s", "first_text_s")}})
             print(f"[assistant] {r.seconds:.1f}s · model {r.timing.get('model_s')}s in {r.model_calls} calls · "

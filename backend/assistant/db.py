@@ -1,8 +1,8 @@
 """The assistant's tables, in Karma's Postgres (SQLite for tests and quick local runs).
 
 The schema is owned by the API's Alembic migrations (models/common.py,
-migration a7e4c2b9d1f3); these Core definitions mirror it so the service does
-not import the API's models and their dependencies. Keep the two in step.
+migrations a7e4c2b9d1f3 and b3d9e1f4a2c7); these Core definitions mirror it so the
+service does not import the API's models and their dependencies. Keep the two in step.
 
     ASSISTANT_DATABASE_URL   postgresql://user:pass@host:5432/db   (production)
                              unset -> SQLite at ASSISTANT_DB or assistant/data/
@@ -87,8 +87,18 @@ account_setting = Table(
     "assistant_account_setting", metadata,
     Column("account_uuid", String(36), primary_key=True),
     Column("enabled", Boolean, nullable=True),
-    Column("monthly_budget_usd", Float, nullable=True),
+    Column("plan_price_usd", Float, nullable=True),
+    Column("margin_pct", Float, nullable=True),
+    Column("user_messages_per_hour", Integer, nullable=True),
     Column("updated_at", DateTime, nullable=False),
+)
+
+# Read-only here: the billing anchor, which is when a company's allowance resets.
+account = Table(
+    "account", metadata,
+    Column("uuid", String(36), primary_key=True),
+    Column("created_at", DateTime, nullable=False),
+    Column("verified_at", DateTime, nullable=True),
 )
 
 
