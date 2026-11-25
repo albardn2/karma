@@ -2823,3 +2823,22 @@ class AssistantAccountSetting(Base):
     margin_pct = Column(Float, nullable=True)       # 0 <= margin < 100
     user_messages_per_hour = Column(Integer, nullable=True)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AssistantPlanChange(Base):
+    """Append-only history of the assistant plan settings, so a past billing month
+    is priced with the plan in effect when it began. A NULL account_uuid records
+    the platform defaults; otherwise the row holds that company's own values
+    (NULL fields = follow the platform), exactly as saved."""
+    __tablename__ = 'assistant_plan_change'
+    __table_args__ = (
+        Index('ix_assistant_plan_change_account_effective', 'account_uuid', 'effective_at'),
+    )
+
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_uuid = Column(String(36), ForeignKey('account.uuid'), nullable=True)
+    enabled = Column(Boolean, nullable=True)
+    plan_price_usd = Column(Float, nullable=True)
+    margin_pct = Column(Float, nullable=True)
+    effective_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_by_uuid = Column(String(36), ForeignKey('user.uuid'), nullable=True)

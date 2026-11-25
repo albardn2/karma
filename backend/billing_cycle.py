@@ -61,3 +61,11 @@ def billing_anchor_of(verified_at: Optional[datetime], created_at: datetime) -> 
     """The day a company's billing grid starts: the day it was verified, or, for an
     account that predates verification, the day it was created."""
     return (verified_at or created_at).date()
+
+
+def recent_periods(anchor: date, today: date, count: int) -> list[tuple[date, date]]:
+    """Up to `count` periods ending with the current one, oldest first, never before the anchor."""
+    start, _ = current_period(anchor, today)
+    current = (start.year - anchor.year) * 12 + start.month - anchor.month
+    first = max(0, current - count + 1)
+    return [(add_months(anchor, n), add_months(anchor, n + 1)) for n in range(first, current + 1)]

@@ -1,5 +1,9 @@
 """Assistant plans: a per-company price and margin replace the raw monthly budget,
-and a company may override the platform's questions-per-hour limit.
+a company may override the platform's questions-per-hour limit, and every plan
+change is kept so past billing months can be priced.
+
+The plan history starts with a snapshot of today's settings; months before it are
+priced with that snapshot and marked as estimated.
 
 Existing budgets carry over as a price with a 0% margin, so every company keeps
 exactly the model-cost cap it had. Plans are not invoiced until an owner turns
@@ -47,6 +51,20 @@ def _plan_to_budget(value: dict) -> dict:
     return value
 
 
+def _snapshot_current_plans():
+    """The first history rows: the platform defaults (if saved) and every company's own values."""
+    bind = op.get_bind()
+    bind.execute(sa.text(
+        "INSERT INTO assistant_plan_change (uuid, account_uuid, enabled, plan_price_usd, margin_pct, effective_at) "
+        "SELECT gen_random_uuid()::text, NULL, (value->>'enabled_by_default')::boolean, "
+        "(value->>'plan_price_usd')::float, (value->>'margin_pct')::float, now() "
+        "FROM platform_setting WHERE key = :k AND value IS NOT NULL"), {"k": SETTING_KEY})
+    bind.execute(sa.text(
+        "INSERT INTO assistant_plan_change (uuid, account_uuid, enabled, plan_price_usd, margin_pct, effective_at) "
+        "SELECT gen_random_uuid()::text, account_uuid, enabled, plan_price_usd, margin_pct, now() "
+        "FROM assistant_account_setting"))
+
+
 def upgrade():
     op.add_column("assistant_account_setting", sa.Column("plan_price_usd", sa.Float(), nullable=True))
     op.add_column("assistant_account_setting", sa.Column("margin_pct", sa.Float(), nullable=True))
@@ -57,8 +75,24 @@ def upgrade():
     op.drop_column("assistant_account_setting", "monthly_budget_usd")
     _rewrite_platform(_budget_to_plan)
 
+    op.create_table(
+        "assistant_plan_change",
+        sa.Column("uuid", sa.String(36), primary_key=True),
+        sa.Column("account_uuid", sa.String(36), sa.ForeignKey("account.uuid"), nullable=True),
+        sa.Column("enabled", sa.Boolean(), nullable=True),
+        sa.Column("plan_price_usd", sa.Float(), nullable=True),
+        sa.Column("margin_pct", sa.Float(), nullable=True),
+        sa.Column("effective_at", sa.DateTime(), nullable=False),
+        sa.Column("created_by_uuid", sa.String(36), sa.ForeignKey("user.uuid"), nullable=True),
+    )
+    op.create_index("ix_assistant_plan_change_account_effective", "assistant_plan_change",
+                    ["account_uuid", "effective_at"])
+    _snapshot_current_plans()
+
 
 def downgrade():
+    op.drop_index("ix_assistant_plan_change_account_effective", table_name="assistant_plan_change")
+    op.drop_table("assistant_plan_change")
     op.add_column("assistant_account_setting", sa.Column("monthly_budget_usd", sa.Float(), nullable=True))
     op.execute("UPDATE assistant_account_setting "
                "SET monthly_budget_usd = plan_price_usd * (1 - COALESCE(margin_pct, 0) / 100) "

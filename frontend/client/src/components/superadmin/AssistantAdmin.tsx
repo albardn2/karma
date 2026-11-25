@@ -4,6 +4,7 @@ import { Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +17,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 const SETTINGS_URL = "/super-admin/settings/assistant";
 const ACCOUNTS_URL = "/super-admin/assistant/accounts";
 const ACTIONS_URL = "/super-admin/assistant/actions?per_page=50";
+const HISTORY_URL = "/super-admin/assistant/history?months=12";
 
 interface PlatformSettings {
   model_id: string;
@@ -63,6 +65,37 @@ interface Totals {
   profit_pct: number | null;
 }
 
+interface BillingMonth {
+  period_start: string;
+  period_end: string;
+  in_progress: boolean;
+  estimated: boolean;
+  questions: number;
+  cost_usd: number;
+  budget_usd: number | null;
+  margin_pct: number;
+  cost_cap_usd: number | null;
+  hit_cap: boolean;
+  profit_usd: number | null;
+  profit_pct: number | null;
+}
+
+interface PlatformMonth {
+  month: string;
+  questions: number;
+  cost_usd: number;
+  budget_usd: number;
+  profit_usd: number;
+  profit_pct: number | null;
+  companies_at_cap: number;
+  estimated: boolean;
+}
+
+interface History {
+  companies: { account_uuid: string; company_name: string; months: BillingMonth[] }[];
+  platform: PlatformMonth[];
+}
+
 interface ActionRow {
   uuid: string;
   created_at: string;
@@ -98,6 +131,7 @@ export function AssistantAdmin() {
       <p className="text-sm text-gray-600">{t("assistantAdmin.intro")}</p>
       <PlatformCard />
       <CompaniesCard />
+      <MonthlyCard />
       <ActionsCard />
     </div>
   );
@@ -148,6 +182,7 @@ function PlatformCard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [SETTINGS_URL] });
       queryClient.invalidateQueries({ queryKey: [ACCOUNTS_URL] });
+      queryClient.invalidateQueries({ queryKey: [HISTORY_URL] });
       toast({ title: t("common.success"), description: t("assistantAdmin.saved") });
     },
     onError: (e: any) =>
@@ -278,7 +313,11 @@ function CompaniesCard() {
     queryKey: [ACCOUNTS_URL],
     queryFn: () => apiRequest(ACCOUNTS_URL),
   });
-  const settings = queryClient.getQueryData<{ settings: PlatformSettings }>([SETTINGS_URL])?.settings;
+  // same query as the platform card: shares its cache, and re-renders once it loads
+  const settings = useQuery<{ settings: PlatformSettings }>({
+    queryKey: [SETTINGS_URL],
+    queryFn: () => apiRequest(SETTINGS_URL),
+  }).data?.settings;
 
   return (
     <Card>
@@ -354,6 +393,7 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ACCOUNTS_URL] });
+      queryClient.invalidateQueries({ queryKey: [HISTORY_URL] });
       toast({ title: t("common.success"), description: t("assistantAdmin.companySaved", { company: row.company_name }) });
     },
     onError: (e: any) =>
@@ -370,7 +410,7 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
   return (
     <TableRow>
       <TableCell className="font-medium">
-        {row.company_name}
+        <CompanyHistory accountUuid={row.account_uuid} companyName={row.company_name} />
         {row.effective_enabled ? null : (
           <Badge variant="secondary" className="ms-2">
             {t("assistantAdmin.off")}
@@ -454,6 +494,148 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
         </Button>
       </TableCell>
     </TableRow>
+  );
+}
+
+const monthLabel = (ym: string) =>
+  new Date(ym + "-01T00:00:00").toLocaleDateString(undefined, { month: "short", year: "numeric" });
+
+function useHistory() {
+  return useQuery<History>({ queryKey: [HISTORY_URL], queryFn: () => apiRequest(HISTORY_URL) });
+}
+
+/** Profit in $ and %, or a dash for a month that earned nothing. */
+function ProfitCell({ profit, pctValue }: { profit: number | null; pctValue: number | null }) {
+  if (profit == null) return <>—</>;
+  return (
+    <span className={profit < 0 ? "text-red-600" : undefined}>
+      {money(profit)} ({pct(pctValue)})
+    </span>
+  );
+}
+
+/** All companies together, by the calendar month each billing month begins in. */
+function MonthlyCard() {
+  const { t } = useLanguage();
+  const { data } = useHistory();
+  const months = (data?.platform ?? []).filter((m) => m.questions > 0 || m.budget_usd > 0).reverse();
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("assistantAdmin.monthlyTitle")}</CardTitle>
+        <CardDescription>{t("assistantAdmin.monthlyDesc")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {months.length === 0 ? (
+          <p className="text-sm text-gray-500">{t("assistantAdmin.noHistory")}</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("assistantAdmin.month")}</TableHead>
+                <TableHead>{t("assistantAdmin.questions")}</TableHead>
+                <TableHead>{t("assistantAdmin.budgets")}</TableHead>
+                <TableHead>{t("assistantAdmin.modelCost")}</TableHead>
+                <TableHead>{t("assistantAdmin.profitCol")}</TableHead>
+                <TableHead>{t("assistantAdmin.atCap")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {months.map((m) => (
+                <TableRow key={m.month}>
+                  <TableCell className="whitespace-nowrap">
+                    {monthLabel(m.month)}
+                    {m.estimated && " *"}
+                  </TableCell>
+                  <TableCell>{m.questions}</TableCell>
+                  <TableCell>${usd(m.budget_usd)}</TableCell>
+                  <TableCell>${usd(m.cost_usd)}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <ProfitCell profit={m.budget_usd > 0 ? m.profit_usd : null} pctValue={m.profit_pct} />
+                  </TableCell>
+                  <TableCell>{m.companies_at_cap}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {months.some((m) => m.estimated) && (
+          <p className="mt-3 text-xs text-gray-500">{t("assistantAdmin.estimatedNote")}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** The company's name, opening its billing months when clicked. */
+function CompanyHistory({ accountUuid, companyName }: { accountUuid: string; companyName: string }) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const { data } = useHistory();
+  const months = [...(data?.companies.find((c) => c.account_uuid === accountUuid)?.months ?? [])].reverse();
+
+  return (
+    <>
+      <button
+        type="button"
+        className="text-start font-medium text-primary underline-offset-2 hover:underline"
+        onClick={() => setOpen(true)}
+        data-testid={`assistant-history-${accountUuid}`}
+      >
+        {companyName}
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{companyName}</DialogTitle>
+            <DialogDescription>{t("assistantAdmin.companyHistoryDesc")}</DialogDescription>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("assistantAdmin.billingMonth")}</TableHead>
+                <TableHead>{t("assistantAdmin.questions")}</TableHead>
+                <TableHead>{t("assistantAdmin.budgetCol")}</TableHead>
+                <TableHead>{t("assistantAdmin.modelCost")}</TableHead>
+                <TableHead>{t("assistantAdmin.profitCol")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {months.map((m) => (
+                <TableRow key={m.period_start}>
+                  <TableCell className="whitespace-nowrap">
+                    {shortDate(m.period_start)} – {shortDate(m.period_end)}
+                    {m.estimated && " *"}
+                    {m.in_progress && (
+                      <Badge variant="secondary" className="ms-2">
+                        {t("assistantAdmin.inProgress")}
+                      </Badge>
+                    )}
+                    {m.hit_cap && (
+                      <Badge variant="destructive" className="ms-2">
+                        {t("assistantAdmin.hitCap")}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>{m.questions}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {m.budget_usd == null ? "—" : `$${usd(m.budget_usd)} · ${m.margin_pct}%`}
+                  </TableCell>
+                  <TableCell>${usd(m.cost_usd)}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <ProfitCell profit={m.profit_usd} pctValue={m.profit_pct} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {months.some((m) => m.estimated) && (
+            <p className="text-xs text-gray-500">{t("assistantAdmin.estimatedNote")}</p>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

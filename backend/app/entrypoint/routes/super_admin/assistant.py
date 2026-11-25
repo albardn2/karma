@@ -10,10 +10,12 @@ from datetime import datetime
 from typing import Optional
 
 from flask import jsonify, request
+from flask_jwt_extended import get_jwt_identity
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.adapters.unit_of_work.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from app.domains.assistant_plan import domain as assistant_plan
+from app.domains.assistant_plan import history
 from app.domains.billing import domain as billing
 from app.dto.auth import PermissionScope
 from app.entrypoint.routes.common.auth import scopes_required
@@ -30,6 +32,8 @@ from models.common import (
 )
 
 SUPER = PermissionScope.SUPER_ADMIN.value
+HISTORY_MONTHS_DEFAULT = 12
+HISTORY_MONTHS_MAX = 36
 
 
 def _models() -> list:
@@ -91,6 +95,7 @@ def set_assistant_settings():
             row.value = payload.model_dump()
         else:
             uow.session.add(PlatformSetting(key=assistant_plan.SETTING_KEY, value=payload.model_dump()))
+        history.record_change(uow, None, payload.model_dump(), created_by_uuid=get_jwt_identity())
         uow.session.flush()
         result = _settings_response(uow)
         uow.commit()
@@ -99,13 +104,6 @@ def set_assistant_settings():
 
 def _round(value: Optional[float]) -> Optional[float]:
     return None if value is None else round(value, 4)
-
-
-def _profit_pct(revenue: Optional[float], profit: Optional[float]) -> Optional[float]:
-    """Profit as a share of what the plan earns; None when it earns nothing."""
-    if not revenue or profit is None:
-        return None
-    return round(profit / revenue * 100, 1)
 
 
 def _account_row(uow, platform: dict, account: AccountModel, own: Optional[AssistantAccountSetting],
@@ -137,7 +135,7 @@ def _account_row(uow, platform: dict, account: AccountModel, own: Optional[Assis
         # what the plan earns this period, and what is left once the model is paid
         "revenue_usd": revenue,
         "profit_usd": _round(profit),
-        "profit_pct": _profit_pct(revenue, profit),
+        "profit_pct": history.profit_pct(revenue, profit),
     }
 
 
@@ -159,7 +157,7 @@ def _totals(rows: list) -> dict:
         "cost_usd": round(cost, 4),
         "revenue_usd": round(revenue, 2),
         "profit_usd": round(revenue - cost, 4),
-        "profit_pct": _profit_pct(revenue, revenue - cost),
+        "profit_pct": history.profit_pct(revenue, revenue - cost),
     }
 
 
@@ -188,9 +186,33 @@ def set_account_assistant(account_uuid):
         row.margin_pct = payload.margin_pct
         row.user_messages_per_hour = payload.user_messages_per_hour
         row.updated_at = datetime.utcnow()
+        history.record_change(uow, account_uuid, payload.model_dump(), created_by_uuid=get_jwt_identity())
         uow.session.flush()
         result = _account_rows(uow, [account_uuid])[0]
         uow.commit()
+    return jsonify(result), 200
+
+
+@super_admin_blueprint.route("/assistant/history", methods=["GET"])
+@scopes_required(SUPER)
+def assistant_history():
+    """Each company's cost and profit for its last `months` billing months, and the
+    platform's totals by calendar month."""
+    months = min(max(int(request.args.get("months", HISTORY_MONTHS_DEFAULT)), 1), HISTORY_MONTHS_MAX)
+    with SqlAlchemyUnitOfWork(account_uuid=None) as uow:
+        accounts = (uow.session.query(AccountModel).filter(AccountModel.is_deleted.is_(False))
+                    .order_by(AccountModel.company_name).all())
+        by_company = history.company_months(
+            uow, assistant_plan.platform_settings(uow), accounts,
+            {a.uuid: billing.billing_anchor(a) for a in accounts}, billing.damascus_today(), months)
+        result = {
+            "companies": [{
+                "account_uuid": a.uuid,
+                "company_name": a.company_name,
+                "months": [m.to_json() for m in by_company[a.uuid]],
+            } for a in accounts],
+            "platform": history.platform_months(by_company),
+        }
     return jsonify(result), 200
 
 
