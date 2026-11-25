@@ -51,12 +51,14 @@ interface AccountRow {
   used_pct: number | null;
   revenue_usd: number | null;
   profit_usd: number | null;
+  profit_pct: number | null;
 }
 
 interface Totals {
   cost_usd: number;
   revenue_usd: number;
   profit_usd: number;
+  profit_pct: number | null;
 }
 
 interface ActionRow {
@@ -75,6 +77,7 @@ interface ActionRow {
 
 const usd = (n: number | null | undefined) => (n == null ? "" : `${n < 1 && n > 0 ? n.toFixed(4) : n.toFixed(2)}`);
 const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
+const pct = (n: number | null | undefined) => (n == null ? "—" : `${n}%`);
 const text = (n: number | null | undefined) => (n == null ? "" : String(n));
 const shortDate = (iso: string) =>
   new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -278,6 +281,7 @@ function CompaniesCard() {
             revenue: usd(data?.totals.revenue_usd ?? 0),
             cost: usd(data?.totals.cost_usd ?? 0),
             profit: usd(data?.totals.profit_usd ?? 0),
+            pct: pct(data?.totals.profit_pct),
           })}
         </CardDescription>
       </CardHeader>
@@ -409,7 +413,7 @@ function CompanyRow({ row, platform }: { row: AccountRow; platform?: PlatformSet
           "—"
         ) : (
           <span className={row.profit_usd < 0 ? "text-red-600" : "text-gray-700"}>
-            ${usd(row.profit_usd)}
+            ${usd(row.profit_usd)} ({pct(row.profit_pct)})
             <span className="text-gray-500"> / ${usd(row.revenue_usd)}</span>
           </span>
         )}

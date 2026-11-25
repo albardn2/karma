@@ -100,6 +100,13 @@ def _round(value: Optional[float]) -> Optional[float]:
     return None if value is None else round(value, 4)
 
 
+def _profit_pct(revenue: Optional[float], profit: Optional[float]) -> Optional[float]:
+    """Profit as a share of what the plan earns; None when it earns nothing."""
+    if not revenue or profit is None:
+        return None
+    return round(profit / revenue * 100, 1)
+
+
 def _account_row(uow, platform: dict, account: AccountModel, own: Optional[AssistantAccountSetting],
                  today) -> dict:
     company = assistant_plan.plan_for(platform, own)
@@ -107,6 +114,7 @@ def _account_row(uow, platform: dict, account: AccountModel, own: Optional[Assis
     period_start, period_end = current_period(billing.billing_anchor(account), today)
     usage = assistant_plan.usage_since(uow, account.uuid, period_start)
     revenue = plan.price_usd if company.enabled else None
+    profit = None if revenue is None else revenue - usage.cost_usd
     return {
         "account_uuid": account.uuid,
         "company_name": account.company_name,
@@ -125,7 +133,8 @@ def _account_row(uow, platform: dict, account: AccountModel, own: Optional[Assis
         "used_pct": plan.used_pct(usage.cost_usd),
         # what the plan earns this period, and what is left once the model is paid
         "revenue_usd": revenue,
-        "profit_usd": None if revenue is None else _round(revenue - usage.cost_usd),
+        "profit_usd": _round(profit),
+        "profit_pct": _profit_pct(revenue, profit),
     }
 
 
@@ -147,6 +156,7 @@ def _totals(rows: list) -> dict:
         "cost_usd": round(cost, 4),
         "revenue_usd": round(revenue, 2),
         "profit_usd": round(revenue - cost, 4),
+        "profit_pct": _profit_pct(revenue, revenue - cost),
     }
 
 
