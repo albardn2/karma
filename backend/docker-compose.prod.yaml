@@ -118,7 +118,11 @@ services:
       # alembic. Nothing in the database could previously self-heal: a stuck
       # query or a lock wait blocked a request forever, and an API request
       # that has run for 30s has already lost the user.
-      PG_SESSION_OPTIONS: "-c statement_timeout=30000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=60000"
+      #
+      # jit=off: Postgres JIT-compiles any query its cost estimate calls big,
+      # and for this API's dashboard aggregates the compile alone measured
+      # 6.4s of an 18s query. Request queries are too short to win it back.
+      PG_SESSION_OPTIONS: "-c statement_timeout=30000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=60000 -c jit=off"
       # Abort a worker whose request has wedged. Under gthread gunicorn's
       # --timeout only notices a dead WORKER, not a stuck request, so a pure
       # CPU loop would hold its thread forever. 120s sits above the slowest

@@ -13,6 +13,7 @@ from app.domains.customer.tag_funnels import (
     build_payload as build_tag_funnels,
     resolve_period_params,
 )
+from app.domains.customer_order.amounts import order_amounts
 from app.domains.exchange_rate.converter import CurrencyConverter
 from app.dto.auth import PermissionScope
 from app.dto.trip import TripStatus
@@ -146,8 +147,7 @@ def overview():
 
         # ---- money metrics from orders created in the window ----
         # per-currency maps kept as-is (existing consumers read them); converted
-        # totals/series added alongside. amount_due needs the hybrid props, so
-        # iterate the window's orders (dashboard windows are bounded).
+        # totals/series added alongside.
         revenue_total: dict = defaultdict(float)
         debt_total: dict = defaultdict(float)
         revenue_by_day: dict = defaultdict(lambda: defaultdict(float))
@@ -156,14 +156,13 @@ def overview():
         debt_conv_total = 0.0
         revenue_conv_by_day: dict = defaultdict(float)
         orders_count = 0
-        window_orders = (
-            s.query(CustomerOrderModel)
-            .filter(
+        window_orders = order_amounts(
+            s,
+            s.query(CustomerOrderModel).filter(
                 CustomerOrderModel.is_deleted.is_(False),
                 CustomerOrderModel.created_at >= start,
                 CustomerOrderModel.account_uuid == uow.account_uuid,
-            )
-            .all()
+            ),
         )
         for o in window_orders:
             cur = o.currency or "?"
@@ -427,14 +426,13 @@ def profitability():
             return k if k in starts else None
 
         # ---- revenue: order total at order created_at ----
-        for o in (
-            s.query(CustomerOrderModel)
-            .filter(
+        for o in order_amounts(
+            s,
+            s.query(CustomerOrderModel).filter(
                 CustomerOrderModel.is_deleted.is_(False),
                 CustomerOrderModel.created_at >= start,
                 CustomerOrderModel.account_uuid == uow.account_uuid,
-            )
-            .all()
+            ),
         ):
             k = bucket(o.created_at)
             if not k:
@@ -675,7 +673,8 @@ def vehicle_profitability():
             return k if k in starts else None
 
         # ---- revenue: orders made on this vehicle's trips ----
-        for o in (
+        for o in order_amounts(
+            s,
             s.query(CustomerOrderModel)
             .join(TripStopModel, TripStopModel.uuid == CustomerOrderModel.trip_stop_uuid)
             .join(TripModel, TripModel.uuid == TripStopModel.trip_uuid)
@@ -684,8 +683,7 @@ def vehicle_profitability():
                 CustomerOrderModel.created_at >= start,
                 CustomerOrderModel.account_uuid == uow.account_uuid,
                 TripModel.vehicle_uuid == vehicle_uuid,
-            )
-            .all()
+            ),
         ):
             k = bucket(o.created_at)
             if not k:
@@ -872,7 +870,7 @@ def _revenue_over_time_result(created_by_uuid=None):
         )
         if created_by_uuid:
             q = q.filter(CustomerOrderModel.created_by_uuid == created_by_uuid)
-        for o in q.all():
+        for o in order_amounts(s, q):
             k = bucket(o.created_at)
             if not k:
                 continue
