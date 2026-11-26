@@ -1,0 +1,86 @@
+# A prod-shaped copy of the API for load tests: its own database and its own
+# API, built from backend/Dockerfile with the prod gunicorn command, sharing two
+# CPUs and about 2 GB the way they share the prod droplet. Locust gets the other
+# CPUs so generating load does not steal from what is being measured.
+#
+# Nothing here touches the local dev stack (docker-compose.local.yml): separate
+# project name, volume, network and ports. See loadtest/README.md.
+name: karma-loadtest
+
+x-sut-cpus: &sut-cpus "0,1"
+
+services:
+  db:
+    image: postgis/postgis:13-3.1-alpine
+    cpuset: *sut-cpus
+    mem_limit: 1200m
+    environment:
+      POSTGRES_USER: local
+      POSTGRES_PASSWORD: local
+      POSTGRES_DB: backend
+    # Same settings as backend/docker-compose.prod.yaml.
+    command: >
+      postgres
+      -c listen_addresses='*'
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c log_min_duration_statement=500
+      -c log_lock_waits=on
+      -c log_checkpoints=on
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "local", "-d", "backend"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./seed.sql:/seed.sql:ro
+
+  migrate:
+    build: ../backend
+    image: karma-backend:loadtest
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["sh", "-c", "python scripts/wait_for_db.py && alembic upgrade head"]
+    environment:
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+
+  web:
+    image: karma-backend:loadtest
+    cpuset: *sut-cpus
+    mem_limit: 750m
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      SQLALCHEMY_DATABASE_URI: "postgresql://local:local@db:5432/backend"
+      PG_SESSION_OPTIONS: "-c statement_timeout=30000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=60000 -c jit=off"
+      REQUEST_WATCHDOG_SECONDS: "120"
+      JWT_SECRET_KEY: "loadtest-only-not-a-secret"
+      KARMA_ENV: loadtest
+    ports:
+      - "127.0.0.1:5100:5000"
+
+  locust:
+    image: locustio/locust:2.32.4
+    cpuset: "2,3"
+    profiles: ["run"]
+    depends_on:
+      - web
+    working_dir: /mnt/loadtest
+    volumes:
+      - ./:/mnt/loadtest
+    environment:
+      LT_COMPANIES: ${LT_COMPANIES:-100}
+      LT_USERS: ${LT_USERS:-100}
+      LT_PASSWORD: ${LT_PASSWORD:?set by run.sh}
+    command: >
+      -f locustfile.py --host http://web:5000 --headless
+      -u ${LT_CONCURRENT:-1000} -r ${LT_SPAWN_RATE:-10} -t ${LT_DURATION:-10m}
+      --csv results/${LT_RUN:-run} --html results/${LT_RUN:-run}.html --only-summary
+
+volumes:
+  pgdata:
